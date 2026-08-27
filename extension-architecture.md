@@ -474,8 +474,8 @@ ZIP и SHA-256 через `scripts/build-release.ps1`, затем публику
 с автоматически сформированными notes.
 
 Popup при открытии запрашивает только `releases/latest` репозитория
-`Phuoctonge/DashBridge`; успешный результат кэшируется в `storage.local` на 12
-часов. Draft/prerelease, неожиданный тег, GitHub URL или имя ZIP отклоняются.
+`Phuoctonge/DashBridge`; успешный результат кэшируется в `storage.local` на один
+час. Draft/prerelease, неожиданный тег, GitHub URL или имя ZIP отклоняются.
 При более новой версии показывается ссылка на ZIP. Автоматической установки нет:
 для unpacked extension пользователь вручную заменяет файлы и нажимает
 **Обновить** на странице расширений браузера.

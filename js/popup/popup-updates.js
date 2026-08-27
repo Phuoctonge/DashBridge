@@ -3,7 +3,7 @@
 
     const API_URL = 'https://api.github.com/repos/Phuoctonge/DashBridge/releases/latest';
     const CACHE_KEY = 'dashbridgeUpdateCheck';
-    const CACHE_TTL_MS = 12 * 60 * 60 * 1000;
+    const CACHE_TTL_MS = 60 * 60 * 1000;
     const REQUEST_TIMEOUT_MS = 6000;
 
     function showUpdateNotice(release) {

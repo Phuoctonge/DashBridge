@@ -17,7 +17,7 @@ assert(html.indexOf('js/shared/update-check.js') < html.indexOf('js/popup/popup-
     'trusted metadata parser must load before the popup update controller');
 assert(/\.update-notice\[hidden\]\s*\{[^}]*display:\s*none/s.test(css),
     'the notice must not reserve popup space when no update exists');
-assert(source.includes('12 * 60 * 60 * 1000')
+assert(source.includes('60 * 60 * 1000')
     && source.includes("cache: 'no-store'")
     && source.includes('AbortController'),
     'GitHub checks must be cached locally and have a bounded network lifetime');
