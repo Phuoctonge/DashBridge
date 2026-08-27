@@ -444,8 +444,8 @@ node test/run-js-tests.js
 node test/run-python-smoke-tests.js
 ```
 
-На 2026-08-27: 88 JavaScript behavior-файлов и 41 исполняемый Python
-smoke/security/audit-файл. Все 74 production JavaScript-файла проходят
+На 2026-08-28: 92 JavaScript behavior-файла и 41 исполняемый Python
+smoke/security/audit-файл. Все 76 production JavaScript-файла проходят
 `node --check`.
 `DASHBRIDGE_PYTHON` задаёт Python, если он не находится автоматически.
 
@@ -465,6 +465,20 @@ smoke/security/audit-файл. Все 74 production JavaScript-файла про
 
 Практическая матрица влияния изменений и checklist ревью находятся в
 `docs/development-guide.md`.
+
+## Выпуски и уведомления об обновлениях
+
+Push тега `vX.Y.Z` запускает `.github/workflows/release.yml`. Workflow выполняет
+полный набор тестов, требует совпадения тега с версией `manifest.json`, собирает
+ZIP и SHA-256 через `scripts/build-release.ps1`, затем публикует GitHub Release
+с автоматически сформированными notes.
+
+Popup при открытии запрашивает только `releases/latest` репозитория
+`Phuoctonge/DashBridge`; успешный результат кэшируется в `storage.local` на 12
+часов. Draft/prerelease, неожиданный тег, GitHub URL или имя ZIP отклоняются.
+При более новой версии показывается ссылка на ZIP. Автоматической установки нет:
+для unpacked extension пользователь вручную заменяет файлы и нажимает
+**Обновить** на странице расширений браузера.
 
 ## Куда добавлять функцию
 

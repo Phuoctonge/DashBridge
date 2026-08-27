@@ -1,6 +1,6 @@
 # DashBridge: ориентир для дальнейшей разработки
 
-> Проверено по исходному коду и тестам 2026-08-27. Архитектурный источник
+> Проверено по исходному коду и тестам 2026-08-28. Архитектурный источник
 > истины — [`extension-architecture.md`](../extension-architecture.md), карта
 > разрешений — [`permission-map.md`](permission-map.md), незавершённые
 > направления — [`plans/README.md`](../plans/README.md). История не описывает
@@ -13,7 +13,7 @@
 
 - 92 JavaScript behavior-файла;
 - 41 Python smoke/security/audit-файл;
-- `node --check` для всех 74 production JavaScript-файлов.
+- `node --check` для всех 76 production JavaScript-файлов.
 
 Автотесты хорошо фиксируют структурные и поведенческие контракты, но не
 заменяют живую проверку Chrome/Grafana: renderer, clipboard, capture,
@@ -138,9 +138,14 @@ foreach ($file in $files) { node --check $file }
 ```
 
 Push тега `vX.Y.Z` запускает `.github/workflows/release.yml`: полный набор
-тестов, сборку `DashBridge-X.Y.Z.zip` и публикацию GitHub Release. Popup читает
-только последний стабильный release репозитория `Phuoctonge/DashBridge` и
-принимает download URL лишь при полном совпадении тега, версии и имени архива.
+тестов, проверку совпадения тега с версией manifest, сборку
+`DashBridge-X.Y.Z.zip` и SHA-256, затем публикацию GitHub Release с
+автоматически сформированными release notes. При открытии popup проверяет
+`releases/latest` не чаще одного раза в 12 часов, игнорирует draft/prerelease и
+принимает download URL лишь при полном совпадении стабильного тега, версии,
+GitHub-путей и имени архива. Это уведомление об обновлении, а не автоматическая
+установка: ZIP скачивается по действию пользователя, после чего распакованное
+расширение нужно заменить и обновить в браузере вручную.
 
 ## Политика комментариев
 
