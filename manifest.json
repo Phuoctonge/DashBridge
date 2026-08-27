@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "DashBridge",
-    "version": "2.4.0",
+    "version": "2.4.1",
     "description": "Grafana-инструменты, Traffic Recorder с .dashflow record/replay, Jira Worklog и TDM-экспорт.",
     "permissions": [
         "storage",

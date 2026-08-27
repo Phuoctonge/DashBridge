@@ -134,7 +134,7 @@ foreach ($file in $files) { node --check $file }
 исключая тесты, документацию и локальные артефакты:
 
 ```powershell
-./scripts/build-release.ps1 -ExpectedTag 'v2.4.0'
+./scripts/build-release.ps1 -ExpectedTag 'v2.4.1'
 ```
 
 Push тега `vX.Y.Z` запускает `.github/workflows/release.yml`: полный набор

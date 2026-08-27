@@ -7,7 +7,7 @@ const manifest = JSON.parse(fs.readFileSync('manifest.json', 'utf8'));
 const workflow = fs.readFileSync('.github/workflows/release.yml', 'utf8');
 const builder = fs.readFileSync('scripts/build-release.ps1', 'utf8');
 
-assert.strictEqual(manifest.version, '2.4.0');
+assert.strictEqual(manifest.version, '2.4.1');
 assert(workflow.includes("- 'v*'")
     && workflow.includes('node test/run-all-tests.js')
     && workflow.indexOf('node test/run-all-tests.js') < workflow.indexOf('gh release create'),
