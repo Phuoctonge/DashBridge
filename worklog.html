@@ -1,0 +1,95 @@
+﻿<!DOCTYPE html>
+<html lang="ru" data-ui-scale="auto">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jira Worklog Manager - DashBridge</title>
+    <link rel="stylesheet" href="css/theme.css">
+    <link rel="stylesheet" href="css/worklog.css">
+    <!-- theme.js в <head> — применяется до рендера body, исключает мигание темы (FOWT) -->
+    <script src="js/theme.js"></script>
+</head>
+
+<body>
+    <div class="header">
+        <div>
+            <div class="auth-check">
+                <div id="authDot" class="auth-dot"></div>
+                <span id="authText">Статус Jira: неизвестно</span>
+                <button id="checkAuth" class="btn btn-outline"
+                    style="font-size: 11px; padding: 2px 8px;">Проверить</button>
+            </div>
+            <h1><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round"
+                    style="width: 22px; height: 22px; vertical-align: middle; margin-right: 8px; color: var(--primary);">
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                </svg>Jira Worklog Manager</h1>
+            <div id="totalStats"
+                style="font-size: 14px; margin-top: 10px; color: var(--text-muted, #6b778c); display: flex; gap: 30px;">
+                <div>День: <span id="dayTotal" style="font-weight: 700; color: var(--primary);">0</span> ч.</div>
+                <div>Неделя: <span id="weekTotal"
+                        style="font-weight: 700; color: var(--color-success, #00875a);">0</span> ч.</div>
+            </div>
+        </div>
+        <div class="actions" style="display: flex; gap: 8px; align-items: center;">
+            <button id="sortToggle" class="btn"
+                style="background: #ebecf0; color: #42526e; display: inline-flex; align-items: center;"
+                title="Изменить порядок сортировки"><svg class="ic" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="m21 16-4 4-4-4" />
+                    <path d="M17 20V4" />
+                    <path d="m3 8 4-4 4 4" />
+                    <path d="M7 4v16" />
+                </svg> По убыванию</button>
+            <button id="clearSent" class="btn"
+                style="background: #ebecf0; color: #42526e; display: inline-flex; align-items: center;"><svg class="ic"
+                    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6l-1 14H6L5 6" />
+                    <path d="M10 11v6" />
+                    <path d="M14 11v6" />
+                    <path d="M9 6V4h6v2" />
+                </svg> Очистить отправленные</button>
+            <button id="addRow" class="btn btn-primary" style="display: inline-flex; align-items: center;"><svg
+                    class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                </svg> Добавить строку</button>
+            <button id="sendAll" class="btn btn-success" style="display: inline-flex; align-items: center;"><svg
+                    class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="m22 2-7 20-4-9-9-4Z" />
+                    <path d="M22 2 11 13" />
+                </svg> Отправить всё в Jira</button>
+        </div>
+    </div>
+
+    <div id="globalStatus"></div>
+
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th class="col-key">Issue Key</th>
+                    <th class="col-task">Название задачи</th>
+                    <th class="col-time">Time (h)</th>
+                    <th class="col-date">Start Date</th>
+                    <th class="col-desc">Description</th>
+                    <th class="col-status">Status</th>
+                    <th class="col-actions">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="logTableBody"></tbody>
+        </table>
+    </div>
+
+    <script src="js/shared/storage-writer.js"></script>
+    <script src="js/shared/local-state-schema.js"></script>
+    <script src="js/pages/worklog.js"></script>
+</body>
+
+</html>

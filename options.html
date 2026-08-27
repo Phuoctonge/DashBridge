@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="ru" data-ui-scale="auto">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Настройки DashBridge</title>
+    <link rel="stylesheet" href="css/theme.css">
+    <link rel="stylesheet" href="css/options.css">
+    <!-- theme.js в <head> — применяется до рендера body, исключает мигание темы (FOWT) -->
+    <script src="js/theme.js"></script>
+</head>
+
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1><svg class="ic ic-header" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3" />
+                    <path
+                        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg> Настройки DashBridge</h1>
+        </div>
+    </div>
+    <div class="container">
+        <div class="interface-section">
+            <h3 class="interface-section-title"><svg class="ic ic-primary" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path
+                        d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 14.7255 3.09032 17.1962 4.85857 19C4.94975 19.0912 5.0913 19.1467 5.23438 19.1467H7.3125C7.68367 19.1467 7.98438 18.846 7.98438 18.4748v-1.1219c0-.3712.3007-.6719.6719-.6719h1.1219c.3712 0 .6719.3007.6719.6719V19.988c0 .241.128.463.339.585.452.261.948.406 1.46.425.241.01.442.21.442.451v.551z" />
+                    <circle cx="7.5" cy="10.5" r="1.5" />
+                    <circle cx="11.5" cy="7.5" r="1.5" />
+                    <circle cx="16.5" cy="9.5" r="1.5" />
+                </svg> Интерфейс</h3>
+            <div class="form-group form-row">
+                <label for="settingRememberTab" class="form-label form-label-row">Запоминать
+                    последнюю открытую вкладку</label>
+                <label class="switch">
+                    <input type="checkbox" id="settingRememberTab">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="form-group form-row">
+                <label for="settingRememberSubTab" class="form-label form-label-row">Запоминать
+                    последнюю подвкладку Grafana</label>
+                <label class="switch">
+                    <input type="checkbox" id="settingRememberSubTab">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="form-group form-row interface-scale-row">
+                <div>
+                    <label for="settingUiScale" class="form-label form-label-row">Масштаб интерфейса</label>
+                    <p class="form-hint">Меняет поля, кнопки и текст расширения, не затрагивая размеры снимков.</p>
+                </div>
+                <select id="settingUiScale" class="form-input interface-scale-select">
+                    <option value="auto">Автоматически</option>
+                    <option value="90">90%</option>
+                    <option value="100">100%</option>
+                    <option value="110">110%</option>
+                    <option value="125">125%</option>
+                    <option value="150">150%</option>
+                </select>
+            </div>
+
+            <hr class="divider">
+            <h4 class="subsection-title">
+                <svg class="ic ic-primary-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                    <line x1="3" y1="9" x2="21" y2="9" />
+                    <line x1="9" y1="21" x2="9" y2="9" />
+                </svg>
+                <span>Активные модули (вкладки):</span>
+            </h4>
+
+            <!-- Модуль Grafana (Раскрывающийся) -->
+            <div class="collapsible-group">
+                <div class="collapsible-header">
+                    <div class="collapsible-header-title">
+                        <svg class="arrow-icon ic" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="9 18 15 12 9 6" />
+                        </svg>
+                        <span>Вкладка Grafana</span>
+                    </div>
+                    <label class="switch" data-stop-propagation>
+                        <input type="checkbox" id="settingModuleGrafana">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="collapsible-content">
+                    <div class="form-group form-row form-row-divider">
+                        <label for="settingModuleGrafanaLinks" class="form-label form-label-row-sm">Дашборды</label>
+                        <label class="switch">
+                            <input type="checkbox" id="settingModuleGrafanaLinks">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="form-group form-row form-row-divider">
+                        <label for="settingModuleGrafanaBatch" class="form-label form-label-row-sm">Массовый
+                            сбор</label>
+                        <label class="switch">
+                            <input type="checkbox" id="settingModuleGrafanaBatch">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="form-group form-row form-row-divider-last">
+                        <label for="settingModuleGrafanaDebug" class="form-label form-label-row-sm">Отладочная
+                            информация</label>
+                        <label class="switch">
+                            <input type="checkbox" id="settingModuleGrafanaDebug">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Вкладка Recorder -->
+            <div class="module-toggle">
+                <span class="module-toggle-label">Вкладка Recorder</span>
+                <label class="switch">
+                    <input type="checkbox" id="settingModuleRecorder">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <!-- Вкладка Jira -->
+            <div class="module-toggle">
+                <span class="module-toggle-label">Вкладка Jira</span>
+                <label class="switch">
+                    <input type="checkbox" id="settingModuleJira">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <!-- Вкладка TDM Export -->
+            <div class="module-toggle module-toggle-last">
+                <span class="module-toggle-label">Вкладка TDM Export</span>
+                <label class="switch">
+                    <input type="checkbox" id="settingModuleTdm">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <div class="section-card">
+            <h4 class="section-title-h4">
+                <svg class="ic ic-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="20" x2="18" y2="10" />
+                    <line x1="12" y1="20" x2="12" y2="4" />
+                    <line x1="6" y1="20" x2="6" y2="14" />
+                    <line x1="2" y1="20" x2="22" y2="20" />
+                </svg> Grafana
+            </h4>
+            <div class="options-subsection">
+                <h5 class="options-subsection-title">Подключение</h5>
+                <p class="section-description">Укажите домены корпоративных Grafana для встраивания в <strong>Единый дашборд Grafana</strong> и использования инструментов DashBridge на панелях.</p>
+                <textarea id="settingGrafanaIframeDomains" class="form-input form-input-mono"
+                    placeholder="grafanakns.mos.ru&#10;mon-dc.mos.ru"></textarea>
+                <div class="form-hint-italic">
+                    * По одному домену на строку (без http/https). Добавляйте только доверенные Grafana: для них разрешаются
+                    встраивание в iframe и инструменты DashBridge на панелях.
+                </div>
+                <div class="form-group form-group-last">
+                    <label class="form-label">Параметры для переноса между дашбордами:</label>
+                    <input type="text" id="settingGrafanaKeepParams" class="form-input" placeholder="from, to, var-project">
+                    <div class="form-hint">Через запятую. Например: from,
+                        to, var-project, var-station</div>
+                </div>
+            </div>
+            <div class="options-subsection">
+                <h5 class="options-subsection-title">Метрики и имена серверов</h5>
+                <div class="metric-settings-grid">
+                    <div class="metric-settings-group metric-settings-group-cpu">
+                        <h6 class="metric-settings-title">CPU</h6>
+                        <div class="form-group">
+                            <label class="form-label" for="settingGrafanaCpuPanelTitle">Название CPU-панели:</label>
+                            <input type="text" id="settingGrafanaCpuPanelTitle" class="form-input" placeholder="CPU Usage">
+                        </div>
+                        <div class="form-group form-group-last">
+                            <label class="form-label">Ключевое слово Idle для поиска и конвертации:</label>
+                            <input type="text" id="settingGrafanaKeyword" class="form-input" placeholder="idle">
+                        </div>
+                    </div>
+                    <div class="metric-settings-group metric-settings-group-ram">
+                        <h6 class="metric-settings-title">RAM</h6>
+                        <div class="form-group">
+                            <label class="form-label" for="settingGrafanaMemPanelTitle">Название RAM-панели:</label>
+                            <input type="text" id="settingGrafanaMemPanelTitle" class="form-input" placeholder="Memory">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="settingGrafanaMemCalcMode">Способ расчёта RAM (% Used):</label>
+                            <select id="settingGrafanaMemCalcMode" class="form-input">
+                                <option value="available">Total + Available</option>
+                                <option value="used">Total + Used</option>
+                            </select>
+                            <div id="settingGrafanaMemFormula" class="metric-formula"></div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="settingGrafanaMemTotalKeyword">Название серии Total:</label>
+                            <input type="text" id="settingGrafanaMemTotalKeyword" class="form-input" placeholder="Total">
+                        </div>
+                        <div class="form-group form-group-last">
+                            <label class="form-label" id="settingGrafanaMemSecondKeywordLabel"
+                                for="settingGrafanaMemAvailKeyword">Название серии Available:</label>
+                            <input type="text" id="settingGrafanaMemAvailKeyword" class="form-input" placeholder="Available">
+                        </div>
+                    </div>
+                    <div class="metric-settings-group metric-settings-group-load">
+                        <h6 class="metric-settings-title">Load Average</h6>
+                        <div class="form-group">
+                            <label class="form-label" for="settingGrafanaLoadPanelTitle">Название панели Load Average:</label>
+                            <input type="text" id="settingGrafanaLoadPanelTitle" class="form-input" placeholder="Load Average">
+                        </div>
+                        <div class="form-group form-group-last">
+                            <label class="form-label" for="settingGrafanaCpuCapacityCoefficient">Коэффициент порога по vCPU:</label>
+                            <input type="number" id="settingGrafanaCpuCapacityCoefficient" class="form-input"
+                                min="0.01" max="10" step="0.05" value="0.8">
+                            <div class="form-hint">Порог по умолчанию: количество vCPU × коэффициент</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="metric-settings-group metric-settings-group-servers">
+                    <h6 class="metric-settings-title">Имена серверов</h6>
+                    <div class="form-group form-group-last">
+                        <label class="form-label">Суффикс домена и порта для удаления:</label>
+                        <input type="text" id="settingGrafanaDomain" class="form-input" placeholder=".passport.local:9182">
+                        <div class="domain-trim-toggle">
+                            <label for="settingGrafanaTrimDomainEnabled">Удалять этот суффикс в названиях серий всех панелей Grafana</label>
+                            <label class="switch"><input type="checkbox" id="settingGrafanaTrimDomainEnabled"><span
+                                    class="slider"></span></label>
+                        </div>
+                        <div class="form-hint">При копировании результатов анализа суффикс удаляется всегда.</div>
+                    </div>
+                </div>
+                <div class="metric-settings-group metric-settings-group-capture">
+                    <h6 class="metric-settings-title">Компактный снимок</h6>
+                    <div class="row">
+                        <div class="form-group">
+                            <label class="form-label" for="settingGrafanaCompactExportWidth">Ширина (px):</label>
+                            <input type="number" id="settingGrafanaCompactExportWidth" class="form-input"
+                                min="100" max="4096" step="1" placeholder="1000">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="settingGrafanaCompactExportHeight">Высота (px):</label>
+                            <input type="number" id="settingGrafanaCompactExportHeight" class="form-input"
+                                min="100" max="4096" step="1" placeholder="520">
+                        </div>
+                    </div>
+                    <div class="form-hint">Используется для компактных снимков в Grafana, DashBridge и массовом сборе.</div>
+                </div>
+            </div>
+            <div class="options-subsection options-subsection-last">
+                <h5 class="options-subsection-title">Анализ CPU/RAM</h5>
+            <div class="row">
+                <div class="form-group">
+                    <label class="form-label">CPU Порог 🟨 (%):</label>
+                    <input type="number" id="settingCpuWarn" class="form-input" value="50">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">CPU Порог 🟥 (%):</label>
+                    <input type="number" id="settingCpuCrit" class="form-input" value="80">
+                </div>
+            </div>
+            <div class="row">
+                <div class="form-group">
+                    <label class="form-label">RAM Порог 🟨 (%):</label>
+                    <input type="number" id="settingMemWarn" class="form-input" value="80">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">RAM Порог 🟥 (%):</label>
+                    <input type="number" id="settingMemCrit" class="form-input" value="90">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Шаблон для "Весь список":</label>
+                <input type="text" id="settingCpuTemplateFull" class="form-input" placeholder="{server} до {cpu}%">
+                <div class="form-hint">Доступно: {server}, {cpu}</div>
+            </div>
+            <div class="form-group form-group-last">
+                <label class="form-label">Шаблон для "TOP-3":</label>
+                <textarea id="settingCpuTemplateTop3" class="form-input form-input-textarea"
+                    placeholder="до {cpu1}% для {server1}, до {cpu2}% для {server2}, для остальных до {cpu3}%"></textarea>
+                <div class="form-hint">Доступно: {server1..3},
+                    {cpu1..3}</div>
+            </div>
+            <hr class="divider">
+            <div class="form-group">
+                <label class="form-label">Шаблон RAM "Весь список":</label>
+                <input type="text" id="settingMemTemplateFull" class="form-input" placeholder="{server} до {mem}%">
+                <div class="form-hint">Доступно: {server}, {mem}</div>
+            </div>
+            <div class="form-group form-group-last">
+                <label class="form-label">Шаблон RAM "TOP-3":</label>
+                <textarea id="settingMemTemplateTop3" class="form-input form-input-textarea"
+                    placeholder="до {mem1}% для {server1}, до {mem2}% для {server2}, для остальных до {mem3}%"></textarea>
+                <div class="form-hint">Доступно: {server1..3},
+                    {mem1..3}</div>
+            </div>
+            </div>
+        </div>
+
+        <div class="section-card">
+            <h4 class="section-title-h4">
+                <svg class="ic ic-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                </svg> Jira
+            </h4>
+            <div class="form-group">
+                <label class="form-label">Базовый URL Jira:</label>
+                <input type="text" id="settingJiraUrl" class="form-input" placeholder="https://jira.lanit.ru">
+            </div>
+            <div class="form-group form-group-mt-mb-16">
+                <label class="form-label">Часовой пояс для списания времени:</label>
+                <select id="settingJiraTz" class="form-input">
+                    <option value="local">Локальный часовой пояс браузера</option>
+                    <option value="Europe/Moscow">Europe/Moscow (Москва, UTC+3)</option>
+                    <option value="Europe/Kaliningrad">Europe/Kaliningrad (Калининград, UTC+2)</option>
+                    <option value="Europe/Samara">Europe/Samara (Самара, UTC+4)</option>
+                    <option value="Asia/Yekaterinburg">Asia/Yekaterinburg (Екатеринбург, UTC+5)</option>
+                    <option value="Asia/Omsk">Asia/Omsk (Омск, UTC+6)</option>
+                    <option value="Asia/Novosibirsk">Asia/Novosibirsk (Новосибирск, UTC+7)</option>
+                    <option value="Asia/Krasnoyarsk">Asia/Krasnoyarsk (Красноярск, UTC+7)</option>
+                    <option value="Asia/Irkutsk">Asia/Irkutsk (Иркутск, UTC+8)</option>
+                    <option value="Asia/Yakutsk">Asia/Yakutsk (Якутск, UTC+9)</option>
+                    <option value="Asia/Vladivostok">Asia/Vladivostok (Владивосток, UTC+10)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="section-card">
+            <h4 class="section-title-h4">
+                <svg class="ic ic-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                </svg> Confluence / Wiki
+            </h4>
+            <div class="form-group form-row">
+                <label for="settingConfluenceScrollFixEnabled" class="form-label form-label-row">
+                    Автоматически исправлять прокрутку редактора
+                </label>
+                <label class="switch">
+                    <input type="checkbox" id="settingConfluenceScrollFixEnabled">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <p class="section-description">
+                Укажите адреса корпоративных Wiki-систем, на которых нужно автоматически исправлять проблемы со
+                скроллом.
+            </p>
+            <textarea id="settingWikiDomains" class="form-input form-input-mono"
+                placeholder="itpm-wiki.mos.ru&#10;wiki.mos-team.ru&#10;wiki.lanit.ru"></textarea>
+            <div class="form-hint-italic">
+                * По одному домену на строку (без http/https)
+            </div>
+            <div class="form-group form-group-last">
+                <label class="form-label">Идентификаторы iframe редактора (через запятую):</label>
+                <input type="text" id="settingWikiIframeIds" class="form-input"
+                    placeholder="wysiwygTextarea_ifr, mce_0_ifr">
+            </div>
+        </div>
+
+        <div class="section-card section-card-last">
+            <h4 class="section-title-h4">
+                <svg class="ic ic-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg> TDM Chat
+            </h4>
+            <div class="form-group">
+                <label class="form-label">Домен для проверки активности TDM:</label>
+                <input type="text" id="settingTdmDomain" class="form-input" placeholder="tdm.mos.ru">
+            </div>
+            <hr class="divider">
+            <h5 class="options-subsection-title">Экспорт сообщений</h5>
+            <div class="form-group form-row">
+                <label for="settingTdmSavePhotosDefault" class="form-label form-label-row">
+                    Сохранять фотографии по умолчанию
+                </label>
+                <label class="switch">
+                    <input type="checkbox" id="settingTdmSavePhotosDefault">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="form-group form-row">
+                <label for="settingTdmRememberDate" class="form-label form-label-row">
+                    Запоминать выбранный период экспорта
+                </label>
+                <label class="switch">
+                    <input type="checkbox" id="settingTdmRememberDate">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="form-group form-row">
+                <label for="settingTdmExcludeUserDefault" class="form-label form-label-row">
+                    Игнорировать фотографии пользователя по умолчанию
+                </label>
+                <label class="switch">
+                    <input type="checkbox" id="settingTdmExcludeUserDefault">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div id="settingTdmExcludeUserTextGroup" class="form-group form-group-last" hidden>
+                <label class="form-label" for="settingTdmExcludeUserTextDefault">Имя пользователя:</label>
+                <input type="text" id="settingTdmExcludeUserTextDefault" class="form-input"
+                    maxlength="500" placeholder="ФИО или «Я»">
+            </div>
+        </div>
+
+        <div class="maintenance-section">
+            <h4 class="section-title-h4 section-title-muted">
+                <svg class="ic ic-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path
+                        d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+                </svg> Управление данными (Maintenance)
+            </h4>
+            <p class="form-hint-block-lg">
+                Вы можете сохранить все настройки расширения в файл или восстановить их из резервной копии. Импорт
+                обновляет сохранённые ключи и не удаляет остальные локальные данные.
+            </p>
+            <div class="maintenance-actions">
+                <button id="exportBtn" class="btn btn-secondary-flex"><svg class="ic ic-white" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="17 8 12 3 7 8" />
+                        <line x1="12" y1="3" x2="12" y2="15" />
+                    </svg> Экспорт (JSON)</button>
+                <button id="importBtn" class="btn btn-secondary-flex"><svg class="ic ic-white" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 16 12 21 17 16" />
+                        <line x1="12" y1="21" x2="12" y2="9" />
+                    </svg> Импорт (JSON)</button>
+            </div>
+            <input type="file" id="importFile" class="hidden" accept=".json">
+            <div id="maintenanceStatus" class="maintenance-status"></div>
+        </div>
+
+    </div> <!-- Конец container -->
+
+    <!-- Плавающий смарт-остров сохранения -->
+    <div class="save-island">
+        <button id="saveBtn" class="btn btn-save">
+            <span id="saveBtnText"><svg class="ic ic-white" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                    <polyline points="17 21 17 13 7 13 7 21" />
+                    <polyline points="7 3 7 8 15 8" />
+                </svg> Сохранить все настройки</span>
+        </button>
+    </div>
+
+    <!-- Статус (скрытый, используется только для логики) -->
+    <div id="status" class="hidden"></div>
+
+    <div class="spacer-40"></div>
+
+
+    <script src="js/shared/grafana-settings.js"></script>
+    <script src="js/shared/url-validation.js"></script>
+    <script src="js/shared/local-state-schema.js"></script>
+    <script src="js/pages/options.js"></script>
+</body>
+
+</html>

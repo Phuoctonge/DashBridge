@@ -1,0 +1,627 @@
+﻿        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+            margin: 0;
+            background-color: var(--bg);
+            color: var(--text-main);
+            /* UI scale may shrink rem below the legacy popup width (for
+               example 22rem is only 316.8px at 90%). Keep the shell at least
+               352px wide while still allowing larger accessibility scales. */
+            width: clamp(352px, 22rem, 480px);
+            min-width: 320px;
+            height: auto;
+            min-height: 0;
+            max-height: 600px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        html {
+            overflow: hidden;
+        }
+
+        /* Keep Chrome's action-popup viewport immutable. Only this region
+           scrolls, so long Grafana content cannot resize or scroll the shell. */
+        .popup-scroll-region {
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow-x: hidden;
+            overflow-y: auto;
+            scrollbar-gutter: stable;
+            overscroll-behavior: contain;
+        }
+
+        .app-header,
+        .tabs-nav {
+            flex: 0 0 auto;
+        }
+
+        /* Header */
+        .app-header {
+            background: var(--header-grad);
+            padding: 1.5rem 1.25rem;
+            color: white;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .app-header h1 {
+            margin: 0;
+            font-size: var(--font-size-page-title);
+            font-weight: var(--font-weight-page-title);
+            letter-spacing: -0.5px;
+        }
+
+        .app-header p {
+            margin: 0.25rem 0 0;
+            font-size: 0.75rem;
+            opacity: 0.8;
+        }
+
+        /* Tabs Navigation */
+        .tabs-nav {
+            display: flex;
+            background: var(--surface);
+            padding: 0.5rem;
+            gap: 0.25rem;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 0.75rem 0.375rem;
+            border: none;
+            background: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-radius: var(--radius-md);
+            font-size: 0.75rem;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .tab-btn:hover {
+            background: var(--tab-hover-bg);
+            color: var(--tab-active-text);
+            border-color: var(--primary);
+        }
+
+        .tab-btn.active {
+            background: var(--tab-active-bg);
+            color: var(--tab-active-text);
+        }
+
+        .tab-btn i {
+            font-size: 1.125rem;
+        }
+
+        /* SVG-РёРєРѕРЅРєРё */
+        .ic {
+            display: inline-block;
+            vertical-align: middle;
+            flex-shrink: 0;
+            width: 0.9375rem;
+            height: 0.9375rem;
+        }
+
+        .tab-btn .ic {
+            width: 1.25rem;
+            height: 1.25rem;
+        }
+
+        .subnav-icon .ic {
+            width: 1.25rem;
+            height: 1.25rem;
+        }
+
+        .btn .ic,
+        .section-title .ic {
+            width: 0.9375rem;
+            height: 0.9375rem;
+        }
+
+        #openSettingsBtn .ic {
+            width: 1.0625rem;
+            height: 1.0625rem;
+        }
+
+        /* Tab Content */
+        .tab-content {
+            display: none;
+            padding: 1rem 1rem 0.25rem;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .tab-content > .card:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Cards & Components */
+        .section-title {
+            font-size: var(--font-size-section-title);
+            font-weight: var(--font-weight-section-title);
+            margin: 0 0 0.75rem;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid #fff;
+            border-radius: var(--radius-md);
+            padding: 0.75rem;
+            margin-bottom: 0.75rem;
+            box-shadow: var(--shadow);
+        }
+
+        .grafana-timestamp-hint {
+            margin: 0 0 0.625rem;
+            color: var(--text-muted);
+            font-size: 0.6875rem;
+            line-height: 1.4;
+        }
+
+        .grafana-timestamp-hint code,
+        .grafana-timestamp-value code {
+            font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+        }
+
+        .grafana-timestamp-result {
+            display: grid;
+            gap: 0.4375rem;
+            margin-top: 0.5625rem;
+        }
+
+        .grafana-timestamp-result[hidden] {
+            display: none;
+        }
+
+        .grafana-timestamp-value {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            gap: 0.125rem 0.5rem;
+            width: 100%;
+            padding: 0.5rem 0.625rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            background: var(--surface);
+            color: var(--text-main);
+            text-align: left;
+            cursor: pointer;
+        }
+
+        .grafana-timestamp-value span {
+            color: var(--text-muted);
+            font-size: 0.625rem;
+        }
+
+        .grafana-timestamp-value code {
+            grid-column: 1;
+            font-size: 0.8125rem;
+            font-weight: 700;
+        }
+
+        .grafana-timestamp-value small {
+            grid-column: 2;
+            grid-row: 1 / span 2;
+            color: var(--primary);
+            font-size: 0.625rem;
+        }
+
+        .grafana-timestamp-value:hover,
+        .grafana-timestamp-value:focus-visible {
+            border-color: var(--primary);
+        }
+
+        .grafana-timestamp-status {
+            margin-top: 0.4375rem;
+            color: var(--text-muted);
+            font-size: 0.625rem;
+            line-height: 1.35;
+        }
+
+        .grafana-timestamp-status:empty {
+            display: none;
+        }
+
+        .grafana-timestamp-status.error {
+            color: #dc2626;
+        }
+
+        /* Buttons Style */
+        .btn {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: var(--radius-md);
+            border: none;
+            font-size: 0.875rem;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            border: 1px solid var(--primary);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+            border-color: var(--primary-hover);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+        }
+
+        .btn-outline {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--primary);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-dashed {
+            background: var(--surface);
+            border: 2px dashed var(--border);
+            color: var(--primary);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-dashed:hover {
+            border-color: var(--primary);
+            background: #f0f7ff;
+            transform: scale(1.02);
+        }
+
+        .btn-outline:hover {
+            border-color: var(--primary);
+            background: #f0f7ff;
+        }
+
+        .btn-jira {
+            background: #0052cc;
+            color: white;
+        }
+
+        /* Dashboard Items */
+        #customButtonsContainer {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .button-row {
+            display: flex;
+            gap: 0.375rem;
+            align-items: center;
+        }
+
+        .grafana-link-btn {
+            flex: 1;
+            padding: 0.875rem 1rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.8125rem;
+            cursor: pointer;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: var(--shadow);
+        }
+
+        .grafana-link-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .btn-icon {
+            width: 2.375rem;
+            height: 2.375rem;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .btn-icon:hover {
+            transform: scale(1.15);
+        }
+
+        .btn-edit:hover {
+            background: #f0fdf4;
+            color: var(--secondary);
+            border-color: var(--secondary);
+        }
+
+        .btn-delete:hover {
+            background: #fef2f2;
+            color: #ef4444;
+            border-color: #ef4444;
+        }
+
+        /* Forms */
+        .form-group {
+            margin-bottom: 0.75rem;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            color: var(--text-muted);
+        }
+
+        input[type="text"],
+        input[type="datetime-local"],
+        select {
+            width: 100%;
+            padding: 0.625rem;
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            font-size: 0.8125rem;
+            box-sizing: border-box;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        /* Toggle Switch */
+        .switch-group {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--surface);
+            padding: 0.75rem;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border);
+        }
+
+        .switch-label {
+            font-size: 0.8125rem;
+            font-weight: 500;
+        }
+
+        /* Modal (фон подложки — общий, из theme.css: --modal-overlay-bg) */
+        #modalOverlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: var(--modal-overlay-bg);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: var(--surface);
+            width: 85%;
+            padding: 1.25rem;
+            border-radius: var(--radius-lg);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-header {
+            margin-bottom: 1rem;
+        }
+
+        .modal-header h4 {
+            margin: 0;
+            font-size: 1.125rem;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1.25rem;
+        }
+
+        .debug-easter-egg-trigger {
+            appearance: none;
+            border: 0;
+            background: transparent;
+            color: inherit;
+            cursor: text;
+            font: inherit;
+            font-weight: 700;
+            padding: 0;
+            text-decoration: none;
+        }
+
+        .fresh-code-notice {
+            background: rgba(255, 193, 7, 0.1);
+            border-left: 3px solid #ffc107;
+            border-radius: 0.25rem;
+            color: var(--text-muted);
+            font-size: 0.6875rem;
+            line-height: 1.4;
+            margin: 0.5rem 1rem 1rem;
+            padding: 0.625rem;
+        }
+
+        .fresh-code-notice p {
+            margin: 0;
+        }
+
+        .fresh-code-notice-icon {
+            font-size: 0.75rem;
+        }
+
+        .fresh-code-notice .debug-easter-egg-trigger {
+            display: none;
+        }
+
+        .fresh-code-notice.is-debug #freshCodeNoticeText {
+            display: none;
+        }
+
+        .fresh-code-notice.is-debug .debug-easter-egg-trigger {
+            display: inline;
+        }
+
+        .btn-save {
+            background: var(--primary);
+            color: white;
+            flex: 2;
+        }
+
+        .btn-cancel {
+            background: #f1f5f9;
+            color: var(--text-muted);
+            flex: 1;
+        }
+
+        /* TDM Export Status */
+        #tdmExportStatus {
+            margin-top: 0.625rem;
+            padding: 0.625rem;
+            background: #ecfdf5;
+            color: #059669;
+            border-radius: 0.5rem;
+            font-size: 0.75rem;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .divider {
+            height: 1px;
+            background: var(--border);
+            margin: 1rem 0;
+            border: none;
+        }
+
+        #openSettingsBtn {
+            position: absolute;
+            top: 0.9375rem;
+            right: 0.9375rem;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            color: white;
+            font-size: 1.125rem;
+            width: 2.25rem;
+            height: 2.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            padding: 0;
+            line-height: 1;
+        }
+
+        #openSettingsBtn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: rotate(90deg) scale(1.1);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Toggle Switch CSS */
+        #grafanaRefreshLegendBtn:hover {
+            color: var(--primary) !important;
+            border-color: var(--primary) !important;
+        }
+
+        .grafana-subnav {
+            display: block;
+            padding: 0;
+            background: transparent;
+            border: 0;
+            margin-bottom: 0.75rem;
+            margin-top: -0.25rem;
+        }
+
+        .subnav-row {
+            display: flex;
+            gap: 0.25rem;
+            width: 100%;
+        }
+
+        .grafana-sub-btn {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.1875rem;
+            padding: 0.4375rem 0.1875rem;
+            border: 1px solid transparent;
+            border-radius: 0.5rem;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 0.65625rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.18s, color 0.18s, border-color 0.18s;
+            line-height: 1.3;
+            text-align: center;
+        }
+
+        .grafana-sub-btn .subnav-icon {
+            font-size: 1.0625rem;
+            line-height: 1;
+        }
+
+        .grafana-sub-btn:hover {
+            background: var(--tab-hover-bg);
+            color: var(--tab-active-text);
+            border-color: var(--border);
+        }
+
+        .grafana-sub-btn.active {
+            background: var(--tab-active-bg);
+            color: var(--tab-active-text);
+            border-color: var(--primary);
+        }
+
+        .grafana-sub-btn:focus {
+            outline: none;
+        }
+
+        .grafana-sub-btn:focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+        }
+
+        input[type="text"].search-input {
+            width: 100%;
+            font-size: 0.6875rem;
+            padding: 0.375rem 0.5rem 0.375rem 1.625rem !important;
+            border: 1px solid var(--border);
+            border-radius: 0.25rem;
+            font-family: inherit;
+            box-sizing: border-box;
+            transition: all 0.2s;
+            background: var(--surface);
+            color: var(--text-color);
+        }
+
+        input[type="text"].search-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+        }

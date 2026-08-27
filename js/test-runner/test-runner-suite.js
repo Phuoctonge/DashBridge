@@ -1,0 +1,4659 @@
+// test-runner-suite.js
+// Набор тест-сценариев A–F для E2E тестирования DashBridge в реальной Grafana.
+// Каждый сценарий: { id, category, name, run(tabId, env) → Promise<{ pass, details }> }
+// Все visual-тесты обратимы: read → modify → check DOM → restore.
+
+// --- Вспомогательные функции выполнения в MAIN world ---
+
+async function execMain(tabId, func, args = []) {
+    const results = await chrome.scripting.executeScript({
+        target: { tabId },
+        world: 'MAIN',
+        func,
+        args,
+    });
+    return results?.[0]?.result;
+}
+
+async function execIsolated(tabId, func, args = []) {
+    const results = await chrome.scripting.executeScript({
+        target: { tabId },
+        world: 'ISOLATED',
+        func,
+        args,
+    });
+    return results?.[0]?.result;
+}
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Возвращает panelId с приоритетом: viewPanelId (из ?viewPanel=N) > firstGraphPanelId > firstPanelId
+// При viewPanel режиме в DOM только одна панель — используем её ID напрямую.
+function resolvePanelId(env) {
+    return env.probe?.viewPanelId || env.probe?.firstGraphPanelId || env.probe?.firstPanelId || null;
+}
+
+// Принудительный refresh данных через штатную кнопку Grafana.
+// Это запускает реальный запрос данных, в отличие от одного redraw canvas.
+async function triggerRefresh(tabId) {
+    return execMain(tabId, () => {
+        const refreshButton = document.querySelector('[data-testid="data-testid RefreshPicker run button"]');
+        if (refreshButton) {
+            refreshButton.click();
+            return 'RefreshPicker.run-button';
+        }
+        // Fallback для старых/кастомных сборок Grafana без RefreshPicker.
+        try {
+            const appEvents = window.__grafana_app_events || window.grafanaRuntime?.appEvents;
+            if (appEvents?.emit) { appEvents.emit('refresh'); return 'appEvents.emit'; }
+        } catch (_) { }
+        try {
+            const bus = window?.grafanaRuntime?.getAppEvents?.();
+            if (bus?.publish) { bus.publish({ type: 'refresh' }); return 'bus.publish'; }
+        } catch (_) { }
+        try {
+            const plots = document.querySelectorAll('[class*="uplot"], [class*="u-wrap"]');
+            plots.forEach(p => { try { (p?._uplot || p?.uplot)?.redraw?.(true, true); } catch (_) { } });
+            return 'uplot.redraw';
+        } catch (_) { }
+        return 'no-refresh-api';
+    });
+}
+
+// Отключает автообновление через штатный RefreshPicker Grafana.
+// Одного удаления ?refresh= недостаточно: React scheduler уже мог быть запущен.
+// Возвращает исходный интервал и признак успешного UI-переключения для восстановления.
+async function disableAutoRefresh(tabId) {
+    return execMain(tabId, async () => {
+        const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+        const label = element => (element?.innerText || element?.textContent || '').replace(/\s+/g, ' ').trim();
+        let previous = null;
+        let disabledByUi = false;
+
+        try {
+            const url = new URL(location.href);
+            previous = url.searchParams.get('refresh');
+
+            const intervalButton = document.querySelector('[data-testid="data-testid RefreshPicker interval button"]');
+            if (intervalButton && previous) {
+                intervalButton.click();
+                await wait(100);
+
+                const menu = [...document.querySelectorAll('[role="menu"]')]
+                    .find(element => element.offsetParent !== null && /\bOff\b/i.test(label(element)));
+                const offItem = menu && [...menu.querySelectorAll('button, [role="menuitem"], [role="option"], a, div')]
+                    .find(element => label(element).toLowerCase() === 'off');
+
+                if (offItem) {
+                    offItem.click();
+                    await wait(100);
+                    disabledByUi = true;
+                }
+            }
+
+            // Fallback для нестандартных/старых страниц и визуальное удаление параметра.
+            const cleanedUrl = new URL(location.href);
+            cleanedUrl.searchParams.delete('refresh');
+            history.replaceState(history.state, '', cleanedUrl.toString());
+            window.dispatchEvent(new PopStateEvent('popstate'));
+            return { value: previous, disabledByUi };
+        } catch (_) {
+            return { value: previous, disabledByUi };
+        }
+    });
+}
+
+// Восстанавливает исходный интервал через RefreshPicker и URL как fallback.
+async function restoreAutoRefresh(tabId, previousState) {
+    const previous = typeof previousState === 'string' ? previousState : previousState?.value;
+    if (!previous) return;
+    return execMain(tabId, async (interval, restoreThroughUi) => {
+        const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+        const label = element => (element?.innerText || element?.textContent || '').replace(/\s+/g, ' ').trim();
+        try {
+            if (restoreThroughUi) {
+                const intervalButton = document.querySelector('[data-testid="data-testid RefreshPicker interval button"]');
+                if (intervalButton) {
+                    intervalButton.click();
+                    await wait(100);
+                    const menu = [...document.querySelectorAll('[role="menu"]')]
+                        .find(element => element.offsetParent !== null);
+                    const intervalItem = menu && [...menu.querySelectorAll('button, [role="menuitem"], [role="option"], a, div')]
+                        .find(element => label(element).toLowerCase() === interval.toLowerCase());
+                    if (intervalItem) {
+                        intervalItem.click();
+                        return 'ui-restored';
+                    }
+                }
+            }
+
+            const url = new URL(location.href);
+            url.searchParams.set('refresh', interval);
+            history.replaceState(history.state, '', url.toString());
+            window.dispatchEvent(new PopStateEvent('popstate'));
+            return 'url-restored';
+        } catch (_) { return 'restore-failed'; }
+    }, [previous, Boolean(previousState?.disabledByUi)]);
+}
+
+// Отправляет applyPanelTools в MAIN world (имитирует popup-команду).
+// transformSettings — минимальный набор необходимых ключей.
+async function applyPanelTools(tabId, tools) {
+    await execMain(tabId, () => {
+        window.__dashbridgeDebugLogs = [];
+    });
+    // The page runtime expects a flat settings object. Matrix steps keep visual
+    // and transform settings grouped for readability, so normalize only at the
+    // command boundary rather than silently relying on nested fields.
+    const command = {
+        ...tools,
+        ...(tools?.visualSettings || {}),
+        ...(tools?.transformSettings || {}),
+    };
+    delete command.visualSettings;
+    delete command.transformSettings;
+    return execMain(tabId, (toolsArg) => new Promise(resolve => {
+        // panel-tools intentionally ignores top-level tab messages until its
+        // caller opts in. Popup commands do this in runGrafanaCommand(); the
+        // E2E runner must do the same or every command waits for the timeout.
+        window.__dashbridgePanelToolsAllowTop = true;
+        const reqId = `test_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        let settled = false;
+        const finish = result => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timeout);
+            window.removeEventListener('message', handler);
+            resolve(result);
+        };
+        const handler = e => {
+            if (e.source === window && e.origin === location.origin && e.data?.action === 'panelToolsApplied' && e.data?.requestId === reqId) {
+                finish({
+                    status: e.data.commandStatus === 'error'
+                        ? 'command-error'
+                        : (e.data.legendVisibilityApplied === false ? 'native-legend-apply-failed' : 'applied'),
+                    state: window.__dashbridgePanelToolsState || null,
+                    acknowledgement: e.data,
+                    legendVisibilityDiagnostic: window.__dashbridgeLegendVisibilityDiagnostic || null,
+                    commandDiagnostic: window.__dashbridgePanelToolsCommandDiagnostic || null,
+                });
+            }
+        };
+        // This watchdog does not establish application; only the matching
+        // acknowledgement below does. Keep it aligned with the production
+        // command bridge because Grafana can briefly remount a panel on reset.
+        const timeout = setTimeout(() => finish({
+            status: 'timeout',
+            state: window.__dashbridgePanelToolsState || null,
+        }), 20000);
+        window.addEventListener('message', handler);
+        window.postMessage({
+            action: 'applyPanelTools',
+            requestId: reqId,
+            tools: toolsArg,
+            transformSettings: {
+                grafanaIdleKeyword: 'idle',
+                grafanaMemTotalKeyword: 'total',
+                grafanaTrimDomain: false,
+                grafanaTrimDomainEnabled: false,
+            },
+        }, location.origin);
+    }), [command]);
+}
+
+// ─── Structured runtime diagnostics ─────────────────────────────────
+// The runner owns this journal instead of trying to read Chrome DevTools history.
+// Every result receives serializable evidence, including PASS and SKIP outcomes.
+async function installRuntimeDiagnostics(tabId) {
+    return execMain(tabId, () => {
+        if (window.__dashbridgeE2EDiagnostics?.installed) return { installed: true, reused: true };
+        const safe = (value, depth = 0, seen = new WeakSet()) => {
+            if (depth > 20) return '[depth-limit-20]';
+            if (value === null || value === undefined) return value;
+            if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
+            if (value instanceof Error) return { name: value.name, message: value.message, stack: String(value.stack || '') };
+            if (typeof value === 'bigint') return `${value}n`;
+            if (typeof value === 'object' && seen.has(value)) return '[circular]';
+            if (typeof value === 'object') seen.add(value);
+            if (Array.isArray(value)) return value.map(item => safe(item, depth + 1, seen));
+            if (typeof value === 'object') {
+                const output = {};
+                Object.entries(value).forEach(([key, item]) => { output[key] = safe(item, depth + 1, seen); });
+                return output;
+            }
+            return `[${typeof value}]`;
+        };
+        const journal = window.__dashbridgeE2EDiagnostics = {
+            installed: true,
+            startedAt: Date.now(),
+            nextEventId: 0,
+            events: [],
+            originals: {},
+        };
+        const push = (level, args) => {
+            journal.events.push({
+                id: ++journal.nextEventId,
+                at: Date.now(),
+                level,
+                args: args.map(arg => safe(arg, 0, new WeakSet())),
+            });
+        };
+        ['debug', 'log', 'info', 'warn', 'error'].forEach(level => {
+            journal.originals[level] = console[level];
+            console[level] = function (...args) {
+                push(level, args);
+                return journal.originals[level].apply(this, args);
+            };
+        });
+        journal.onError = event => push('error', [event.message, event.error]);
+        journal.onRejection = event => push('unhandledrejection', [event.reason]);
+        window.addEventListener('error', journal.onError);
+        window.addEventListener('unhandledrejection', journal.onRejection);
+        return { installed: true, reused: false };
+    });
+}
+
+let lastPanelDiagnosticCaptureAt = 0;
+
+const DIAGNOSTIC_CAPTURE_MODES = Object.freeze({
+    SEMANTIC: 'semantic-only',
+    CANVAS: 'canvas',
+    PANEL: 'panel',
+    FORENSIC: 'forensic',
+});
+
+function normalizeDiagnosticCaptureMode(mode) {
+    return Object.values(DIAGNOSTIC_CAPTURE_MODES).includes(mode)
+        ? mode : DIAGNOSTIC_CAPTURE_MODES.FORENSIC;
+}
+
+function diagnosticCaptureModeForTransition(settings, activeIds = [], changedIds = null) {
+    const hasDeclaredFeatureSet = Array.isArray(changedIds);
+    const evidenceIds = hasDeclaredFeatureSet && changedIds.length ? changedIds : (activeIds || []);
+    const ids = new Set(evidenceIds);
+    const visual = settings?.visualSettings || {};
+    const transform = settings?.transformSettings || {};
+    const affectsPanelLayout = ids.has('invertLegend')
+        || ids.has('seriesVisibility')
+        || ids.has('seriesQueryFilter')
+        || ids.has('invertIdle')
+        || ids.has('convertMemToUsed')
+        || (!hasDeclaredFeatureSet && (
+            Object.prototype.hasOwnProperty.call(visual, 'invertLegend')
+            || Object.prototype.hasOwnProperty.call(settings || {}, 'legendVisibility')
+            || Object.prototype.hasOwnProperty.call(transform, 'seriesQueryFilterEnabled')
+            || Object.prototype.hasOwnProperty.call(transform, 'invertIdle')
+            || Object.prototype.hasOwnProperty.call(transform, 'convertMemToUsed')
+        ));
+    return affectsPanelLayout ? DIAGNOSTIC_CAPTURE_MODES.PANEL : DIAGNOSTIC_CAPTURE_MODES.CANVAS;
+}
+
+async function capturePanelDiagnosticImage(tabId, panelId, { retainViewport = true } = {}) {
+    // Chrome throttles captureVisibleTab to roughly two calls per second.
+    // Keep every transition screenshot instead of silently losing fast calls.
+    const throttleWaitMs = Math.max(0, 600 - (Date.now() - lastPanelDiagnosticCaptureAt));
+    if (throttleWaitMs) await sleep(throttleWaitMs);
+    lastPanelDiagnosticCaptureAt = Date.now();
+    const captureStartedAt = Date.now();
+    const rect = await execMain(tabId, pid => {
+        const dom = window.DashBridgeGrafanaDom;
+        const panel = dom?.findPanelById?.(pid);
+        const root = dom?.outerPanel?.(panel) || panel;
+        if (!root) return null;
+        const bounds = root.getBoundingClientRect();
+        if (bounds.width <= 1 || bounds.height <= 1) return null;
+        return {
+            x: Math.max(0, bounds.x), y: Math.max(0, bounds.y),
+            width: Math.min(bounds.width, window.innerWidth - Math.max(0, bounds.x)),
+            height: Math.min(bounds.height, window.innerHeight - Math.max(0, bounds.y)),
+            dpr: window.devicePixelRatio || 1,
+        };
+    }, [panelId]);
+    if (!rect || rect.width <= 1 || rect.height <= 1) {
+        return { dataUrl: null, error: 'panel-not-visible-or-empty', capturedAt: Date.now(), throttleWaitMs };
+    }
+
+    try {
+        const tab = await chrome.tabs.get(tabId);
+        const source = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'png' });
+        if (!source) return { dataUrl: null, error: 'captureVisibleTab-empty-result', capturedAt: Date.now(), throttleWaitMs };
+        return await new Promise(resolve => {
+            const image = new Image();
+            image.onload = () => {
+                const dpr = rect.dpr;
+                const x = Math.round(rect.x * dpr);
+                const y = Math.round(rect.y * dpr);
+                const width = Math.min(Math.round(rect.width * dpr), image.naturalWidth - x);
+                const height = Math.min(Math.round(rect.height * dpr), image.naturalHeight - y);
+                if (width <= 1 || height <= 1) return resolve({
+                    dataUrl: null, error: 'panel-crop-empty', capturedAt: Date.now(), throttleWaitMs,
+                    crop: { ...rect, width, height },
+                });
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const context = canvas.getContext('2d', { willReadFrequently: true });
+                context.drawImage(image, x, y, width, height, 0, 0, width, height);
+                const dataUrl = canvas.toDataURL('image/png');
+                const hashDataUrl = value => `fnv1a-${(() => {
+                    let hashValue = 2166136261;
+                    for (let i = 0; i < value.length; i += 1) {
+                        hashValue = Math.imul(hashValue ^ value.charCodeAt(i), 16777619);
+                    }
+                    return (hashValue >>> 0).toString(16);
+                })()}`;
+                let pixelStats = null;
+                try {
+                    const pixels = context.getImageData(0, 0, width, height).data;
+                    const stride = Math.max(1, Math.floor((width * height) / 16384));
+                    const bins = Array(16).fill(0);
+                    let count = 0, sum = 0, sumSq = 0, opaque = 0, min = 255, max = 0;
+                    for (let pixel = 0; pixel < width * height; pixel += stride) {
+                        const offset = pixel * 4;
+                        const luminance = Math.round(0.2126 * pixels[offset] + 0.7152 * pixels[offset + 1] + 0.0722 * pixels[offset + 2]);
+                        count += 1; sum += luminance; sumSq += luminance * luminance;
+                        if (pixels[offset + 3] > 250) opaque += 1;
+                        min = Math.min(min, luminance); max = Math.max(max, luminance);
+                        bins[Math.min(15, Math.floor(luminance / 16))] += 1;
+                    }
+                    const mean = count ? sum / count : 0;
+                    pixelStats = {
+                        samples: count, luminanceMean: Number(mean.toFixed(3)),
+                        luminanceStdDev: Number(Math.sqrt(Math.max(0, sumSq / Math.max(1, count) - mean * mean)).toFixed(3)),
+                        luminanceMin: min, luminanceMax: max,
+                        opaqueRatio: Number((opaque / Math.max(1, count)).toFixed(4)), histogram16: bins,
+                    };
+                } catch (error) {
+                    pixelStats = { error: error?.message || String(error) };
+                }
+                resolve({
+                    dataUrl, width, height,
+                    hash: hashDataUrl(dataUrl),
+                    pixelStats, capturedAt: Date.now(), captureDurationMs: Date.now() - captureStartedAt,
+                    throttleWaitMs, crop: rect,
+                    viewportImage: retainViewport ? {
+                        dataUrl: source,
+                        width: image.naturalWidth,
+                        height: image.naturalHeight,
+                        hash: hashDataUrl(source),
+                        bytes: source.length,
+                        capturedAt: Date.now(),
+                    } : null,
+                });
+            };
+            image.onerror = () => resolve({ dataUrl: null, error: 'captured-tab-image-decode-failed', capturedAt: Date.now(), throttleWaitMs });
+            image.src = source;
+        });
+    } catch (error) {
+        return {
+            dataUrl: null,
+            error: error?.message || String(error),
+            capturedAt: Date.now(),
+            captureDurationMs: Date.now() - captureStartedAt,
+            throttleWaitMs,
+        };
+    }
+}
+
+function runtimeVisualReuseSignature(snapshot) {
+    if (!snapshot?.panelFound) return null;
+    return JSON.stringify({
+        renderer: snapshot.renderer || null,
+        dom: {
+            structuralHash: snapshot.domSnapshot?.root?.outerHTMLStructuralHash
+                || snapshot.domSnapshot?.root?.outerHTMLHash || null,
+            rect: snapshot.domSnapshot?.root?.rect || null,
+            document: snapshot.domSnapshot?.document || null,
+        },
+        canvas: (snapshot.canvas || []).map(item => ({
+            hash: item?.hash || null, width: item?.width || null, height: item?.height || null,
+            pixelStats: item?.pixelStats || null,
+        })),
+        legend: snapshot.legend || null,
+        markers: snapshot.markers || null,
+        series: snapshot.series || null,
+        threshold: snapshot.thresholdDiagnostic || null,
+        visualStyleState: snapshot.visualStyleState || null,
+        tools: snapshot.tools || null,
+    });
+}
+
+function canReuseRuntimeVisual(snapshot, source, captureMode = 'forensic') {
+    if (!source?.panelFound) return false;
+    const currentSignature = runtimeVisualReuseSignature(snapshot);
+    if (currentSignature === null || currentSignature !== runtimeVisualReuseSignature(source)) return false;
+    const mode = ['semantic-only', 'canvas', 'panel', 'forensic'].includes(captureMode)
+        ? captureMode : 'forensic';
+    if (mode === 'semantic-only') return true;
+    if (mode === 'canvas') {
+        return (source.canvas || []).some(item => typeof item?.dataUrl === 'string' && item.dataUrl);
+    }
+    if (!source?.panelImage?.dataUrl) return false;
+    return mode !== 'forensic' || !!source?.viewportImage?.dataUrl;
+}
+
+function runtimeVisualReuseHash(snapshot) {
+    const text = runtimeVisualReuseSignature(snapshot) || '';
+    let hash = 2166136261;
+    for (let index = 0; index < text.length; index += 1) {
+        hash = Math.imul(hash ^ text.charCodeAt(index), 16777619);
+    }
+    return `fnv1a-${(hash >>> 0).toString(16).padStart(8, '0')}`;
+}
+
+async function captureRuntimeDiagnostic(tabId, panelId, {
+    reuseVisualFrom = null,
+    captureMode = DIAGNOSTIC_CAPTURE_MODES.FORENSIC,
+    captureReason = 'explicit-full-diagnostic',
+} = {}) {
+    const mode = normalizeDiagnosticCaptureMode(captureMode);
+    const includeCanvasImages = mode !== DIAGNOSTIC_CAPTURE_MODES.SEMANTIC;
+    const diagnostic = await execMain(tabId, (pid, visualOptions) => {
+        const dom = window.DashBridgeGrafanaDom;
+        const visual = window.DashBridgeGrafanaVisualEngine;
+        const panel = dom?.findPanelById?.(pid);
+        let root = dom?.outerPanel?.(panel) || panel;
+        while (root && !root.classList?.contains('react-grid-item')
+            && !root.classList?.contains('panel-container') && root.parentElement) {
+            root = root.parentElement;
+        }
+        const hash = text => {
+            let value = 2166136261;
+            for (let i = 0; i < text.length; i += 1) value = Math.imul(value ^ text.charCodeAt(i), 16777619);
+            return `fnv1a-${(value >>> 0).toString(16)}`;
+        };
+        const display = value => typeof value === 'function' ? `[function ${value.name || 'anonymous'}]`
+            : value === undefined ? '[undefined]' : value === null ? null
+                : typeof value === 'object' ? `[${value.constructor?.name || 'object'}]` : value;
+        const rootOuterHTML = (() => {
+            try { return root?.outerHTML || ''; } catch (error) { return `[outerHTML-error: ${error?.message || String(error)}]`; }
+        })();
+        // Grafana rewrites equivalent inline pointer/legend styles every frame.
+        // Preserve the lossless HTML above, but use a style-neutral structural
+        // hash when deciding whether another full-page PNG adds information.
+        const rootStructuralHTML = rootOuterHTML.replace(/\sstyle="[^"]*"/gi, '');
+        const rootRect = (() => {
+            const rect = root?.getBoundingClientRect?.();
+            return rect ? {
+                x: rect.x, y: rect.y, top: rect.top, right: rect.right,
+                bottom: rect.bottom, left: rect.left, width: rect.width, height: rect.height,
+            } : null;
+        })();
+        const environment = {
+            url: location.href,
+            title: document.title,
+            readyState: document.readyState,
+            visibilityState: document.visibilityState,
+            hasFocus: document.hasFocus(),
+            activeElement: document.activeElement ? {
+                tag: document.activeElement.tagName,
+                id: document.activeElement.id || '',
+                className: String(document.activeElement.className || ''),
+                ariaLabel: document.activeElement.getAttribute?.('aria-label') || '',
+            } : null,
+            online: navigator.onLine,
+            userAgent: navigator.userAgent,
+            language: navigator.language,
+            languages: [...(navigator.languages || [])],
+            hardwareConcurrency: navigator.hardwareConcurrency || null,
+            deviceMemory: navigator.deviceMemory || null,
+            devicePixelRatio: window.devicePixelRatio || 1,
+            viewport: {
+                innerWidth: window.innerWidth, innerHeight: window.innerHeight,
+                outerWidth: window.outerWidth, outerHeight: window.outerHeight,
+                scrollX: window.scrollX, scrollY: window.scrollY,
+            },
+            screen: window.screen ? {
+                width: screen.width, height: screen.height,
+                availWidth: screen.availWidth, availHeight: screen.availHeight,
+                colorDepth: screen.colorDepth, pixelDepth: screen.pixelDepth,
+            } : null,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || null,
+            colorSchemeDark: matchMedia?.('(prefers-color-scheme: dark)')?.matches ?? null,
+            navigation: performance.getEntriesByType?.('navigation')?.map(entry => ({
+                type: entry.type,
+                startTime: entry.startTime,
+                duration: entry.duration,
+                domInteractive: entry.domInteractive,
+                domContentLoadedEventEnd: entry.domContentLoadedEventEnd,
+                loadEventEnd: entry.loadEventEnd,
+                transferSize: entry.transferSize,
+                decodedBodySize: entry.decodedBodySize,
+            })) || [],
+            resources: performance.getEntriesByType?.('resource')?.map(entry => ({
+                name: entry.name,
+                entryType: entry.entryType,
+                initiatorType: entry.initiatorType,
+                startTime: entry.startTime,
+                duration: entry.duration,
+                fetchStart: entry.fetchStart,
+                domainLookupStart: entry.domainLookupStart,
+                domainLookupEnd: entry.domainLookupEnd,
+                connectStart: entry.connectStart,
+                secureConnectionStart: entry.secureConnectionStart,
+                connectEnd: entry.connectEnd,
+                requestStart: entry.requestStart,
+                responseStart: entry.responseStart,
+                responseEnd: entry.responseEnd,
+                transferSize: entry.transferSize,
+                encodedBodySize: entry.encodedBodySize,
+                decodedBodySize: entry.decodedBodySize,
+                nextHopProtocol: entry.nextHopProtocol,
+                renderBlockingStatus: entry.renderBlockingStatus,
+                responseStatus: entry.responseStatus,
+            })) || [],
+            memory: performance.memory ? {
+                jsHeapSizeLimit: performance.memory.jsHeapSizeLimit,
+                totalJSHeapSize: performance.memory.totalJSHeapSize,
+                usedJSHeapSize: performance.memory.usedJSHeapSize,
+            } : null,
+        };
+        const domSnapshot = {
+            root: root ? {
+                tag: root.tagName,
+                id: root.id || '',
+                className: String(root.className || ''),
+                attributes: Object.fromEntries([...root.attributes].map(attribute => [attribute.name, attribute.value])),
+                rect: rootRect,
+                childElementCount: root.childElementCount,
+                descendantCount: root.querySelectorAll('*').length,
+                canvasCount: root.querySelectorAll('canvas').length,
+                buttonCount: root.querySelectorAll('button').length,
+                text: root.innerText || '',
+                outerHTML: rootOuterHTML,
+                outerHTMLBytes: rootOuterHTML.length,
+                outerHTMLHash: hash(rootOuterHTML),
+                outerHTMLStructuralHash: hash(rootStructuralHTML),
+            } : null,
+            document: {
+                htmlClassName: document.documentElement.className || '',
+                htmlDataTheme: document.documentElement.getAttribute('data-theme'),
+                bodyClassName: document.body?.className || '',
+                bodyChildElementCount: document.body?.childElementCount || 0,
+            },
+        };
+        const canvas = root ? [...root.querySelectorAll('canvas')].map(element => {
+            let data = '';
+            try { data = element.toDataURL('image/png'); } catch (_) { }
+            const h = hash(data);
+            let pixelStats = null;
+            try {
+                const context = element.getContext('2d', { willReadFrequently: true });
+                const pixels = context.getImageData(0, 0, element.width, element.height).data;
+                const stride = Math.max(1, Math.floor((element.width * element.height) / 16384));
+                const bins = Array(16).fill(0);
+                let count = 0, sum = 0, sumSq = 0, transparent = 0, min = 255, max = 0;
+                for (let pixel = 0; pixel < element.width * element.height; pixel += stride) {
+                    const offset = pixel * 4;
+                    const luminance = Math.round(0.2126 * pixels[offset] + 0.7152 * pixels[offset + 1] + 0.0722 * pixels[offset + 2]);
+                    count += 1; sum += luminance; sumSq += luminance * luminance;
+                    if (pixels[offset + 3] < 5) transparent += 1;
+                    min = Math.min(min, luminance); max = Math.max(max, luminance);
+                    bins[Math.min(15, Math.floor(luminance / 16))] += 1;
+                }
+                const mean = count ? sum / count : 0;
+                pixelStats = {
+                    samples: count, luminanceMean: Number(mean.toFixed(3)),
+                    luminanceStdDev: Number(Math.sqrt(Math.max(0, sumSq / Math.max(1, count) - mean * mean)).toFixed(3)),
+                    luminanceMin: min, luminanceMax: max,
+                    transparentRatio: Number((transparent / Math.max(1, count)).toFixed(4)), histogram16: bins,
+                };
+            } catch (error) {
+                pixelStats = { error: error?.message || String(error) };
+            }
+
+            // The hash supports compact matrix comparisons; the image is retained
+            // as visual evidence for the diagnostic viewer and exported artifact.
+            return {
+                width: element.width,
+                height: element.height,
+                hash: h,
+                bytes: data.length,
+                ...(visualOptions?.includeCanvasImages ? { dataUrl: data } : {}),
+                pixelStats,
+            };
+        }) : [];
+        const state = window.__dashbridgePanelToolsState || null;
+        // Use the production engine's resolver so the diagnostic renderer is
+        // not reported as "unknown" for a chart the threshold engine can see.
+        const findUPlot = () => {
+            const resolved = visual?.findUPlot?.(root);
+            if (resolved?.series && typeof resolved.redraw === 'function') return resolved;
+            const candidates = root ? [root, ...root.querySelectorAll('.uplot, .u-wrap, canvas')] : [];
+            for (const candidate of candidates) {
+                for (const key of Object.getOwnPropertyNames(candidate)) {
+                    let direct;
+                    try { direct = candidate[key]; } catch (_) { continue; }
+                    if (direct?.series && typeof direct.redraw === 'function' && typeof direct.setData === 'function') return direct;
+                }
+            }
+            return null;
+        };
+        const uplot = findUPlot();
+        const axes = uplot?.axes?.map((axis, index) => ({
+            index,
+            scale: axis.scale || null,
+            side: axis.side ?? null,
+            size: display(axis._size),
+            space: display(axis._space),
+            found: Array.isArray(axis._found) ? axis._found.map(display) : display(axis._found),
+        })) || [];
+        let series = [];
+        let renderer = 'unknown';
+        if (uplot?.series) {
+            renderer = 'uplot';
+            series = uplot.series.slice(1).map((item, index) => ({
+                index: index + 1,
+                label: item.label || '',
+                // Grafana's uPlot invokes fill as a callback, so the public
+                // renderer value remains callable. The engine records the
+                // semantic disabled state separately for causal verification.
+                fill: item.__dashbridgeFillDisabled === true ? false : display(item.fill),
+                fillDisabled: item.__dashbridgeFillDisabled === true,
+                fillType: typeof item.fill,
+                evaluatedFill: (() => {
+                    try {
+                        const value = typeof item.fill === 'function' ? item.fill(uplot, index + 1) : item.fill;
+                        return display(value);
+                    } catch (error) {
+                        return `[error: ${error?.message || String(error)}]`;
+                    }
+                })(),
+                originalFill: display(item.__dashbridgeOriginalAreaFill),
+                evaluatedOriginalFill: (() => {
+                    try {
+                        const original = item.__dashbridgeOriginalAreaFill;
+                        const value = typeof original === 'function' ? original(uplot, index + 1) : original;
+                        return display(value);
+                    } catch (error) {
+                        return `[error: ${error?.message || String(error)}]`;
+                    }
+                })(),
+                width: display(item.width),
+                originalWidth: display(item.__dashbridgeOriginalLineWidth),
+                show: display(item.show)
+            }));
+        } else {
+            const flot = (() => {
+                const host = root?.querySelector('.flot-base, .flot-overlay, .flot-placeholder') || root;
+                try { return window.jQuery?.plot?.getPlot?.(host) || window.$?.plot?.getPlot?.(host) || null; } catch (_) { return null; }
+            })();
+            if (flot?.getData) {
+                renderer = 'flot';
+                series = flot.getData().map((item, index) => ({
+                    index,
+                    label: item.label || '',
+                    fill: display(item.lines?.fill),
+                    fillDisabled: item.lines?.fill === false,
+                    fillType: typeof item.lines?.fill,
+                    evaluatedFill: display(item.lines?.fill),
+                    originalFill: display(item.__dashbridgeOriginalAreaFill),
+                    evaluatedOriginalFill: display(item.__dashbridgeOriginalAreaFill),
+                    width: display(item.lines?.lineWidth),
+                    originalWidth: display(item.__dashbridgeOriginalLineWidth),
+                    show: display(item.lines?.show),
+                }));
+            }
+        }
+        const legendEntries = root ? Array.from(dom?.legendItems?.(panel) || []) : [];
+        const legendContainer = root?.querySelector('.dashbridge-legend-bottom') || null;
+        const chartHost = root?.querySelector('.graph-panel__chart, .uplot, canvas') || null;
+        const rectOf = element => {
+            if (!element) return null;
+            const rect = element.getBoundingClientRect();
+            return {
+                left: Math.round(rect.left), top: Math.round(rect.top),
+                right: Math.round(rect.right), bottom: Math.round(rect.bottom),
+                width: Math.round(rect.width), height: Math.round(rect.height),
+            };
+        };
+        const legendSelectors = '.graph-legend, .legend-container, .u-legend, [class*="legend-container" i], [class*="LegendTable" i]';
+        const containsAllLegendItems = candidate => candidate
+            && legendEntries.length > 0
+            && legendEntries.every(item => candidate.contains(item));
+        // Grafana 12 can render virtualized legend buttons in a generated class
+        // wrapper (for example `css-*`) without any stable legend/table selector.
+        // Match the production engine: when that happens, derive the lowest
+        // shared ancestor of all entries. This is the actual visual legend and
+        // lets geometry distinguish bottom from right instead of accepting a
+        // flex-direction-only change as evidence.
+        const sharedLegendAncestor = () => {
+            if (!legendEntries.length) return null;
+            let candidate = legendEntries[0];
+            while (candidate && candidate !== root) {
+                if (containsAllLegendItems(candidate)) return candidate;
+                candidate = candidate.parentElement;
+            }
+            return null;
+        };
+        const legendRow = root?.querySelector('tr[class*="LegendRow"], .u-legend tr, .u-legend-row') || null;
+        const namedLegend = legendRow?.closest?.(`table, [role="table"], .u-legend, ${legendSelectors}`)
+            || legendEntries[0]?.closest?.(`table, [role="table"], .u-legend, ${legendSelectors}`)
+            || root?.querySelector(legendSelectors)
+            || null;
+        const detectedLegend = legendContainer
+            || (namedLegend && (!legendEntries.length || containsAllLegendItems(namedLegend)) ? namedLegend : null)
+            || sharedLegendAncestor();
+        const findFlexContainer = element => {
+            let candidate = element?.parentElement || null;
+            while (candidate && candidate !== root) {
+                const style = getComputedStyle(candidate);
+                if (style.display === 'flex') return candidate;
+                candidate = candidate.parentElement;
+            }
+            return null;
+        };
+        const flexContainer = findFlexContainer(chartHost);
+        const chartRect = rectOf(chartHost);
+        const legendRect = rectOf(detectedLegend);
+        const flexStyle = flexContainer ? getComputedStyle(flexContainer) : null;
+        const belowChart = !!(chartRect && legendRect && legendRect.top >= chartRect.bottom - 2);
+        const rightOfChart = !!(chartRect && legendRect && legendRect.left >= chartRect.right - 2);
+        const spansChartWidth = !!(chartRect && legendRect && legendRect.width >= chartRect.width * 0.8);
+        const grafanaDirection = flexContainer?.classList.contains('graph-panel--legend-right')
+            ? 'right'
+            : (flexContainer?.classList.contains('graph-panel--legend-bottom') ? 'bottom' : null);
+        // Grafana 10 keeps its native `graph-panel--legend-right` class while
+        // DashBridge temporarily overrides the same container with inline
+        // flex-direction:column. During an active DashBridge lifecycle the
+        // saved baseline + marker/inline style is newer evidence than that
+        // intentionally stale native class. Preferring the class made a
+        // visibly moved Flot legend fail H3 even though production worked.
+        const dashBridgeLayoutActive = !!root
+            && Object.prototype.hasOwnProperty.call(root, '__dashBridgeLegendOriginalDirection')
+            && [flexContainer, chartHost, detectedLegend].filter(Boolean)
+                .some(element => Object.prototype.hasOwnProperty.call(element, '__dashBridgeLegendLayoutSnapshot'));
+        const dashBridgeDirection = dashBridgeLayoutActive && flexStyle?.flexDirection === 'column' && legendContainer
+            ? 'bottom'
+            : (dashBridgeLayoutActive && flexStyle?.flexDirection === 'row' && !legendContainer ? 'right' : null);
+        const direction = dashBridgeDirection || grafanaDirection
+            || (rightOfChart ? 'right' : (belowChart ? 'bottom' : 'unknown'));
+        const directionEvidence = dashBridgeDirection ? 'dashbridge-active-layout'
+            : (grafanaDirection ? 'grafana-class'
+                : (rightOfChart ? 'legend-left >= chart-right' : (belowChart ? 'legend-top >= chart-bottom' : 'no-unambiguous-geometry')));
+        // The marker and containment count identify the intended legend table,
+        // while geometry proves it is visibly below the chart rather than merely
+        // reflowing the Name/Mean/Max cells in its original position.
+        const bottomLayout = {
+            chart: chartRect,
+            container: rectOf(legendContainer),
+            belowChart,
+            spansChartWidth,
+        };
+        const legendPosition = {
+            direction,
+            directionEvidence,
+            grafanaDirection,
+            markerBottom: !!legendContainer,
+            chart: chartRect,
+            legend: legendRect,
+            flex: rectOf(flexContainer),
+            relations: { belowChart, rightOfChart, spansChartWidth },
+            flexStyle: flexStyle ? { display: flexStyle.display, flexDirection: flexStyle.flexDirection } : null,
+            flexClasses: flexContainer?.className || '',
+            legendClasses: detectedLegend?.className || '',
+            inlineStyles: {
+                flex: flexContainer?.getAttribute('style') || null,
+                chart: chartHost?.getAttribute('style') || null,
+                legend: detectedLegend?.getAttribute('style') || null,
+            },
+            engineState: {
+                originalDirection: root?.__dashBridgeLegendOriginalDirection || null,
+                hasLayoutSnapshot: [flexContainer, chartHost, detectedLegend]
+                    .filter(Boolean)
+                    .some(element => Object.prototype.hasOwnProperty.call(element, '__dashBridgeLegendLayoutSnapshot')),
+            },
+        };
+        // Keep the same occurrence key as the production visibility command.
+        // Label text alone is ambiguous whenever Grafana renders duplicate series.
+        const legendOccurrences = new Map();
+        const readNativeDisabled = entry => [...entry.querySelectorAll('button')].some(button => {
+            const fiberKey = Object.keys(button).find(key => key.startsWith('__reactFiber$'));
+            for (let fiber = fiberKey && button[fiberKey], depth = 0;
+                fiber && depth < 32; depth += 1, fiber = fiber.return) {
+                const item = fiber.memoizedProps?.item;
+                if (item && typeof fiber.memoizedProps.onLabelClick === 'function') return item.disabled === true;
+            }
+            return false;
+        });
+        const visibilityEntries = legendEntries.map(entry => {
+            const labelNode = dom?.legendLabel?.(entry) || entry;
+            const label = (labelNode.textContent || '').trim();
+            const occurrence = legendOccurrences.get(label) || 0;
+            legendOccurrences.set(label, occurrence + 1);
+            const classes = `${entry.className || ''} ${labelNode.className || ''}`.toLowerCase();
+            const opacity = Number.parseFloat(getComputedStyle(entry).opacity || '1');
+            return {
+                key: `${label}\u0000${occurrence}`,
+                label,
+                occurrence,
+                hidden: entry.classList.contains('dashbridge-uplot-fast-hidden'),
+                dimmed: entry.classList.contains('dashbridge-uplot-fast-dimmed'),
+                nativeHidden: readNativeDisabled(entry),
+                visuallyHidden: classes.includes('hidden') || classes.includes('disabled') || opacity < 0.6,
+            };
+        }).filter(entry => entry.label);
+        const markerLabels = selector => root
+            ? [...root.querySelectorAll(selector)].map(item => (item.textContent || '').trim()).filter(Boolean) : [];
+        const thresholdHost = root?.matches?.('[data-dashbridge-threshold-engine]')
+            ? root : root?.querySelector?.('[data-dashbridge-threshold-engine]');
+        const nativeHiddenLabels = visibilityEntries.filter(entry => entry.nativeHidden).map(entry => entry.label);
+        const logs = window.__dashbridgeDebugLogs ? window.__dashbridgeDebugLogs.splice(0, window.__dashbridgeDebugLogs.length) : [];
+        const visualReapplySnapshot = (() => {
+            const source = window.__dashbridgeVisualReapplyDiagnostic;
+            if (!source) return null;
+            const events = source.events || [];
+            const retainedEvents = events.slice(-200);
+            return JSON.parse(JSON.stringify({
+                ...source,
+                events: retainedEvents,
+                eventWindow: {
+                    total: events.length,
+                    retained: retainedEvents.length,
+                    firstRetainedId: retainedEvents[0]?.id || null,
+                    lastRetainedId: retainedEvents.at(-1)?.id || null,
+                    truncated: retainedEvents.length < events.length,
+                },
+            }));
+        })();
+        return {
+            at: Date.now(), panelId: pid || null, panelFound: !!root, renderer,
+            environment,
+            domSnapshot,
+            logs,
+            legendVisibilityDiagnostic: window.__dashbridgeLegendVisibilityDiagnostic
+                ? JSON.parse(JSON.stringify(window.__dashbridgeLegendVisibilityDiagnostic)) : null,
+            panelToolsCommandDiagnostic: window.__dashbridgePanelToolsCommandDiagnostic
+                ? JSON.parse(JSON.stringify(window.__dashbridgePanelToolsCommandDiagnostic)) : null,
+            panelToolsRuntime: {
+                loaded: !!window.__dashbridgePanelToolsRuntimeLoaded,
+                handlerInstalled: typeof window.__dashbridgePanelToolsMessageHandler === 'function',
+                runtimeGeneration: window.__dashbridgePanelToolsRuntimeGeneration || null,
+                allowTop: !!window.__dashbridgePanelToolsAllowTop,
+            },
+            visualStyleState: visual?.getLocalStyleDebug?.({
+                root,
+                removeFill: !!state?.removeFill,
+                thickenLines: !!state?.thickenLines,
+            }) || null,
+            visualReapplyDiagnostic: visualReapplySnapshot,
+            legacyVisualObserverDiagnostic: window.__dashbridgeLegacyVisualObserverDiagnostic
+                ? JSON.parse(JSON.stringify(window.__dashbridgeLegacyVisualObserverDiagnostic)) : null,
+            dataLayoutReflowDiagnostic: window.__dashbridgeDataLayoutReflowDiagnostic
+                ? JSON.parse(JSON.stringify(window.__dashbridgeDataLayoutReflowDiagnostic)) : null,
+            canvas, axes, legendItems: legendEntries.length,
+            legend: {
+                entries: legendEntries.length,
+                bottomEntries: legendContainer
+                    ? legendEntries.filter(item => legendContainer.contains(item)).length : 0,
+                bottomContainer: legendContainer ? {
+                    tag: legendContainer.tagName,
+                    className: legendContainer.className,
+                    text: (legendContainer.innerText || '').trim(),
+                } : null,
+                layout: bottomLayout,
+                position: legendPosition,
+            },
+            chartSeriesCount: root ? (visual?.getChartSeriesCount?.(root) || 0) : 0,
+            markers: root ? {
+                legendBottom: !!root.querySelector('.dashbridge-legend-bottom'),
+                hidden: root.querySelectorAll('.dashbridge-uplot-fast-hidden').length,
+                hiddenLabels: markerLabels('.dashbridge-uplot-fast-hidden'),
+                dimmed: root.querySelectorAll('.dashbridge-uplot-fast-dimmed').length,
+                dimmedLabels: markerLabels('.dashbridge-uplot-fast-dimmed'),
+                nativeHidden: nativeHiddenLabels.length,
+                nativeHiddenLabels,
+                visibilityEntries,
+                threshold: root.querySelectorAll('[data-dashbridge-threshold-line]').length,
+                thresholdEngine: thresholdHost?.getAttribute('data-dashbridge-threshold-engine') || '',
+            } : {},
+            // These are compact MAIN-world counters. They make network and
+            // threshold failures actionable without retaining query payloads.
+            interceptor: window.__dashbridgeDataInterceptorDiagnostic
+                ? JSON.parse(JSON.stringify(window.__dashbridgeDataInterceptorDiagnostic)) : null,
+            thresholdDiagnostic: window.__dashbridgeThresholdDiagnostic
+                ? JSON.parse(JSON.stringify(window.__dashbridgeThresholdDiagnostic)) : null,
+            tools: state ? JSON.parse(JSON.stringify(state)) : null,
+            series,
+        };
+    }, [panelId, { includeCanvasImages }]);
+    const visualStateRef = `visual-state-${runtimeVisualReuseHash(diagnostic)}`;
+    if (canReuseRuntimeVisual(diagnostic, reuseVisualFrom, mode)) {
+        if (mode === DIAGNOSTIC_CAPTURE_MODES.PANEL || mode === DIAGNOSTIC_CAPTURE_MODES.FORENSIC) {
+            diagnostic.panelImage = reuseVisualFrom.panelImage;
+        }
+        if (mode === DIAGNOSTIC_CAPTURE_MODES.FORENSIC) {
+            diagnostic.viewportImage = reuseVisualFrom.viewportImage;
+        }
+        diagnostic.visualCapture = {
+            mode: 'reused-equivalent',
+            requestedMode: mode,
+            reason: captureReason,
+            visualStateRef,
+            sourceAt: reuseVisualFrom.visualCapture?.sourceAt || reuseVisualFrom.at || null,
+            verifiedAt: diagnostic.at,
+            signatureHash: runtimeVisualReuseHash(diagnostic),
+            proof: 'renderer+dom+geometry+canvas+legend+markers+series+threshold+visual-style+tools',
+        };
+        return diagnostic;
+    }
+    if (mode === DIAGNOSTIC_CAPTURE_MODES.SEMANTIC) {
+        diagnostic.visualCapture = {
+            mode: 'hash-only',
+            requestedMode: mode,
+            reason: captureReason,
+            visualStateRef,
+            sourceAt: diagnostic.at,
+            verifiedAt: diagnostic.at,
+            signatureHash: runtimeVisualReuseHash(diagnostic),
+            proof: 'fresh-renderer+dom+geometry+canvas-hash+pixels+legend+markers+series+threshold+visual-style+tools',
+        };
+        return diagnostic;
+    }
+    if (mode === DIAGNOSTIC_CAPTURE_MODES.CANVAS) {
+        diagnostic.visualCapture = {
+            mode: 'captured-canvas',
+            requestedMode: mode,
+            reason: captureReason,
+            visualStateRef,
+            sourceAt: diagnostic.at,
+            verifiedAt: diagnostic.at,
+            signatureHash: runtimeVisualReuseHash(diagnostic),
+        };
+        return diagnostic;
+    }
+    // Canvas snapshots omit Grafana's HTML legend. This crop preserves the
+    // visible panel layout, including series rows below the plot.
+    const imageCapture = await capturePanelDiagnosticImage(tabId, panelId, {
+        retainViewport: mode === DIAGNOSTIC_CAPTURE_MODES.FORENSIC,
+    });
+    diagnostic.viewportImage = imageCapture?.viewportImage || null;
+    if (imageCapture && Object.prototype.hasOwnProperty.call(imageCapture, 'viewportImage')) {
+        delete imageCapture.viewportImage;
+    }
+    diagnostic.panelImage = imageCapture;
+    diagnostic.visualCapture = {
+        mode: reuseVisualFrom ? 'captured-after-reuse-mismatch' : 'captured',
+        requestedMode: mode,
+        reason: captureReason,
+        visualStateRef,
+        sourceAt: diagnostic.at,
+        verifiedAt: diagnostic.at,
+        signatureHash: runtimeVisualReuseHash(diagnostic),
+    };
+    return diagnostic;
+}
+
+async function readRuntimeDiagnosticEvents(tabId, afterEventId = 0) {
+    return execMain(tabId, lastId => {
+        const journal = window.__dashbridgeE2EDiagnostics;
+        const events = journal?.events || [];
+        const cursor = Number.isInteger(lastId) && lastId >= 0 ? lastId : 0;
+        return {
+            startedAt: journal?.startedAt || null,
+            nextEventId: journal?.nextEventId || 0,
+            events: events.filter(event => event.id > cursor),
+        };
+    }, [afterEventId]);
+}
+
+async function readNetworkDiagnosticArchive(tabId) {
+    return execMain(tabId, () => {
+        const archive = window.__dashbridgeDataInterceptorArchive;
+        return archive ? JSON.parse(JSON.stringify(archive)) : {
+            schema: 'dashbridge-e2e-network-payload-archive/v1',
+            startedAt: null,
+            requests: {},
+            responses: {},
+        };
+    });
+}
+
+function runtimeSnapshotRef(path, snapshot) {
+    return {
+        ref: path,
+        at: snapshot?.at || null,
+        panelId: snapshot?.panelId || null,
+        panelImageHash: snapshot?.panelImage?.hash || null,
+        viewportImageHash: snapshot?.viewportImage?.hash || null,
+        canvasHashes: (snapshot?.canvas || []).map(image => image?.hash).filter(Boolean),
+        domOuterHTMLHash: snapshot?.domSnapshot?.root?.outerHTMLHash || null,
+    };
+}
+
+// Builds an exhaustive, machine-readable explanation of what changed between
+// two observations. Full snapshots are retained separately; image payloads are
+// represented here by hashes so the diff does not duplicate base64 data.
+function buildRuntimeDiagnosticDiff(before, after) {
+    const changes = [];
+    const countsByRoot = {};
+    let truncated = false;
+    const maxChanges = 25_000;
+    const hashText = text => {
+        let value = 2166136261;
+        for (let index = 0; index < text.length; index += 1) {
+            value = Math.imul(value ^ text.charCodeAt(index), 16777619);
+        }
+        return `fnv1a-${(value >>> 0).toString(16)}`;
+    };
+    const imageDescriptor = value => value && typeof value === 'object' ? {
+        hash: value.hash || null,
+        width: value.width || null,
+        height: value.height || null,
+        bytes: value.imageBytes || value.bytes || value.dataUrl?.length || null,
+        error: value.error || null,
+        capturedAt: value.capturedAt || null,
+        pixelStats: value.pixelStats || null,
+    } : null;
+    const safeValue = (value, depth = 0) => {
+        if (typeof value === 'string' && value.startsWith('data:image/')) {
+            return { imagePayload: true, characters: value.length, hash: hashText(value) };
+        }
+        if (typeof value === 'string' && value.length > 8192) {
+            return {
+                largeCanonicalValue: true,
+                characters: value.length,
+                hash: hashText(value),
+                first4096: value.slice(0, 4096),
+                last4096: value.slice(-4096),
+            };
+        }
+        if (value === null || value === undefined || typeof value !== 'object') return value;
+        if (depth > 14) return '[diff-depth-limit]';
+        if (Array.isArray(value)) return value.map(item => safeValue(item, depth + 1));
+        return Object.fromEntries(Object.entries(value).map(([key, item]) => [
+            key,
+            key === 'dataUrl' ? safeValue(item, depth + 1) : safeValue(item, depth + 1),
+        ]));
+    };
+    const push = (path, beforeValue, afterValue, kind) => {
+        if (changes.length >= maxChanges) { truncated = true; return; }
+        const root = path.split(/[.[]/, 1)[0] || '(root)';
+        countsByRoot[root] = (countsByRoot[root] || 0) + 1;
+        changes.push({
+            index: changes.length + 1,
+            path,
+            kind,
+            before: safeValue(beforeValue),
+            after: safeValue(afterValue),
+        });
+    };
+    const walk = (left, right, path = '', depth = 0) => {
+        if (changes.length >= maxChanges) { truncated = true; return; }
+        if (Object.is(left, right)) return;
+        if (path.endsWith('.dataUrl') || path === 'dataUrl') {
+            push(path, imageDescriptor({ dataUrl: left }), imageDescriptor({ dataUrl: right }), 'image-payload-changed');
+            return;
+        }
+        const leftObject = left !== null && typeof left === 'object';
+        const rightObject = right !== null && typeof right === 'object';
+        if (!leftObject || !rightObject || depth >= 16) {
+            push(path || '(root)', left, right, left === undefined ? 'added' : (right === undefined ? 'removed' : 'changed'));
+            return;
+        }
+        if (Array.isArray(left) !== Array.isArray(right)) {
+            push(path || '(root)', left, right, 'type-changed');
+            return;
+        }
+        const keys = Array.isArray(left)
+            ? Array.from({ length: Math.max(left.length, right.length) }, (_, index) => index)
+            : [...new Set([...Object.keys(left), ...Object.keys(right)])];
+        keys.forEach(key => walk(left[key], right[key], Array.isArray(left)
+            ? `${path}[${key}]`
+            : (path ? `${path}.${key}` : key), depth + 1));
+    };
+    walk(before || null, after || null);
+
+    const eventDelta = (left, right) => {
+        const leftEvents = Array.isArray(left?.events) ? left.events : [];
+        const rightEvents = Array.isArray(right?.events) ? right.events : [];
+        const lastId = leftEvents.reduce((max, event) => Math.max(max, Number(event?.id) || 0), 0);
+        return rightEvents.filter(event => (Number(event?.id) || 0) > lastId);
+    };
+    const keyedDelta = (left = [], right = [], keyOf) => {
+        const leftMap = new Map(left.map(item => [keyOf(item), item]));
+        const rightMap = new Map(right.map(item => [keyOf(item), item]));
+        const keys = [...new Set([...leftMap.keys(), ...rightMap.keys()])];
+        return keys.flatMap(key => {
+            const a = leftMap.get(key);
+            const b = rightMap.get(key);
+            return JSON.stringify(a) === JSON.stringify(b) ? [] : [{ key, before: a || null, after: b || null }];
+        });
+    };
+    const beforeCanvas = before?.canvas || [];
+    const afterCanvas = after?.canvas || [];
+    return {
+        schema: 'dashbridge-e2e-runtime-diff/v1',
+        beforeAt: before?.at || null,
+        afterAt: after?.at || null,
+        elapsedMs: before?.at && after?.at ? Math.max(0, after.at - before.at) : null,
+        changed: changes.length > 0,
+        changeCount: changes.length,
+        truncated,
+        maxChanges,
+        countsByRoot,
+        changes,
+        images: {
+            panel: { before: imageDescriptor(before?.panelImage), after: imageDescriptor(after?.panelImage) },
+            viewport: { before: imageDescriptor(before?.viewportImage), after: imageDescriptor(after?.viewportImage) },
+            canvas: Array.from({ length: Math.max(beforeCanvas.length, afterCanvas.length) }, (_, index) => ({
+                index,
+                before: imageDescriptor(beforeCanvas[index]),
+                after: imageDescriptor(afterCanvas[index]),
+            })),
+        },
+        tools: { before: before?.tools || null, after: after?.tools || null },
+        markers: { before: before?.markers || null, after: after?.markers || null },
+        visibilityChanges: keyedDelta(
+            before?.markers?.visibilityEntries,
+            after?.markers?.visibilityEntries,
+            item => item?.key || ''
+        ),
+        seriesChanges: keyedDelta(before?.series, after?.series, item => `${item?.index}\u0000${item?.label || ''}`),
+        network: {
+            before: before?.interceptor || null,
+            after: after?.interceptor || null,
+            addedEvents: eventDelta(before?.interceptor, after?.interceptor),
+        },
+        visualReapply: {
+            before: before?.visualReapplyDiagnostic || null,
+            after: after?.visualReapplyDiagnostic || null,
+            addedEvents: eventDelta(before?.visualReapplyDiagnostic, after?.visualReapplyDiagnostic),
+        },
+        consoleAndDebugLogs: {
+            before: before?.logs || [],
+            after: after?.logs || [],
+        },
+        dom: {
+            beforeHash: before?.domSnapshot?.root?.outerHTMLHash || null,
+            afterHash: after?.domSnapshot?.root?.outerHTMLHash || null,
+            beforeBytes: before?.domSnapshot?.root?.outerHTMLBytes || null,
+            afterBytes: after?.domSnapshot?.root?.outerHTMLBytes || null,
+            changed: before?.domSnapshot?.root?.outerHTMLHash !== after?.domSnapshot?.root?.outerHTMLHash,
+        },
+    };
+}
+
+async function readQueryLifecycle(tabId, afterEventId = 0) {
+    return execMain(tabId, lastId => {
+        const journal = window.__dashbridgeDataInterceptorDiagnostic;
+        const cursor = Number.isInteger(lastId) && lastId >= 0 ? lastId : 0;
+        const events = Array.isArray(journal?.events) ? journal.events : [];
+        return {
+            nextEventId: Number(journal?.nextEventId) || 0,
+            activeRequests: Number(journal?.activeRequests) || 0,
+            events: events.filter(event => event.id > cursor),
+            last: journal?.last ? JSON.parse(JSON.stringify(journal.last)) : null,
+        };
+    }, [afterEventId]);
+}
+
+// The deadline is strictly a watchdog. Completion is caused by a selected
+// panel response reaching a terminal journal state, never by elapsed time.
+async function waitForTargetQueryLifecycle(tabId, afterEventId, timeoutMs = 12000) {
+    return execMain(tabId, (cursor, timeout) => new Promise(resolve => {
+        const journal = window.__dashbridgeDataInterceptorDiagnostic;
+        const startedAt = performance.now();
+        const finish = result => resolve({
+            ...result,
+            cursor: Number(journal?.nextEventId) || cursor,
+            activeRequests: Number(journal?.activeRequests) || 0,
+            events: (journal?.events || []).filter(event => event.id > cursor),
+        });
+        const poll = () => {
+            const events = (journal?.events || []).filter(event => event.id > cursor);
+            const target = [...events].reverse().find(event => ['transform', 'transform-skipped'].includes(event.stage)
+                && ['iframe', 'query-signature', 'legend-fallback'].includes(event.scope));
+            if (target) return finish({ status: 'target-complete', target });
+            const targetDecodeError = [...events].reverse().find(event => event.stage === 'decode-error');
+            if (targetDecodeError) return finish({ status: 'decode-error', error: targetDecodeError });
+            if (performance.now() - startedAt >= timeout) {
+                const started = events.some(event => event.stage === 'request-start');
+                const httpError = [...events].reverse().find(event => event.stage === 'query-error');
+                return finish({
+                    status: httpError ? 'query-error' : (started ? 'target-not-matched' : 'request-not-started'),
+                    error: httpError || null,
+                });
+            }
+            requestAnimationFrame(poll);
+        };
+        poll();
+    }), [afterEventId, timeoutMs]);
+}
+
+// ─── Transition matrix executor ────────────────────────────────────
+
+/**
+ * Снимает текущее визуальное состояние: canvas data URL + DOM-маркеры.
+ * @param {number} tabId
+ * @param {string} panelId
+ * @returns {Promise<{canvas: string|null, dom: object}>}
+ */
+async function captureState(tabId, panelId) {
+    // Keep canvas and DOM snapshots in one MAIN-world operation so both refer
+    // to the same resolved panel branch.
+    const [canvas, dom] = await Promise.all([
+        execMain(tabId, pid => {
+            const shared = window.DashBridgeGrafanaDom;
+            const panel = shared?.findPanelById?.(pid);
+            let root = shared?.outerPanel?.(panel) || panel;
+            while (root && !root.classList?.contains('react-grid-item')
+                && !root.classList?.contains('panel-container') && root.parentElement) root = root.parentElement;
+            if (!root) return null;
+            // Flot uses layered canvases; serialize all layers to observe redraws.
+            const image = [...root.querySelectorAll('canvas')].map(cnv => {
+                try { return cnv.toDataURL(); } catch (_) { return ''; }
+            }).join('|');
+            return image || null;
+        }, [panelId]),
+        execMain(tabId, pid => {
+            const shared = window.DashBridgeGrafanaDom;
+            const panel = shared?.findPanelById?.(pid);
+            let root = shared?.outerPanel?.(panel) || panel;
+            while (root && !root.classList?.contains('react-grid-item')
+                && !root.classList?.contains('panel-container') && root.parentElement) root = root.parentElement;
+            if (!root) return { legendBottom: false, hidden: false, dimmed: false, seriesCount: 0, thresholdApplied: false, hasCanvas: false };
+            const thresholdHost = root.matches?.('[data-dashbridge-threshold-engine]')
+                ? root : root.querySelector('[data-dashbridge-threshold-engine]');
+            return {
+                legendBottom: !!root.querySelector('.dashbridge-legend-bottom'),
+                hidden: !!root.querySelector('.dashbridge-uplot-fast-hidden'),
+                dimmed: !!root.querySelector('.dashbridge-uplot-fast-dimmed'),
+                seriesCount: root.querySelectorAll('.dashbridge-uplot-fast-hidden').length
+                    + root.querySelectorAll('.dashbridge-uplot-fast-dimmed').length,
+                // The overlay line can be clipped when a threshold is outside
+                // the current Y range. The engine marker proves computation and
+                // application without requiring an incidental canvas repaint.
+                thresholdApplied: !!thresholdHost?.getAttribute('data-dashbridge-threshold-engine'),
+                thresholdEngine: thresholdHost?.getAttribute('data-dashbridge-threshold-engine') || '',
+                hasCanvas: root.querySelectorAll('canvas').length > 0,
+            };
+        }, [panelId]),
+    ]);
+    return { canvas, dom };
+}
+
+/**
+ * Waits until the selected panel has reached a real, observable steady state.
+ * A command acknowledgement and a terminal query event are not sufficient:
+ * panel-tools can still have a two-frame visual reapply queued, while React or
+ * uPlot can repaint the canvas shortly afterwards. The returned frame journal
+ * is retained in the JSON report so fast changes remain diagnosable.
+ */
+async function waitForPanelStability(tabId, panelId, {
+    timeoutMs = 8000,
+    quietMs = 300,
+    stableFrames = 4,
+} = {}) {
+    return execMain(tabId, (pid, options) => new Promise(resolve => {
+        const dom = window.DashBridgeGrafanaDom;
+        const startedAt = performance.now();
+        const startedWallAt = Date.now();
+        const samples = [];
+        let lastFingerprint = null;
+        let stableSince = null;
+        let consecutiveStableFrames = 0;
+        let mutationVersion = 0;
+        let lastSampleMutationVersion = 0;
+        let rootGeneration = 0;
+        let observedRoot = null;
+        let observer = null;
+        const mutationCounts = {
+            childList: 0,
+            attributes: 0,
+            characterData: 0,
+            attributesByName: {},
+            targets: {},
+        };
+
+        const hashText = value => {
+            const text = String(value || '');
+            let hash = 2166136261;
+            for (let i = 0; i < text.length; i++) {
+                hash ^= text.charCodeAt(i);
+                hash = Math.imul(hash, 16777619);
+            }
+            return `${(hash >>> 0).toString(16).padStart(8, '0')}:${text.length}`;
+        };
+        const serialisableTools = () => {
+            const state = window.__dashbridgePanelToolsState || {};
+            return {
+                removeFill: !!state.removeFill,
+                thickenLines: !!state.thickenLines,
+                thickenLinesValue: state.thickenLinesValue ?? null,
+                invertLegend: !!state.invertLegend,
+                legendVisibility: state.legendVisibility ?? null,
+                invertIdle: !!state.invertIdle,
+                convertMemToUsed: !!state.convertMemToUsed,
+                seriesQueryFilterEnabled: !!state.seriesQueryFilterEnabled,
+                thresholdEnabled: !!state.thresholdEnabled,
+            };
+        };
+        const attachObserver = root => {
+            if (root === observedRoot) return;
+            observer?.disconnect();
+            observedRoot = root;
+            rootGeneration += 1;
+            if (!root) return;
+            observer = new MutationObserver(records => {
+                mutationVersion += records.length || 1;
+                records.forEach(record => {
+                    mutationCounts[record.type] = (mutationCounts[record.type] || 0) + 1;
+                    if (record.attributeName) {
+                        mutationCounts.attributesByName[record.attributeName]
+                            = (mutationCounts.attributesByName[record.attributeName] || 0) + 1;
+                    }
+                    const target = record.target;
+                    const signature = `${target?.tagName || target?.nodeName || 'unknown'}${target?.id ? `#${target.id}` : ''}${target?.className && typeof target.className === 'string' ? `.${target.className.replace(/\s+/g, '.').slice(0, 160)}` : ''}`;
+                    mutationCounts.targets[signature] = (mutationCounts.targets[signature] || 0) + 1;
+                });
+            });
+            observer.observe(root, {
+                subtree: true,
+                childList: true,
+                attributes: true,
+                characterData: true,
+                attributeFilter: ['class', 'style', 'width', 'height', 'aria-checked', 'aria-selected'],
+            });
+        };
+        const finish = (status, reason) => {
+            observer?.disconnect();
+            const topMutationTargets = Object.entries(mutationCounts.targets)
+                .map(([target, count]) => ({ target, count }))
+                .sort((a, b) => b.count - a.count)
+                .slice(0, 100);
+            resolve({
+                schema: 'dashbridge-e2e-panel-settlement/v1',
+                status,
+                reason,
+                panelId: pid,
+                startedAt: startedWallAt,
+                finishedAt: Date.now(),
+                elapsedMs: Math.round(performance.now() - startedAt),
+                requiredQuietMs: options.quietMs,
+                requiredStableFrames: options.stableFrames,
+                observedFrames: samples.length,
+                observedMutations: mutationVersion,
+                observedRootGenerations: rootGeneration,
+                mutationSummary: {
+                    childList: mutationCounts.childList,
+                    attributes: mutationCounts.attributes,
+                    characterData: mutationCounts.characterData,
+                    attributesByName: mutationCounts.attributesByName,
+                    topTargets: topMutationTargets,
+                },
+                samples,
+            });
+        };
+        const geometry = element => {
+            if (!element) return null;
+            const rect = element.getBoundingClientRect();
+            const round = value => Math.round(Number(value || 0) * 100) / 100;
+            return {
+                x: round(rect.x), y: round(rect.y),
+                width: round(rect.width), height: round(rect.height),
+                top: round(rect.top), right: round(rect.right),
+                bottom: round(rect.bottom), left: round(rect.left),
+            };
+        };
+        const sample = () => {
+            const panel = dom?.findPanelById?.(pid);
+            const root = dom?.outerPanel?.(panel) || panel;
+            let evidenceRoot = root;
+            while (evidenceRoot && !evidenceRoot.classList?.contains('react-grid-item')
+                && !evidenceRoot.classList?.contains('panel-container') && evidenceRoot.parentElement) {
+                evidenceRoot = evidenceRoot.parentElement;
+            }
+            attachObserver(evidenceRoot);
+            const now = performance.now();
+            const canvases = evidenceRoot ? [...evidenceRoot.querySelectorAll('canvas')] : [];
+            const canvas = canvases.map((item, index) => {
+                let dataUrl = '';
+                try { dataUrl = item.toDataURL(); } catch (_) { dataUrl = '[unavailable]'; }
+                return {
+                    index,
+                    width: item.width,
+                    height: item.height,
+                    clientWidth: item.clientWidth,
+                    clientHeight: item.clientHeight,
+                    hash: hashText(dataUrl),
+                };
+            });
+            const legend = root ? (dom?.legendItems?.(panel) || []).map((item, index) => ({
+                index,
+                label: (dom?.legendLabel?.(item)?.textContent || item.textContent || '').replace(/\s+/g, ' ').trim(),
+                className: item.className || '',
+                opacity: getComputedStyle(item).opacity,
+                ariaChecked: item.getAttribute('aria-checked'),
+                ariaSelected: item.getAttribute('aria-selected'),
+                geometry: geometry(item),
+            })) : [];
+            const query = window.__dashbridgeDataInterceptorDiagnostic || {};
+            const threshold = window.__dashbridgeThresholdDiagnostic || null;
+            const visualReapply = window.__dashbridgeVisualReapplyDiagnostic || {};
+            const dataLayoutReflow = window.__dashbridgeDataLayoutReflowDiagnostic || {};
+            const facts = {
+                rootFound: !!evidenceRoot,
+                rootConnected: !!evidenceRoot?.isConnected,
+                rootGeneration,
+                rootGeometry: geometry(evidenceRoot),
+                canvas,
+                legend,
+                markers: evidenceRoot ? {
+                    hidden: evidenceRoot.querySelectorAll('.dashbridge-uplot-fast-hidden').length,
+                    dimmed: evidenceRoot.querySelectorAll('.dashbridge-uplot-fast-dimmed').length,
+                    legendBottom: evidenceRoot.querySelectorAll('.dashbridge-legend-bottom').length,
+                    thresholdEngine: evidenceRoot.getAttribute('data-dashbridge-threshold-engine') || '',
+                } : null,
+                tools: serialisableTools(),
+                query: {
+                    activeRequests: Number(query.activeRequests) || 0,
+                    nextEventId: Number(query.nextEventId) || 0,
+                    lastStage: query.last?.stage || null,
+                    lastScope: query.last?.scope || null,
+                },
+                visualReapply: {
+                    pending: visualReapply.pending === true,
+                    activeGeneration: Number(visualReapply.activeGeneration) || 0,
+                    attemptsPlanned: Number(visualReapply.attemptsPlanned) || 0,
+                    attemptsFinished: Number(visualReapply.attemptsFinished) || 0,
+                    lastCompletedAt: visualReapply.lastCompletedAt || null,
+                    finishedAt: visualReapply.finishedAt || null,
+                    errors: Number(visualReapply.errors) || 0,
+                },
+                dataLayoutReflow: {
+                    pending: dataLayoutReflow.pending === true,
+                    activeGeneration: Number(dataLayoutReflow.activeGeneration) || 0,
+                    attemptsPlanned: Number(dataLayoutReflow.attemptsPlanned) || 0,
+                    attemptsFinished: Number(dataLayoutReflow.attemptsFinished) || 0,
+                    lastCompletedAt: dataLayoutReflow.lastCompletedAt || null,
+                    finishedAt: dataLayoutReflow.finishedAt || null,
+                    errors: Number(dataLayoutReflow.errors) || 0,
+                },
+                threshold: threshold ? {
+                    enabled: !!threshold.enabled,
+                    panelFound: !!threshold.panelFound,
+                    engine: threshold.status?.engine || threshold.unitEngine || '',
+                    applied: threshold.status?.applied ?? null,
+                    exceeded: threshold.status?.exceeded ?? null,
+                } : null,
+                mutationVersion,
+                mutationsSincePreviousFrame: mutationVersion - lastSampleMutationVersion,
+            };
+            // MutationObserver is diagnostic evidence, not the definition of a
+            // visible state. Grafana virtualized legends rewrite identical style
+            // attributes every frame. Include resulting geometry/semantics in
+            // the fingerprint, while retaining raw mutation activity separately.
+            const { mutationVersion: _mutationVersion, mutationsSincePreviousFrame: _mutationDelta, ...observableFacts } = facts;
+            const fingerprint = JSON.stringify(observableFacts);
+            const same = fingerprint === lastFingerprint;
+            if (same) consecutiveStableFrames += 1;
+            else {
+                lastFingerprint = fingerprint;
+                consecutiveStableFrames = 1;
+                stableSince = now;
+            }
+            samples.push({
+                frame: samples.length + 1,
+                at: Date.now(),
+                elapsedMs: Math.round(now - startedAt),
+                sameAsPrevious: same,
+                consecutiveStableFrames,
+                stableForMs: Math.round(now - stableSince),
+                ...facts,
+            });
+            lastSampleMutationVersion = mutationVersion;
+
+            const quietLongEnough = now - stableSince >= options.quietMs;
+            const queryIdle = facts.query.activeRequests === 0;
+            const visualReapplyIdle = facts.visualReapply.pending === false;
+            const dataLayoutReflowIdle = facts.dataLayoutReflow.pending === false;
+            if (facts.rootFound && facts.rootConnected && canvas.length > 0
+                && queryIdle && visualReapplyIdle && dataLayoutReflowIdle && quietLongEnough
+                && consecutiveStableFrames >= options.stableFrames) {
+                finish('stable', 'Observable panel geometry, legend, canvas, query activity and visual reapply lifecycle remained unchanged for the required window');
+                return;
+            }
+            if (now - startedAt >= options.timeoutMs) {
+                const blockers = [];
+                if (!facts.rootFound || !facts.rootConnected) blockers.push('panel-not-connected');
+                if (!canvas.length) blockers.push('canvas-missing');
+                if (!queryIdle) blockers.push('query-still-active');
+                if (!visualReapplyIdle) blockers.push('visual-reapply-pending');
+                if (!dataLayoutReflowIdle) blockers.push('data-layout-reflow-pending');
+                if (!quietLongEnough) blockers.push('panel-still-changing');
+                if (consecutiveStableFrames < options.stableFrames) blockers.push('insufficient-stable-frames');
+                finish('timeout', blockers.join(', ') || 'stability-timeout');
+                return;
+            }
+            requestAnimationFrame(sample);
+        };
+        sample();
+    }), [panelId, { timeoutMs, quietMs, stableFrames }]);
+}
+
+/**
+ * Получает привязку сетевого преобразования непосредственно перед командой.
+ * Подписи из popup не существуют в E2E-командах, поэтому без этого шага
+ * перехватчик намеренно считает все ответы чужими для выбранной панели.
+ */
+async function captureTargetDataScope(tabId, panelId) {
+    return execMain(tabId, async pid => {
+        const dom = window.DashBridgeGrafanaDom;
+        const visual = window.DashBridgeGrafanaVisualEngine;
+        const panel = dom?.findPanelById?.(pid);
+        const root = dom?.outerPanel?.(panel) || panel;
+        if (!root) return { targetQuerySignatures: [], targetLegendSeries: [] };
+        const legendItems = dom?.legendItems?.(panel) || [];
+        const seen = new Set();
+        const targetLegendSeries = legendItems.map(item => (item.textContent || '').trim())
+            .filter(name => name && !seen.has(name) && seen.add(name));
+        const targetQuerySignatures = await visual?.getPanelQuerySignaturesAsync?.({ root, panelId: pid }) || [];
+        return { targetQuerySignatures, targetLegendSeries };
+    }, [panelId]);
+}
+
+/**
+ * Применяет настройки к панели через applyPanelTools и ждёт применения.
+ * @param {number} tabId
+ * @param {string} panelId
+ * @param {object} settings — visualSettings и/или transformSettings
+ */
+async function applySettingsAndWait(tabId, panelId, settings, { refresh = true, verifyPersistence = false } = {}) {
+    const transform = { ...(settings?.transformSettings || {}) };
+    // Реальный UI всегда хранит числовое значение порога. E2E включает флаг
+    // отдельно, поэтому задаём тот же валидный нулевой порог, если значения нет.
+    if (transform.thresholdEnabled && !Object.prototype.hasOwnProperty.call(transform, 'thresholdValue')) {
+        transform.thresholdValue = 0;
+        transform.thresholdRawValue = null;
+    }
+    // Target scope is captured for every lifecycle command. This lets a visual
+    // setting prove persistence against the selected panel's real response too.
+    const targetScope = await captureTargetDataScope(tabId, panelId);
+    const commandCursor = (await readQueryLifecycle(tabId)).nextEventId;
+    // `panelId` is retained for the matrix's compact call contract; the
+    // top-level command also receives targetPanelId for panel-tools routing.
+    const command = { panelId, targetPanelId: panelId, ...settings, ...targetScope, transformSettings: transform };
+    const result = await applyPanelTools(tabId, command);
+    // A command and a graph Refresh are separate user-visible actions. Capture
+    // the exact intermediate state so failures in immediate application can be
+    // distinguished from failures in refresh persistence.
+    const afterCommandBeforeRefresh = await captureRuntimeDiagnostic(tabId, panelId, {
+        captureMode: DIAGNOSTIC_CAPTURE_MODES.SEMANTIC,
+        captureReason: 'after-command-before-refresh-semantic-proof',
+    });
+    if (result?.status !== 'applied') return {
+        ...result,
+        afterCommandBeforeRefresh,
+        refresh: null,
+        lifecycle: null,
+        settlement: null,
+        cursor: commandCursor,
+        commandCursor,
+    };
+    if (!refresh) {
+        const settlement = await waitForPanelStability(tabId, panelId);
+        return { ...result, afterCommandBeforeRefresh, refresh: null, lifecycle: null, settlement, cursor: commandCursor, commandCursor };
+    }
+    // Establish the causal cursor immediately before the refresh. Events emitted
+    // while the command itself was applying must not satisfy the refresh wait.
+    const cursor = (await readQueryLifecycle(tabId)).nextEventId;
+    const refreshResult = await triggerRefresh(tabId);
+    const lifecycle = await waitForTargetQueryLifecycle(tabId, cursor);
+    const settlement = lifecycle?.status === 'target-complete'
+        ? await waitForPanelStability(tabId, panelId)
+        : null;
+    const persistence = {
+        required: !!verifyPersistence,
+        status: verifyPersistence ? 'not-run' : 'not-required',
+        reason: verifyPersistence ? 'Initial refresh or settlement was not proven' : 'No active feature requires persistence proof',
+        beforeRefresh: null,
+        cursor: null,
+        refresh: null,
+        lifecycle: null,
+        settlement: null,
+        passed: !verifyPersistence,
+    };
+    if (verifyPersistence && lifecycle?.status === 'target-complete' && settlement?.status === 'stable') {
+        // This is a distinct user-visible action. Capture the state after the
+        // command's first refresh, then refresh again without resending tools.
+        // The final transition invariant therefore proves persistence rather
+        // than merely proving that the command's immediate reapply succeeded.
+        persistence.beforeRefresh = await captureRuntimeDiagnostic(tabId, panelId, {
+            captureMode: DIAGNOSTIC_CAPTURE_MODES.SEMANTIC,
+            captureReason: 'first-refresh-persistence-semantic-proof',
+        });
+        persistence.cursor = (await readQueryLifecycle(tabId)).nextEventId;
+        persistence.refresh = await triggerRefresh(tabId);
+        persistence.lifecycle = await waitForTargetQueryLifecycle(tabId, persistence.cursor);
+        persistence.settlement = persistence.lifecycle?.status === 'target-complete'
+            ? await waitForPanelStability(tabId, panelId)
+            : null;
+        persistence.passed = persistence.lifecycle?.status === 'target-complete'
+            && persistence.settlement?.status === 'stable';
+        persistence.status = persistence.passed ? 'proven' : 'failed';
+        persistence.reason = persistence.passed
+            ? 'Active feature state survived a second refresh without another applyPanelTools command'
+            : (persistence.lifecycle?.status !== 'target-complete'
+                ? `Second refresh lifecycle was not proven: ${persistence.lifecycle?.status || 'unknown'}`
+                : `Panel did not settle after second refresh: ${persistence.settlement?.reason || persistence.settlement?.status || 'unknown'}`);
+    }
+    return { ...result, afterCommandBeforeRefresh, refresh: refreshResult, lifecycle, settlement, persistence, cursor, commandCursor };
+}
+
+/**
+ * Сброс всех визуальных и трансформационных настроек к исходному состоянию.
+ * Всегда вызывается в блоке finally для гарантированного отката.
+ */
+async function resetAllSettings(tabId, panelId) {
+    return applySettingsAndWait(tabId, panelId, {
+        // Send an explicit empty map rather than null. It is a structured
+        // command to restore every native legend item and cannot be mistaken
+        // for an omitted optional property while crossing the MAIN-world
+        // message bridge.
+        legendVisibility: {},
+        visualSettings: {
+            removeFill: false,
+            thickenLines: false,
+            thickenLinesValue: 0.5,
+            invertLegend: false,
+        },
+        transformSettings: {
+            invertIdle: false,
+            convertMemToUsed: false,
+            seriesQueryFilterEnabled: false,
+            seriesQueryFilterValue: 0,
+            seriesQueryFilterRawValue: null,
+            seriesQueryFilterMode: 'max',
+            thresholdEnabled: false,
+        },
+    });
+}
+
+/**
+ * Запускает последовательность переходов и проверяет инварианты на каждом шаге.
+ * В блоке finally гарантированно сбрасывает настройки.
+ *
+ * @param {number} tabId
+ * @param {object} env — тестовое окружение (env.panelId, env.hasLegend, env.hasCPU, …)
+ * @param {Array<{label: string, settings: object|function, invariant: function}>} transitions
+ * @returns {Promise<{pass: boolean, skip?: boolean, details: string[]}>}
+ */
+function transitionSkipReason(settings, env) {
+    const visual = settings?.visualSettings || {};
+    const transform = settings?.transformSettings || {};
+    if (visual.invertLegend && !env.hasLegend) return 'нет легенды';
+    if (transform.invertIdle && !env.hasCPU) return 'нет CPU-панели';
+    if (transform.convertMemToUsed && !env.hasRAM) return 'нет RAM-панели';
+    if (transform.seriesQueryFilterEnabled && !env.hasSeries) return 'нет серий для фильтра';
+    if (settings?.legendVisibility && !env.hasVisibilitySeries) return 'нет двух управляемых серий легенды';
+    return '';
+}
+
+async function runTransitionTest(tabId, env, transitions) {
+    const liveProgress = {
+        schema: 'dashbridge-e2e-transition-progress/v1',
+        startedAt: Date.now(),
+        phase: 'resolve-transitions',
+        totalTransitions: transitions.length,
+        completedTransitions: 0,
+        current: null,
+        steps: [],
+    };
+    env.__dashbridgeTransitionProgress = liveProgress;
+    // Resolve generated commands before checking preconditions. This keeps
+    // dynamic feature settings (for example duplicate-safe legend keys)
+    // subject to the same causal skip contract as static settings.
+    const resolvedTransitions = await Promise.all(transitions.map(async step => ({
+        ...step,
+        settings: typeof step.settings === 'function'
+            ? await step.settings(env)
+            : step.settings,
+    })));
+    const skippedReason = resolvedTransitions.map(step => transitionSkipReason(step.settings, env)).find(Boolean);
+    if (skippedReason) {
+        const capturedAt = Date.now();
+        const baseline = await captureRuntimeDiagnostic(tabId, env.panelId, {
+            reuseVisualFrom: env.__dashbridgeCapabilitySnapshot || env.__dashbridgeCurrentOuterBefore || null,
+            captureMode: DIAGNOSTIC_CAPTURE_MODES.SEMANTIC,
+            captureReason: 'capability-skip-semantic-proof',
+        });
+        env.__dashbridgeCapabilitySnapshot = baseline;
+        return {
+            pass: true, skip: true, details: `SKIP: ${skippedReason}`,
+            diagnostic: {
+                kind: 'transition',
+                skipReason: skippedReason,
+                transitions: [],
+                baseline,
+                actionTimeline: [{
+                    schema: 'dashbridge-e2e-action-event/v1',
+                    sequence: 1,
+                    action: 'scenario-skipped',
+                    description: 'Сценарий не запускался: проверяемая возможность отсутствует в текущем окружении',
+                    startedAt: capturedAt,
+                    finishedAt: Date.now(),
+                    durationMs: Date.now() - capturedAt,
+                    input: { resolvedTransitions, skippedReason },
+                    output: { status: 'skip', reason: skippedReason },
+                    snapshotRefs: { observed: runtimeSnapshotRef('diagnostic.baseline', baseline) },
+                    diffs: [],
+                }],
+            },
+        };
+    }
+
+    const panelId = env.panelId;
+    const testStartedAt = Date.now();
+    let baseline = null;
+    const diagnostic = {
+        kind: 'transition',
+        schema: 'dashbridge-e2e-scenario-diagnostic/v2',
+        startedAt: testStartedAt,
+        baseline: null,
+        opened: null,
+        transitions: [],
+        actionTimeline: [],
+    };
+    const appendAction = action => diagnostic.actionTimeline.push({
+        schema: 'dashbridge-e2e-action-event/v1',
+        sequence: diagnostic.actionTimeline.length + 1,
+        relativeStartedMs: Math.max(0, (action.startedAt || Date.now()) - testStartedAt),
+        relativeFinishedMs: Math.max(0, (action.finishedAt || Date.now()) - testStartedAt),
+        ...action,
+    });
+    const nativeLegendResetVerified = runtimeDiagnostic => {
+        const entries = runtimeDiagnostic?.markers?.visibilityEntries || [];
+        const nativeHiddenEntries = entries.filter(entry => entry.nativeHidden === true);
+        const commandState = runtimeDiagnostic?.tools || null;
+        const staleVisibility = commandState?.legendVisibility
+            && Object.entries(commandState.legendVisibility).some(([, visible]) => visible === false);
+        return {
+            pass: entries.length > 0 && nativeHiddenEntries.length === 0 && !staleVisibility,
+            entries: entries.length,
+            nativeHidden: nativeHiddenEntries.map(entry => entry.key),
+            staleVisibility: !!staleVisibility,
+        };
+    };
+    const details = [];
+    let allPassed = true;
+    let anySkipped = false;
+
+    // First preserve exactly what was visible when the scenario opened. This
+    // is deliberately captured before isolation so a contaminated incoming
+    // state can be reconstructed from JSON and screenshots.
+    const openedAt = Date.now();
+    const openedSnapshot = await captureRuntimeDiagnostic(tabId, panelId, {
+        reuseVisualFrom: env.__dashbridgeCurrentOuterBefore || null,
+        captureMode: DIAGNOSTIC_CAPTURE_MODES.SEMANTIC,
+        captureReason: 'scenario-opened-semantic-bookmark',
+    });
+    diagnostic.opened = openedSnapshot;
+
+    // Isolate once, then preserve state across the complete user sequence.
+    // Resetting before every step would test independent snapshots rather than
+    // ON→ON, partial-OFF and multi-feature interactions.
+    const isolationStartedAt = Date.now();
+    liveProgress.phase = 'isolation-reset';
+    const isolationRuntimeCursor = (await readRuntimeDiagnosticEvents(tabId)).nextEventId;
+    const isolationReset = await resetAllSettings(tabId, panelId);
+    const isolationSnapshot = await captureRuntimeDiagnostic(tabId, panelId, {
+        captureMode: DIAGNOSTIC_CAPTURE_MODES.PANEL,
+        captureReason: 'canonical-isolated-baseline',
+    });
+    const isolationRuntimeEvents = await readRuntimeDiagnosticEvents(tabId, isolationRuntimeCursor);
+    const isolationNativeReset = nativeLegendResetVerified(isolationSnapshot);
+    const isolationResetPassed = isolationReset.status === 'applied'
+        && isolationReset.lifecycle?.status === 'target-complete'
+        && isolationReset.settlement?.status === 'stable'
+        && isolationNativeReset.pass;
+    baseline = await captureState(tabId, panelId);
+    diagnostic.baseline = isolationSnapshot;
+    baseline.diagnostic = diagnostic.baseline;
+    diagnostic.isolation = {
+        status: isolationReset.status,
+        lifecycle: isolationReset.lifecycle || null,
+        settlement: isolationReset.settlement || null,
+        acknowledgement: isolationReset.acknowledgement || null,
+        queue: isolationReset.acknowledgement?.queue || null,
+        refresh: isolationReset.refresh || null,
+        commandCursor: isolationReset.commandCursor ?? null,
+        refreshCursor: isolationReset.cursor ?? null,
+        nativeLegend: isolationNativeReset,
+        afterCommandBeforeRefresh: isolationReset.afterCommandBeforeRefresh || null,
+        passed: isolationResetPassed,
+    };
+    const isolationFinishedAt = Date.now();
+    liveProgress.phase = 'transitions';
+    liveProgress.isolationDurationMs = isolationFinishedAt - isolationStartedAt;
+    appendAction({
+        action: 'isolate-scenario-baseline',
+        description: 'Зафиксировано входное состояние страницы, затем все функции явно сброшены и график обновлён',
+        startedAt: openedAt,
+        finishedAt: isolationFinishedAt,
+        durationMs: isolationFinishedAt - openedAt,
+        input: {
+            panelId,
+            intent: 'restore-all-features-to-native-baseline',
+            resolvedTransitions,
+        },
+        output: {
+            status: isolationReset.status,
+            passed: isolationResetPassed,
+            acknowledgement: isolationReset.acknowledgement || null,
+            lifecycle: isolationReset.lifecycle || null,
+            settlement: isolationReset.settlement || null,
+            nativeLegend: isolationNativeReset,
+            runtimeEvents: isolationRuntimeEvents,
+        },
+        snapshotRefs: {
+            pageOpened: runtimeSnapshotRef('diagnostic.opened', openedSnapshot),
+            afterCommandBeforeRefresh: runtimeSnapshotRef('diagnostic.isolation.afterCommandBeforeRefresh', isolationReset.afterCommandBeforeRefresh),
+            afterIsolationReset: runtimeSnapshotRef('diagnostic.baseline', isolationSnapshot),
+        },
+        diffs: [
+            {
+                phase: 'page-opened-to-after-reset-command-before-refresh',
+                ...buildRuntimeDiagnosticDiff(openedSnapshot, isolationReset.afterCommandBeforeRefresh || isolationSnapshot),
+            },
+            {
+                phase: 'after-reset-command-to-isolated-baseline-after-refresh',
+                ...buildRuntimeDiagnosticDiff(isolationReset.afterCommandBeforeRefresh || openedSnapshot, isolationSnapshot),
+            },
+            {
+                phase: 'page-opened-to-isolated-baseline',
+                ...buildRuntimeDiagnosticDiff(openedSnapshot, isolationSnapshot),
+            },
+        ],
+    });
+
+    let reusableStableSnapshot = isolationSnapshot;
+    let previousActiveIds = [];
+    try {
+        for (let i = 0; i < resolvedTransitions.length; i++) {
+            const { label, settings: resolvedSettings, invariant, activeIds = [] } = resolvedTransitions[i];
+            const changedIds = [...new Set([...previousActiveIds, ...activeIds])]
+                .filter(id => previousActiveIds.includes(id) !== activeIds.includes(id));
+            const actionStartedAt = Date.now();
+            liveProgress.phase = 'transition';
+            liveProgress.current = {
+                index: i + 1,
+                label,
+                activeIds: [...activeIds],
+                startedAt: actionStartedAt,
+            };
+            const actionRuntimeCursor = (await readRuntimeDiagnosticEvents(tabId)).nextEventId;
+            const before = await captureRuntimeDiagnostic(tabId, panelId, {
+                reuseVisualFrom: reusableStableSnapshot,
+                captureMode: DIAGNOSTIC_CAPTURE_MODES.SEMANTIC,
+                captureReason: 'transition-before-semantic-proof',
+            });
+            const command = isolationResetPassed
+                ? await applySettingsAndWait(tabId, panelId, resolvedSettings, { verifyPersistence: activeIds.length > 0 })
+                : {
+                    status: 'isolation-reset-failed',
+                    lifecycle: isolationReset.lifecycle || null,
+                    reset: isolationReset,
+                };
+            const afterState = await captureState(tabId, panelId);
+            let after = await captureRuntimeDiagnostic(tabId, panelId, {
+                reuseVisualFrom: activeIds.length ? reusableStableSnapshot : baseline,
+                captureMode: diagnosticCaptureModeForTransition(resolvedSettings, activeIds, changedIds),
+                captureReason: 'settled-user-visible-transition-state',
+            });
+            previousActiveIds = [...activeIds];
+            reusableStableSnapshot = after;
+            const actionRuntimeEvents = await readRuntimeDiagnosticEvents(tabId, actionRuntimeCursor);
+            // Invariants normally compare compact canvas/DOM state. Attach the
+            // richer renderer-series snapshot for response-transform checks.
+            afterState.diagnostic = after;
+            const lifecycle = command.lifecycle;
+            const visualPersistenceFeatures = ['removeFill', 'thickenLines', 'invertLegend', 'seriesVisibility'];
+            const requiresVisualReapply = activeIds.some(id => visualPersistenceFeatures.includes(id));
+            const reapplyBefore = Number(command.persistence?.beforeRefresh?.visualReapplyDiagnostic?.completed) || 0;
+            const reapplyAfter = Number(after?.visualReapplyDiagnostic?.completed) || 0;
+            const reapplyErrorsBefore = Number(command.persistence?.beforeRefresh?.visualReapplyDiagnostic?.errors) || 0;
+            const reapplyErrorsAfter = Number(after?.visualReapplyDiagnostic?.errors) || 0;
+            const visualReapplyProof = {
+                required: requiresVisualReapply,
+                completedBeforeSecondRefresh: reapplyBefore,
+                completedAfterSecondRefresh: reapplyAfter,
+                completedDelta: reapplyAfter - reapplyBefore,
+                errorsBeforeSecondRefresh: reapplyErrorsBefore,
+                errorsAfterSecondRefresh: reapplyErrorsAfter,
+                errorDelta: reapplyErrorsAfter - reapplyErrorsBefore,
+                passed: !requiresVisualReapply || (reapplyAfter > reapplyBefore && reapplyErrorsAfter === reapplyErrorsBefore),
+            };
+            if (command.persistence?.required) {
+                command.persistence.visualReapply = visualReapplyProof;
+                if (!visualReapplyProof.passed) {
+                    command.persistence.passed = false;
+                    command.persistence.status = 'failed';
+                    command.persistence.reason = 'After the second graph refresh no successful causal visual-style reapply was recorded';
+                }
+            }
+            const persistencePassed = command.persistence?.required !== true || command.persistence?.passed === true;
+            const lifecyclePassed = command.status === 'applied'
+                && lifecycle?.status === 'target-complete'
+                && command.settlement?.status === 'stable'
+                && persistencePassed;
+            const checkResult = lifecyclePassed
+                ? invariant(baseline, afterState, env)
+                : {
+                    pass: false,
+                    reason: command.status !== 'applied'
+                        ? `команда не подтверждена: ${command.status || 'unknown'}`
+                        : (lifecycle?.status !== 'target-complete'
+                            ? `обновление целевой панели не доказано: ${lifecycle?.status || 'unknown'}`
+                            : (command.settlement?.status !== 'stable'
+                                ? `панель не стабилизировалась: ${command.settlement?.reason || command.settlement?.status || 'unknown'}`
+                                : `функция не пережила повторный refresh: ${command.persistence?.reason || 'unknown'}`)),
+                    debug: JSON.stringify({ lifecycle: lifecycle || null, settlement: command.settlement || null, persistence: command.persistence || null }),
+                };
+            const stepPassed = checkResult.pass;
+            const stepSkipped = !!(checkResult.skip || checkResult.reason?.startsWith('SKIP:'));
+
+            if (!stepPassed && !stepSkipped) {
+                after = await captureRuntimeDiagnostic(tabId, panelId, {
+                    captureMode: DIAGNOSTIC_CAPTURE_MODES.FORENSIC,
+                    captureReason: 'automatic-forensic-transition-failure',
+                });
+                afterState.diagnostic = after;
+                reusableStableSnapshot = after;
+            }
+
+            if (stepSkipped) anySkipped = true;
+            else allPassed = allPassed && stepPassed;
+
+            diagnostic.transitions.push({
+                schema: 'dashbridge-e2e-transition-evidence/v1',
+                index: i + 1,
+                label,
+                settings: resolvedSettings,
+                activeIds,
+                changedIds,
+                visualEvidenceRequirement: after.visualCapture?.requestedMode === DIAGNOSTIC_CAPTURE_MODES.FORENSIC
+                    ? 'forensic'
+                    : (after.visualCapture?.requestedMode === DIAGNOSTIC_CAPTURE_MODES.PANEL ? 'panel' : 'canvas'),
+                command,
+                before,
+                after,
+                lifecycle,
+                settlement: command.settlement || null,
+                persistence: command.persistence || null,
+                visualReapplyProof,
+                isolationReset: {
+                    status: i === 0 ? isolationReset.status : 'not-repeated',
+                    lifecycle: i === 0 ? (isolationReset.lifecycle || null) : null,
+                    nativeLegend: i === 0 ? isolationNativeReset : null,
+                    passed: isolationResetPassed,
+                    reason: i === 0
+                        ? 'Чистый baseline установлен до последовательности'
+                        : 'Состояние предыдущего шага сохранено для последовательного перехода',
+                },
+                invariant: {
+                    pass: stepPassed,
+                    skip: stepSkipped,
+                    reason: checkResult.reason || '',
+                    debug: checkResult.debug || '',
+                },
+                verdict: {
+                    outcome: stepSkipped ? 'skip' : (stepPassed ? 'pass' : 'fail'),
+                    commandApplied: command.status === 'applied',
+                    targetLifecyclePassed: lifecycle?.status === 'target-complete',
+                    panelSettled: command.settlement?.status === 'stable',
+                    persistenceRequired: command.persistence?.required === true,
+                    persistencePassed,
+                    semanticInvariantPassed: !!checkResult.pass,
+                    reason: checkResult.reason || '',
+                },
+            });
+            const afterFirstRefresh = command.persistence?.beforeRefresh || null;
+            const actionFinishedAt = Date.now();
+            liveProgress.steps.push({
+                index: i + 1,
+                label,
+                activeIds: [...activeIds],
+                durationMs: actionFinishedAt - actionStartedAt,
+                commandStatus: command.status || null,
+                lifecycleStatus: command.lifecycle?.status || null,
+                settlementStatus: command.settlement?.status || null,
+                persistenceStatus: command.persistence?.status || null,
+                invariantPassed: !!stepPassed,
+            });
+            liveProgress.completedTransitions = i + 1;
+            liveProgress.current = null;
+            appendAction({
+                action: 'apply-transition',
+                transitionIndex: i + 1,
+                description: `Шаг ${i + 1}: ${label}`,
+                startedAt: actionStartedAt,
+                finishedAt: actionFinishedAt,
+                durationMs: actionFinishedAt - actionStartedAt,
+                input: {
+                    panelId,
+                    label,
+                    settings: resolvedSettings,
+                    activeIds,
+                    persistenceRefreshRequired: activeIds.length > 0,
+                    expected: 'command acknowledgement, target query completion, stable panel, semantic invariant',
+                },
+                output: {
+                    status: command.status,
+                    acknowledgement: command.acknowledgement || null,
+                    commandDiagnostic: command.commandDiagnostic || null,
+                    lifecycle: command.lifecycle || null,
+                    settlement: command.settlement || null,
+                    persistence: command.persistence || null,
+                    visualReapplyProof,
+                    invariant: {
+                        pass: stepPassed,
+                        skip: stepSkipped,
+                        reason: checkResult.reason || '',
+                        debug: checkResult.debug || '',
+                    },
+                    runtimeEvents: actionRuntimeEvents,
+                },
+                checkpoints: [
+                    { stage: 'before-captured', at: before.at || null },
+                    { stage: 'command-acknowledged', at: command.acknowledgement?.completedAt || null },
+                    { stage: 'after-command-before-refresh-captured', at: command.afterCommandBeforeRefresh?.at || null },
+                    { stage: 'first-target-query-complete', at: command.lifecycle?.target?.at || null },
+                    { stage: 'first-panel-settled', at: command.settlement?.finishedAt || null },
+                    { stage: 'after-first-refresh-captured', at: afterFirstRefresh?.at || null },
+                    { stage: 'second-target-query-complete', at: command.persistence?.lifecycle?.target?.at || null },
+                    { stage: 'second-panel-settled', at: command.persistence?.settlement?.finishedAt || null },
+                    { stage: 'final-state-captured', at: after.at || null },
+                ],
+                snapshotRefs: {
+                    before: runtimeSnapshotRef(`diagnostic.transitions[${i}].before`, before),
+                    afterCommandBeforeRefresh: runtimeSnapshotRef(`diagnostic.transitions[${i}].command.afterCommandBeforeRefresh`, command.afterCommandBeforeRefresh),
+                    afterFirstRefresh: runtimeSnapshotRef(`diagnostic.transitions[${i}].persistence.beforeRefresh`, afterFirstRefresh),
+                    afterSecondRefresh: runtimeSnapshotRef(`diagnostic.transitions[${i}].after`, after),
+                },
+                diffs: [
+                    {
+                        phase: 'before-to-after-command-before-refresh',
+                        ...buildRuntimeDiagnosticDiff(before, command.afterCommandBeforeRefresh || afterFirstRefresh || after),
+                    },
+                    {
+                        phase: 'after-command-before-refresh-to-after-first-refresh',
+                        ...buildRuntimeDiagnosticDiff(command.afterCommandBeforeRefresh || before, afterFirstRefresh || after),
+                    },
+                    {
+                        phase: 'before-to-after-first-refresh',
+                        ...buildRuntimeDiagnosticDiff(before, afterFirstRefresh || after),
+                    },
+                    ...(afterFirstRefresh ? [{
+                        phase: 'after-first-refresh-to-after-second-refresh',
+                        ...buildRuntimeDiagnosticDiff(afterFirstRefresh, after),
+                    }] : []),
+                    {
+                        phase: 'complete-action-before-to-after',
+                        ...buildRuntimeDiagnosticDiff(before, after),
+                    },
+                ],
+            });
+            details.push(`${i + 1}. ${label}: ${stepPassed ? '✓' : '✗'} ${checkResult.reason || ''}`);
+            // Structured lifecycle evidence already lives in diagnostic.transitions.
+            // Do not duplicate its full JSON inside the human-readable details.
+            // A hard causal failure invalidates all following states. Do not
+            // fabricate further evidence after the selected query was absent.
+            if (!stepPassed && !stepSkipped) break;
+        }
+    } finally {
+        const resetStartedAt = Date.now();
+        liveProgress.phase = 'final-reset';
+        liveProgress.current = { startedAt: resetStartedAt };
+        const resetRuntimeCursor = (await readRuntimeDiagnosticEvents(tabId)).nextEventId;
+        const beforeReset = await captureRuntimeDiagnostic(tabId, panelId, {
+            reuseVisualFrom: reusableStableSnapshot,
+            captureMode: DIAGNOSTIC_CAPTURE_MODES.SEMANTIC,
+            captureReason: 'before-reset-semantic-proof',
+        });
+        const reset = await resetAllSettings(tabId, panelId);
+        const afterState = await captureState(tabId, panelId);
+        let after = await captureRuntimeDiagnostic(tabId, panelId, {
+            reuseVisualFrom: baseline,
+            captureMode: DIAGNOSTIC_CAPTURE_MODES.PANEL,
+            captureReason: 'restored-baseline-proof',
+        });
+        const resetRuntimeEvents = await readRuntimeDiagnosticEvents(tabId, resetRuntimeCursor);
+        afterState.diagnostic = after;
+        const resetLifecyclePassed = reset.status === 'applied'
+            && reset.lifecycle?.status === 'target-complete'
+            && reset.settlement?.status === 'stable';
+        const resetNativeLegend = nativeLegendResetVerified(after);
+        diagnostic.beforeReset = beforeReset;
+        // A reset acknowledgement alone is insufficient. Verify every declared
+        // feature is semantically OFF, including native Grafana legend state,
+        // before allowing the next test to reuse this panel.
+        const resetInvariant = resetLifecyclePassed && resetNativeLegend.pass
+            ? activeSetInvariant([], null)(baseline, afterState, env)
+            : {
+                pass: false,
+                reason: resetLifecyclePassed
+                    ? 'Нативная видимость легенды не восстановлена'
+                    : (reset.lifecycle?.status !== 'target-complete'
+                        ? `Сброс не доказан: ${reset.lifecycle?.status || reset.status || 'unknown'}`
+                        : `Панель не стабилизировалась после сброса: ${reset.settlement?.reason || reset.settlement?.status || 'unknown'}`),
+                debug: JSON.stringify({ lifecycle: reset.lifecycle || null, settlement: reset.settlement || null, nativeLegend: resetNativeLegend }),
+            };
+        const resetPassed = resetLifecyclePassed && resetNativeLegend.pass && resetInvariant.pass;
+        if (!resetPassed) {
+            after = await captureRuntimeDiagnostic(tabId, panelId, {
+                captureMode: DIAGNOSTIC_CAPTURE_MODES.FORENSIC,
+                captureReason: 'automatic-forensic-reset-failure',
+            });
+            afterState.diagnostic = after;
+        }
+        diagnostic.reset = {
+            schema: 'dashbridge-e2e-transition-evidence/v1',
+            command: reset,
+            after,
+            lifecycle: reset.lifecycle,
+            settlement: reset.settlement || null,
+            nativeLegend: resetNativeLegend,
+            invariant: resetInvariant,
+            pass: resetPassed,
+            verdict: {
+                outcome: resetPassed ? 'pass' : 'fail',
+                commandApplied: reset.status === 'applied',
+                targetLifecyclePassed: reset.lifecycle?.status === 'target-complete',
+                panelSettled: reset.settlement?.status === 'stable',
+                semanticInvariantPassed: !!resetInvariant.pass,
+                reason: resetPassed ? 'Сброс семантически подтвердил исходное состояние всех функций' : resetInvariant.reason,
+            },
+        };
+        const resetFinishedAt = Date.now();
+        appendAction({
+            action: 'restore-after-scenario',
+            description: 'После сценария все функции явно выключены, выполнен Refresh и доказан безопасный baseline для следующего теста',
+            startedAt: resetStartedAt,
+            finishedAt: resetFinishedAt,
+            durationMs: resetFinishedAt - resetStartedAt,
+            input: { panelId, intent: 'restore-all-features-to-native-baseline' },
+            output: {
+                status: reset.status,
+                pass: resetPassed,
+                acknowledgement: reset.acknowledgement || null,
+                lifecycle: reset.lifecycle || null,
+                settlement: reset.settlement || null,
+                nativeLegend: resetNativeLegend,
+                invariant: resetInvariant,
+                runtimeEvents: resetRuntimeEvents,
+            },
+            checkpoints: [
+                { stage: 'before-reset-captured', at: beforeReset.at || null },
+                { stage: 'reset-command-acknowledged', at: reset.acknowledgement?.completedAt || null },
+                { stage: 'after-reset-command-before-refresh-captured', at: reset.afterCommandBeforeRefresh?.at || null },
+                { stage: 'reset-target-query-complete', at: reset.lifecycle?.target?.at || null },
+                { stage: 'reset-panel-settled', at: reset.settlement?.finishedAt || null },
+                { stage: 'after-reset-captured', at: after.at || null },
+            ],
+            snapshotRefs: {
+                beforeReset: runtimeSnapshotRef('diagnostic.beforeReset', beforeReset),
+                afterResetCommandBeforeRefresh: runtimeSnapshotRef('diagnostic.reset.command.afterCommandBeforeRefresh', reset.afterCommandBeforeRefresh),
+                afterReset: runtimeSnapshotRef('diagnostic.reset.after', after),
+            },
+            diffs: [
+                {
+                    phase: 'before-reset-to-after-reset-command-before-refresh',
+                    ...buildRuntimeDiagnosticDiff(beforeReset, reset.afterCommandBeforeRefresh || after),
+                },
+                {
+                    phase: 'after-reset-command-before-refresh-to-after-reset-refresh',
+                    ...buildRuntimeDiagnosticDiff(reset.afterCommandBeforeRefresh || beforeReset, after),
+                },
+                {
+                    phase: 'before-reset-to-restored-baseline',
+                    ...buildRuntimeDiagnosticDiff(beforeReset, after),
+                },
+            ],
+        });
+        diagnostic.finishedAt = resetFinishedAt;
+        diagnostic.durationMs = resetFinishedAt - testStartedAt;
+        liveProgress.phase = 'complete';
+        liveProgress.current = null;
+        liveProgress.finishedAt = resetFinishedAt;
+        liveProgress.durationMs = resetFinishedAt - liveProgress.startedAt;
+        if (!resetPassed) {
+            allPassed = false;
+            // A subsequent test would have no trustworthy baseline. The core
+            // turns this explicit signal into aborted/not-run results for the
+            // rest of this URL instead of spreading a destructive state.
+            diagnostic.environmentUnsafe = true;
+            details.push(`Сброс: ✗ ${resetInvariant.reason || 'исходное состояние не доказано'}`);
+        }
+    }
+
+    return {
+        pass: allPassed,
+        skip: anySkipped && allPassed,
+        environmentUnsafe: diagnostic.environmentUnsafe === true,
+        details: anySkipped && allPassed ? `SKIP: ${details.join(' | ')}` : details.join(' | '),
+        diagnostic,
+    };
+}
+
+// ─── Строгие инвариантные проверки для каждого переключателя ───────
+
+/**
+ * Каждый инвариант принимает (baseline, current, env) и возвращает
+ * { pass: boolean, reason?: string, debug?: string }
+ */
+const matrixInvariants = {
+    // Canvas is diagnostic evidence only: Grafana may repaint an identical
+    // image after a real response. Style checks therefore inspect the renderer
+    // state that production code mutates, and skip only when it is unavailable.
+    rendererSeries: current => (current.diagnostic?.series || []).filter(series => series && series.label !== undefined),
+    unavailableRenderer: current => !current.diagnostic?.panelFound || !current.diagnostic?.renderer || current.diagnostic.renderer === 'unknown',
+    skipUnsupportedRenderer: current => ({
+        pass: true,
+        skip: true,
+        reason: 'SKIP: рендерер графика не предоставляет состояние серий',
+        debug: `renderer=${current.diagnostic?.renderer || 'unknown'}`,
+    }),
+    everyRendererSeries: (current, predicate) => {
+        const series = matrixInvariants.rendererSeries(current);
+        return series.length > 0 && series.every(predicate);
+    },
+
+    // ── removeFill ──────────────────────────────────────────────────
+    removeFillOn: (baseline, current) => {
+        if (matrixInvariants.unavailableRenderer(current)) return matrixInvariants.skipUnsupportedRenderer(current);
+        const transparent = value => typeof value === 'string'
+            && (/rgba\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\)/i.test(value)
+                || /transparent/i.test(value));
+        const applied = matrixInvariants.everyRendererSeries(current, series => series.originalFill !== '[undefined]'
+            && (series.fill === false || (series.fillDisabled === true && transparent(series.evaluatedFill))));
+        const styleStateApplied = current.diagnostic?.visualStyleState?.fillMatchesExpected === true;
+        return {
+            pass: applied && styleStateApplied,
+            reason: applied && styleStateApplied ? 'заливка отключена в состоянии всех серий'
+                : 'состояние заливки серий не отключено или потеряно после замены renderer',
+            debug: applied && styleStateApplied ? '' : JSON.stringify({
+                styleState: current.diagnostic?.visualStyleState || null,
+                series: matrixInvariants.rendererSeries(current),
+            }),
+        };
+    },
+    removeFillOff: (baseline, current) => {
+        if (matrixInvariants.unavailableRenderer(current)) return matrixInvariants.skipUnsupportedRenderer(current);
+        const transparent = value => typeof value === 'string'
+            && (/rgba\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\)/i.test(value)
+                || /transparent/i.test(value));
+        const restored = matrixInvariants.everyRendererSeries(current, series => {
+            if (series.fillDisabled === true || series.fill === false || transparent(series.evaluatedFill)) return false;
+            // Grafana can replace uPlot while restoring native visibility or
+            // source data. A fresh renderer has no DashBridge baseline fields;
+            // that is a clean state, not a failed restore, when its live fill
+            // is native and no disabled marker survived.
+            if (series.originalFill === '[undefined]') return true;
+            return series.fill === series.originalFill
+                && series.evaluatedFill === series.evaluatedOriginalFill;
+        });
+        const styleStateRestored = current.diagnostic?.visualStyleState?.fillMatchesExpected === true;
+        return {
+            pass: restored && styleStateRestored,
+            reason: restored && styleStateRestored ? 'заливка серий восстановлена до исходного значения'
+                : 'заливка серий не восстановлена или восстановлена в другом renderer',
+            debug: restored && styleStateRestored ? '' : JSON.stringify({
+                styleState: current.diagnostic?.visualStyleState || null,
+                series: matrixInvariants.rendererSeries(current),
+            }),
+        };
+    },
+
+    // ── thickenLines ────────────────────────────────────────────────
+    thickenLinesOn: (baseline, current) => {
+        if (matrixInvariants.unavailableRenderer(current)) return matrixInvariants.skipUnsupportedRenderer(current);
+        const applied = matrixInvariants.everyRendererSeries(current, series => Number.isFinite(series.width)
+            && Number.isFinite(series.originalWidth) && series.width > series.originalWidth);
+        return {
+            pass: applied,
+            reason: applied ? 'толщина всех серий увеличена в renderer state' : 'толщина серий не увеличена',
+            debug: applied ? '' : JSON.stringify(matrixInvariants.rendererSeries(current)),
+        };
+    },
+    thickenLinesOff: (baseline, current) => {
+        if (matrixInvariants.unavailableRenderer(current)) return matrixInvariants.skipUnsupportedRenderer(current);
+        const restored = matrixInvariants.everyRendererSeries(current, series => Number.isFinite(series.width)
+            && (!Number.isFinite(series.originalWidth) || series.width === series.originalWidth));
+        return {
+            pass: restored,
+            reason: restored ? 'толщина серий восстановлена до исходной' : 'толщина серий не восстановлена',
+            debug: restored ? '' : JSON.stringify(matrixInvariants.rendererSeries(current)),
+        };
+    },
+
+    // ── invertLegend ─────────────────────────────────────────────────
+    invertLegendOn: (baseline, current, env) => {
+        if (!env.hasLegend) return { pass: true, skip: true, reason: 'SKIP: нет легенды' };
+        const before = baseline.diagnostic?.legend?.position;
+        const after = current.diagnostic?.legend?.position;
+        if (!before || !after || !['right', 'bottom'].includes(before.direction)) {
+            return {
+                pass: false,
+                reason: 'исходное положение легенды не определено однозначно',
+                debug: JSON.stringify({ before, after }),
+            };
+        }
+        const expectedDirection = before.direction === 'right' ? 'bottom' : 'right';
+        const allEntriesMoved = after.direction === 'bottom'
+            ? current.diagnostic?.legend?.entries > 0 && current.diagnostic.legend.bottomEntries === current.diagnostic.legend.entries
+            : true;
+        const markerMatchesDirection = after.direction === 'bottom'
+            ? current.dom.legendBottom === true
+            : current.dom.legendBottom === false;
+        const applied = after.direction === expectedDirection && allEntriesMoved && markerMatchesDirection;
+        return {
+            pass: applied,
+            reason: applied
+                ? `легенда инвертирована: ${before.direction} → ${after.direction}`
+                : `ожидалась инверсия ${before.direction} → ${expectedDirection}, получено ${after.direction}`,
+            debug: applied ? '' : JSON.stringify({ before, after, expectedDirection, allEntriesMoved, markerMatchesDirection }),
+        };
+    },
+    invertLegendOff: (baseline, current, env) => {
+        if (!env.hasLegend) return { pass: true, skip: true, reason: 'SKIP: нет легенды' };
+        const before = baseline.diagnostic?.legend?.position;
+        const after = current.diagnostic?.legend?.position;
+        const restored = !!before
+            && before.direction !== 'unknown'
+            && after?.direction === before.direction
+            && !current.dom.legendBottom
+            && !current.diagnostic?.legend?.bottomContainer
+            && current.diagnostic?.legend?.bottomEntries === 0;
+        return {
+            pass: restored,
+            reason: restored
+                ? `легенда восстановлена: ${after.direction}`
+                : `легенда не восстановлена в исходное положение ${before?.direction || 'unknown'}`,
+            debug: restored ? '' : JSON.stringify({ before, after, marker: current.dom.legendBottom, legend: current.diagnostic?.legend }),
+        };
+    },
+    removeFillLegendThresholdOff: (baseline, current, env) => {
+        const fill = matrixInvariants.removeFillOff(baseline, current);
+        const legend = matrixInvariants.invertLegendOff(baseline, current, env);
+        const threshold = matrixInvariants.thresholdOff(baseline, current);
+        const pass = fill.pass && legend.pass && threshold.pass;
+        return {
+            pass,
+            skip: fill.skip || legend.skip || threshold.skip,
+            reason: `заливка: ${fill.reason}; легенда: ${legend.reason}; порог: ${threshold.reason}`,
+            debug: pass ? '' : [fill.debug, legend.debug, threshold.debug].filter(Boolean).join(' | '),
+        };
+    },
+
+    // ── invertIdle (CPU) ─────────────────────────────────────────────
+    // These assertions deliberately inspect Grafana's calculated series label,
+    // rather than treating a canvas redraw as proof of a data transformation.
+    // `applySettingsAndWait()` forces a real query before this snapshot.
+    invertIdleOn: (baseline, current, env) => {
+        if (!env.hasCPU) return { pass: true, skip: true, reason: 'SKIP: нет CPU-панели' };
+        // Grafana 10/Flot can replace its plot object after a transformed
+        // response. `getPlot()` may still expose the previous idle series while
+        // the live legend already renders the calculated load series. Require
+        // both causal network evidence and a user-visible label, accepting the
+        // renderer or the keyed legend as equivalent observations.
+        const labels = [
+            ...(current.diagnostic?.series || []).map(item => String(item.label || '')),
+            ...(current.diagnostic?.markers?.visibilityEntries || []).map(item => String(item.label || '')),
+        ];
+        const transform = [...(current.diagnostic?.interceptor?.events || [])].reverse()
+            .find(event => event.stage === 'transform'
+                && ['iframe', 'query-signature', 'legend-fallback'].includes(event.scope)
+                && event.invertIdle === true);
+        const transformed = !!transform && labels.some(label => /load\s*\(calc\)/i.test(label));
+        return {
+            pass: transformed,
+            reason: transformed ? 'CPU Idle → Load подтверждён серией load (calc)' : 'CPU Load (calc) не получен после refresh',
+            debug: transformed ? '' : JSON.stringify({
+                transform: transform || null,
+                labels,
+            }),
+        };
+    },
+    invertIdleOff: (baseline, current, env) => {
+        if (!env.hasCPU) return { pass: true, skip: true, reason: 'SKIP: нет CPU-панели' };
+        const labels = [
+            ...(current.diagnostic?.series || []).map(item => String(item.label || '')),
+            ...(current.diagnostic?.markers?.visibilityEntries || []).map(item => String(item.label || '')),
+        ];
+        const targetEvent = [...(current.diagnostic?.interceptor?.events || [])].reverse()
+            .find(event => ['transform', 'transform-skipped'].includes(event.stage)
+                && ['iframe', 'query-signature', 'legend-fallback'].includes(event.scope));
+        const nativeResponse = targetEvent?.stage === 'transform-skipped'
+            || (targetEvent?.stage === 'transform' && targetEvent.invertIdle === false);
+        const restored = nativeResponse && !labels.some(label => /load\s*\(calc\)/i.test(label));
+        return {
+            pass: restored,
+            reason: restored ? 'CPU восстановлен после refresh без преобразования' : 'CPU всё ещё содержит load (calc)',
+            debug: restored ? '' : JSON.stringify({ targetEvent: targetEvent || null, labels }),
+        };
+    },
+
+    // ── convertMemToUsed (RAM) ───────────────────────────────────────
+    convertMemOn: (baseline, current, env) => {
+        if (!env.hasRAM) return { pass: true, skip: true, reason: 'SKIP: нет RAM-панели' };
+        const labels = (current.diagnostic?.series || []).map(item => String(item.label || ''));
+        const transformed = labels.some(label => /used\s*%\s*\(calc\)/i.test(label));
+        return {
+            pass: transformed,
+            reason: transformed ? 'RAM → % Used подтверждён серией Used % (calc)' : 'RAM Used % (calc) не получен после refresh',
+            debug: transformed ? '' : `После refresh не найдена серия Used % (calc); серии: ${labels.join(', ') || 'нет данных'}`,
+        };
+    },
+    convertMemOff: (baseline, current, env) => {
+        if (!env.hasRAM) return { pass: true, skip: true, reason: 'SKIP: нет RAM-панели' };
+        const labels = (current.diagnostic?.series || []).map(item => String(item.label || ''));
+        const restored = !labels.some(label => /used\s*%\s*\(calc\)/i.test(label));
+        return {
+            pass: restored,
+            reason: restored ? 'RAM восстановлен после refresh без преобразования' : 'RAM всё ещё содержит Used % (calc)',
+            debug: restored ? '' : `После отключения найдена вычисленная RAM-серия: ${labels.join(', ')}`,
+        };
+    },
+
+    // ── seriesQueryFilterEnabled ─────────────────────────────────────
+    seriesFilterOn: (baseline, current, env) => {
+        if (!env.hasSeries) return { pass: true, skip: true, reason: 'SKIP: нет серий для фильтра' };
+        const transform = [...(current.diagnostic?.interceptor?.events || [])].reverse()
+            .find(event => event.stage === 'transform'
+                && ['iframe', 'query-signature', 'legend-fallback'].includes(event.scope)
+                && event.sourceFilterEnabled);
+        const metrics = transform?.sourceFilter;
+        if (!metrics) {
+            return {
+                pass: false,
+                reason: 'фильтр не предоставил семантический отчёт',
+                debug: 'В target transform отсутствует sourceFilter с количеством удалённых серий',
+            };
+        }
+        if (metrics.removedSeries > 0) {
+            return {
+                pass: true,
+                reason: `источник отфильтрован: удалено ${metrics.removedSeries} из ${metrics.beforeSeries} серий`,
+            };
+        }
+        return {
+            pass: true,
+            skip: true,
+            reason: 'SKIP: в целевом ответе нет серий, которые можно безопасно убрать',
+            debug: JSON.stringify(metrics),
+        };
+    },
+    seriesFilterOff: (baseline, current) => {
+        const targetEvent = [...(current.diagnostic?.interceptor?.events || [])].reverse()
+            .find(event => ['transform', 'transform-skipped'].includes(event.stage)
+                && ['iframe', 'query-signature', 'legend-fallback'].includes(event.scope));
+        const restoredByTransform = targetEvent?.stage === 'transform'
+            && targetEvent.sourceFilterEnabled === false
+            && targetEvent.sourceFilter?.enabled === false
+            && targetEvent.afterSeries === targetEvent.beforeSeries;
+        // With every data transform OFF, the interceptor intentionally avoids
+        // decoding or cloning the response. A target-scoped transform-skipped
+        // event is therefore direct proof that Grafana received native data.
+        const restoredByNativeBypass = targetEvent?.stage === 'transform-skipped'
+            && targetEvent.reason === 'visual-only-observed'
+            && current.diagnostic?.tools?.seriesQueryFilterEnabled === false;
+        const restored = restoredByTransform || restoredByNativeBypass;
+        return {
+            pass: restored,
+            reason: restored
+                ? (restoredByNativeBypass
+                    ? 'source-фильтр отключён: целевой ответ возвращён Grafana без преобразования'
+                    : `source-фильтр отключён: восстановлено ${targetEvent.afterSeries} серий`)
+                : 'не доказано отключение source-фильтра в ответе целевой панели',
+            debug: restored ? '' : JSON.stringify({ targetEvent: targetEvent || null }),
+        };
+    },
+
+    // ── pairwise transform reset ─────────────────────────────────────
+    // A canvas bitmap is deliberately not used here: returning the same source
+    // data may still produce a different raster. The selected response journal
+    // proves source filtering is disabled, while the threshold marker proves
+    // the visual calculation is removed.
+    thresholdAndSeriesFilterOff: (baseline, current) => {
+        const targetEvent = [...(current.diagnostic?.interceptor?.events || [])].reverse()
+            .find(event => ['transform', 'transform-skipped'].includes(event.stage)
+                && ['iframe', 'query-signature', 'legend-fallback'].includes(event.scope));
+        const filterDisabled = (targetEvent?.stage === 'transform'
+            && targetEvent.sourceFilterEnabled === false
+            && targetEvent.sourceFilter?.enabled === false
+            && targetEvent.afterSeries === targetEvent.beforeSeries)
+            || (targetEvent?.stage === 'transform-skipped'
+                && targetEvent.reason === 'visual-only-observed'
+                && current.diagnostic?.tools?.seriesQueryFilterEnabled === false);
+        const thresholdDisabled = !current.dom.thresholdApplied;
+        const restored = filterDisabled && thresholdDisabled;
+        return {
+            pass: restored,
+            reason: restored ? 'порог снят, а ответ выбранной панели восстановлен без source-фильтра' : 'не доказан полный сброс пары порог + source-фильтр',
+            debug: restored ? '' : JSON.stringify({
+                thresholdApplied: current.dom.thresholdApplied,
+                targetEvent: targetEvent || null,
+            }),
+        };
+    },
+
+    // ── thresholdEnabled ────────────────────────────────────────────
+    thresholdOn: (baseline, current, env) => {
+        const threshold = current.diagnostic?.thresholdDiagnostic || {};
+        const status = threshold.status || {};
+        const expectedPanel = String(env.panelId || '');
+        const panelMatches = !expectedPanel || String(threshold.panelId || '') === expectedPanel;
+        const semanticApplied = current.dom.thresholdApplied
+            && threshold.enabled === true
+            && threshold.panelFound === true
+            && panelMatches
+            && ['uplot', 'flot'].includes(status.engine)
+            && Number.isFinite(Number(status.rawThreshold))
+            && Number.isFinite(Number(status.threshold));
+        return {
+            pass: semanticApplied,
+            reason: semanticApplied
+                ? `порог вычислен для ${status.seriesName || 'серии'} (${status.engine})`
+                : 'не доказано вычисление порога для выбранной панели',
+            debug: semanticApplied ? '' : JSON.stringify({
+                thresholdApplied: current.dom.thresholdApplied,
+                expectedPanel,
+                threshold,
+            }),
+        };
+    },
+    thresholdOff: (baseline, current) => {
+        const threshold = current.diagnostic?.thresholdDiagnostic || {};
+        const removed = !current.dom.thresholdApplied && threshold.enabled === false && threshold.status?.enabled === false;
+        return {
+            pass: removed,
+            reason: removed ? 'порог семантически отключён и маркер снят' : 'не доказано отключение порога',
+            debug: removed ? '' : JSON.stringify({ thresholdApplied: current.dom.thresholdApplied, threshold }),
+        };
+    },
+
+    // ── seriesVisibility ─────────────────────────────────────────────
+    seriesVisibilityOn: (baseline, current, env) => {
+        if (!env.hasVisibilitySeries) return { pass: true, skip: true, reason: 'SKIP: нет двух управляемых серий легенды' };
+        const markers = current.diagnostic?.markers || {};
+        const target = env.visibilityTarget;
+        const targetEntry = (markers.visibilityEntries || []).find(entry => entry.key === target?.key);
+        const targetHidden = !!targetEntry && (targetEntry.hidden || targetEntry.dimmed || targetEntry.nativeHidden || targetEntry.visuallyHidden);
+        return {
+            pass: targetHidden,
+            reason: targetHidden ? `серия ${target?.key} скрыта через легенду` : `не доказано скрытие выбранной серии ${target?.key || ''}`,
+            debug: targetHidden ? '' : JSON.stringify({ target, targetEntry, visibilityEntries: markers.visibilityEntries || [] }),
+        };
+    },
+    seriesVisibilityOff: (baseline, current, env) => {
+        if (!env.hasVisibilitySeries) return { pass: true, skip: true, reason: 'SKIP: нет двух управляемых серий легенды' };
+        const markers = current.diagnostic?.markers || {};
+        const target = env.visibilityTarget;
+        const targetEntry = (markers.visibilityEntries || []).find(entry => entry.key === target?.key);
+        const targetStillHidden = !!targetEntry && (targetEntry.hidden || targetEntry.dimmed || targetEntry.nativeHidden || targetEntry.visuallyHidden);
+        const restored = !!targetEntry && !targetStillHidden;
+        return {
+            pass: restored,
+            reason: restored ? `видимость серии ${target?.key} восстановлена` : `после отключения видимость серии ${target?.key || ''} не восстановлена`,
+            debug: restored ? '' : JSON.stringify({ target, targetEntry, visibilityEntries: markers.visibilityEntries || [] }),
+        };
+    },
+
+    // ── canvasChanged (универсальный) ────────────────────────────────
+    canvasChanged: (baseline, current) => {
+        const changed = baseline.canvas !== current.canvas;
+        return {
+            pass: changed,
+            reason: changed ? 'canvas изменился' : 'canvas не изменился',
+            debug: changed ? '' : 'Ожидалось изменение canvas после применения настроек',
+        };
+    },
+    canvasReverted: (baseline, current) => {
+        const reverted = baseline.canvas === current.canvas;
+        return {
+            pass: reverted,
+            reason: reverted ? 'canvas вернулся к базе' : 'canvas не соответствует базе',
+            debug: reverted ? '' : 'Ожидалось восстановление canvas после сброса настроек',
+        };
+    },
+};
+
+// ─── Генераторы матричных переходов ────────────────────────────────
+
+const makeOffSettings = onSettings => Object.fromEntries(Object.entries(onSettings).map(([group, values]) => [
+    group,
+    Object.fromEntries(Object.entries(values).map(([key, value]) => [key, typeof value === 'boolean' ? false : value]))
+]));
+
+/**
+ * Генерирует строгие lifecycle-переходы для одиночного переключателя:
+ *   1. OFF→ON;
+ *   2. ON→OFF с доказанным промежуточным ON;
+ *   3. OFF→ON→OFF→ON (идемпотентность).
+ * Каждый вариант проходит через общий executor, включая causal refresh и reset.
+ */
+function generateSingleToggleTests(id, name, category, onSettings, invariantOn, invariantOff) {
+    return [
+        {
+            id: `${id}_1`,
+            category,
+            name: `${name} OFF→ON`,
+            async run(tabId, env) {
+                return runTransitionTest(tabId, env, [
+                    { label: 'OFF→ON', settings: onSettings, invariant: invariantOn },
+                ]);
+            },
+        },
+        {
+            id: `${id}_2`,
+            category,
+            name: `${name} ON→OFF`,
+            async run(tabId, env) {
+                // The ON precondition is itself a transition: no direct command
+                // may bypass command acknowledgement or target-query evidence.
+                return runTransitionTest(tabId, env, [
+                    { label: 'OFF→ON (предусловие)', settings: onSettings, invariant: invariantOn },
+                    { label: 'ON→OFF', settings: makeOffSettings(onSettings), invariant: invariantOff },
+                ]);
+            },
+        },
+        {
+            id: `${id}_3`,
+            category,
+            name: `${name} OFF→ON→OFF→ON (идемпотентность)`,
+            async run(tabId, env) {
+                return runTransitionTest(tabId, env, [
+                    { label: 'OFF→ON (1)', settings: onSettings, invariant: invariantOn },
+                    {
+                        label: 'ON→OFF',
+                        settings: makeOffSettings(onSettings),
+                        invariant: invariantOff,
+                    },
+                    { label: 'OFF→ON (2)', settings: onSettings, invariant: invariantOn },
+                ]);
+            },
+        },
+    ];
+}
+
+// ─── Декларативная причинная E2E-матрица ─────────────────────────────
+
+const mergeMatrixSettings = (...settings) => settings.reduce((result, value) => {
+    if (!value) return result;
+    for (const [key, item] of Object.entries(value)) {
+        if (item && typeof item === 'object' && !Array.isArray(item)) {
+            result[key] = { ...(result[key] || {}), ...item };
+        } else {
+            result[key] = item;
+        }
+    }
+    return result;
+}, {});
+
+function combineInvariantResults(results) {
+    const relevant = results.filter(Boolean);
+    const failed = relevant.filter(result => !result.pass && !result.skip);
+    const skipped = relevant.filter(result => result.skip);
+    return {
+        pass: failed.length === 0,
+        skip: failed.length === 0 && skipped.length > 0,
+        reason: relevant.map(result => result.reason).filter(Boolean).join('; '),
+        debug: failed.map(result => result.debug).filter(Boolean).join(' | '),
+    };
+}
+
+const visibilitySettings = env => {
+    const target = env.visibilityTarget;
+    return target ? { legendVisibility: { [target.key]: false } } : { legendVisibility: {} };
+};
+
+const E2E_FEATURE_REGISTRY = [
+    { id: 'removeFill', name: 'removeFill', on: { visualSettings: { removeFill: true } }, off: { visualSettings: { removeFill: false } }, invariant: matrixInvariants.removeFillOn, inactive: matrixInvariants.removeFillOff },
+    { id: 'thickenLines', name: 'thickenLines', on: { visualSettings: { thickenLines: true, thickenLinesValue: 3 } }, off: { visualSettings: { thickenLines: false, thickenLinesValue: 3 } }, invariant: matrixInvariants.thickenLinesOn, inactive: matrixInvariants.thickenLinesOff },
+    { id: 'invertLegend', name: 'invertLegend', on: { visualSettings: { invertLegend: true } }, off: { visualSettings: { invertLegend: false } }, invariant: matrixInvariants.invertLegendOn, inactive: matrixInvariants.invertLegendOff },
+    { id: 'seriesVisibility', name: 'seriesVisibility', on: visibilitySettings, off: { legendVisibility: {} }, invariant: matrixInvariants.seriesVisibilityOn, inactive: matrixInvariants.seriesVisibilityOff },
+    { id: 'invertIdle', name: 'invertIdle', on: { transformSettings: { invertIdle: true } }, off: { transformSettings: { invertIdle: false } }, invariant: matrixInvariants.invertIdleOn, inactive: matrixInvariants.invertIdleOff },
+    { id: 'convertMemToUsed', name: 'convertMemToUsed', on: { transformSettings: { convertMemToUsed: true } }, off: { transformSettings: { convertMemToUsed: false } }, invariant: matrixInvariants.convertMemOn, inactive: matrixInvariants.convertMemOff },
+    { id: 'seriesQueryFilter', name: 'seriesQueryFilter', on: { transformSettings: { seriesQueryFilterEnabled: true, seriesQueryFilterValue: Number.MAX_SAFE_INTEGER, seriesQueryFilterRawValue: Number.MAX_SAFE_INTEGER, seriesQueryFilterMode: 'max' } }, off: { transformSettings: { seriesQueryFilterEnabled: false } }, invariant: matrixInvariants.seriesFilterOn, inactive: matrixInvariants.seriesFilterOff },
+    { id: 'thresholdEnabled', name: 'thresholdEnabled', on: { transformSettings: { thresholdEnabled: true } }, off: { transformSettings: { thresholdEnabled: false } }, invariant: matrixInvariants.thresholdOn, inactive: matrixInvariants.thresholdOff },
+];
+const E2E_FEATURES_BY_ID = Object.fromEntries(E2E_FEATURE_REGISTRY.map(feature => [feature.id, feature]));
+
+function featureSettings(activeIds, env) {
+    return mergeMatrixSettings(...E2E_FEATURE_REGISTRY.map(feature => {
+        const source = activeIds.includes(feature.id) ? feature.on : feature.off;
+        return typeof source === 'function' ? source(env) : source;
+    }));
+}
+
+function activeSetInvariant(activeIds, changedId = null) {
+    return (baseline, current, env) => {
+        const active = activeIds.map(id => E2E_FEATURES_BY_ID[id]?.invariant(baseline, current, env));
+        // The all-OFF state and final reset must prove restoration of every
+        // feature, not merely the last one that happened to change.
+        const inactiveIds = activeIds.length === 0
+            ? E2E_FEATURE_REGISTRY.map(feature => feature.id)
+            : (changedId && !activeIds.includes(changedId) ? [changedId] : []);
+        const inactive = inactiveIds.map(id => E2E_FEATURES_BY_ID[id]?.inactive(baseline, current, env));
+        // Unsupported inactive features (for example CPU on a non-CPU panel)
+        // must not turn an otherwise valid visual OFF/reset transition into SKIP.
+        // Capability checks already skip a scenario when such a feature is active.
+        return combineInvariantResults([...active, ...inactive.filter(result => !result?.skip)]);
+    };
+}
+
+function makeMatrixTransitions(states) {
+    let previous = [];
+    return states.map(activeIds => {
+        const changedId = [...previous, ...activeIds].find(id => previous.includes(id) !== activeIds.includes(id)) || null;
+        previous = activeIds;
+        return {
+            label: activeIds.length ? `активны: ${activeIds.join(', ')}` : 'все функции выключены',
+            activeIds: [...activeIds],
+            settings: env => featureSettings(activeIds, env),
+            invariant: activeSetInvariant(activeIds, changedId),
+        };
+    });
+}
+
+function matrixTest(id, name, states, runModes = ['full']) {
+    // Each transition performs one graph Refresh. An active state performs a
+    // second Refresh to prove persistence without resending the command;
+    // isolation and final cleanup contribute one refresh each.
+    const refreshCount = states.reduce(
+        (count, activeIds) => count + (activeIds.length > 0 ? 2 : 1),
+        2
+    );
+    return {
+        id, category: 'H', name, runModes,
+        expectedRefreshCount: refreshCount,
+        timeoutBudgetModel: 'max(30s, expectedRefreshCount * 3.5s + 15s)',
+        // Each active transition proves two real graph refreshes and now waits
+        // for the complete renderer-reapply generation. Long pair/high-risk
+        // vectors therefore need a budget proportional to their state count.
+        timeoutMs: Math.max(30_000, refreshCount * 3_500 + 15_000),
+        async run(tabId, env) {
+            return runTransitionTest(tabId, env, makeMatrixTransitions(states));
+        }
+    };
+}
+
+// Each lifecycle explicitly repeats both commands. Repeated ON/OFF calls are not
+// cosmetic: Grafana may replace renderer objects between applications, so the
+// current active-set invariant must hold after every acknowledgement and refresh.
+function generateLifecycleMatrixTests() {
+    return E2E_FEATURE_REGISTRY.flatMap((feature, index) => {
+        const id = `H${index + 1}`;
+        return [
+            matrixTest(`${id}_1`, `${feature.name} OFF→ON`, [[feature.id]], ['fast', 'full']),
+            matrixTest(`${id}_2`, `${feature.name} ON→OFF`, [[feature.id], []], ['full']),
+            matrixTest(
+                `${id}_3`,
+                `${feature.name} OFF→ON→ON→OFF→OFF→ON (идемпотентность)`,
+                [[feature.id], [feature.id], [], [], [feature.id]],
+                ['full']
+            ),
+        ];
+    });
+}
+
+// Deterministic pair coverage. Every vector is traversed in both directions:
+//   00 → 10 → 11 → 01 → 11 → 00
+//   00 → 01 → 11 → 10 → 11 → 00
+// The partial-OFF states are mandatory: they catch a feature restoring or
+// destroying renderer state while its neighbour remains active.
+const E2E_PAIRWISE_VECTORS = [
+    ['removeFill', 'thickenLines'], ['removeFill', 'seriesVisibility'],
+    ['thickenLines', 'invertLegend'], ['seriesVisibility', 'invertLegend'],
+    ['seriesVisibility', 'thresholdEnabled'], ['seriesVisibility', 'seriesQueryFilter'],
+    ['invertIdle', 'invertLegend'], ['convertMemToUsed', 'seriesVisibility'],
+    ['seriesQueryFilter', 'thresholdEnabled'], ['removeFill', 'thresholdEnabled'],
+];
+
+function pairwiseStates(first, second, reverse = false) {
+    const [left, right] = reverse ? [second, first] : [first, second];
+    return [[], [left], [left, right], [right], [left, right], []];
+}
+
+function generatePairwiseMatrixTests() {
+    return E2E_PAIRWISE_VECTORS.flatMap(([first, second], index) => [
+        matrixTest(
+            `HP${index + 1}_1`,
+            `${first} + ${second}: снять ${first}, сохранив ${second}`,
+            pairwiseStates(first, second),
+            ['full']
+        ),
+        matrixTest(
+            `HP${index + 1}_2`,
+            `${first} + ${second}: снять ${second}, сохранив ${first}`,
+            pairwiseStates(first, second, true),
+            ['full']
+        ),
+    ]);
+}
+
+// These chains cover shared renderer routes and data/visual interactions that
+// are more failure-prone than arbitrary triples. Each chain contains a partial
+// removal and a repeat activation; every command already waits for a target
+// refresh in runTransitionTest().
+const E2E_HIGH_RISK_SEQUENCES = [
+    ['invertLegend', 'thickenLines', 'invertLegend', 'thickenLines'],
+    ['removeFill', 'thickenLines', 'seriesVisibility', 'invertLegend'],
+    ['seriesVisibility', 'thresholdEnabled', 'seriesQueryFilter'],
+    ['removeFill', 'invertLegend', 'thresholdEnabled'],
+    ['invertIdle', 'seriesVisibility', 'invertLegend'],
+];
+
+function highRiskStates(features) {
+    const unique = [...new Set(features)];
+    const states = unique.map((_, position) => unique.slice(0, position + 1));
+    // Remove every feature once while keeping the rest active, then rebuild the
+    // complete set. This exposes stale baseline caches and destructive cleanup.
+    unique.forEach(feature => {
+        states.push(unique.filter(id => id !== feature), unique);
+    });
+    states.push([]);
+    return states;
+}
+
+function generateHighRiskMatrixTests() {
+    return E2E_HIGH_RISK_SEQUENCES.map((features, index) => matrixTest(
+        `HR${index + 1}`,
+        `рискованная цепочка: ${features.join(' → ')}`,
+        highRiskStates(features),
+        index === 0 ? ['fast', 'full'] : ['full']
+    ));
+}
+
+const suiteH = [
+    ...generateLifecycleMatrixTests(),
+    ...generatePairwiseMatrixTests(),
+    ...generateHighRiskMatrixTests(),
+];
+
+// --- Категория A: Обнаружение окружения ---
+
+const suiteA = [
+    {
+        id: 'A1',
+        category: 'A',
+        name: 'Grafana Runtime Detection',
+        async run(tabId, env) {
+            const version = env.probe?.grafanaVersion;
+            if (!version) return { pass: false, details: 'grafanaBootData.settings.buildInfo.version не найден' };
+            return { pass: true, details: `v${version}` };
+        },
+    },
+    {
+        id: 'A2',
+        category: 'A',
+        name: 'Route Type Detection',
+        async run(tabId, env) {
+            const rt = env.probe?.routeType;
+            if (!rt) return { pass: false, details: 'routeType не определён' };
+            return { pass: true, details: rt.toUpperCase() };
+        },
+    },
+    {
+        id: 'A3',
+        category: 'A',
+        name: 'Engine Detection',
+        async run(tabId, env) {
+            const engine = env.probe?.engine;
+            if (!engine || engine === 'none') return { pass: false, details: 'canvas не найден — движок не определён' };
+            return { pass: true, details: engine === 'flot' ? 'Flot (canvas.flot-base)' : 'uPlot (canvas)' };
+        },
+    },
+    {
+        id: 'A4',
+        category: 'A',
+        name: 'Panel Count',
+        async run(tabId, env) {
+            const count = env.probe?.allPanelCount ?? 0;
+            if (count < 1) return { pass: false, details: 'Панели не найдены в DOM' };
+            const vis = env.probe?.visiblePanelCount ?? 0;
+            return { pass: true, details: `Всего в DOM: ${count}, видимых: ${vis}` };
+        },
+    },
+    {
+        id: 'A5',
+        category: 'A',
+        name: 'Content Script Injection',
+        async run(tabId, env) {
+            const ok = env.probe?.contentScript === true;
+            return {
+                pass: ok,
+                details: ok ? 'data-dashbridge-icon-url присутствует' : 'Маркер content script не найден на <html>',
+            };
+        },
+    },
+    {
+        id: 'A6',
+        category: 'A',
+        name: 'MAIN World Runtime: panelToolsState',
+        async run(tabId, env) {
+            const ok = env.probe?.runtimes?.panelToolsState === true;
+            return {
+                pass: ok,
+                details: ok ? 'window.__dashbridgePanelToolsState загружен' : 'window.__dashbridgePanelToolsState не найден',
+            };
+        },
+    },
+    {
+        id: 'A7',
+        category: 'A',
+        name: 'MAIN World Runtime: VisualEngine',
+        async run(tabId, env) {
+            const ok = env.probe?.runtimes?.visualEngine === true;
+            return {
+                pass: ok,
+                details: ok ? 'window.DashBridgeGrafanaVisualEngine загружен' : 'window.DashBridgeGrafanaVisualEngine не найден',
+            };
+        },
+    },
+    {
+        id: 'A8',
+        category: 'A',
+        name: 'MAIN World Runtime: PanelState',
+        async run(tabId, env) {
+            const ok = env.probe?.runtimes?.panelState === true;
+            return {
+                pass: ok,
+                details: ok ? 'window.DashBridgeGrafanaPanelState загружен' : 'window.DashBridgeGrafanaPanelState не найден',
+            };
+        },
+    },
+    {
+        id: 'A9',
+        category: 'A',
+        name: 'MAIN World Runtime: GrafanaDom',
+        async run(tabId, env) {
+            const ok = env.probe?.runtimes?.grafanaDom === true;
+            return {
+                pass: ok,
+                details: ok ? 'window.DashBridgeGrafanaDom загружен' : 'window.DashBridgeGrafanaDom не найден',
+            };
+        },
+    },
+];
+
+// --- Категория B: Визуальные операции (обратимые) ---
+
+const suiteB = [
+    {
+        id: 'B1',
+        category: 'B',
+        name: 'removeFill ON → canvas изменился',
+        async run(tabId, env) {
+            const panelId = resolvePanelId(env);
+            if (!panelId) return { pass: false, details: 'Нет видимой панели для теста' };
+            if (!env.probe?.runtimes?.visualEngine) return { pass: false, details: 'VisualEngine не загружен' };
+
+            // Snapshot до
+            const before = await execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                if (!dom) return null;
+                const panel = dom.findPanelById(pid) || dom.visiblePanels()[0];
+                if (!panel) return null;
+                const canvas = panel.querySelector('canvas') || document.querySelector('canvas');
+                try { return canvas?.toDataURL() || null; } catch (_) { return null; }
+            }, [panelId]);
+
+            // Применить removeFill
+            await execMain(tabId, (pid) => {
+                return window.DashBridgeGrafanaVisualEngine?.apply({ panelId: pid, removeFill: true });
+            }, [panelId]);
+            await sleep(600);
+
+            // Snapshot после
+            const after = await execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                if (!dom) return null;
+                const panel = dom.findPanelById(pid) || dom.visiblePanels()[0];
+                if (!panel) return null;
+                const canvas = panel.querySelector('canvas') || document.querySelector('canvas');
+                try { return canvas?.toDataURL() || null; } catch (_) { return null; }
+            }, [panelId]);
+
+            const changed = before && after && before !== after;
+            return {
+                pass: changed || before === null,
+                details: changed ? 'canvas перерисован (toDataURL изменился)'
+                    : before === null ? 'canvas недоступен (cross-origin), apply выполнен без ошибок'
+                        : 'canvas НЕ изменился после removeFill',
+            };
+        },
+    },
+    {
+        id: 'B2',
+        category: 'B',
+        name: 'removeFill OFF → canvas восстановлен',
+        async run(tabId, env) {
+            const panelId = resolvePanelId(env);
+            if (!panelId) return { pass: false, details: 'Нет видимой панели' };
+            if (!env.probe?.runtimes?.visualEngine) return { pass: false, details: 'VisualEngine не загружен' };
+
+            const before = await execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                const canvas = panel?.querySelector('canvas') || document.querySelector('canvas');
+                try { return canvas?.toDataURL() || null; } catch (_) { return null; }
+            }, [panelId]);
+
+            await execMain(tabId, (pid) => {
+                return window.DashBridgeGrafanaVisualEngine?.apply({ panelId: pid, removeFill: false });
+            }, [panelId]);
+            await sleep(600);
+
+            const after = await execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                const canvas = panel?.querySelector('canvas') || document.querySelector('canvas');
+                try { return canvas?.toDataURL() || null; } catch (_) { return null; }
+            }, [panelId]);
+
+            return {
+                pass: true,
+                details: before !== after ? 'canvas изменился при отключении removeFill' : 'canvas без изменений (заливка и так была)',
+            };
+        },
+    },
+    {
+        id: 'B3',
+        category: 'B',
+        name: 'lineWidth ON (3px) → canvas изменился',
+        async run(tabId, env) {
+            const panelId = resolvePanelId(env);
+            if (!panelId) return { pass: false, details: 'Нет видимой панели' };
+            if (!env.probe?.runtimes?.visualEngine) return { pass: false, details: 'VisualEngine не загружен' };
+
+            const before = await execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                const canvas = panel?.querySelector('canvas') || document.querySelector('canvas');
+                try { return canvas?.toDataURL() || null; } catch (_) { return null; }
+            }, [panelId]);
+
+            await execMain(tabId, (pid) => {
+                return window.DashBridgeGrafanaVisualEngine?.apply({
+                    panelId: pid, thickenLines: true, thickenLinesValue: 3,
+                });
+            }, [panelId]);
+            await sleep(600);
+
+            const after = await execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                const canvas = panel?.querySelector('canvas') || document.querySelector('canvas');
+                try { return canvas?.toDataURL() || null; } catch (_) { return null; }
+            }, [panelId]);
+
+            const changed = before && after && before !== after;
+            return {
+                pass: changed || before === null,
+                details: changed ? 'canvas перерисован (линии утолщены)'
+                    : before === null ? 'canvas недоступен, apply выполнен'
+                        : 'canvas НЕ изменился после lineWidth:3',
+            };
+        },
+    },
+    {
+        id: 'B4',
+        category: 'B',
+        name: 'lineWidth OFF → canvas восстановлен',
+        async run(tabId, env) {
+            const panelId = resolvePanelId(env);
+            if (!panelId) return { pass: false, details: 'Нет видимой панели' };
+            if (!env.probe?.runtimes?.visualEngine) return { pass: false, details: 'VisualEngine не загружен' };
+
+            await execMain(tabId, (pid) => {
+                return window.DashBridgeGrafanaVisualEngine?.apply({ panelId: pid, thickenLines: false });
+            }, [panelId]);
+            await sleep(600);
+
+            return { pass: true, details: 'thickenLines:false применён без ошибок' };
+        },
+    },
+    {
+        id: 'B5',
+        category: 'B',
+        name: 'invertLegend ON → dashbridge-legend-bottom или flex-direction:column',
+        async run(tabId, env) {
+            const panelId = resolvePanelId(env);
+            if (!panelId) return { pass: false, details: 'Нет видимой панели' };
+            if (!env.probe?.runtimes?.visualEngine) return { pass: false, details: 'VisualEngine не загружен' };
+
+            await execMain(tabId, (pid) => {
+                return window.DashBridgeGrafanaVisualEngine?.apply({ panelId: pid, invertLegend: true });
+            }, [panelId]);
+            await sleep(600);
+
+            const result = await execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                if (!panel) return { found: false };
+                const outer = panel.closest?.('[data-panelid],[data-viz-panel-key],[class*="react-grid-item"]') || panel;
+                const legendBottom = outer.querySelector('.dashbridge-legend-bottom');
+                // Ищем любой контейнер с flex-direction — в v12 это может быть глубоко вложенный элемент
+                const allFlex = [...outer.querySelectorAll('*')].filter(el => el.style?.flexDirection);
+                const flexDir = allFlex.length > 0 ? allFlex[0].style.flexDirection : null;
+                // Также проверяем легенда-контейнер по классу
+                const legendContainer = outer.querySelector(
+                    '[class*="legend" i] > *, [class*="Legend"] > *, .dashbridge-legend-bottom'
+                );
+                const legendParentFlex = legendContainer?.parentElement?.style?.flexDirection || null;
+                return {
+                    found: true,
+                    hasLegendBottom: !!legendBottom,
+                    flexDirection: flexDir || legendParentFlex,
+                    flexInStyle: flexDir,
+                    legendParentFlex,
+                    flexCount: allFlex.length,
+                };
+            }, [panelId]);
+
+            const pass = result?.hasLegendBottom
+                || result?.flexDirection === 'column'
+                || result?.flexDirection === 'column-reverse'
+                || result?.flexDirection === 'row'
+                || result?.legendParentFlex;
+            return {
+                pass: pass || !result?.found,
+                details: result?.hasLegendBottom
+                    ? 'класс dashbridge-legend-bottom присутствует'
+                    : result?.flexDirection
+                        ? `flex-direction: ${result.flexDirection}`
+                        : result?.found === false ? 'панель не найдена в DOM'
+                            : `DOM не изменился (flexCount=${result?.flexCount} legendParentFlex=${result?.legendParentFlex})`,
+            };
+        },
+    },
+    {
+        id: 'B6',
+        category: 'B',
+        name: 'invertLegend OFF → dashbridge-legend-bottom исчез',
+        async run(tabId, env) {
+            const panelId = resolvePanelId(env);
+            if (!panelId) return { pass: false, details: 'Нет видимой панели' };
+            if (!env.probe?.runtimes?.visualEngine) return { pass: false, details: 'VisualEngine не загружен' };
+
+            await execMain(tabId, (pid) => {
+                return window.DashBridgeGrafanaVisualEngine?.apply({ panelId: pid, invertLegend: false });
+            }, [panelId]);
+            await sleep(600);
+
+            const result = await execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                if (!panel) return { found: false };
+                const outer = panel.closest?.('[data-panelid],[data-viz-panel-key],[class*="react-grid-item"]') || panel;
+                return {
+                    found: true,
+                    hasLegendBottom: !!outer.querySelector('.dashbridge-legend-bottom'),
+                };
+            }, [panelId]);
+
+            const pass = !result?.hasLegendBottom;
+            return {
+                pass,
+                details: pass ? 'dashbridge-legend-bottom убран' : 'dashbridge-legend-bottom всё ещё присутствует',
+            };
+        },
+    },
+];
+
+// --- Категория C: Фильтрация серий ---
+
+const suiteC = [
+    {
+        id: 'C1',
+        category: 'C',
+        name: 'Legend rows exist',
+        async run(tabId, env) {
+            const count = env.probe?.legendCount ?? 0;
+            if (count > 0) return { pass: true, details: `${count} элементов легенды (${env.probe?.legendSelector})` };
+
+            // Попробуем ещё раз в MAIN world
+            const liveCount = await execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panels = dom?.visiblePanels() || [];
+                if (!panels.length) return 0;
+                return dom?.legendItems(panels[0])?.length ?? 0;
+            }, [resolvePanelId(env)]);
+
+            return {
+                pass: (liveCount ?? 0) > 0,
+                details: liveCount > 0 ? `${liveCount} элементов легенды` : 'Легенда не найдена (панель без серий?)',
+            };
+        },
+    },
+    {
+        id: 'C2',
+        category: 'C',
+        name: 'legendFilter: скрыть 1 серию → DOM-маркер',
+        async run(tabId, env) {
+            const panelId = resolvePanelId(env);
+            if (!panelId) return { pass: false, details: 'Нет видимой панели' };
+            if (!env.probe?.runtimes?.visualEngine) return { pass: false, details: 'VisualEngine не загружен' };
+
+            // Берём имя тем же способом, что grafana-panel-tools: именно текст
+            // LegendLabel/button является ключом React runtime, а не весь текст строки.
+            const seriesKey = await execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                const item = dom?.legendItems(panel)?.[0];
+                const label = item?.querySelector?.(
+                    '[class*="LegendLabel"], button, .graph-legend-alias, [class*="legend-label" i], [class*="legend-item-name" i], td, span'
+                ) || item;
+                return label?.textContent?.trim() || null;
+            }, [panelId]);
+
+            if (!seriesKey) return { pass: false, details: 'Серии легенды не найдены' };
+
+            const config = { [seriesKey]: false };
+            let result;
+            try {
+                await execMain(tabId, (pid, cfg) => {
+                    const dom = window.DashBridgeGrafanaDom;
+                    const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                    const root = dom?.outerPanel?.(panel) || panel || document;
+                    return window.DashBridgeGrafanaVisualEngine?.applySeriesVisibility?.({
+                        root, seriesConfig: cfg, mode: 'fast_click_toggle'
+                    });
+                }, [panelId, config]);
+                await sleep(700);
+
+                result = await execMain(tabId, (pid, key) => {
+                    const dom = window.DashBridgeGrafanaDom;
+                    const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                    if (!panel) return { found: false };
+                    const root = dom?.outerPanel?.(panel) || panel;
+                    const nativeItems = [...root.querySelectorAll('button')].map(button => {
+                        const fiberKey = Object.keys(button).find(name => name.startsWith('__reactFiber$'));
+                        for (let fiber = fiberKey && button[fiberKey], depth = 0;
+                            fiber && depth < 32; depth += 1, fiber = fiber.return) {
+                            if (fiber.memoizedProps?.item && typeof fiber.memoizedProps.onLabelClick === 'function') {
+                                return fiber.memoizedProps.item;
+                            }
+                        }
+                        return null;
+                    }).filter(Boolean);
+                    const nativeDisabled = nativeItems.filter(item => item.disabled === true).length;
+                    const targetDisabled = nativeItems.some(item => item.label === key && item.disabled === true);
+                    const uplotHidden = root.querySelectorAll('.dashbridge-uplot-fast-hidden').length;
+                    const uplotDimmed = root.querySelectorAll('.dashbridge-uplot-fast-dimmed').length;
+                    const flotHidden = [...root.querySelectorAll('.graph-legend-series')]
+                        .filter(row => row.style.display === 'none' || parseFloat(row.style.opacity || '1') < 0.5).length;
+                    return {
+                        found: true, targetDisabled, nativeDisabled, uplotHidden, uplotDimmed,
+                        flotHidden, legendTotal: dom?.legendItems(panel)?.length || 0
+                    };
+                }, [panelId, seriesKey]);
+            } finally {
+                await execMain(tabId, pid => {
+                    const dom = window.DashBridgeGrafanaDom;
+                    const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                    return window.DashBridgeGrafanaVisualEngine?.resetSeriesVisibility?.({
+                        root: dom?.outerPanel?.(panel) || panel || document
+                    });
+                }, [panelId]);
+            }
+
+            const hidden = (result?.nativeDisabled ?? 0) + (result?.uplotHidden ?? 0)
+                + (result?.uplotDimmed ?? 0) + (result?.flotHidden ?? 0);
+            const pass = !!result?.targetDisabled || hidden > 0;
+            return {
+                pass,
+                details: pass
+                    ? `Серия «${seriesKey}» скрыта (native=${result.nativeDisabled} uplot=${result.uplotHidden} dimmed=${result.uplotDimmed} flot=${result.flotHidden})`
+                    : `Легенда найдена (${result?.legendTotal ?? 0}), но состояние скрытия не применилось (native=0 uplot=${result?.uplotHidden ?? 0} dimmed=${result?.uplotDimmed ?? 0} flot=${result?.flotHidden ?? 0})`,
+            };
+        },
+    },
+    {
+        id: 'C3',
+        category: 'C',
+        name: 'legendFilter: сбросить → маркеры исчезли',
+        async run(tabId, env) {
+            const panelId = resolvePanelId(env);
+            if (!panelId) return { pass: false, details: 'Нет видимой панели' };
+            if (!env.probe?.runtimes?.visualEngine) return { pass: false, details: 'VisualEngine не загружен' };
+
+            await execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                if (!panel) return;
+                const root = panel.closest?.('[data-panelid],[data-viz-panel-key],[class*="react-grid-item"]') || panel;
+                return window.DashBridgeGrafanaVisualEngine?.resetSeriesVisibility?.({ root });
+            }, [panelId]);
+            await sleep(500);
+
+            const result = await execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                if (!panel) return { found: false };
+                const outer = panel.closest?.('[data-panelid],[data-viz-panel-key],[class*="react-grid-item"]') || panel;
+                return {
+                    found: true,
+                    uplotHidden: outer.querySelectorAll('.dashbridge-uplot-fast-hidden').length,
+                    uplotDimmed: outer.querySelectorAll('.dashbridge-uplot-fast-dimmed').length,
+                    flotHidden: [...outer.querySelectorAll('.graph-legend-series')]
+                        .filter(r => r.style.display === 'none').length,
+                };
+            }, [panelId]);
+
+            const remaining = (result?.uplotHidden ?? 0) + (result?.uplotDimmed ?? 0) + (result?.flotHidden ?? 0);
+            return {
+                pass: remaining === 0,
+                details: remaining === 0
+                    ? 'Все серии восстановлены, маркеры исчезли'
+                    : `Осталось скрытых: uplot=${result?.uplotHidden} dimmed=${result?.uplotDimmed} flot=${result?.flotHidden}`,
+            };
+        },
+    },
+    {
+        id: 'C4',
+        category: 'C',
+        name: 'Скрыть все кроме 1 серии',
+        async run(tabId, env) {
+            const panelId = resolvePanelId(env);
+            if (!panelId) return { pass: false, details: 'Нет видимой панели' };
+            if (!env.probe?.runtimes?.visualEngine) return { pass: false, details: 'VisualEngine не загружен' };
+
+            // Используем те же уникальные ключи, что и штатный panel-tools.
+            const keys = await execMain(tabId, pid => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                const seen = new Set();
+                return (dom?.legendItems(panel) || []).map(item => {
+                    const label = item.querySelector?.(
+                        '[class*="LegendLabel"], button, .graph-legend-alias, [class*="legend-label" i], [class*="legend-item-name" i], td, span'
+                    ) || item;
+                    return label?.textContent?.trim() || '';
+                }).filter(key => key && !seen.has(key) && seen.add(key));
+            }, [panelId]);
+
+            if (!keys || keys.length < 2) return { pass: false, details: `Недостаточно серий (${keys?.length ?? 0})` };
+
+            // applySeriesVisibility ожидает { key: bool } — true=видима, false=скрыта
+            const config = {};
+            keys.forEach((k, i) => { config[k] = i === 0; });
+
+            await execMain(tabId, (pid, cfg) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                const root = dom?.outerPanel?.(panel) || panel || document;
+                return window.DashBridgeGrafanaVisualEngine?.applySeriesVisibility?.({
+                    root, seriesConfig: cfg, mode: 'fast_click_toggle'
+                });
+            }, [panelId, config]);
+            await sleep(700);
+
+            const result = await execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                if (!panel) return { found: false };
+                const outer = panel.closest?.('[data-panelid],[data-viz-panel-key],[class*="react-grid-item"]') || document;
+                const root = outer === document ? document : outer;
+                const nativeDisabled = [...root.querySelectorAll('button')].map(button => {
+                    const fiberKey = Object.keys(button).find(name => name.startsWith('__reactFiber$'));
+                    for (let fiber = fiberKey && button[fiberKey], depth = 0;
+                        fiber && depth < 32; depth += 1, fiber = fiber.return) {
+                        if (fiber.memoizedProps?.item && typeof fiber.memoizedProps.onLabelClick === 'function') {
+                            return fiber.memoizedProps.item;
+                        }
+                    }
+                    return null;
+                }).filter(item => item?.disabled === true).length;
+                const uplotHidden = root.querySelectorAll('.dashbridge-uplot-fast-hidden').length;
+                const uplotDimmed = root.querySelectorAll('.dashbridge-uplot-fast-dimmed').length;
+                const uOff = root.querySelectorAll('.u-legend tr.u-off, .u-legend-row.u-off').length;
+                const flotHidden = [...root.querySelectorAll('.graph-legend-series')]
+                    .filter(row => row.style.display === 'none' || parseFloat(row.style.opacity || '1') < 0.5).length;
+                return {
+                    found: true,
+                    hidden: nativeDisabled + uplotHidden + uplotDimmed + uOff + flotHidden,
+                    nativeDisabled, uplotHidden, uplotDimmed, uOff, flotHidden,
+                };
+            }, [panelId]);
+
+            // Сбрасываем после теста
+            await execMain(tabId, pid => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                return window.DashBridgeGrafanaVisualEngine?.resetSeriesVisibility?.({
+                    root: dom?.outerPanel?.(panel) || panel || document
+                });
+            }, [panelId]);
+
+            const expected = keys.length - 1;
+            const pass = (result?.hidden ?? 0) >= expected;
+            return {
+                pass,
+                details: pass
+                    ? `Скрыто ${result?.hidden} из ${keys.length} серий (native=${result?.nativeDisabled ?? 0}, ожидается ≥${expected})`
+                    : `Легенда найдена (${keys.length}), но скрыто только ${result?.hidden} (native=${result?.nativeDisabled ?? 0}, ожидалось ≥${expected})`,
+            };
+        },
+    },
+    {
+        id: 'C5',
+        category: 'C',
+        name: 'getChartSeriesCount > 0',
+        async run(tabId, env) {
+            const panelId = resolvePanelId(env);
+            if (!panelId) return { pass: false, details: 'Нет видимой панели' };
+            if (!env.probe?.runtimes?.visualEngine) return { pass: false, details: 'VisualEngine не загружен' };
+
+            const count = await execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                if (!panel) return 0;
+                const root = panel.closest?.('[data-panelid],[data-viz-panel-key],[class*="react-grid-item"]') || panel;
+                return window.DashBridgeGrafanaVisualEngine?.getChartSeriesCount?.(root) ?? 0;
+            }, [panelId]);
+
+            return {
+                pass: (count ?? 0) > 0,
+                details: count > 0 ? `Серий на графике: ${count}` : 'getChartSeriesCount вернул 0',
+            };
+        },
+    },
+];
+
+// --- Категория D: Комбинаторные тесты ---
+
+const suiteD = [
+    {
+        id: 'D1',
+        category: 'D',
+        name: 'removeFill + lineWidth: оба ON → только removeFill → сброс',
+        async run(tabId, env) {
+            const panelId = resolvePanelId(env);
+            if (!panelId) return { pass: false, details: 'Нет видимой панели' };
+            if (!env.probe?.runtimes?.visualEngine) return { pass: false, details: 'VisualEngine не загружен' };
+
+            const snap = async () => execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                const canvas = panel?.querySelector('canvas') || document.querySelector('canvas');
+                try { return canvas?.toDataURL() || null; } catch (_) { return null; }
+            }, [panelId]);
+
+            const s0 = await snap();
+
+            // Оба ON
+            await execMain(tabId, (pid) => window.DashBridgeGrafanaVisualEngine?.apply({ panelId: pid, removeFill: true, thickenLines: true, thickenLinesValue: 3 }), [panelId]);
+            await sleep(600);
+            const s1 = await snap();
+
+            // Только removeFill
+            await execMain(tabId, (pid) => window.DashBridgeGrafanaVisualEngine?.apply({ panelId: pid, removeFill: true, thickenLines: false }), [panelId]);
+            await sleep(600);
+            const s2 = await snap();
+
+            // Полный сброс
+            await execMain(tabId, (pid) => window.DashBridgeGrafanaVisualEngine?.apply({ panelId: pid, removeFill: false, thickenLines: false }), [panelId]);
+            await sleep(600);
+
+            const step1Changed = s0 && s1 && s0 !== s1;
+            const steps = [
+                step1Changed ? '✓ s0→s1 canvas изменился (оба ON)' : '? s0→s1 без изменений (canvas недоступен)',
+                s1 && s2 ? (s1 !== s2 ? '✓ s1→s2 canvas изменился (отключён lineWidth)' : '~ s1=s2 нет изменений') : '? snap недоступен',
+            ];
+
+            return { pass: true, details: steps.join(' | ') };
+        },
+    },
+    {
+        id: 'D2',
+        category: 'D',
+        name: 'invertLegend + legendFilter: оба ON → только invertLegend → сброс',
+        async run(tabId, env) {
+            const panelId = resolvePanelId(env);
+            if (!panelId) return { pass: false, details: 'Нет видимой панели' };
+            if (!env.probe?.runtimes?.visualEngine) return { pass: false, details: 'VisualEngine не загружен' };
+
+            // invertLegend ON
+            await execMain(tabId, (pid) => window.DashBridgeGrafanaVisualEngine?.apply({ panelId: pid, invertLegend: true }), [panelId]);
+            await sleep(500);
+
+            // legendFilter: скрыть 1 серию
+            const seriesKey = await execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                if (!panel) return null;
+                const items = dom?.legendItems(panel) || [];
+                return items[0]?.dataset?.label || items[0]?.textContent?.trim() || null;
+            }, [panelId]);
+
+            if (seriesKey) {
+                await execMain(tabId, (pid, cfg) => {
+                    const dom = window.DashBridgeGrafanaDom;
+                    const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                    if (!panel) return;
+                    const root = panel.closest?.('[data-panelid],[data-viz-panel-key],[class*="react-grid-item"]') || panel;
+                    return window.DashBridgeGrafanaVisualEngine?.applySeriesVisibility?.({ root, seriesConfig: cfg });
+                }, [panelId, { [seriesKey]: false }]);
+                await sleep(500);
+            }
+
+            // Проверяем оба маркера
+            const bothResult = await execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                if (!panel) return { found: false };
+                const outer = panel.closest?.('[data-panelid],[data-viz-panel-key],[class*="react-grid-item"]') || panel;
+                return {
+                    legendBottom: !!outer.querySelector('.dashbridge-legend-bottom'),
+                    hidden: outer.querySelectorAll('.dashbridge-uplot-fast-hidden').length,
+                };
+            }, [panelId]);
+
+            // Сбросить legendFilter, оставить invertLegend
+            await execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                if (!panel) return;
+                const root = panel.closest?.('[data-panelid],[data-viz-panel-key],[class*="react-grid-item"]') || panel;
+                return window.DashBridgeGrafanaVisualEngine?.resetSeriesVisibility?.({ root });
+            }, [panelId]);
+            await sleep(400);
+
+            const onlyInvertResult = await execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                if (!panel) return { found: false };
+                const outer = panel.closest?.('[data-panelid],[data-viz-panel-key],[class*="react-grid-item"]') || panel;
+                return {
+                    legendBottom: !!outer.querySelector('.dashbridge-legend-bottom'),
+                    hidden: outer.querySelectorAll('.dashbridge-uplot-fast-hidden').length,
+                };
+            }, [panelId]);
+
+            // Полный сброс
+            await execMain(tabId, (pid) => window.DashBridgeGrafanaVisualEngine?.apply({ panelId: pid, invertLegend: false }), [panelId]);
+
+            const steps = [
+                `Шаг 1 (оба ON): legendBottom=${bothResult?.legendBottom} hidden=${bothResult?.hidden}`,
+                `Шаг 2 (только invertLegend): legendBottom=${onlyInvertResult?.legendBottom} hidden=${onlyInvertResult?.hidden}`,
+            ];
+            return { pass: true, details: steps.join(' | ') };
+        },
+    },
+    {
+        id: 'D3',
+        category: 'D',
+        name: 'removeFill + invertLegend: ON+ON → check both → OFF+OFF → clean',
+        async run(tabId, env) {
+            const panelId = resolvePanelId(env);
+            if (!panelId) return { pass: false, details: 'Нет видимой панели' };
+            if (!env.probe?.runtimes?.visualEngine) return { pass: false, details: 'VisualEngine не загружен' };
+
+            // Внешние снимки runSingleTest показывают только исходное и уже
+            // очищенное состояние. Для обратимого сценария они обязаны быть
+            // похожи, поэтому сохраняем доказательство каждого подшага.
+            const diagnostic = {
+                kind: 'transition',
+                baseline: await captureRuntimeDiagnostic(tabId, panelId),
+                transitions: [],
+            };
+            let onSnapshot;
+            let resetSnapshot;
+            let legendOn = false;
+            let legendOff = false;
+
+            try {
+                const beforeOn = await captureRuntimeDiagnostic(tabId, panelId);
+                const onCommand = await execMain(tabId, pid => window.DashBridgeGrafanaVisualEngine?.apply({
+                    panelId: pid, removeFill: true, invertLegend: true,
+                }), [panelId]);
+                await sleep(700);
+                onSnapshot = await captureRuntimeDiagnostic(tabId, panelId);
+                legendOn = !!onSnapshot?.markers?.legendBottom;
+                diagnostic.transitions.push({
+                    index: 1,
+                    label: 'Включить removeFill + invertLegend',
+                    settings: { visualSettings: { removeFill: true, invertLegend: true } },
+                    command: onCommand,
+                    before: beforeOn,
+                    after: onSnapshot,
+                    invariant: {
+                        pass: legendOn,
+                        skip: false,
+                        reason: legendOn
+                            ? 'Легенда перенесена вниз; визуальное состояние зафиксировано снимком.'
+                            : 'Не найден маркер .dashbridge-legend-bottom после включения invertLegend.',
+                    },
+                });
+
+                const beforeReset = await captureRuntimeDiagnostic(tabId, panelId);
+                const resetCommand = await execMain(tabId, pid => window.DashBridgeGrafanaVisualEngine?.apply({
+                    panelId: pid, removeFill: false, invertLegend: false,
+                }), [panelId]);
+                await sleep(700);
+                resetSnapshot = await captureRuntimeDiagnostic(tabId, panelId);
+                legendOff = !!resetSnapshot?.markers?.legendBottom;
+                diagnostic.transitions.push({
+                    index: 2,
+                    label: 'Выключить removeFill + invertLegend (очистка)',
+                    settings: { visualSettings: { removeFill: false, invertLegend: false } },
+                    command: resetCommand,
+                    before: beforeReset,
+                    after: resetSnapshot,
+                    invariant: {
+                        pass: !legendOff,
+                        skip: false,
+                        reason: !legendOff
+                            ? 'Маркер нижней легенды удалён; состояние очищено.'
+                            : 'Маркер .dashbridge-legend-bottom остался после очистки.',
+                    },
+                });
+            } finally {
+                // Гарантируем чистое состояние даже при ошибке снимка или команды.
+                const reset = await execMain(tabId, pid => window.DashBridgeGrafanaVisualEngine?.apply({
+                    panelId: pid, removeFill: false, invertLegend: false,
+                }), [panelId]);
+                diagnostic.reset = { command: reset, after: await captureRuntimeDiagnostic(tabId, panelId) };
+            }
+
+            const baselineHash = diagnostic.baseline?.canvas?.[0]?.hash || '';
+            const onHash = onSnapshot?.canvas?.[0]?.hash || '';
+            const resetHash = resetSnapshot?.canvas?.[0]?.hash || '';
+            const canvasChanged = !!baselineHash && !!onHash && baselineHash !== onHash;
+            const canvasResetChanged = !!onHash && !!resetHash && onHash !== resetHash;
+            const snapshotsAvailable = !!baselineHash && !!onHash && !!resetHash;
+            const pass = snapshotsAvailable && canvasChanged && canvasResetChanged && legendOn && !legendOff;
+
+            return {
+                pass,
+                details: [
+                    canvasChanged ? '✓ canvas изменился при ON' : '✗ canvas не изменился при ON',
+                    `legendBottom ON=${legendOn} OFF=${legendOff}`,
+                    canvasResetChanged ? '✓ canvas изменился при очистке' : '✗ canvas не изменился при очистке',
+                    snapshotsAvailable ? '✓ переходы сохранены в диагностике' : '✗ отсутствуют снимки canvas',
+                ].join(' | '),
+                diagnostic,
+            };
+        },
+    },
+    {
+        id: 'D4',
+        category: 'D',
+        name: 'Все три: removeFill + lineWidth + invertLegend одновременно',
+        async run(tabId, env) {
+            const panelId = resolvePanelId(env);
+            if (!panelId) return { pass: false, details: 'Нет видимой панели' };
+            if (!env.probe?.runtimes?.visualEngine) return { pass: false, details: 'VisualEngine не загружен' };
+
+            const snapCanvas = async () => execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                const canvas = panel?.querySelector('canvas') || document.querySelector('canvas');
+                try { return canvas?.toDataURL() || null; } catch (_) { return null; }
+            }, [panelId]);
+
+            const s0 = await snapCanvas();
+
+            // Все три ON
+            await execMain(tabId, (pid) => window.DashBridgeGrafanaVisualEngine?.apply({
+                panelId: pid, removeFill: true, thickenLines: true, thickenLinesValue: 3, invertLegend: true,
+            }), [panelId]);
+            await sleep(700);
+
+            const s1 = await snapCanvas();
+            const legend1 = await execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                const outer = panel?.closest?.('[data-panelid],[data-viz-panel-key],[class*="react-grid-item"]') || panel;
+                return !!outer?.querySelector('.dashbridge-legend-bottom');
+            }, [panelId]);
+
+            // Все три OFF
+            await execMain(tabId, (pid) => window.DashBridgeGrafanaVisualEngine?.apply({
+                panelId: pid, removeFill: false, thickenLines: false, invertLegend: false,
+            }), [panelId]);
+            await sleep(700);
+
+            const s2 = await snapCanvas();
+            const legend2 = await execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                const outer = panel?.closest?.('[data-panelid],[data-viz-panel-key],[class*="react-grid-item"]') || panel;
+                return !!outer?.querySelector('.dashbridge-legend-bottom');
+            }, [panelId]);
+
+            return {
+                pass: true,
+                details: [
+                    s0 && s1 && s0 !== s1 ? '✓ canvas изменился (все ON)' : '? canvas без изменений',
+                    `legendBottom ON=${legend1} OFF=${legend2}`,
+                    s1 && s2 && s1 !== s2 ? '✓ canvas изменился (все OFF)' : '~ canvas при сбросе',
+                ].join(' | '),
+            };
+        },
+    },
+    {
+        id: 'D5',
+        category: 'D',
+        name: 'removeFill + thickenLines (без invertLegend)',
+        async run(tabId, env) {
+            const panelId = resolvePanelId(env);
+            if (!panelId) return { pass: false, details: 'Нет видимой панели' };
+            if (!env.probe?.runtimes?.visualEngine) return { pass: false, details: 'VisualEngine не загружен' };
+
+            const snapCanvas = async () => execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                const canvas = panel?.querySelector('canvas') || document.querySelector('canvas');
+                try { return canvas?.toDataURL() || null; } catch (_) { return null; }
+            }, [panelId]);
+
+            const s0 = await snapCanvas();
+
+            await execMain(tabId, (pid) => window.DashBridgeGrafanaVisualEngine?.apply({
+                panelId: pid, removeFill: true, thickenLines: true, thickenLinesValue: 3, invertLegend: false,
+            }), [panelId]);
+            await sleep(700);
+            const s1 = await snapCanvas();
+
+            await execMain(tabId, (pid) => window.DashBridgeGrafanaVisualEngine?.apply({
+                panelId: pid, removeFill: false, thickenLines: false, invertLegend: false,
+            }), [panelId]);
+            await sleep(700);
+            const s2 = await snapCanvas();
+
+            return {
+                pass: true,
+                details: [
+                    s0 && s1 && s0 !== s1 ? '✓ canvas изменился (removeFill+thicken ON)' : '? canvas без изменений',
+                    s1 && s2 && s1 !== s2 ? '✓ canvas восстановлен' : '~ canvas при сбросе',
+                ].join(' | '),
+            };
+        },
+    },
+    {
+        id: 'D6',
+        category: 'D',
+        name: 'thickenLines + invertLegend (без removeFill)',
+        async run(tabId, env) {
+            const panelId = resolvePanelId(env);
+            if (!panelId) return { pass: false, details: 'Нет видимой панели' };
+            if (!env.probe?.runtimes?.visualEngine) return { pass: false, details: 'VisualEngine не загружен' };
+
+            const readRendererState = async () => {
+                const snapshot = await captureRuntimeDiagnostic(tabId, panelId);
+                return {
+                    legendDirection: snapshot?.legend?.position?.direction || 'unknown',
+                    legendInverted: !!snapshot?.legend?.position?.engineState?.originalDirection,
+                    series: snapshot?.series || [],
+                };
+            };
+
+            // Reproduce the UI sequence: the legend stays inverted while only
+            // the thickness option is switched back off.
+            await execMain(tabId, (pid) => window.DashBridgeGrafanaVisualEngine?.apply({
+                panelId: pid, removeFill: false, thickenLines: false, thickenLinesValue: 3, invertLegend: true,
+            }), [panelId]);
+            await sleep(500);
+            const legendOnly = await readRendererState();
+
+            await execMain(tabId, (pid) => window.DashBridgeGrafanaVisualEngine?.apply({
+                panelId: pid, removeFill: false, thickenLines: true, thickenLinesValue: 3, invertLegend: true,
+            }), [panelId]);
+            await sleep(700);
+            const thickened = await readRendererState();
+
+            await execMain(tabId, (pid) => window.DashBridgeGrafanaVisualEngine?.apply({
+                panelId: pid, removeFill: false, thickenLines: false, thickenLinesValue: 3, invertLegend: true,
+            }), [panelId]);
+            await sleep(700);
+            const restored = await readRendererState();
+
+            const hasSeries = thickened.series.length > 0 && restored.series.length > 0;
+            const thickeningApplied = hasSeries && thickened.series.every(series =>
+                Number.isFinite(series.width)
+                && Number.isFinite(series.originalWidth)
+                && series.width > series.originalWidth
+            );
+            const widthsRestored = hasSeries && restored.series.every(series =>
+                Number.isFinite(series.width)
+                && Number.isFinite(series.originalWidth)
+                && series.width === series.originalWidth
+            );
+            const legendStayedInverted = legendOnly.legendInverted
+                && thickened.legendInverted
+                && restored.legendInverted
+                && legendOnly.legendDirection !== 'unknown'
+                && thickened.legendDirection === legendOnly.legendDirection
+                && restored.legendDirection === legendOnly.legendDirection;
+
+            return {
+                pass: hasSeries && thickeningApplied && widthsRestored && legendStayedInverted,
+                details: [
+                    hasSeries ? `✓ uPlot series=${restored.series.length}` : '✗ uPlot series не найдены',
+                    thickeningApplied ? '✓ линии утолщены' : '✗ линии не утолщены',
+                    widthsRestored ? '✓ исходная толщина восстановлена при активной легенде' : '✗ толщина не восстановлена',
+                    legendStayedInverted
+                        ? `✓ легенда оставалась ${restored.legendDirection}`
+                        : '✗ инверсия легенды потеряна или её положение не определено',
+                ].join(' | '),
+                diagnostic: { legendOnly, thickened, restored },
+            };
+        },
+    },
+    {
+        id: 'D7',
+        category: 'D',
+        name: 'removeFill + invertLegend + seriesVisibility (все три + скрытие серии)',
+        async run(tabId, env) {
+            const panelId = resolvePanelId(env);
+            if (!panelId) return { pass: false, details: 'Нет видимой панели' };
+            if (!env.probe?.runtimes?.visualEngine) return { pass: false, details: 'VisualEngine не загружен' };
+            if ((env.probe?.legendCount ?? 0) < 2) return { pass: false, details: 'Недостаточно серий для теста' };
+
+            const snapCanvas = async () => execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                const canvas = panel?.querySelector('canvas') || document.querySelector('canvas');
+                try { return canvas?.toDataURL() || null; } catch (_) { return null; }
+            }, [panelId]);
+
+            const seriesKey = await execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                const items = dom?.legendItems(panel) || [];
+                return items[0]?.textContent?.trim() || null;
+            }, [panelId]);
+
+            const s0 = await snapCanvas();
+
+            // Шаг 1: removeFill + invertLegend ON
+            await execMain(tabId, (pid) => window.DashBridgeGrafanaVisualEngine?.apply({
+                panelId: pid, removeFill: true, invertLegend: true,
+            }), [panelId]);
+            await sleep(600);
+
+            // Шаг 2: + скрыть серию
+            if (seriesKey) {
+                await execMain(tabId, (pid, key) => {
+                    const dom = window.DashBridgeGrafanaDom;
+                    const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                    const root = panel?.closest?.('[data-panelid],[data-viz-panel-key],[class*="react-grid-item"]') || panel;
+                    return window.DashBridgeGrafanaVisualEngine?.applySeriesVisibility?.({ root, seriesConfig: { [key]: { visible: false } } });
+                }, [panelId, seriesKey]);
+                await sleep(600);
+            }
+            const s1 = await snapCanvas();
+
+            // Откат: сброс видимости серий
+            if (seriesKey) {
+                await execMain(tabId, (pid, key) => {
+                    const dom = window.DashBridgeGrafanaDom;
+                    const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                    const root = panel?.closest?.('[data-panelid],[data-viz-panel-key],[class*="react-grid-item"]') || panel;
+                    return window.DashBridgeGrafanaVisualEngine?.resetSeriesVisibility?.({ root });
+                }, [panelId, seriesKey]);
+            }
+            await execMain(tabId, (pid) => window.DashBridgeGrafanaVisualEngine?.apply({
+                panelId: pid, removeFill: false, invertLegend: false,
+            }), [panelId]);
+            await sleep(700);
+            const s2 = await snapCanvas();
+
+            return {
+                pass: true,
+                details: [
+                    s0 && s1 && s0 !== s1 ? '✓ комбинация изменила canvas' : '? canvas без изменений',
+                    seriesKey ? `series="${seriesKey}" скрыта` : 'серии не найдены',
+                    s1 && s2 && s1 !== s2 ? '✓ восстановлен' : '~ сброс',
+                ].join(' | '),
+            };
+        },
+    },
+    {
+        id: 'D8',
+        category: 'D',
+        name: 'thickenLines + seriesVisibility (без fill/legend)',
+        async run(tabId, env) {
+            const panelId = resolvePanelId(env);
+            if (!panelId) return { pass: false, details: 'Нет видимой панели' };
+            if (!env.probe?.runtimes?.visualEngine) return { pass: false, details: 'VisualEngine не загружен' };
+            if ((env.probe?.legendCount ?? 0) < 2) return { pass: false, details: 'Недостаточно серий для теста' };
+
+            const snapCanvas = async () => execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                const canvas = panel?.querySelector('canvas') || document.querySelector('canvas');
+                try { return canvas?.toDataURL() || null; } catch (_) { return null; }
+            }, [panelId]);
+
+            const seriesKey = await execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                const items = dom?.legendItems(panel) || [];
+                return items[0]?.textContent?.trim() || null;
+            }, [panelId]);
+
+            const s0 = await snapCanvas();
+
+            await execMain(tabId, (pid) => window.DashBridgeGrafanaVisualEngine?.apply({
+                panelId: pid, thickenLines: true, thickenLinesValue: 4,
+            }), [panelId]);
+            await sleep(600);
+
+            if (seriesKey) {
+                await execMain(tabId, (pid, key) => {
+                    const dom = window.DashBridgeGrafanaDom;
+                    const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                    const root = panel?.closest?.('[data-panelid],[data-viz-panel-key],[class*="react-grid-item"]') || panel;
+                    return window.DashBridgeGrafanaVisualEngine?.applySeriesVisibility?.({ root, seriesConfig: { [key]: { visible: false } } });
+                }, [panelId, seriesKey]);
+                await sleep(600);
+            }
+            const s1 = await snapCanvas();
+
+            if (seriesKey) {
+                await execMain(tabId, (pid) => {
+                    const dom = window.DashBridgeGrafanaDom;
+                    const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                    const root = panel?.closest?.('[data-panelid],[data-viz-panel-key],[class*="react-grid-item"]') || panel;
+                    return window.DashBridgeGrafanaVisualEngine?.resetSeriesVisibility?.({ root });
+                }, [panelId]);
+            }
+            await execMain(tabId, (pid) => window.DashBridgeGrafanaVisualEngine?.apply({
+                panelId: pid, thickenLines: false,
+            }), [panelId]);
+            await sleep(700);
+            const s2 = await snapCanvas();
+
+            return {
+                pass: true,
+                details: [
+                    s0 && s1 && s0 !== s1 ? '✓ thicken+visibility изменили canvas' : '? без изменений',
+                    seriesKey ? `series="${seriesKey}"` : 'без серий',
+                    s1 && s2 && s1 !== s2 ? '✓ восстановлен' : '~ сброс',
+                ].join(' | '),
+            };
+        },
+    },
+    {
+        id: 'D9',
+        category: 'D',
+        name: 'Все 4: removeFill + thickenLines + invertLegend + seriesVisibility',
+        async run(tabId, env) {
+            const panelId = resolvePanelId(env);
+            if (!panelId) return { pass: false, details: 'Нет видимой панели' };
+            if (!env.probe?.runtimes?.visualEngine) return { pass: false, details: 'VisualEngine не загружен' };
+            if ((env.probe?.legendCount ?? 0) < 2) return { pass: false, details: 'Недостаточно серий для теста' };
+
+            const snapCanvas = async () => execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                const canvas = panel?.querySelector('canvas') || document.querySelector('canvas');
+                try { return canvas?.toDataURL() || null; } catch (_) { return null; }
+            }, [panelId]);
+
+            const seriesKey = await execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                const items = dom?.legendItems(panel) || [];
+                return items[0]?.textContent?.trim() || null;
+            }, [panelId]);
+
+            const s0 = await snapCanvas();
+
+            // Все 4 ON
+            await execMain(tabId, (pid) => window.DashBridgeGrafanaVisualEngine?.apply({
+                panelId: pid, removeFill: true, thickenLines: true, thickenLinesValue: 3, invertLegend: true,
+            }), [panelId]);
+            await sleep(600);
+
+            if (seriesKey) {
+                await execMain(tabId, (pid, key) => {
+                    const dom = window.DashBridgeGrafanaDom;
+                    const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                    const root = panel?.closest?.('[data-panelid],[data-viz-panel-key],[class*="react-grid-item"]') || panel;
+                    return window.DashBridgeGrafanaVisualEngine?.applySeriesVisibility?.({ root, seriesConfig: { [key]: { visible: false } } });
+                }, [panelId, seriesKey]);
+                await sleep(600);
+            }
+            const s1 = await snapCanvas();
+
+            const legendOn = await execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                const outer = panel?.closest?.('[data-panelid],[data-viz-panel-key],[class*="react-grid-item"]') || panel;
+                return !!outer?.querySelector('.dashbridge-legend-bottom');
+            }, [panelId]);
+
+            // Все OFF + сброс серий
+            if (seriesKey) {
+                await execMain(tabId, (pid) => {
+                    const dom = window.DashBridgeGrafanaDom;
+                    const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                    const root = panel?.closest?.('[data-panelid],[data-viz-panel-key],[class*="react-grid-item"]') || panel;
+                    return window.DashBridgeGrafanaVisualEngine?.resetSeriesVisibility?.({ root });
+                }, [panelId]);
+            }
+            await execMain(tabId, (pid) => window.DashBridgeGrafanaVisualEngine?.apply({
+                panelId: pid, removeFill: false, thickenLines: false, invertLegend: false,
+            }), [panelId]);
+            await sleep(700);
+            const s2 = await snapCanvas();
+
+            return {
+                pass: true,
+                details: [
+                    s0 && s1 && s0 !== s1 ? '✓ все 4 изменили canvas' : '? canvas без изменений',
+                    `legendBottom=${legendOn}`,
+                    seriesKey ? `series="${seriesKey}" скрыта` : 'без серий',
+                    s1 && s2 && s1 !== s2 ? '✓ полный сброс сработал' : '~ canvas при сбросе',
+                ].join(' | '),
+            };
+        },
+    },
+    {
+        id: 'D10',
+        category: 'D',
+        name: 'Последовательное переключение: каждый switch отдельно → все OFF',
+        async run(tabId, env) {
+            const panelId = resolvePanelId(env);
+            if (!panelId) return { pass: false, details: 'Нет видимой панели' };
+            if (!env.probe?.runtimes?.visualEngine) return { pass: false, details: 'VisualEngine не загружен' };
+
+            const snapCanvas = async () => execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                const canvas = panel?.querySelector('canvas') || document.querySelector('canvas');
+                try { return canvas?.toDataURL() || null; } catch (_) { return null; }
+            }, [panelId]);
+
+            const s0 = await snapCanvas();
+
+            // Шаг 1: только removeFill
+            await execMain(tabId, (pid) => window.DashBridgeGrafanaVisualEngine?.apply({
+                panelId: pid, removeFill: true, thickenLines: false, invertLegend: false,
+            }), [panelId]);
+            await sleep(500);
+            const s1 = await snapCanvas();
+
+            // Шаг 2: добавить thickenLines
+            await execMain(tabId, (pid) => window.DashBridgeGrafanaVisualEngine?.apply({
+                panelId: pid, removeFill: true, thickenLines: true, thickenLinesValue: 3, invertLegend: false,
+            }), [panelId]);
+            await sleep(500);
+            const s2 = await snapCanvas();
+
+            // Шаг 3: добавить invertLegend
+            await execMain(tabId, (pid) => window.DashBridgeGrafanaVisualEngine?.apply({
+                panelId: pid, removeFill: true, thickenLines: true, thickenLinesValue: 3, invertLegend: true,
+            }), [panelId]);
+            await sleep(500);
+            const s3 = await snapCanvas();
+
+            // Шаг 4: все OFF
+            await execMain(tabId, (pid) => window.DashBridgeGrafanaVisualEngine?.apply({
+                panelId: pid, removeFill: false, thickenLines: false, invertLegend: false,
+            }), [panelId]);
+            await sleep(500);
+            const s4 = await snapCanvas();
+
+            const step1 = s0 && s1 && s0 !== s1;
+            const step2 = s1 && s2 && s1 !== s2;
+            const step3 = s2 && s3; // invertLegend может не влиять на canvas
+            const step4 = s3 && s4 && s3 !== s4;
+
+            return {
+                pass: true,
+                details: [
+                    step1 ? '✓ +fill' : '~ fill=?',
+                    step2 ? '✓ +thicken' : '~ thicken=?',
+                    step3 ? '~ +legend' : '? legend=?',
+                    step4 ? '✓ reset' : '~ reset=?',
+                ].join(' | '),
+            };
+        },
+    },
+];
+
+// --- Категория E: Data Pipeline ---
+
+const suiteE = [
+    {
+        id: 'E1',
+        category: 'E',
+        name: 'Fetch interceptor active (panelToolsState)',
+        async run(tabId, env) {
+            if (!env.probe?.runtimes?.panelToolsState) {
+                return { pass: false, details: 'window.__dashbridgePanelToolsState не загружен' };
+            }
+            const result = await execMain(tabId, () => {
+                const state = window.__dashbridgePanelToolsState;
+                if (!state) return null;
+                return {
+                    isMap: state instanceof Map,
+                    size: state instanceof Map ? state.size : typeof state,
+                };
+            });
+            return {
+                pass: !!result,
+                details: result ? `panelToolsState: Map=${result.isMap}, size=${result.size}` : 'state недоступен',
+            };
+        },
+    },
+    {
+        id: 'E2',
+        category: 'E',
+        urlHost: 'mon-dc.mos.ru',
+        urlFilter: 'viewPanel=2',   // CPU-панель: ?viewPanel=2 → invertIdle
+        name: 'invertIdle: canvas изменяется после трансформации CPU',
+        async run(tabId, env) {
+            if (!env.probe?.runtimes?.panelToolsState) return { pass: false, details: 'panelToolsState не загружен' };
+            const panelId = resolvePanelId(env);
+
+            // snap0 — состояние ДО (без трансформации)
+            const snapCanvas = async () => execMain(tabId, () => {
+                const canvas = document.querySelector('canvas');
+                try { return canvas?.toDataURL() || null; } catch (_) { return null; }
+            });
+
+            // Сначала сброс: убеждаемся что invertIdle=false
+            await applyPanelTools(tabId, { invertIdle: false, convertMemToUsed: false });
+            await sleep(1000);
+            const snap0 = await snapCanvas();
+
+            // Отключаем авто-рефреш на время теста
+            const prevRefresh = await disableAutoRefresh(tabId);
+
+            // Применяем invertIdle=true → триггерим рефреш данных
+            await applyPanelTools(tabId, { invertIdle: true });
+            await triggerRefresh(tabId);
+            await sleep(3000);
+            const snap1 = await snapCanvas();
+
+            // Откат
+            await applyPanelTools(tabId, { invertIdle: false });
+            await triggerRefresh(tabId);
+            await sleep(2000);
+            const snap2 = await snapCanvas();
+
+            await restoreAutoRefresh(tabId, prevRefresh);
+
+            const transformed = snap0 && snap1 && snap0 !== snap1;
+            const restored = snap1 && snap2 && snap1 !== snap2;
+            return {
+                pass: transformed,
+                details: [
+                    transformed ? '✓ invertIdle изменил canvas' : '✗ canvas не изменился (нет CPU-данных?)',
+                    restored ? '✓ сброс сработал' : '~ canvas после сброса не изменился',
+                    panelId ? `panel=${panelId}` : 'panelId=null',
+                ].join(' | '),
+            };
+        },
+    },
+    {
+        id: 'E3',
+        category: 'E',
+        urlHost: 'mon-dc.mos.ru',
+        urlFilter: 'viewPanel=6',   // RAM-панель: ?viewPanel=6 → convertMemToUsed
+        name: 'convertMemToUsed: canvas изменяется после трансформации RAM',
+        async run(tabId, env) {
+            if (!env.probe?.runtimes?.panelToolsState) return { pass: false, details: 'panelToolsState не загружен' };
+            const panelId = resolvePanelId(env);
+
+            const snapCanvas = async () => execMain(tabId, () => {
+                const canvas = document.querySelector('canvas');
+                try { return canvas?.toDataURL() || null; } catch (_) { return null; }
+            });
+
+            // Сброс
+            await applyPanelTools(tabId, { invertIdle: false, convertMemToUsed: false });
+            await sleep(1000);
+            const snap0 = await snapCanvas();
+
+            const prevRefresh = await disableAutoRefresh(tabId);
+
+            // Применяем convertMemToUsed=true
+            await applyPanelTools(tabId, { convertMemToUsed: true });
+            await triggerRefresh(tabId);
+            await sleep(3000);
+            const snap1 = await snapCanvas();
+
+            // Откат
+            await applyPanelTools(tabId, { convertMemToUsed: false });
+            await triggerRefresh(tabId);
+            await sleep(2000);
+            const snap2 = await snapCanvas();
+
+            await restoreAutoRefresh(tabId, prevRefresh);
+
+            const transformed = snap0 && snap1 && snap0 !== snap1;
+            const restored = snap1 && snap2 && snap1 !== snap2;
+            return {
+                pass: transformed,
+                details: [
+                    transformed ? '✓ convertMemToUsed изменил canvas' : '✗ canvas не изменился (нет RAM-данных?)',
+                    restored ? '✓ сброс сработал' : '~ canvas после сброса не изменился',
+                    panelId ? `panel=${panelId}` : 'panelId=null',
+                ].join(' | '),
+            };
+        },
+    },
+    {
+        id: 'E4',
+        category: 'E',
+        name: 'seriesQueryFilter флаг доступен',
+        async run(tabId, env) {
+            if (!env.probe?.runtimes?.panelToolsState) return { pass: false, details: 'panelToolsState не загружен' };
+            const result = await execMain(tabId, () => {
+                const state = window.__dashbridgePanelToolsState;
+                if (!state) return null;
+                const entries = [...(state instanceof Map ? state.entries() : [])];
+                if (!entries.length) return { noEntries: true };
+                const [, val] = entries[0];
+                return { hasFlag: 'seriesQueryFilter' in (val || {}), value: val?.seriesQueryFilter };
+            });
+            return {
+                pass: result?.hasFlag === true || result?.noEntries === true,
+                details: result?.noEntries ? 'Нет панелей в state' : `seriesQueryFilter: ${JSON.stringify(result?.value)}`,
+            };
+        },
+    },
+];
+
+// --- Категория F: Storage и Background ---
+
+const suiteF = [
+    {
+        id: 'F1',
+        category: 'F',
+        name: 'chrome.storage.local read/write',
+        async run(_tabId, _env) {
+            const key = '__dashbridge_test_probe_' + Date.now();
+            const value = 'ok_' + Math.random();
+            try {
+                await chrome.storage.local.set({ [key]: value });
+                const result = await chrome.storage.local.get(key);
+                await chrome.storage.local.remove(key);
+                const pass = result[key] === value;
+                return { pass, details: pass ? 'read/write успешно' : `Записано: ${value}, прочитано: ${result[key]}` };
+            } catch (e) {
+                return { pass: false, details: `Ошибка: ${e.message}` };
+            }
+        },
+    },
+    {
+        id: 'F2',
+        category: 'F',
+        name: 'chrome.storage.sync read',
+        async run(_tabId, _env) {
+            try {
+                await chrome.storage.sync.get(null);
+                return { pass: true, details: 'chrome.storage.sync доступен' };
+            } catch (e) {
+                return { pass: false, details: `Ошибка: ${e.message}` };
+            }
+        },
+    },
+    {
+        id: 'F3',
+        category: 'F',
+        name: 'Background worker alive',
+        async run(_tabId, _env) {
+            try {
+                const response = await new Promise((resolve, reject) => {
+                    const timeout = setTimeout(() => reject(new Error('timeout 3s')), 3000);
+                    chrome.runtime.sendMessage({ type: '__devBridgePing' }, (resp) => {
+                        clearTimeout(timeout);
+                        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+                        else resolve(resp);
+                    });
+                });
+                return { pass: true, details: `Background ответил: ${JSON.stringify(response)}` };
+            } catch (e) {
+                // Отсутствие ответа — не критично, background может не обрабатывать этот тип
+                return { pass: true, details: `Background не ответил на ping (${e.message}) — норма если ping не реализован` };
+            }
+        },
+    },
+];
+
+// --- Категория G: Auto-refresh Persistence ---
+// Проверяет что визуальные изменения DashBridge сохраняются после авто-обновления графика.
+// Схема каждого теста:
+//   snap0 (before) → apply change → snap1 (changed) → trigger refresh → wait → snap2 (after refresh)
+//   pass = snap2 !== snap0  (изменения не сбросились)
+//          AND snap1 !== snap0 (изменение вообще произошло — иначе тест бессмысленен)
+
+const suiteG = [
+    {
+        id: 'G1',
+        category: 'G',
+        name: 'removeFill сохраняется после refresh',
+        async run(tabId, env) {
+            const panelId = resolvePanelId(env);
+            if (!panelId) return { pass: false, details: 'Нет видимой панели с графиком' };
+            if (!env.probe?.runtimes?.visualEngine) return { pass: false, details: 'VisualEngine не загружен' };
+
+            const snapCanvas = async () => execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                const canvas = panel?.querySelector('canvas') || document.querySelector('canvas');
+                try { return canvas?.toDataURL() || null; } catch (_) { return null; }
+            }, [panelId]);
+
+            // Отключаем авто-рефреш на время теста
+            const prevRefresh = await disableAutoRefresh(tabId);
+
+            // 1. Снимок ДО
+            const snap0 = await snapCanvas();
+
+            // 2. Применяем removeFill=true
+            await execMain(tabId, (pid) =>
+                window.DashBridgeGrafanaVisualEngine?.apply({ panelId: pid, removeFill: true }),
+                [panelId]);
+            await sleep(700);
+
+            // 3. Снимок ПОСЛЕ изменения
+            const snap1 = await snapCanvas();
+            const changed = snap0 && snap1 && snap0 !== snap1;
+            if (!changed) {
+                await execMain(tabId, (pid) =>
+                    window.DashBridgeGrafanaVisualEngine?.apply({ panelId: pid, removeFill: false }),
+                    [panelId]);
+                await restoreAutoRefresh(tabId, prevRefresh);
+                return { pass: false, details: 'removeFill не изменил canvas — невозможно проверить persistence' };
+            }
+
+            // 4. Принудительный refresh (имитирует авто-обновление)
+            await triggerRefresh(tabId);
+
+            // 5. Ждём перерисовки
+            await sleep(3000);
+
+            // 6. Снимок ПОСЛЕ refresh
+            const snap2 = await snapCanvas();
+
+            // 7. Откат
+            await execMain(tabId, (pid) =>
+                window.DashBridgeGrafanaVisualEngine?.apply({ panelId: pid, removeFill: false }),
+                [panelId]);
+            await restoreAutoRefresh(tabId, prevRefresh);
+
+            const persistent = snap2 && snap0 && snap2 !== snap0;
+            return {
+                pass: persistent,
+                details: [
+                    changed ? '✓ change applied' : '✗ change not applied',
+                    persistent ? '✓ persistent after refresh' : '✗ RESET after refresh',
+                    snap1 && snap2 ? (snap1 === snap2 ? '= snap1==snap2' : '≠ snap1!=snap2') : '? no canvas',
+                ].join(' | '),
+            };
+        },
+    },
+    {
+        id: 'G2',
+        category: 'G',
+        name: 'seriesVisibility сохраняется после refresh',
+        async run(tabId, env) {
+            const panelId = resolvePanelId(env);
+            if (!panelId) return { pass: false, details: 'Нет видимой панели с графиком' };
+            if (!env.probe?.runtimes?.visualEngine) return { pass: false, details: 'VisualEngine не загружен' };
+
+            const legendCount = env.probe?.legendCount ?? 0;
+            if (legendCount < 2) return { pass: false, details: `Недостаточно серий (${legendCount}) для теста visibility` };
+
+            const seriesNames = await execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                if (!dom) return [];
+                // Сначала пробуем через findPanelById, затем fallback на весь document
+                // (в ?viewPanel= режиме легенда v12 рендерится вне .react-grid-item)
+                const panel = dom.findPanelById(pid) || dom.visiblePanels?.()?.[0];
+                let items = panel ? dom.legendItems(panel) : [];
+                if (!items?.length) {
+                    const sel = '.graph-legend-series, [class*="legend-item" i], .u-legend tr, .u-legend-row, [class*="LegendRow"], [class*="legend"] [role="button"]';
+                    items = [...document.querySelectorAll(sel)];
+                }
+                return items
+                    ?.map(el => el.dataset?.label || el.querySelector?.('[class*="label" i]')?.textContent?.trim() || el.textContent?.trim())
+                    ?.map(s => s?.trim())
+                    ?.filter(Boolean)
+                    ?.slice(0, 3) || [];
+            }, [panelId]);
+
+            if (!seriesNames?.length) return { pass: false, details: 'legendItems() вернул пустой массив (нет легенды в DOM)' };
+
+            const snapCanvas = async () => execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                const canvas = panel?.querySelector('canvas') || document.querySelector('canvas');
+                try { return canvas?.toDataURL() || null; } catch (_) { return null; }
+            }, [panelId]);
+
+            const prevRefresh = await disableAutoRefresh(tabId);
+            const snap0 = await snapCanvas();
+
+            const firstSeries = seriesNames[0];
+            const seriesConfig = { [firstSeries]: { visible: false } };
+
+            await execMain(tabId, (pid, cfg) =>
+                window.DashBridgeGrafanaVisualEngine?.applySeriesVisibility({ root: document, seriesConfig: cfg }),
+                [panelId, seriesConfig]);
+            await sleep(700);
+
+            const snap1 = await snapCanvas();
+            const changed = snap0 && snap1 && snap0 !== snap1;
+
+            await triggerRefresh(tabId);
+            await sleep(3000);
+
+            const snap2 = await snapCanvas();
+
+            // Восстанавливаем серии
+            await execMain(tabId, (pid, cfg) => {
+                const restored = {};
+                Object.keys(cfg).forEach(k => { restored[k] = { visible: true }; });
+                window.DashBridgeGrafanaVisualEngine?.applySeriesVisibility({ root: document, seriesConfig: restored });
+            }, [panelId, seriesConfig]);
+            await restoreAutoRefresh(tabId, prevRefresh);
+
+            const persistent = snap2 && snap0 && snap2 !== snap0;
+            return {
+                pass: persistent || !changed,
+                details: [
+                    `series="${firstSeries}"`,
+                    changed ? '✓ hidden' : '? canvas не изменился',
+                    persistent ? '✓ persistent' : (changed ? '✗ RESET after refresh' : '~ skip (no change)'),
+                ].join(' | '),
+            };
+        },
+    },
+    {
+        id: 'G3',
+        category: 'G',
+        name: 'thickenLines сохраняется после refresh',
+        async run(tabId, env) {
+            const panelId = resolvePanelId(env);
+            if (!panelId) return { pass: false, details: 'Нет видимой панели с графиком' };
+            if (!env.probe?.runtimes?.visualEngine) return { pass: false, details: 'VisualEngine не загружен' };
+
+            const snapCanvas = async () => execMain(tabId, (pid) => {
+                const dom = window.DashBridgeGrafanaDom;
+                const panel = dom?.findPanelById(pid) || dom?.visiblePanels()?.[0];
+                const canvas = panel?.querySelector('canvas') || document.querySelector('canvas');
+                try { return canvas?.toDataURL() || null; } catch (_) { return null; }
+            }, [panelId]);
+
+            const prevRefresh = await disableAutoRefresh(tabId);
+            const snap0 = await snapCanvas();
+
+            await execMain(tabId, (pid) =>
+                window.DashBridgeGrafanaVisualEngine?.apply({ panelId: pid, thickenLines: true, thickenLinesValue: 4 }),
+                [panelId]);
+            await sleep(700);
+
+            const snap1 = await snapCanvas();
+            const changed = snap0 && snap1 && snap0 !== snap1;
+
+            if (!changed) {
+                await execMain(tabId, (pid) =>
+                    window.DashBridgeGrafanaVisualEngine?.apply({ panelId: pid, thickenLines: false }),
+                    [panelId]);
+                await restoreAutoRefresh(tabId, prevRefresh);
+                return { pass: false, details: 'thickenLines не изменил canvas — невозможно проверить persistence' };
+            }
+
+            await triggerRefresh(tabId);
+            await sleep(3000);
+
+            const snap2 = await snapCanvas();
+
+            // Откат
+            await execMain(tabId, (pid) =>
+                window.DashBridgeGrafanaVisualEngine?.apply({ panelId: pid, thickenLines: false }),
+                [panelId]);
+            await restoreAutoRefresh(tabId, prevRefresh);
+
+            const persistent = snap2 && snap0 && snap2 !== snap0;
+            return {
+                pass: persistent,
+                details: [
+                    '✓ thickenLines=4 applied',
+                    persistent ? '✓ persistent after refresh' : '✗ RESET after refresh',
+                    snap1 && snap2 ? (snap1 === snap2 ? '= snap unchanged by refresh' : '≠ snap changed by refresh') : '? no canvas',
+                ].join(' | '),
+            };
+        },
+    },
+];
+
+// ─── Человекочитаемые ссылки тестов ──────────────────────────────────
+// Stable IDs remain useful to automation; this registry translates them into
+// a feature and a source-level owner for people reading the E2E report.
+const TEST_FEATURE_REFERENCES = {
+    A6: {
+        label: 'Контроллер настроек панели',
+        description: 'Принимает настройки визуализации и преобразования данных для выбранной панели.',
+        sourceFile: 'js/content/grafana-panel-tools.js',
+        sourceSymbol: 'window.__dashbridgePanelToolsState',
+    },
+    A7: {
+        label: 'Движок визуального оформления графика',
+        description: 'Применяет заливку, толщину линий, легенду, видимость серий и пороги.',
+        sourceFile: 'js/content/grafana-visual-engine.js',
+        sourceSymbol: 'window.DashBridgeGrafanaVisualEngine',
+    },
+    A8: {
+        label: 'Состояние панели Grafana',
+        description: 'Хранит и восстанавливает настройки конкретной панели.',
+        sourceFile: 'js/content/grafana-panel-state.js',
+        sourceSymbol: 'window.DashBridgeGrafanaPanelState',
+    },
+    A9: {
+        label: 'Поиск и адресация панелей Grafana',
+        description: 'Находит целевую панель и её DOM-элементы.',
+        sourceFile: 'js/content/grafana-dom.js',
+        sourceSymbol: 'window.DashBridgeGrafanaDom',
+    },
+    B1: {
+        label: 'Отключение заливки под линиями',
+        description: 'Включает removeFill и проверяет, что график был перерисован.',
+        sourceFile: 'js/content/grafana-visual-engine.js',
+        sourceSymbol: 'applyLocalSeriesStyles',
+    },
+    B2: {
+        label: 'Восстановление заливки под линиями',
+        description: 'Отключает removeFill и проверяет возврат визуального состояния.',
+        sourceFile: 'js/content/grafana-visual-engine.js',
+        sourceSymbol: 'applyLocalSeriesStyles',
+    },
+    B3: {
+        label: 'Утолщение линий графика',
+        description: 'Включает thickenLines и проверяет перерисовку графика.',
+        sourceFile: 'js/content/grafana-visual-engine.js',
+        sourceSymbol: 'applyLocalSeriesStyles',
+    },
+    B4: {
+        label: 'Восстановление толщины линий',
+        description: 'Отключает thickenLines и проверяет возврат исходного стиля.',
+        sourceFile: 'js/content/grafana-visual-engine.js',
+        sourceSymbol: 'applyLocalSeriesStyles',
+    },
+    C1: {
+        label: 'Фильтрация серий в легенде',
+        description: 'Проверяет применение фильтра видимости серий через легенду Grafana.',
+        sourceFile: 'js/content/grafana-visual-engine.js',
+        sourceSymbol: 'applySeriesVisibility',
+    },
+    C2: {
+        label: 'Скрытие серии через легенду',
+        description: 'Проверяет нативное скрытие выбранной серии.',
+        sourceFile: 'js/content/grafana-visual-engine.js',
+        sourceSymbol: 'applyUPlotNativeLegendVisibility',
+    },
+    H1: {
+        label: 'Заливка графика: переходы ON/OFF',
+        description: 'Матрица включает и выключает removeFill, затем проверяет возврат состояния.',
+        sourceFile: 'js/content/grafana-visual-engine.js',
+        sourceSymbol: 'applyLocalSeriesStyles',
+    },
+    H4: {
+        label: 'Толщина линий: переходы ON/OFF',
+        description: 'Матрица проверяет включение, выключение и сброс thickenLines.',
+        sourceFile: 'js/content/grafana-visual-engine.js',
+        sourceSymbol: 'applyLocalSeriesStyles',
+    },
+    H7: {
+        label: 'Инверсия легенды: переходы ON/OFF',
+        description: 'Матрица переносит все строки легенды вниз и проверяет их восстановление.',
+        sourceFile: 'js/content/grafana-visual-engine.js',
+        sourceSymbol: 'applyPopupLegendAndVisuals',
+    },
+    H10: {
+        label: 'Видимость серии: переходы ON/OFF',
+        description: 'Матрица скрывает выбранную серию по duplicate-safe ключу легенды и восстанавливает её.',
+        sourceFile: 'js/content/grafana-visual-engine.js',
+        sourceSymbol: 'applySeriesVisibility',
+    },
+    H13: {
+        label: 'Преобразование CPU: Idle → Load',
+        description: 'После обновления данных ожидает вычисленную серию load (calc).',
+        sourceFile: 'js/content/grafana-panel-tools.js',
+        sourceSymbol: 'transformCpuData',
+    },
+    H16: {
+        label: 'Преобразование RAM: → % Used',
+        description: 'После обновления данных ожидает вычисленную серию Used % (calc).',
+        sourceFile: 'js/content/grafana-panel-tools.js',
+        sourceSymbol: 'transformMemData',
+    },
+    H19: {
+        label: 'Фильтрация серий по запросу',
+        description: 'Матрица включает и выключает фильтрацию данных выбранных серий.',
+        sourceFile: 'js/content/grafana-panel-tools.js',
+        sourceSymbol: 'filterSeriesByThreshold',
+    },
+    H22: {
+        label: 'Порог на графике',
+        description: 'Матрица проверяет отображение и сброс пороговой линии.',
+        sourceFile: 'js/content/grafana-visual-engine.js',
+        sourceSymbol: 'setThreshold',
+    },
+};
+
+function getTestFeatureReference(testId) {
+    const id = String(testId || '');
+    const baseId = id.replace(/_\d+$/, '');
+    return TEST_FEATURE_REFERENCES[id] || TEST_FEATURE_REFERENCES[baseId] || null;
+}
+
+// --- Экспорт ---
+
+// Legacy B/D/E/G scenarios contained timing-based or unconditional PASS paths.
+// Their supported coverage is represented by the causal lifecycle matrix (H);
+// F3 remains diagnostic-only until a supported worker health contract exists.
+const DASHBRIDGE_TEST_SUITE = [...suiteF.filter(test => test.id !== 'F3'), ...suiteA, ...suiteH];

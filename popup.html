@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DashBridge</title>
+    <link rel="stylesheet" href="css/theme.css">
+    <link rel="stylesheet" href="css/popup.css">
+    <!-- theme.js в <head> — применяется до рендера body, исключает мигание темы (FOWT) -->
+    <script src="js/theme.js"></script>
+</head>
+
+<body>
+    <div class="app-header" style="position: relative;">
+        <h1 class="app-title">DashBridge</h1>
+        <div class="app-subtitle">Ваш мост к инструментам</div>
+        <button id="themeToggleBtn" class="btn-theme" data-compact title="Переключить тему"
+            style="position: absolute; top: 0.75rem; left: 0.75rem; width: 2.25rem; height: 2.25rem; padding: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;"></button>
+        <button id="openSettingsBtn" title="Настройки расширения"><svg class="ic" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path
+                    d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg></button>
+    </div>
+
+
+    <nav class="tabs-nav">
+        <button class="tab-btn active" data-tab="tab-grafana">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="20" x2="18" y2="10" />
+                <line x1="12" y1="20" x2="12" y2="4" />
+                <line x1="6" y1="20" x2="6" y2="14" />
+                <line x1="2" y1="20" x2="22" y2="20" />
+            </svg>
+            <span>Grafana</span>
+        </button>
+        <button class="tab-btn" data-tab="tab-recorder" title="Traffic Recorder">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="5" width="18" height="14" rx="3" />
+                <circle cx="9" cy="12" r="3" fill="currentColor" stroke="none" />
+                <path d="M15 9v6" />
+                <path d="M18 10.5v3" />
+            </svg>
+            <span>Recorder</span>
+        </button>
+        <button class="tab-btn" data-tab="tab-jira">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+            </svg>
+            <span>Jira</span>
+        </button>
+        <button class="tab-btn" data-tab="tab-tdm">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+            <span>TDM Export</span>
+        </button>
+    </nav>
+
+    <main class="popup-scroll-region">
+    <!-- Tab: Grafana -->
+    <div id="tab-grafana" class="tab-content active" style="padding-top: 0.5rem;">
+        <!-- Переключатель подвкладок Grafana -->
+        <div class="grafana-subnav">
+            <div class="subnav-row">
+                <button class="grafana-sub-btn" data-sub="grafana-links">
+                    <span class="subnav-icon"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                        </svg></span>
+                    <span>Дашборды</span>
+                </button>
+                <button class="grafana-sub-btn" data-sub="grafana-batch">
+                    <span class="subnav-icon"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path
+                                d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                            <circle cx="12" cy="13" r="4" />
+                        </svg></span>
+                    <span>Массовый сбор</span>
+                </button>
+                <button class="grafana-sub-btn" data-sub="grafana-debug">
+                    <span class="subnav-icon"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="9" />
+                            <path d="M9 9h.01M15 9h.01M9 15h6" />
+                        </svg></span>
+                    <span>Отладочная</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Fallback if all subtabs are disabled -->
+        <div id="grafana-no-subtabs" style="display: none; padding: 2.5rem 1.25rem; text-align: center;">
+            <div style="font-size: 2.5rem; margin-bottom: 1rem;">📊</div>
+            <h4 style="margin: 0 0 0.5rem 0; color: var(--text-main); font-weight: 600;">Все разделы Grafana отключены</h4>
+            <p style="color: var(--text-muted); font-size: 0.75rem; margin: 0 0 1rem 0;">
+                Вы можете включить нужные разделы Grafana в настройках.
+            </p>
+        </div>
+
+        <!-- Подвкладка: Ссылки (Дашборды) -->
+        <div id="grafana-links" class="grafana-sub-content">
+            <button id="openDashBridgeBtn" class="btn btn-primary"
+                style="margin-bottom: 0.75rem; width: 100%; font-size: 0.8125rem; border: none;">
+                <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                    <polyline points="2 17 12 22 22 17" />
+                    <polyline points="2 12 12 17 22 12" />
+                </svg> Единый дашборд Grafana
+            </button>
+
+            <div class="card grafana-timestamp-card">
+                <h3 class="section-title"><svg class="ic" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="9" />
+                        <path d="M12 7v5l3 2" />
+                    </svg> Время для Django</h3>
+                <p class="grafana-timestamp-hint">Преобразует <code>from</code> и <code>to</code> текущей вкладки
+                    Grafana в timestamp (миллисекунды). Значения сохраняются на 3 минуты.</p>
+                <button id="grafanaTimestampReadBtn" class="btn btn-outline" type="button">Получить из текущей
+                    вкладки</button>
+                <div id="grafanaTimestampResult" class="grafana-timestamp-result" hidden>
+                    <button class="grafana-timestamp-value" type="button" data-timestamp-copy="from"
+                        aria-label="Скопировать начало теста">
+                        <span>Начало теста</span><code id="grafanaTimestampFrom"></code><small>Копировать</small>
+                    </button>
+                    <button class="grafana-timestamp-value" type="button" data-timestamp-copy="to"
+                        aria-label="Скопировать конец теста">
+                        <span>Конец теста</span><code id="grafanaTimestampTo"></code><small>Копировать</small>
+                    </button>
+                </div>
+                <div id="grafanaTimestampStatus" class="grafana-timestamp-status" role="status" aria-live="polite"></div>
+            </div>
+
+            <div class="card">
+                <h3 class="section-title"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                    </svg> Мои дашборды</h3>
+                <div id="customButtonsContainer">
+                    <!-- Buttons rendered by JS -->
+                </div>
+            </div>
+
+            <div style="padding: 0 0.25rem;">
+                <button id="openAddModal" class="btn btn-dashed" style="font-size: 0.75rem; padding: 0.625rem;">
+                    <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg> Добавить ссылку
+                </button>
+            </div>
+        </div>
+
+        <!-- Подвкладка: Массовый сбор -->
+        <div id="grafana-batch" class="grafana-sub-content" style="display: none;">
+            <div class="card">
+                <h3 class="section-title"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                        <circle cx="12" cy="13" r="4" />
+                    </svg> Массовый сбор скриншотов 🚧</h3>
+                <p style="font-size: 0.6875rem; color: var(--text-muted); margin-bottom: 0.75rem; line-height: 1.4;">
+                    Пакетный сборщик отчетов. Сканирует дашборды, изолирует линии на графиках (series) и скачивает
+                    десятки скриншотов за разные периоды одним ZIP-архивом.
+                </p>
+                <button id="openBatchCaptureBtn" class="btn btn-outline"
+                    style="width: 100%; font-size: 0.75rem; padding: 0.75rem; border-color: var(--primary); color: var(--primary); background: rgba(16, 185, 129, 0.05);">
+                    <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path
+                            d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" />
+                        <path
+                            d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" />
+                        <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" />
+                        <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
+                    </svg> Открыть панель сбора
+                </button>
+            </div>
+        </div>
+
+        <!-- Подвкладка: Отладочная информация -->
+        <div id="grafana-debug" class="grafana-sub-content" style="display: none;">
+            <div class="card">
+                <h3 class="section-title"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="9" />
+                        <path d="M9 9h.01M15 9h.01M9 15h6" />
+                    </svg> Отладочная информация Grafana</h3>
+                <p style="font-size: 0.6875rem; color: var(--text-muted); margin: 0 0 0.75rem; line-height: 1.4;">
+                    Собирает сведения только для отладки: версию и окружение Grafana, структуру панелей,
+                    размеры canvas, легенды и DOM-цепочки. Данные дашборда, запросы и cookies не копируются.
+                </p>
+                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <button id="grafanaDebugFullBtn" class="btn btn-primary">Скопировать полный отчёт</button>
+                    <button id="grafanaDebugGuiCaptureBtn" class="btn btn-outline">Собрать скриншоты интерфейса
+                        (ZIP)</button>
+                    <button id="grafanaDebugTestRunnerBtn" class="btn btn-outline">
+                        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="9 11 12 14 22 4" />
+                            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                        </svg>
+                        E2E Test Runner
+                    </button>
+                </div>
+                <p style="font-size: 0.625rem; color: var(--text-muted); margin: 0.625rem 0 0; line-height: 1.35;">
+                    Временное окно расширения откроется на несколько секунд и закроется автоматически.
+                </p>
+                <div id="grafanaDebugStatus" role="status"
+                    style="display: none; margin-top: 0.625rem; font-size: 0.6875rem; color: var(--text-muted);"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: Traffic Recorder -->
+    <div id="tab-recorder" class="tab-content">
+        <div class="card">
+            <h3 class="section-title">
+                <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 7v5l3 2" />
+                </svg> Traffic Recorder
+            </h3>
+            <p style="font-size: 0.6875rem; color: var(--text-muted); margin: 0 0 0.75rem; line-height: 1.4;">
+                Запись действий и сетевого трафика, replay и сравнение изменений в сценариях .dashflow.
+            </p>
+            <button id="openTrafficRecorderBtn" class="btn btn-outline" type="button"
+                style="width: 100%; font-size: 0.75rem; padding: 0.75rem; border-color: var(--primary); color: var(--primary); background: rgba(var(--primary-rgb), 0.05);">
+                <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" />
+                    <path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" />
+                    <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" />
+                    <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
+                </svg> Открыть Traffic Recorder
+            </button>
+        </div>
+    </div>
+
+    <!-- Tab: Jira -->
+    <div id="tab-jira" class="tab-content">
+        <div class="card">
+            <h3 class="section-title"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                </svg> Учет времени</h3>
+            <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 1rem;">
+                Управляйте своими логами и списывайте время в Jira пакетом.
+            </p>
+            <button id="openJiraPage" class="btn btn-jira">
+                <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                </svg> Открыть WorkLog
+            </button>
+        </div>
+
+        <div class="card">
+            <h3 class="section-title"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="17 1 21 5 17 9" />
+                    <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                    <polyline points="7 23 3 19 7 15" />
+                    <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+                </svg> Перенос времени</h3>
+            <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 1rem;">
+                Скопируйте или перенесите записи времени из текущей задачи в другую (нажмите, находясь на странице
+                задачи).
+            </p>
+            <button id="transferWorklogBtn" class="btn btn-outline" style="border-color: #0052cc; color: #0052cc;">
+                <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path
+                        d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" />
+                    <path
+                        d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" />
+                    <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" />
+                    <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
+                </svg> Копирование/перенос WorkLog в другую задачу
+            </button>
+        </div>
+    </div>
+
+
+    <!-- Tab: TDM Export -->
+    <div id="tab-tdm" class="tab-content">
+        <div class="card">
+            <h3 class="section-title"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg> Экспорт TDM Chat</h3>
+            <div class="form-group" style="margin-bottom: 0.5rem;">
+                <label class="form-label" style="font-size: 0.75rem; margin-bottom: 0.25rem;">С (дата и время):</label>
+                <input type="datetime-local" id="tdmExportStart" style="padding: 0.375rem;">
+            </div>
+            <div class="form-group" style="margin-bottom: 0.5rem;">
+                <label class="form-label" style="font-size: 0.75rem; margin-bottom: 0.25rem;">По (дата и время):</label>
+                <input type="datetime-local" id="tdmExportEnd" style="padding: 0.375rem;">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0.625rem;">
+                <label class="form-label">Формат:</label>
+                <select id="tdmExportFormat" style="padding: 0.375rem;">
+                    <option value="html">HTML</option>
+                    <option value="json">JSON</option>
+                    <option value="both">Оба (HTML + JSON)</option>
+                </select>
+            </div>
+            <div
+                style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8125rem; margin-top: 0.625rem; border-top: 1px solid var(--border); padding-top: 0.5rem;">
+                <span style="color: var(--text-color); font-weight: 500;">Сохранять фотографии</span>
+                <label class="switch">
+                    <input type="checkbox" id="tdmExportPhotos" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div id="tdmFilterUserContainer"
+                style="margin-top: 0.5rem; border-top: 1px solid var(--border); padding-top: 0.5rem; display: flex; align-items: center; justify-content: space-between; font-size: 0.75rem;">
+                <span style="color: var(--text-color); font-weight: 500; display: flex; align-items: center; gap: 0.25rem;">
+                    Игнорировать фото от пользователя
+                    <span
+                        title="Введите ФИО пользователя как в чате (например, Иванов Иван Иванович) или напишите 'Я', чтобы исключить ваши собственные фотографии."
+                        style="color: var(--primary); cursor: help; font-weight: bold; border: 1px solid var(--primary); border-radius: 50%; width: 0.875rem; height: 0.875rem; display: inline-flex; align-items: center; justify-content: center; font-size: 0.625rem;">i</span>
+                </span>
+                <label class="switch">
+                    <input type="checkbox" id="tdmExcludeUserCheckbox">
+                    <span class="slider"></span>
+                </label>
+                <div style="margin-top: 0.625rem;">
+                    <input type="text" id="tdmExcludeUserText" placeholder="Введите ФИО или 'Я'"
+                        style="display: none; width: 100%; padding: 0.5rem; box-sizing: border-box; border-radius: 0.5rem; border: 1px solid var(--border); font-size: 0.8125rem;">
+                </div>
+            </div>
+
+            <button id="tdmExportBtn" class="btn btn-primary" style="margin-top: 0.75rem;">Начать экспорт</button>
+            <div id="tdmExportStatus" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- Tab: No Modules Fallback -->
+    <div id="tab-no-modules" class="tab-content" style="padding: 2.5rem 1.25rem; text-align: center; background: #fff;">
+        <div style="font-size: 3rem; margin-bottom: 1rem;">🧩</div>
+        <h3 style="margin: 0 0 0.625rem 0; color: var(--text-main); font-weight: 600;">Все вкладки отключены</h3>
+        <p style="color: var(--text-muted); font-size: 0.8125rem; line-height: 1.5; margin: 0 0 1.25rem 0;">
+            Пожалуйста, перейдите в настройки расширения и включите необходимые модули для работы.
+        </p>
+        <button id="openSettingsFallbackBtn" class="btn btn-primary" style="margin: 0 auto; max-width: 12.5rem;">
+            Открыть настройки
+        </button>
+    </div>
+
+    <aside id="freshCodeNotice" class="fresh-code-notice" aria-label="Предупреждение о новой функции">
+        <p>
+            <span class="fresh-code-notice-icon">🚧</span> —
+            <strong id="freshCodeNoticeText">Осторожно, свежий код!</strong>
+            <button id="debugFreshCodeEasterEgg" type="button" class="debug-easter-egg-trigger">Осторожно, свежий
+                код!</button>
+            Фича совсем новая, поэтому в ней могут водиться баги или она может вовсе не работать. Пожалуйста, имейте это
+            в виду при использовании.
+        </p>
+    </aside>
+    </main>
+
+    <!-- Modal for adding/editing dashboards -->
+    <div id="modalOverlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 id="modalTitle">Новый дашборд</h4>
+            </div>
+            <input type="hidden" id="editBtnId">
+            <div class="form-group">
+                <label class="form-label">Название</label>
+                <input type="text" id="newBtnName" placeholder="например, Prod">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Базовый URL ссылки</label>
+                <input type="text" id="newBtnUrl" placeholder="https://grafana...">
+            </div>
+            <div class="modal-actions">
+                <button id="saveBtn" class="btn btn-save">Сохранить</button>
+                <button id="closeModal" class="btn btn-cancel">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="vendor/jszip.min.js"></script>
+    <script src="js/shared/archive-download.js"></script>
+    <script src="js/shared/sync-input-writer.js"></script>
+    <script src="js/popup/popup-core.js"></script>
+    <script src="js/popup/popup-grafana-router.js"></script>
+    <script src="js/shared/grafana-runtime-manifest.js"></script>
+    <script src="js/shared/grafana-runtime.js"></script>
+    <script src="js/shared/grafana-command.js"></script>
+    <script src="js/shared/grafana-panel-tools-bridge.js"></script>
+    <script src="js/shared/grafana-settings.js"></script>
+    <script src="js/shared/grafana-time.js"></script>
+    <script src="js/shared/local-state-schema.js"></script>
+    <script src="js/popup/popup-grafana-links.js"></script>
+    <script src="js/popup/popup-grafana-debug.js"></script>
+    <script src="js/popup/popup-debug-easter-egg.js"></script>
+    <script src="js/shared/url-validation.js"></script>
+    <script src="js/popup/popup-jira.js"></script>
+    <script src="js/popup/popup-tdm.js"></script>
+</body>
+
+</html>

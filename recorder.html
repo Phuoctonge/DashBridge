@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="ru" data-ui-scale="auto">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>DashBridge Traffic Recorder</title>
+    <link rel="stylesheet" href="css/theme.css">
+    <link rel="stylesheet" href="css/recorder.css">
+    <script src="js/theme.js"></script>
+</head>
+<body>
+    <header class="recorder-header">
+        <div>
+            <h1>Traffic Recorder</h1>
+            <p>Запись действий и сетевого трафика Chrome</p>
+        </div>
+    </header>
+
+    <main>
+        <section class="control-card">
+            <div class="url-row">
+                <label class="sr-only" for="startUrl">URL для записи</label>
+                <input id="startUrl" type="url" placeholder="site.ru или https://site.ru" autocomplete="off">
+                <button id="startButton" class="primary">Начать запись</button>
+                <button id="stopButton" disabled>Остановить</button>
+            </div>
+            <div class="import-row">
+                <label class="file-button" role="button" tabindex="0">Открыть .dashflow<input id="flowFile" type="file" accept=".dashflow,.zip,application/zip"></label>
+                <button id="replayButton" disabled>Запустить replay</button>
+                <button id="saveButton" disabled>Сохранить .dashflow</button>
+            </div>
+            <div class="network-switches">
+                <div class="network-switch-card">
+                    <label><input id="disableCache" type="checkbox" checked><span>Disable Cache</span><small>Загружать ресурсы с сервера, обходя browser и Service Worker cache</small></label>
+                </div>
+                <div class="network-switch-card">
+                    <label><input id="disableCookies" type="checkbox" checked><span>Disable Cookies</span><small>Чистая временная incognito-сессия; cookies удаляются после закрытия окна</small></label>
+                    <div id="incognitoSetup" class="incognito-setup" hidden>
+                        <ol class="incognito-instructions">
+                            <li>Откройте настройки расширения.</li>
+                            <li>Включите переключатель «Разрешить использование в режиме инкогнито».</li>
+                            <li>Снова откройте Traffic Recorder. Chrome перезапускает расширение после изменения разрешения.</li>
+                        </ol>
+                        <button id="openIncognitoSettings" type="button">Открыть настройки расширения</button>
+                    </div>
+                </div>
+            </div>
+            <div id="secretWarning" class="warning">
+                Запись сохраняет введенные пароли, cookies, токены и тела HTTP-запросов. Файл .dashflow необходимо хранить как файл с учетными данными.
+            </div>
+            <div class="session-status">
+                <span id="sessionModeBadge" class="session-mode-badge" data-mode="idle">Ожидание</span>
+                <div>
+                    <div id="status" class="status" role="status">Готов к записи</div>
+                    <div id="sessionProgress" class="session-progress">Сессия не запущена</div>
+                </div>
+            </div>
+            <div id="networkMode" class="network-mode"></div>
+        </section>
+
+        <section class="metrics">
+            <div><strong id="stepCount">0</strong><span>Шагов</span></div>
+            <div><strong id="requestCount">0</strong><span>Запросов</span></div>
+            <div><strong id="bodySize">0 Б</strong><span>Тела ответов</span></div>
+            <div><strong id="modeValue">Ожидание</strong><span>Режим</span></div>
+        </section>
+
+        <section class="workspace">
+            <aside>
+                <div class="steps-title">
+                    <h2>Шаги</h2>
+                    <button id="showAllSteps" class="compact-button" type="button" hidden>Все шаги</button>
+                </div>
+                <ol id="steps" class="steps"><li class="empty">Сценарий пока пуст</li></ol>
+            </aside>
+            <div class="traffic-panel">
+                <div class="traffic-title">
+                    <h2>Трафик</h2>
+                    <span id="trafficSummary" class="traffic-summary">Показано 0 из 0</span>
+                </div>
+                <div class="traffic-filters" aria-label="Фильтры трафика">
+                    <label class="sr-only" for="trafficFilter">Фильтр по URL</label>
+                    <input id="trafficFilter" type="search" placeholder="Фильтр URL">
+                    <label class="sr-only" for="trafficMethodFilter">HTTP-метод</label>
+                    <select id="trafficMethodFilter">
+                        <option value="all">Все методы</option>
+                        <option value="GET">GET</option><option value="POST">POST</option>
+                        <option value="PUT">PUT</option><option value="PATCH">PATCH</option>
+                        <option value="DELETE">DELETE</option><option value="OPTIONS">OPTIONS</option>
+                    </select>
+                    <label class="sr-only" for="trafficStatusFilter">Статус ответа</label>
+                    <select id="trafficStatusFilter">
+                        <option value="all">Все статусы</option>
+                        <option value="success">2xx–3xx</option><option value="error">4xx–5xx</option>
+                        <option value="pending">Без ответа</option>
+                    </select>
+                    <label class="sr-only" for="trafficTypeFilter">Тип ресурса</label>
+                    <select id="trafficTypeFilter">
+                        <option value="all">Все типы</option>
+                        <option value="Document">Document</option><option value="Fetch">Fetch</option>
+                        <option value="XHR">XHR</option><option value="Script">Script</option>
+                        <option value="Stylesheet">Stylesheet</option><option value="Image">Image</option>
+                        <option value="Font">Font</option><option value="Media">Media</option>
+                    </select>
+                    <button id="clearTrafficFilters" class="compact-button" type="button">Сбросить</button>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <caption class="sr-only">Сетевые запросы, сгруппированные по шагам сценария</caption>
+                        <thead><tr><th>Метод</th><th>Status</th><th>Тип</th><th>URL</th><th>Размер</th><th>Время</th></tr></thead>
+                        <tbody id="traffic"><tr><td colspan="6" class="empty">Запросов пока нет</td></tr></tbody>
+                    </table>
+                </div>
+                <div class="request-details-zone">
+                    <details class="request-details">
+                        <summary>Детали запроса</summary>
+                        <div class="request-details-toolbar">
+                            <span id="requestDetailsSummary">Запрос не выбран</span>
+                            <div>
+                                <button id="copyRequestUrlButton" class="compact-button" type="button" disabled>Копировать URL</button>
+                                <button id="toggleSensitiveDetailsButton" class="compact-button" type="button" disabled>Показать секреты</button>
+                            </div>
+                        </div>
+                        <pre id="requestDetails">Выберите строку трафика</pre>
+                    </details>
+                </div>
+            </div>
+        </section>
+
+        <section id="comparisonPanel" class="comparison-panel" hidden>
+            <div class="comparison-header">
+                <div>
+                    <h2>Сравнение baseline и replay</h2>
+                    <p id="comparisonSummary"></p>
+                </div>
+                <div class="comparison-controls">
+                    <label class="sr-only" for="comparisonUrlFilter">Фильтр сравнения по URL</label>
+                    <input id="comparisonUrlFilter" type="search" placeholder="Фильтр URL" spellcheck="false">
+                    <label class="sr-only" for="comparisonFilter">Фильтр результата сравнения</label>
+                    <select id="comparisonFilter">
+                        <option value="all">Все результаты</option>
+                        <option value="changed">Изменено</option>
+                        <option value="added">Добавлено</option>
+                        <option value="removed">Удалено</option>
+                        <option value="unchanged">Без изменений</option>
+                    </select>
+                    <button id="exportComparisonButton" type="button">Экспорт Excel</button>
+                </div>
+            </div>
+            <div class="comparison-table-wrap">
+                <table>
+                    <caption class="sr-only">Сравнение сетевых запросов baseline и replay по шагам</caption>
+                    <thead><tr><th>Результат</th><th>Метод</th><th>URL</th><th>Baseline</th><th>Replay</th><th>Различия</th></tr></thead>
+                    <tbody id="comparisonBody"></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <script src="vendor/jszip.min.js"></script>
+    <script src="js/shared/dashflow-schema.js"></script>
+    <script src="js/shared/dashflow-compare.js"></script>
+    <script src="js/shared/dashflow-xlsx.js"></script>
+    <script src="js/pages/operation-progress-window.js"></script>
+    <script src="js/pages/recorder.js"></script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+{
+    "manifest_version": 3,
+    "name": "DashBridge",
+    "version": "2.3.1",
+    "description": "Grafana-инструменты, Traffic Recorder с .dashflow record/replay, Jira Worklog и TDM-экспорт.",
+    "permissions": [
+        "storage",
+        "unlimitedStorage",
+        "activeTab",
+        "tabs",
+        "windows",
+        "scripting",
+        "downloads",
+        "declarativeNetRequestWithHostAccess",
+        "clipboardRead",
+        "clipboardWrite",
+        "debugger"
+    ],
+    "host_permissions": [
+        "<all_urls>"
+    ],
+    "background": {
+        "service_worker": "js/background.js"
+    },
+    "action": {
+        "default_popup": "popup.html",
+        "default_icon": {
+            "16": "icons/icon16.png",
+            "48": "icons/icon48.png",
+            "128": "icons/icon128.png"
+        }
+    },
+    "icons": {
+        "16": "icons/icon16.png",
+        "48": "icons/icon48.png",
+        "128": "icons/icon128.png"
+    },
+    "options_ui": {
+        "page": "options.html",
+        "open_in_tab": true
+    },
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "js/content/inject.js",
+                "icons/dashbridge-mark.svg"
+            ],
+            "matches": [
+                "<all_urls>"
+            ]
+        }
+    ],
+    "content_scripts": [
+        {
+            "matches": [
+                "<all_urls>"
+            ],
+            "js": [
+                "js/shared/grafana-settings.js",
+                "js/shared/grafana-panel-identity.js",
+                "js/shared/grafana-capture-output.js",
+                "js/content/content.js",
+                "js/content/grafana-time-picker-clipboard.js"
+            ],
+            "run_at": "document_start"
+        },
+        {
+            "matches": [
+                "<all_urls>"
+            ],
+            "all_frames": true,
+            "js": [
+                "js/shared/grafana-time.js",
+                "js/content/grafana-iframe.js"
+            ],
+            "run_at": "document_start"
+        }
+    ]
+}

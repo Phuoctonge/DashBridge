@@ -1,0 +1,11 @@
+# Local E2E output can contain multi-gigabyte evidence and must never enter an
+# extension package or source-control changeset.
+dashbridge-e2e-diagnostics-*.json
+
+# Generated test/runtime caches are never extension assets.
+__pycache__/
+.pytest_cache/
+*.py[cod]
+
+# Traffic recordings contain request/response bodies, credentials and tokens.
+*.dashflow

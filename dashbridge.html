@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="ru" data-ui-scale="auto">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DashBridge - Универсальный Дашборд</title>
+    <link rel="stylesheet" href="css/theme.css">
+    <link rel="stylesheet" href="css/dashbridge.css">
+    <!-- theme.js в <head> — применяется до рендера body, исключает мигание темы (FOWT) -->
+    <script src="js/theme.js"></script>
+</head>
+
+<body>
+    <header>
+        <div class="logo">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
+                <path d="M3 5v14a2 2 0 0 0 2 2h16v-5H5a2 2 0 0 1 0-4h14v4" />
+            </svg>
+            DashBridge
+        </div>
+
+        <!-- Переключатель профилей -->
+        <div class="profile-controls">
+            <div style="position: relative;">
+                <button id="profilePickerBtn" class="btn btn-outline profile-picker-btn" title="Переключить профиль">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="7" height="7" rx="1" />
+                        <rect x="14" y="3" width="7" height="7" rx="1" />
+                        <rect x="3" y="14" width="7" height="7" rx="1" />
+                        <rect x="14" y="14" width="7" height="7" rx="1" />
+                    </svg>
+                    <span id="profilePickerLabel">Default</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m6 9 6 6 6-6" />
+                    </svg>
+                </button>
+                <div id="profileDropdown" class="profile-dropdown" style="display:none;">
+                    <div id="profileList"></div>
+                    <div class="profile-dropdown-actions">
+                        <button id="newProfileBtn" type="button" class="profile-dropdown-action" title="Новый профиль"
+                            aria-label="Новый профиль">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="12" y1="5" x2="12" y2="19" />
+                                <line x1="5" y1="12" x2="19" y2="12" />
+                            </svg>
+                        </button>
+                        <button id="renameProfileBtn" type="button" class="profile-dropdown-action"
+                            title="Переименовать профиль" aria-label="Переименовать профиль">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 20h9" />
+                                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                            </svg>
+                        </button>
+                        <button id="deleteProfileBtn" type="button"
+                            class="profile-dropdown-action profile-dropdown-delete" title="Удалить профиль"
+                            aria-label="Удалить профиль">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="3 6 5 6 21 6" />
+                                <path d="M19 6l-1 14H6L5 6" />
+                                <path d="M10 11v6" />
+                                <path d="M14 11v6" />
+                                <path d="M9 6V4h6v2" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="time-controls" style="display: flex; gap: 0.5rem; align-items: center;">
+            <div style="position: relative;">
+                <button id="timePickerBtn" class="btn btn-outline" title="Выбрать время"
+                    style="display: inline-flex; align-items: center;">
+                    <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                    </svg> <span id="timePickerLabel">Last 1 hour</span>
+                </button>
+
+                <!-- Time Popover -->
+                <div id="timePopover" class="grafana-time-picker"
+                    style="display: none; position: absolute; top: calc(100% + 0.5rem); left: 0; z-index: 1000; box-shadow: 0 0.25rem 1rem rgba(0,0,0,0.15);">
+                    <div class="gtp-left">
+                        <h4 style="margin-top: 0; margin-bottom: 1rem; font-size: 1rem; font-weight: 500;">Absolute time
+                            range</h4>
+                        <div class="form-group">
+                            <label>From</label>
+                            <div class="gtp-input-wrapper">
+                                <input type="text" id="absTimeFrom" value="now-1h">
+                                <button class="gtp-icon-btn calendar-btn" data-picker="pickerFrom"><svg class="ic"
+                                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                        stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                                        <line x1="16" y1="2" x2="16" y2="6" />
+                                        <line x1="8" y1="2" x2="8" y2="6" />
+                                        <line x1="3" y1="10" x2="21" y2="10" />
+                                    </svg></button>
+                                <input type="date" id="pickerFrom" class="hidden-date-picker" data-target="absTimeFrom"
+                                    style="position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none;">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>To</label>
+                            <div class="gtp-input-wrapper">
+                                <input type="text" id="absTimeTo" value="now">
+                                <button class="gtp-icon-btn calendar-btn" data-picker="pickerTo"><svg class="ic"
+                                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                        stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                                        <line x1="16" y1="2" x2="16" y2="6" />
+                                        <line x1="8" y1="2" x2="8" y2="6" />
+                                        <line x1="3" y1="10" x2="21" y2="10" />
+                                    </svg></button>
+                                <input type="date" id="pickerTo" class="hidden-date-picker" data-target="absTimeTo"
+                                    style="position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none;">
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; align-items: center; margin-top: 1.5rem;">
+                            <button id="copyTimeBtn" class="btn btn-outline" title="Copy time range"
+                                style="padding: 0.5rem; display: flex; align-items: center; justify-content: center;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                </svg>
+                            </button>
+                            <button id="pasteTimeBtn" class="btn btn-outline" title="Paste time range"
+                                style="padding: 0.5rem; display: flex; align-items: center; justify-content: center;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2">
+                                    </path>
+                                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                                </svg>
+                            </button>
+                            <button id="applyAbsoluteTime" class="btn btn-primary"
+                                style="flex: 1; white-space: nowrap;">Apply time range</button>
+                        </div>
+                    </div>
+
+                    <div class="gtp-right">
+                        <div class="gtp-search">
+                            <input type="text" placeholder="Search quick ranges" id="quickRangeSearch">
+                        </div>
+                        <div class="quick-ranges-list" id="quickRangesList">
+                            <button class="quick-range-btn" data-time="now-5m">Last 5 minutes</button>
+                            <button class="quick-range-btn" data-time="now-15m">Last 15 minutes</button>
+                            <button class="quick-range-btn" data-time="now-30m">Last 30 minutes</button>
+                            <button class="quick-range-btn" data-time="now-1h">Last 1 hour</button>
+                            <button class="quick-range-btn" data-time="now-3h">Last 3 hours</button>
+                            <button class="quick-range-btn" data-time="now-6h">Last 6 hours</button>
+                            <button class="quick-range-btn" data-time="now-12h">Last 12 hours</button>
+                            <button class="quick-range-btn" data-time="now-24h">Last 24 hours</button>
+                            <button class="quick-range-btn" data-time="now-2d">Last 2 days</button>
+                            <button class="quick-range-btn" data-time="now-7d">Last 7 days</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="position: relative; display: flex; align-items: center; gap: 0.25rem;">
+                <button id="forceRefreshBtn" class="btn btn-outline" title="Обновить сейчас"
+                    style="padding: 0.5rem 0.75rem;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-main);">
+                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                        <path d="M3 3v5h5" />
+                    </svg>
+                </button>
+
+                <button id="refreshPickerBtn" class="btn btn-outline" title="Автообновление"
+                    style="display: flex; align-items: center; gap: 6px; padding: 0.5rem 0.75rem;">
+                    <span id="refreshPickerLabel" style="color: var(--primary); font-weight: 500;">Off</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-muted);">
+                        <path d="m6 9 6 6 6-6" />
+                    </svg>
+                </button>
+
+                <!-- Refresh Popover -->
+                <div id="refreshPopover" class="grafana-dropdown"
+                    style="display: none; position: absolute; top: calc(100% + 0.25rem); right: 0; z-index: 1000; background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 0.25rem; box-shadow: 0 0.25rem 0.75rem rgba(0,0,0,0.2); min-width: 7.5rem; padding: 0.5rem 0;">
+                    <button class="dropdown-item" data-refresh="">Off</button>
+                    <div style="height: 1px; background: var(--border-color); margin: 0.25rem 0;"></div>
+                    <button class="dropdown-item" data-refresh="auto">Auto</button>
+                    <button class="dropdown-item" data-refresh="5s">5s</button>
+                    <button class="dropdown-item" data-refresh="10s">10s</button>
+                    <button class="dropdown-item" data-refresh="30s">30s</button>
+                    <button class="dropdown-item" data-refresh="1m">1m</button>
+                    <button class="dropdown-item" data-refresh="5m">5m</button>
+                    <button class="dropdown-item" data-refresh="15m">15m</button>
+                    <button class="dropdown-item" data-refresh="30m">30m</button>
+                    <button class="dropdown-item" data-refresh="1h">1h</button>
+                    <button class="dropdown-item" data-refresh="2h">2h</button>
+                    <button class="dropdown-item" data-refresh="1d">1d</button>
+                </div>
+            </div>
+        </div>
+        <div class="controls">
+            <div class="header-menu report-menu">
+                <button id="reportMenuBtn" class="btn btn-outline header-menu-trigger" type="button"
+                    aria-expanded="false">Сообщение ▾</button>
+                <div id="reportDropdown" class="header-menu-dropdown" style="display:none;">
+                    <button id="generateReportBtn" type="button">Сформировать сообщение</button>
+                    <button id="configureReportBtn" type="button">Настроить шаблон</button>
+                </div>
+            </div>
+            <div class="header-menu">
+                <button id="dataMenuBtn" class="btn btn-outline header-menu-trigger" type="button"
+                    aria-expanded="false">Данные ▾</button>
+                <div id="dataDropdown" class="header-menu-dropdown" style="display:none;">
+                    <button id="exportPanelsBtn" type="button">Экспорт (JSON)</button>
+                    <button id="importPanelsBtn" type="button">Импорт (JSON)</button>
+                </div>
+            </div>
+            <input type="file" id="importPanelsInput" accept=".json" style="display:none">
+            <div class="header-menu add-panel-menu">
+                <button id="addPanelBtn" class="btn btn-primary" type="button"
+                    style="display: inline-flex; align-items: center;">
+                    <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg> Добавить панели
+                </button>
+                <button id="addPanelMenuBtn" class="btn btn-primary add-panel-menu-trigger" type="button"
+                    aria-label="Дополнительные способы добавить панели" aria-expanded="false">▾</button>
+                <div id="addPanelDropdown" class="header-menu-dropdown" style="display:none;">
+                    <button id="quickAddPanelsBtn" type="button">Указать ID вручную</button>
+                    <button id="discoverDashboardPanelsBtn" type="button">Выбрать из дашборда</button>
+                </div>
+            </div>
+            <div class="dashboard-capture-controls">
+            <button id="capturePreparedToggleBtn"
+                class="btn btn-outline dashboard-capture-toggle btn-capture-toggle" type="button"
+                title="Компактный снимок 1000×520: выключён" aria-label="Компактный снимок 1000×520: выключён"
+                aria-pressed="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"
+                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="3" y="5" width="18" height="14" rx="2" />
+                    <path d="M8.5 15.5l7-7" stroke-width="2.25" />
+                    <polygon points="12,7.25 17,7.25 17,12.25" fill="currentColor" stroke="none" />
+                    <polygon points="12,16.75 7,16.75 7,11.75" fill="currentColor" stroke="none" />
+                </svg>
+            </button>
+            <button id="captureAllPanelsBtn" class="btn btn-outline dashboard-capture-all" type="button"
+                title="Сохранить снимки всех активных графиков текущего профиля в ZIP">
+                <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M4 8h16v11.5H4z" />
+                    <path d="M3.5 4.5h17v3.5h-17z" />
+                    <path d="M12 10v5.5" />
+                    <path d="m9.5 13 2.5 2.5 2.5-2.5" />
+                </svg>
+                <span>Скачать снимки</span>
+            </button>
+            </div>
+            <div class="header-menu-container" style="position: relative;">
+                <button id="crosshairMenuBtn" class="btn btn-outline header-menu-trigger"
+                    title="Настройки умного курсора" aria-expanded="false"
+                    style="display: inline-flex; align-items: center; gap: 4px;">
+                    <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="22" y1="12" x2="18" y2="12" />
+                        <line x1="6" y1="12" x2="2" y2="12" />
+                        <line x1="12" y1="6" x2="12" y2="2" />
+                        <line x1="12" y1="22" x2="12" y2="18" />
+                    </svg>
+                    <span>Умный курсор</span>
+                    <span style="font-size: 10px; margin-left: 2px;">▼</span>
+                </button>
+                <div id="crosshairDropdown" class="header-menu-dropdown"
+                    style="display: none; padding: 0.75rem; width: 13.75rem; flex-direction: column; gap: 0.75rem; background: var(--bg-card); border: 1px solid var(--border); box-shadow: var(--shadow-md); border-radius: var(--radius-md); position: absolute; right: 0; top: 100%; margin-top: 0.25rem; z-index: 100;">
+                    <label
+                        style="display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: var(--text-main); margin: 0; cursor: pointer;">
+                        <span>Включить</span>
+                        <span class="switch">
+                            <input type="checkbox" id="crosshairToggleCheckbox">
+                            <span class="slider"></span>
+                        </span>
+                    </label>
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <div
+                            style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted);">
+                            <span>Толщина линии</span>
+                            <span id="crosshairThicknessValue">1px</span>
+                        </div>
+                        <input type="range" id="crosshairThicknessSlider" min="1" max="10" value="1" step="1"
+                            title="Регулировка толщины" style="width: 100%; margin: 0; cursor: pointer;">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="dashboard-container" id="dashboard"></main>
+
+    <!-- Modal for adding new iframe -->
+    <div id="modalOverlay" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4>Добавить панель (Iframe)</h4>
+            </div>
+
+            <div class="form-group">
+                <label>Embed URL (из меню Share -> Embed в Графане)</label>
+                <input type="text" id="newPanelUrl" placeholder="https://grafana.../d-solo/...">
+            </div>
+            <div class="form-group">
+                <label>Ширина на экране</label>
+                <select id="newPanelWidth">
+                    <option value="100%">100% (На всю ширину)</option>
+                    <option value="50%" selected>50% (Половина экрана)</option>
+                    <option value="33%">33% (Треть экрана)</option>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button id="savePanelBtn" class="btn btn-primary">Сохранить</button>
+                <button id="closeModalBtn" class="btn btn-cancel">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="quickAddModalOverlay" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4>Указать ID вручную</h4>
+            </div>
+            <div class="form-group">
+                <label for="quickAddDashboardUrl">URL одного дашборда Grafana</label>
+                <input type="text" id="quickAddDashboardUrl" placeholder="https://grafana.../d/uid/dashboard?orgId=1">
+            </div>
+            <div class="form-group">
+                <label for="quickAddPanelIds">ID панелей</label>
+                <input type="text" id="quickAddPanelIds" placeholder="2, 6, 17">
+                <p class="quick-add-hint">Будет создана отдельная карточка для каждого уникального ID.</p>
+            </div>
+            <div class="form-group">
+                <label for="quickAddPanelWidth">Ширина на экране</label>
+                <select id="quickAddPanelWidth">
+                    <option value="100%">100% (На всю ширину)</option>
+                    <option value="50%" selected>50% (Половина экрана)</option>
+                    <option value="33%">33% (Треть экрана)</option>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button id="saveQuickPanelsBtn" class="btn btn-primary">Добавить графики</button>
+                <button id="closeQuickAddModalBtn" class="btn btn-cancel">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="dashboardPanelPickerOverlay" class="modal-overlay">
+        <div class="modal-content dashboard-panel-picker-modal" role="dialog" aria-modal="true"
+            aria-labelledby="dashboardPanelPickerTitle">
+            <div class="modal-header dashboard-panel-picker-header">
+                <h4 id="dashboardPanelPickerTitle">Выбрать из дашборда</h4>
+                <button id="closeDashboardPanelPickerBtn" class="dashboard-panel-picker-close" type="button"
+                    title="Закрыть" aria-label="Закрыть">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" /></svg>
+                </button>
+            </div>
+            <div class="form-group">
+                <label for="dashboardPanelPickerUrl">URL дашборда Grafana</label>
+                <div class="dashboard-panel-picker-request">
+                    <input type="text" id="dashboardPanelPickerUrl"
+                        placeholder="https://grafana.../d/uid/dashboard?orgId=1">
+                    <button id="loadDashboardPanelsBtn" class="btn btn-primary" type="button">Получить панели</button>
+                </div>
+            </div>
+            <div id="dashboardPanelPickerStatus" class="dashboard-panel-picker-status" role="status"
+                aria-live="polite"></div>
+            <div id="dashboardPanelPickerSelection" class="dashboard-panel-picker-selection" hidden>
+                <div class="dashboard-panel-picker-toolbar">
+                    <button id="selectAllDashboardPanelsBtn" class="btn btn-outline" type="button">Выбрать все</button>
+                    <button id="clearDashboardPanelsBtn" class="btn btn-outline" type="button">Снять выбор</button>
+                </div>
+                <div id="dashboardPanelPickerList" class="dashboard-panel-picker-list"></div>
+                <div class="form-group dashboard-panel-picker-width">
+                    <label for="dashboardPanelPickerWidth">Ширина на экране</label>
+                    <select id="dashboardPanelPickerWidth">
+                        <option value="100%">100% (На всю ширину)</option>
+                        <option value="50%" selected>50% (Половина экрана)</option>
+                        <option value="33%">33% (Треть экрана)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="cancelDashboardPanelPickerBtn" class="btn btn-cancel" type="button">Отмена</button>
+                <button id="addSelectedDashboardPanelsBtn" class="btn btn-primary" type="button" disabled>Добавить выбранные</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="vendor/jszip.min.js"></script>
+    <script src="js/shared/archive-download.js"></script>
+    <script src="js/shared/archive-budget.js"></script>
+    <script src="js/shared/grafana-settings.js"></script>
+    <script src="js/shared/grafana-panel-bootstrap.js"></script>
+    <script src="js/shared/grafana-panel-analysis.js"></script>
+    <script src="js/shared/grafana-time.js"></script>
+    <script src="js/shared/grafana-url.js"></script>
+    <script src="js/shared/grafana-panel-identity.js"></script>
+    <script src="js/shared/grafana-dashboard-api.js"></script>
+    <script src="js/shared/grafana-capture-output.js"></script>
+    <script src="js/shared/grafana-legend-selection.js"></script>
+    <script src="js/shared/grafana-panel-settings-modal.js"></script>
+    <script src="js/shared/storage-writer.js"></script>
+    <script src="js/shared/local-state-schema.js"></script>
+    <script src="js/shared/dashbridge-profile-store.js"></script>
+    <script src="js/shared/dashbridge-report.js"></script>
+    <script src="js/pages/dashbridge-time-state.js"></script>
+    <script src="js/pages/dashbridge-crosshair.js"></script>
+    <script src="js/pages/dashbridge-renderer.js"></script>
+    <script src="js/pages/dashbridge.js"></script>
+
+</body>
+
+</html>

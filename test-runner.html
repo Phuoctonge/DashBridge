@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="ru" data-ui-scale="auto">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DashBridge — E2E Test Runner</title>
+    <link rel="stylesheet" href="css/theme.css">
+    <script src="js/theme.js"></script>
+    <style>
+        /* ── Layout ── */
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: var(--font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+            font-size: 13px;
+            background: var(--bg-primary, #0f1117);
+            color: var(--text-primary, #e2e8f0);
+        }
+
+        .tr-header {
+            background: var(--bg-secondary, #1a1d27);
+            border-bottom: 1px solid var(--border-color, #2d3748);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .tr-header h1 {
+            margin: 0;
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-primary, #e2e8f0);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tr-header-sub {
+            margin-left: auto;
+            font-size: 11px;
+            color: var(--text-muted, #718096);
+        }
+
+        .tr-layout {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 20px 20px 40px;
+        }
+
+        /* ── Input panel ── */
+        .tr-input-panel {
+            background: var(--bg-secondary, #1a1d27);
+            border: 1px solid var(--border-color, #2d3748);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .tr-input-label {
+            display: block;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted, #718096);
+            margin-bottom: 8px;
+        }
+
+        #trUrlInput {
+            width: 100%;
+            min-height: 90px;
+            resize: vertical;
+            background: var(--bg-input, #0f1117);
+            color: var(--text-primary, #e2e8f0);
+            border: 1px solid var(--border-color, #2d3748);
+            border-radius: 6px;
+            padding: 8px 10px;
+            font-family: 'Consolas', 'JetBrains Mono', monospace;
+            font-size: 12px;
+            line-height: 1.6;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+
+        #trUrlInput:focus {
+            border-color: var(--accent, #4299e1);
+        }
+
+        #trUrlInput:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .tr-hint {
+            margin-top: 6px;
+            font-size: 11px;
+            color: var(--text-muted, #718096);
+        }
+
+        /* ── Toolbar ── */
+        .tr-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+
+        .tr-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 14px;
+            border-radius: 6px;
+            border: none;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.15s, background 0.15s;
+            white-space: nowrap;
+        }
+
+        .tr-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .tr-btn-primary {
+            background: var(--accent, #4299e1);
+            color: #fff;
+        }
+
+        .tr-btn-primary:not(:disabled):hover {
+            background: #2b82d0;
+        }
+
+        .tr-btn-danger {
+            background: var(--danger, #e53e3e);
+            color: #fff;
+        }
+
+        .tr-btn-danger:not(:disabled):hover {
+            background: #c53030;
+        }
+
+        .tr-btn-secondary {
+            background: var(--bg-tertiary, #252836);
+            color: var(--text-secondary, #a0aec0);
+            border: 1px solid var(--border-color, #2d3748);
+        }
+
+        .tr-btn-secondary:not(:disabled):hover {
+            background: var(--bg-hover, #2d3748);
+            color: var(--text-primary, #e2e8f0);
+        }
+
+        .tr-toolbar-spacer {
+            flex: 1;
+        }
+
+        /* ── Progress ── */
+        #trProgress {
+            display: none;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 14px;
+        }
+
+        .tr-progress-track {
+            height: 4px;
+            background: var(--bg-tertiary, #252836);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        #trProgressBar {
+            height: 100%;
+            width: 0%;
+            background: var(--accent, #4299e1);
+            border-radius: 2px;
+            transition: width 0.3s ease;
+        }
+
+        #trProgressText {
+            font-size: 11px;
+            color: var(--text-muted, #718096);
+        }
+
+        /* ── Status line ── */
+        #trStatusLine {
+            font-size: 12px;
+            font-weight: 500;
+            min-height: 18px;
+        }
+
+        .tr-status-ok {
+            color: #68d391;
+        }
+
+        .tr-status-fail {
+            color: #fc8181;
+        }
+
+        .tr-status-warn {
+            color: #f6ad55;
+        }
+
+        /* ── Summary ── */
+        #trSummary {
+            display: none;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            border-radius: 6px;
+            margin-bottom: 14px;
+            font-size: 12px;
+        }
+
+        .tr-summary-ok {
+            background: rgba(72, 187, 120, 0.12);
+            border: 1px solid rgba(72, 187, 120, 0.3);
+        }
+
+        .tr-summary-fail {
+            background: rgba(245, 101, 101, 0.12);
+            border: 1px solid rgba(245, 101, 101, 0.3);
+        }
+
+        .tr-summary-warn {
+            background: rgba(237, 137, 54, 0.12);
+            border: 1px solid rgba(237, 137, 54, 0.3);
+        }
+
+        .tr-summary-pct {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .tr-summary-ok .tr-summary-pct {
+            color: #68d391;
+        }
+
+        .tr-summary-fail .tr-summary-pct {
+            color: #fc8181;
+        }
+
+        .tr-summary-warn .tr-summary-pct {
+            color: #f6ad55;
+        }
+
+        .tr-summary-detail {
+            color: var(--text-secondary, #a0aec0);
+        }
+
+        /* ── Results table ── */
+        .tr-results-wrap {
+            border: 1px solid var(--border-color, #2d3748);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .tr-results-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        .tr-results-table thead th {
+            background: var(--bg-secondary, #1a1d27);
+            color: var(--text-muted, #718096);
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            padding: 8px 10px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color, #2d3748);
+            white-space: nowrap;
+        }
+
+        /* URL-header rows */
+        .tr-url-header td {
+            padding: 8px 10px;
+            font-weight: 600;
+            font-size: 12px;
+            border-bottom: 1px solid var(--border-color, #2d3748);
+        }
+
+        .tr-url-ok td {
+            background: rgba(72, 187, 120, 0.07);
+        }
+
+        .tr-url-fail td {
+            background: rgba(245, 101, 101, 0.07);
+        }
+
+        .tr-url-warn td {
+            background: rgba(237, 137, 54, 0.07);
+        }
+
+        .tr-url-toggle {
+            cursor: pointer;
+            user-select: none;
+            margin-right: 6px;
+            color: var(--text-muted, #718096);
+            font-size: 11px;
+        }
+
+        .tr-url-label {
+            color: var(--text-primary, #e2e8f0);
+            font-family: 'Consolas', 'JetBrains Mono', monospace;
+            font-size: 11px;
+            word-break: break-all;
+        }
+
+        .tr-url-meta {
+            margin-left: 10px;
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            background: var(--bg-tertiary, #252836);
+            color: var(--text-muted, #718096);
+        }
+
+        .tr-probe-error {
+            margin-left: 8px;
+            font-size: 10px;
+            color: #f6ad55;
+            cursor: help;
+        }
+
+        .tr-url-counts {
+            float: right;
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            font-size: 11px;
+        }
+
+        .tr-count-pass {
+            color: #68d391;
+            font-weight: 700;
+        }
+
+        .tr-count-fail {
+            color: #fc8181;
+            font-weight: 700;
+        }
+
+        .tr-count-skip {
+            color: #a0aec0;
+            font-weight: 700;
+        }
+
+        .tr-count-total {
+            color: var(--text-muted, #718096);
+        }
+
+        .tr-count-dur {
+            color: var(--text-muted, #718096);
+            font-size: 10px;
+        }
+
+        /* Test rows */
+        .tr-test-row td {
+            padding: 5px 10px;
+            border-bottom: 1px solid var(--border-divider, rgba(255, 255, 255, 0.04));
+            vertical-align: top;
+        }
+
+        .tr-test-row:last-child td {
+            border-bottom: none;
+        }
+
+        .tr-pass td {
+            background: transparent;
+        }
+
+        .tr-fail td {
+            background: rgba(245, 101, 101, 0.04);
+        }
+
+        .tr-skip td {
+            background: rgba(160, 174, 192, 0.04);
+            opacity: 0.7;
+        }
+
+        .tr-test-row:hover td {
+            background: var(--bg-hover-row, rgba(255, 255, 255, 0.03));
+        }
+
+        .tr-td-id {
+            width: 52px;
+            white-space: nowrap;
+        }
+
+        .tr-td-cat {
+            width: 110px;
+            color: var(--text-muted, #718096);
+            white-space: nowrap;
+        }
+
+        .tr-td-name {
+            min-width: 250px;
+        }
+
+        .tr-feature-name {
+            color: var(--text-primary, #e2e8f0);
+            font-weight: 600;
+        }
+
+        .tr-feature-source,
+        .tr-technical-name {
+            margin-top: 2px;
+            color: var(--text-muted, #718096);
+            font-family: 'Consolas', 'JetBrains Mono', monospace;
+            font-size: 10px;
+            line-height: 1.35;
+            overflow-wrap: anywhere;
+        }
+
+        .tr-technical-name {
+            opacity: 0.78;
+        }
+
+        .tr-td-status {
+            width: 60px;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .tr-td-details {
+            color: var(--text-secondary, #a0aec0);
+            word-break: break-word;
+        }
+
+        .tr-td-dur {
+            width: 60px;
+            text-align: right;
+            white-space: nowrap;
+            color: var(--text-muted, #718096);
+            font-size: 11px;
+        }
+
+        .tr-badge {
+            display: inline-block;
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 700;
+            font-family: 'Consolas', monospace;
+        }
+
+        .tr-badge-f {
+            background: rgba(160, 174, 192, 0.15);
+            color: #a0aec0;
+        }
+
+        .tr-badge-a {
+            background: rgba(66, 153, 225, 0.15);
+            color: #63b3ed;
+        }
+
+        .tr-badge-b {
+            background: rgba(72, 187, 120, 0.15);
+            color: #68d391;
+        }
+
+        .tr-badge-c {
+            background: rgba(237, 137, 54, 0.15);
+            color: #f6ad55;
+        }
+
+        .tr-badge-d {
+            background: rgba(159, 122, 234, 0.15);
+            color: #b794f4;
+        }
+
+        .tr-badge-e {
+            background: rgba(237, 100, 166, 0.15);
+            color: #f687b3;
+        }
+
+        .tr-badge-h {
+            background: rgba(129, 230, 217, 0.15);
+            color: #81e6d9;
+        }
+
+        .tr-status-icon {
+            font-weight: 700;
+            font-size: 13px;
+        }
+
+        .tr-pass .tr-status-icon {
+            color: #68d391;
+        }
+
+        .tr-fail .tr-status-icon {
+            color: #fc8181;
+        }
+
+        .tr-skip .tr-status-icon {
+            color: #a0aec0;
+        }
+
+        /* Empty state */
+        #trEmptyState {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 40px 20px;
+            color: var(--text-muted, #718096);
+            font-size: 13px;
+        }
+
+        .tr-empty-icon {
+            font-size: 32px;
+            opacity: 0.4;
+        }
+    </style>
+    <link rel="stylesheet" href="css/test-runner.css">
+</head>
+
+<body>
+    <div class="tr-header">
+        <span class="tr-brand-mark" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5" /><path d="M4 15h5l3-8 3 12 2-6h3" /></svg>
+        </span>
+        <h1>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 11 12 14 22 4" />
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+            </svg>
+            DashBridge E2E Test Runner
+        </h1>
+        <span class="tr-header-sub" id="trHeaderSub">Grafana v10 (Flot) · v12 (uPlot)</span>
+    </div>
+
+    <div class="tr-layout">
+
+        <!-- URL Input -->
+        <div class="tr-input-panel">
+            <label class="tr-input-label" for="trUrlInput">URL Grafana дашбордов (по одному на строку)</label>
+            <textarea id="trUrlInput"
+                placeholder="https://grafana.example.com/d/abc123/dashboard-name&#10;https://grafana2.example.com/d/xyz456/another-dashboard"
+                spellcheck="false"></textarea>
+            <div class="tr-hint">Ctrl+Enter — запуск выбранного профиля. Поддерживаются Grafana 10 (Flot) и 12 (uPlot).
+            </div>
+
+            <div class="tr-toolbar">
+                <label for="trRunMode" class="tr-input-label" style="margin:0">Профиль</label>
+                <select id="trRunMode" class="tr-btn tr-btn-secondary" aria-label="Профиль E2E-проверок">
+                    <option value="fast" selected>Быстрый</option>
+                    <option value="full">Полный</option>
+                </select>
+                <button id="trRunBtn" class="tr-btn tr-btn-primary">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="5 3 19 12 5 21 5 3" />
+                    </svg><span class="tr-btn-label">Запустить тесты</span>
+                </button>
+                <button id="trAbortBtn" class="tr-btn tr-btn-danger" disabled>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                    </svg>
+                    Стоп
+                </button>
+                <span class="tr-toolbar-spacer"></span>
+                <button id="trCopyBtn" class="tr-btn tr-btn-secondary" disabled>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2" />
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                    </svg>
+                    Копировать отчёт
+                </button>
+                <button id="trCopyFailBtn" class="tr-btn tr-btn-secondary" disabled>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Копировать ошибки
+                </button>
+                <button id="trExportDiagnosticsBtn" class="tr-btn tr-btn-secondary" disabled>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>Скачать JSON
+                </button>
+                <button id="trClearBtn" class="tr-btn tr-btn-secondary">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6l-1 14H6L5 6" />
+                        <path d="M10 11v6M14 11v6" />
+                        <path d="M9 6V4h6v2" />
+                    </svg>
+                    Очистить
+                </button>
+            </div>
+        </div>
+
+        <!-- Progress -->
+        <div id="trProgress">
+            <div class="tr-progress-track">
+                <div id="trProgressBar"></div>
+            </div>
+            <span id="trProgressText"></span>
+        </div>
+
+        <!-- Status -->
+        <div id="trStatusLine" class="tr-status"></div>
+
+        <!-- Summary -->
+        <div id="trSummary" class="tr-summary"></div>
+
+        <!-- Results table -->
+        <div class="tr-results-wrap">
+            <table class="tr-results-table" role="grid">
+                <colgroup>
+                    <col class="tr-col-id">
+                    <col class="tr-col-cat">
+                    <col class="tr-col-name">
+                    <col class="tr-col-status">
+                    <col class="tr-col-details">
+                    <col class="tr-col-dur">
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th class="tr-td-id">ID</th>
+                        <th class="tr-td-cat">Категория</th>
+                        <th class="tr-td-name">Тест</th>
+                        <th class="tr-td-status">Статус</th>
+                        <th class="tr-td-details">Детали</th>
+                        <th class="tr-td-dur">Время</th>
+                    </tr>
+                </thead>
+                <tbody id="trResultsBody">
+                </tbody>
+            </table>
+            <div id="trEmptyState">
+                <svg class="tr-empty-icon" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M9 3h6"/><path d="M10 3v6.3L4.7 18a2 2 0 0 0 1.7 3h11.2a2 2 0 0 0 1.7-3L14 9.3V3"/><path d="M8.5 15h7"/></svg>
+                <span>Введите URL дашбордов и нажмите «Запустить тесты»</span>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Scripts: suite/probe → core → report builder → UI -->
+    <script src="js/shared/grafana-runtime-manifest.js"></script>
+    <script src="js/shared/grafana-runtime.js"></script>
+    <script src="js/test-runner/test-runner-probe.js"></script>
+    <script src="js/test-runner/test-runner-suite.js"></script>
+    <script src="js/test-runner/test-runner-core.js"></script>
+    <script src="js/test-runner/test-runner-report.js"></script>
+    <script src="js/test-runner/test-runner-ui.js"></script>
+</body>
+
+</html>

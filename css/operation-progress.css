@@ -1,0 +1,111 @@
+html, body {
+    width: 100%;
+    min-width: 21.25rem;
+    min-height: 15.3125rem;
+    overflow: hidden;
+}
+
+body {
+    padding: 0.875rem;
+    background: var(--bg);
+}
+
+.operation-progress-card {
+    height: 100%;
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--card-bg);
+    box-shadow: var(--shadow-lg);
+}
+
+.operation-progress-card header {
+    display: grid;
+    grid-template-columns: 2.25rem minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.625rem;
+    margin-bottom: 1rem;
+}
+
+.operation-progress-icon {
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.625rem;
+    color: var(--primary);
+    background: rgba(var(--primary-rgb), 0.12);
+}
+
+.operation-progress-icon svg {
+    width: 1.3125rem;
+    height: 1.3125rem;
+}
+
+h1 {
+    overflow: hidden;
+    margin: 0;
+    font-size: 0.875rem;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+header p {
+    overflow: hidden;
+    margin: 0.125rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.6875rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.operation-status {
+    padding: 0.25rem 0.4375rem;
+    border-radius: 999px;
+    color: var(--primary);
+    background: rgba(var(--primary-rgb), 0.12);
+    font-size: 0.625rem;
+    font-weight: 700;
+}
+
+.operation-status[data-status="complete"] { color: var(--success); background: var(--status-success-bg); }
+.operation-status[data-status="partial"] { color: #b45309; background: var(--status-warning-bg); }
+.operation-status[data-status="error"],
+.operation-status[data-status="cancelled"] { color: var(--danger); background: var(--status-danger-bg); }
+
+progress {
+    display: block;
+    width: 100%;
+    height: 0.625rem;
+    overflow: hidden;
+    border: 0;
+    border-radius: 999px;
+    accent-color: var(--primary);
+}
+
+.operation-progress-numbers,
+.operation-progress-stats {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.4375rem;
+    font-size: 0.6875rem;
+}
+
+.operation-progress-stats { color: var(--text-muted); }
+.operation-progress-stats strong { color: var(--text-main); }
+
+.operation-message {
+    min-height: 1.875rem;
+    margin: 0.75rem 0;
+    color: var(--text-muted);
+    font-size: 0.6875rem;
+    line-height: 1.35;
+}
+
+#operationCancel {
+    width: 100%;
+    min-height: 2.125rem;
+}
+
+#operationCancel[hidden] { display: none; }

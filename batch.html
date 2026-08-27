@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ru" data-ui-scale="auto">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DashBridge: Массовый сбор Grafana</title>
+    <link rel="stylesheet" href="css/theme.css">
+    <link rel="stylesheet" href="css/batch.css">
+    <!-- theme.js в <head> — применяется до рендера body, исключает мигание темы (FOWT) -->
+    <script src="js/theme.js"></script>
+</head>
+
+<body>
+    <div class="toast-container" id="toastContainer"></div>
+    <header class="batch-header">
+        <div class="batch-header-content">
+            <div class="batch-brand-mark" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                    <circle cx="12" cy="13" r="4" />
+                </svg>
+            </div>
+            <div>
+                <h1>Массовый сборщик отчётов</h1>
+                <p>Снимки панелей Grafana по временным диапазонам и Series</p>
+            </div>
+        </div>
+    </header>
+    <div class="container">
+        <div class="card batch-parameters-card">
+            <div class="tabs-header">
+                <button class="tab-btn active" data-tab="tab-main">Настройки сбора</button>
+                <button class="tab-btn" data-tab="tab-series">Фильтр линий (Series)</button>
+                <button class="tab-btn" data-tab="tab-logs">Логи выполнения</button>
+            </div>
+
+            <div id="tab-main" class="tab-content active">
+                <div class="form-group">
+                    <label>URL Дашборда Grafana</label>
+                    <div class="batch-url-row">
+                        <input type="text" id="dashUrl" placeholder="https://grafana.example.com/d/..." value=""
+                            class="batch-url-input">
+                        <div class="batch-url-actions">
+                            <button id="getPanelsBtn" class="btn batch-secondary-btn"
+                                title="Получить список панелей напрямую из браузера"><svg class="ic" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                                </svg> ID панелей</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid">
+                    <div class="form-group">
+                        <label>Режим панелей</label>
+                        <select id="panelsMode">
+                            <option value="all">Все панели дашборда</option>
+                            <option value="whitelist">Белый список (только эти ID через запятую)</option>
+                            <option value="blacklist">Черный список (все кроме этих ID)</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="userPanelsGroup" style="display: none;">
+                        <label>ID панелей (через запятую)</label>
+                        <input type="text" id="userPanels" placeholder="2, 5, 12">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Временные диапазоны (From, To через запятую). Каждая пара — с новой строки</label>
+                    <textarea id="timestamps" rows="3" placeholder="17.08.2026 09:00, 17.08.2026 18:00&#10;now-1h, now"></textarea>
+                    <p class="batch-field-hint">Поддерживаются ISO, ДД.ММ.ГГГГ, ДД/ММ/ГГГГ, ГГГГ-ММ-ДД и Unix timestamp; <code>now-…</code> сохраняется. Преобразование выполняется при запуске.</p>
+                </div>
+
+                <div class="form-group">
+                    <fieldset id="captureThemeMain" class="batch-capture-theme-group">
+                        <legend>Тема Grafana для снимков</legend>
+                        <div class="batch-capture-theme-options">
+                            <label><input class="batch-capture-theme" type="radio" name="captureThemeMain"
+                                    value="current"> Текущая</label>
+                            <label><input class="batch-capture-theme" type="radio" name="captureThemeMain" value="light"
+                                    checked> Светлая</label>
+                            <label><input class="batch-capture-theme" type="radio" name="captureThemeMain" value="dark">
+                                Темная</label>
+                        </div>
+                    </fieldset>
+                    <p class="batch-field-hint batch-field-hint-small">
+                        «Текущая» не меняет URL; для светлой и темной темы добавляется параметр Grafana
+                        <code>theme</code>.
+                    </p>
+                </div>
+
+                <div class="form-group batch-compact-capture-option">
+                    <label class="batch-switch-option">
+                        <span class="batch-switch">
+                            <input type="checkbox" id="compactCaptureMain">
+                            <span class="batch-switch-slider" aria-hidden="true"></span>
+                        </span>
+                        <span>Компактный снимок</span>
+                    </label>
+                    <p class="batch-field-hint">Размер берётся из общих настроек DashBridge.</p>
+                </div>
+
+                <section class="batch-panel-rules" aria-labelledby="batchPanelRulesTitle">
+                    <div class="batch-panel-rules-header">
+                        <div>
+                            <h2 id="batchPanelRulesTitle">Правила обработки панелей</h2>
+                            <p>Настройки применяются только к указанным ID панелей при сборе этого дашборда.</p>
+                        </div>
+                        <div class="batch-panel-rules-header-actions">
+                            <button id="resetBatchPanelRulesBtn" class="btn btn-secondary" type="button" hidden>Сбросить</button>
+                            <button id="addBatchPanelRuleBtn" class="btn btn-secondary" type="button">Добавить правило</button>
+                        </div>
+                    </div>
+                    <div id="batchPanelRules" class="batch-panel-rules-list" aria-live="polite"></div>
+                    <p id="batchPanelRulesStatus" class="batch-panel-rules-status" role="status">Изменения сохраняются автоматически.</p>
+                </section>
+            </div>
+
+            <div id="tab-series" class="tab-content">
+                <div class="form-group">
+                    <label>URL дашборда Grafana для Series</label>
+                    <div class="batch-url-row">
+                        <input type="text" id="seriesDashUrl" placeholder="https://grafana.example.com/d/..."
+                            class="batch-url-input">
+                        <div class="batch-url-actions">
+                            <button id="getSeriesPanelsBtn" class="btn batch-secondary-btn">ID
+                                панелей</button>
+                        </div>
+                    </div>
+                    <p class="batch-field-hint batch-field-hint-small">
+                        Выберите панели, подготовьте их и задайте фильтры Series по ключевым фразам.
+                    </p>
+                </div>
+
+                <button id="copyMainSettingsToSeriesBtn" class="btn batch-copy-settings-btn" type="button">Подставить URL и временные срезы из настроек сбора</button>
+                <p id="seriesPanelSelectionStatus" class="batch-field-hint batch-field-hint-small">
+                    Панели не выбраны.</p>
+                <button id="loadSelectedSeriesBtn" class="btn batch-secondary-btn batch-load-series-btn"
+                    hidden>Подготовить выбранные панели</button>
+                <div id="seriesLoaderStatus" class="batch-series-loader" role="status" aria-live="polite" hidden>
+                    Подготовка панелей…
+                </div>
+
+                <section class="batch-series-pattern-section" aria-labelledby="batchSeriesPatternTitle">
+                    <h2 id="batchSeriesPatternTitle">Серии легенды</h2>
+                    <div class="batch-series-patterns">
+                        <label for="seriesIncludeFilter">
+                            <span>Выбрать серии</span>
+                            <input id="seriesIncludeFilter" type="search" placeholder="Например: cpu|load">
+                        </label>
+                        <label for="seriesIgnoreFilter">
+                            <span>Игнорировать серии</span>
+                            <input id="seriesIgnoreFilter" type="search" placeholder="Например: idle|test">
+                        </label>
+                    </div>
+                    <p class="batch-field-hint">Разделяйте фразы символом <code>|</code>. Поиск выполняется без учёта регистра по вхождению в название Series. Исключение имеет приоритет; пустое поле выбора означает все Series.</p>
+                </section>
+
+                <div id="seriesPanelsContainer" class="batch-series-panels">
+                    <!-- Здесь будут появляться карточки панелей со списками серий -->
+                </div>
+
+                <div class="form-group batch-spaced-group">
+                    <label>Временные периоды для выбранных панелей (каждая пара с новой строки)</label>
+                    <textarea id="seriesTimestamps" class="batch-panel-url" placeholder="now-1h, now"
+                        style="height: 50px;"></textarea>
+                </div>
+
+                <div class="series-capture-settings">
+                    <div class="form-group">
+                        <label>Режим сбора изолированных метрик</label>
+                        <select id="seriesCaptureMode">
+                            <option value="group">Групповой (все подходящие Series остаются на одном графике)</option>
+                            <option value="standalone">По отдельности (каждая подходящая Series — в отдельном файле)
+                            </option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <fieldset id="captureThemeSeries" class="batch-capture-theme-group">
+                            <legend>Тема Grafana для снимков</legend>
+                            <div class="batch-capture-theme-options">
+                                <label><input class="batch-capture-theme" type="radio" name="captureThemeSeries"
+                                        value="current"> Текущая</label>
+                                <label><input class="batch-capture-theme" type="radio" name="captureThemeSeries"
+                                        value="light" checked> Светлая</label>
+                                <label><input class="batch-capture-theme" type="radio" name="captureThemeSeries"
+                                        value="dark"> Темная</label>
+                            </div>
+                        </fieldset>
+                    </div>
+                    <div class="form-group batch-compact-capture-option">
+                        <label class="batch-switch-option">
+                            <span class="batch-switch">
+                                <input type="checkbox" id="compactCaptureSeries">
+                                <span class="batch-switch-slider" aria-hidden="true"></span>
+                            </span>
+                            <span>Компактный снимок</span>
+                        </label>
+                        <p class="batch-field-hint">Размер берётся из общих настроек DashBridge.</p>
+                    </div>
+                </div>
+
+                <div class="form-group batch-series-action">
+                    <button id="startSeriesBtn" class="btn btn-primary"><svg
+                            class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path
+                                d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" />
+                            <path
+                                d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" />
+                            <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" />
+                            <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
+                        </svg> Запустить сбор только по фильтрам (Series)</button>
+                    <p class="batch-field-hint batch-field-hint-small">
+                        Для каждой выбранной панели и каждого временного среза будут захвачены Series, подходящие под
+                        фильтры легенды выше (общие настройки дашборда игнорируются).
+                    </p>
+                </div>
+            </div>
+
+            <div id="tab-logs" class="tab-content">
+                <label>Лог выполнения</label>
+                <div id="logContainer" class="log-container">
+                    <div class="log-entry"><span class="log-time">[--:--:--]</span> Жду запуска...</div>
+                </div>
+                <button id="clearLogs" class="btn batch-secondary-btn batch-clear-logs">Очистить
+                    логи</button>
+            </div>
+
+            <div id="mainActionArea">
+                <button id="startBtn" class="btn btn-primary"><svg class="ic"
+                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path
+                            d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" />
+                        <path
+                            d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" />
+                        <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" />
+                        <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
+                    </svg> Запустить сбор всего Дашборда</button>
+                <button id="cancelBtn" class="btn btn-danger" hidden><svg
+                        class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="15" y1="9" x2="9" y2="15" />
+                        <line x1="9" y1="9" x2="15" y2="15" />
+                    </svg> Отменить</button>
+            </div>
+
+            <div id="status" class="status"></div>
+            <div id="batchProgress" class="batch-progress" role="status" aria-live="polite" hidden>
+                <div class="batch-progress-header"><span id="batchProgressText"></span><span id="batchProgressStats"></span></div>
+                <progress id="batchProgressBar" max="1" value="0"></progress>
+            </div>
+        </div>
+    </div>
+
+    <div id="panelsModal" class="modal-overlay">
+        <div class="modal-panels" role="dialog" aria-modal="true" aria-labelledby="modalTitleText">
+            <div class="batch-panel-picker-header">
+                <h2 id="modalTitleText">Выбрать панели дашборда</h2>
+                <button class="close-modal-btn" id="closePanelsModal" type="button" title="Закрыть"
+                    aria-label="Закрыть">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" /></svg>
+                </button>
+            </div>
+            <div class="batch-panel-picker-toolbar">
+                <span id="panelPickerSelectionStatus" role="status" aria-live="polite"></span>
+                <div class="batch-panel-picker-toolbar-actions">
+                    <button id="selectAllPanelPickerBtn" class="btn batch-panel-picker-secondary" type="button">Выбрать все</button>
+                    <button id="clearPanelPickerBtn" class="btn batch-panel-picker-secondary" type="button">Снять выбор</button>
+                </div>
+            </div>
+            <div id="panelsListContainer" class="batch-panel-picker-list"></div>
+            <div class="batch-panel-picker-footer">
+                <button id="cancelPanelPickerBtn" class="btn batch-panel-picker-secondary" type="button">Отмена</button>
+                <button id="applyPanelPickerBtn" class="btn btn-primary" type="button" disabled>Использовать выбранные</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="vendor/jszip.min.js"></script>
+    <script src="js/shared/grafana-runtime-manifest.js"></script>
+    <script src="js/shared/grafana-runtime.js"></script>
+    <script src="js/shared/grafana-command.js"></script>
+    <script src="js/shared/grafana-panel-tools-bridge.js"></script>
+    <script src="js/shared/grafana-settings.js"></script>
+    <script src="js/shared/grafana-batch-panel-rules.js"></script>
+    <script src="js/shared/grafana-legend-engine.js"></script>
+    <script src="js/shared/grafana-panel-capture.js"></script>
+    <script src="js/shared/grafana-url.js"></script>
+    <script src="js/shared/grafana-dashboard-api.js"></script>
+    <script src="js/shared/archive-download.js"></script>
+    <script src="js/shared/storage-writer.js"></script>
+    <script src="js/shared/archive-budget.js"></script>
+    <script src="js/shared/local-state-schema.js"></script>
+    <script src="js/pages/batch-ui.js"></script>
+    <script src="js/pages/batch-state.js"></script>
+    <script src="js/pages/batch-capture-utils.js"></script>
+    <script src="js/pages/batch-capture-runner.js"></script>
+    <script src="js/pages/batch-panel-loader.js"></script>
+    <script src="js/pages/batch-series-selection.js"></script>
+    <script src="js/pages/batch-run-lifecycle.js"></script>
+    <script src="js/pages/operation-progress-window.js"></script>
+    <script src="js/pages/batch.js"></script>
+</body>
+
+</html>
