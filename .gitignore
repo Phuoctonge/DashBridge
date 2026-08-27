@@ -9,3 +9,6 @@ __pycache__/
 
 # Traffic recordings contain request/response bodies, credentials and tokens.
 *.dashflow
+
+# Release archives are reproducible GitHub Actions artifacts.
+dist/

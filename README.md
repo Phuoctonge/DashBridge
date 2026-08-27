@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="manifest.json"><img src="https://img.shields.io/badge/version-2.3.1-4361ee?style=flat-square" alt="Version 2.3.1"></a>
+  <a href="manifest.json"><img src="https://img.shields.io/badge/version-2.4.0-4361ee?style=flat-square" alt="Version 2.4.0"></a>
   <a href="manifest.json"><img src="https://img.shields.io/badge/Chrome-Manifest%20V3-4285f4?style=flat-square&amp;logo=googlechrome&amp;logoColor=white" alt="Chrome Manifest V3"></a>
   <a href="#возможности"><img src="https://img.shields.io/badge/interface-%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9-22a06b?style=flat-square" alt="Русский интерфейс"></a>
 </p>
@@ -195,6 +195,12 @@ Recorder создаёт отдельную контролируемую Chrome-�
 Процесс аналогичен: откройте `edge://extensions`, включите режим разработчика и выберите **Загрузить распакованное**.
 
 После обновления исходных файлов нажмите кнопку **Обновить** на карточке расширения.
+
+При наличии более новой стабильной версии popup показывает уведомление и ссылку
+на проверенный ZIP из [GitHub Releases](https://github.com/Phuoctonge/DashBridge/releases).
+Проверка выполняется не чаще одного раза в 12 часов и не мешает работе расширения
+при отсутствии сети. Распакованное расширение Chrome не может установить ZIP
+самостоятельно: замените файлы в папке и нажмите **Обновить** в `chrome://extensions`.
 
 ## Первичная настройка
 

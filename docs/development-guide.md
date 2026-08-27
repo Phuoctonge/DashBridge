@@ -11,7 +11,7 @@
 Расширение не требует сборки и загружается напрямую из исходной папки. На
 момент проверки проходят:
 
-- 88 JavaScript behavior-файлов;
+- 92 JavaScript behavior-файла;
 - 41 Python smoke/security/audit-файл;
 - `node --check` для всех 74 production JavaScript-файлов.
 
@@ -126,6 +126,21 @@ foreach ($file in $files) { node --check $file }
 5. Для storage проверить новый, legacy и повреждённый state.
 6. Для URL/message/import добавить отрицательный тест, а не только happy path.
 7. Если менялось permission или DNR, обновить `permission-map.md`.
+
+## Выпуск версии
+
+Версия в `manifest.json`, README badge и Git tag должна совпадать. Скрипт
+`scripts/build-release.ps1` собирает минимальный ZIP расширения и SHA-256,
+исключая тесты, документацию и локальные артефакты:
+
+```powershell
+./scripts/build-release.ps1 -ExpectedTag 'v2.4.0'
+```
+
+Push тега `vX.Y.Z` запускает `.github/workflows/release.yml`: полный набор
+тестов, сборку `DashBridge-X.Y.Z.zip` и публикацию GitHub Release. Popup читает
+только последний стабильный release репозитория `Phuoctonge/DashBridge` и
+принимает download URL лишь при полном совпадении тега, версии и имени архива.
 
 ## Политика комментариев
 

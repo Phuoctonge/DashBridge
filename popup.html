@@ -25,6 +25,13 @@
             </svg></button>
     </div>
 
+    <aside id="updateNotice" class="update-notice" aria-live="polite" hidden>
+        <div>
+            <strong>Обновление DashBridge</strong>
+            <span id="updateNoticeText"></span>
+        </div>
+        <button id="downloadUpdateBtn" type="button">Скачать ZIP</button>
+    </aside>
 
     <nav class="tabs-nav">
         <button class="tab-btn active" data-tab="tab-grafana">
@@ -402,6 +409,8 @@
     <script src="vendor/jszip.min.js"></script>
     <script src="js/shared/archive-download.js"></script>
     <script src="js/shared/sync-input-writer.js"></script>
+    <script src="js/shared/update-check.js"></script>
+    <script src="js/popup/popup-updates.js"></script>
     <script src="js/popup/popup-core.js"></script>
     <script src="js/popup/popup-grafana-router.js"></script>
     <script src="js/shared/grafana-runtime-manifest.js"></script>
