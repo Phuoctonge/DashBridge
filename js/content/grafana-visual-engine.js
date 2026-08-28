@@ -2423,17 +2423,6 @@
         let records = [];
         const responseDataStatus = window.__dashbridgePanelToolsVisualMetadata?.responseDataStatus
             || { kind: 'unknown', text: '' };
-        if (['http_error', 'network_error', 'decode_error', 'aborted'].includes(responseDataStatus.kind)) {
-            const responseErrorText = responseDataStatus.text || (responseDataStatus.kind === 'aborted'
-                ? 'Запрос Grafana был отменён'
-                : 'Ошибка при получении данных');
-            return {
-                state: 'error', source, evaluation, operator, engine: 'response', unit, series: [],
-                dataStatus: responseDataStatus.kind,
-                dataStatusText: responseErrorText,
-                error: responseErrorText
-            };
-        }
         const parseLegendCalculation = value => {
             const normalized = String(value || '').replace(/[\u00a0\u202f\s]/g, '').replace(',', '.');
             const match = normalized.match(/[-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?/i);
@@ -2571,13 +2560,17 @@
                     dataStatusText: dataStatus.text || 'Нет превышений по заданному фильтру'
                 };
             }
-            const failureKinds = new Set(['http_error', 'network_error', 'decode_error']);
+            const failureKinds = new Set(['http_error', 'network_error', 'decode_error', 'aborted']);
+            const isFailure = failureKinds.has(dataStatus.kind);
+            const failureText = dataStatus.text || (isFailure
+                ? (dataStatus.kind === 'aborted' ? 'Запрос Grafana был отменён' : 'Ошибка при получении данных')
+                : 'Источник вернул пустой набор данных');
             return {
-                state: failureKinds.has(dataStatus.kind) ? 'error' : 'no_data',
+                state: isFailure ? 'error' : 'no_data',
                 source, evaluation, operator, engine, unit, series: [],
                 dataStatus: dataStatus.kind === 'unknown' ? 'empty_source' : dataStatus.kind,
-                dataStatusText: dataStatus.text || 'Источник вернул пустой набор данных',
-                error: dataStatus.text || 'Источник вернул пустой набор данных'
+                dataStatusText: failureText,
+                error: failureText
             };
         }
         const configuredValue = sla.value !== null && sla.value !== '' && Number.isFinite(Number(sla.value))

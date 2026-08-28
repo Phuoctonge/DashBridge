@@ -3016,12 +3016,16 @@
                 }) || { state: 'no_data', series: [] };
                 const readySnapshot = () => {
                     const status = window.__dashbridgePanelToolsVisualMetadata?.responseDataStatus?.kind || 'unknown';
+                    const current = collect();
+                    // Grafana can leave one background request pending even
+                    // after a table/chart has rendered usable data. What the
+                    // user currently sees is a valid report snapshot and must
+                    // not wait for that unrelated request to time out.
+                    if (Array.isArray(current.series) && current.series.length) return current;
                     if (status === 'loading') return null;
                     const terminalStatuses = new Set([
                         'filtered_empty', 'empty_source', 'http_error', 'network_error', 'decode_error', 'aborted'
                     ]);
-                    const current = collect();
-                    if (Array.isArray(current.series) && current.series.length) return current;
                     // A completed chart with every series hidden is still a
                     // valid final state; it must not keep report generation
                     // waiting forever merely because the public series list is empty.

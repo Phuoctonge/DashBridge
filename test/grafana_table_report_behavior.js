@@ -45,4 +45,8 @@ assert.strictEqual(records[1].values[0], 949);
 assert(source.includes("engine = responseTableRecords.length ? 'table-response' : 'table-dom'")
     && source.includes('records = tableRecords;'),
     'report snapshots must use table rows when neither Flot nor uPlot exists');
+const collectorSource = source.slice(source.indexOf('const collectPanelReportSnapshot'), source.indexOf('const getThresholdDebug'));
+assert(collectorSource.indexOf('records = tableRecords;') < collectorSource.indexOf('const failureKinds = new Set')
+    && collectorSource.includes("new Set(['http_error', 'network_error', 'decode_error', 'aborted'])"),
+    'a visible Metric/Value table must be evaluated before a stale request failure is reported');
 console.log('PASS Grafana table Metric/Value rows feed report snapshots');

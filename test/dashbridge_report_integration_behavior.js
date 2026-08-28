@@ -36,6 +36,15 @@ assert(tools.includes("const terminalStatuses = new Set([")
     && tools.includes("window.addEventListener('dashbridgePanelDataSettled', inspect)")
     && tools.includes("dataStatusText: 'Штатный запрос Grafana не завершился за 120 секунд'"),
     'report snapshots must wait for datasource settlement and return a bounded timeout result');
+const reportReadyStart = tools.indexOf('const readySnapshot = () => {');
+const reportReadyEnd = tools.indexOf('panelReportSnapshotCancellers.get(requestId)?.();', reportReadyStart);
+const reportReadySource = tools.slice(reportReadyStart, reportReadyEnd);
+assert(reportReadyStart >= 0 && reportReadyEnd > reportReadyStart
+    && reportReadySource.indexOf('const current = collect();')
+        < reportReadySource.indexOf("if (status === 'loading') return null;")
+    && reportReadySource.indexOf('if (Array.isArray(current.series) && current.series.length) return current;')
+        < reportReadySource.indexOf("if (status === 'loading') return null;"),
+    'a rendered table or chart must win over a stale loading status instead of waiting 120 seconds');
 assert(visual.includes('const collectPanelReportSnapshot')
     && visual.includes("hasCritical ? 'critical' : (hasWarning ? 'warning' : 'ok')")
     && visual.includes("level: critical ? 'critical' : (warning ? 'warning' : 'normal')"),
@@ -95,7 +104,7 @@ assert(tools.includes("filtered_empty: 'Нет превышений по зад�
     && tools.includes("setPanelDataStatus('decode_error'")
     && tools.includes("setPanelDataStatus('network_error'")
     && visual.includes("dataStatus: 'filtered_empty'")
-    && visual.includes("new Set(['http_error', 'network_error', 'decode_error'])"),
+    && visual.includes("new Set(['http_error', 'network_error', 'decode_error', 'aborted'])"),
     'Grafana panels and report snapshots must preserve distinct empty and transport outcomes');
 assert(tools.includes("error?.name === 'AbortError' ? 'aborted' : 'network-error'")
     && tools.includes("this.__dashbridgeRequestAborted ? 'aborted' : 'network-error'")
@@ -103,6 +112,14 @@ assert(tools.includes("error?.name === 'AbortError' ? 'aborted' : 'network-error
     && tools.includes('transportFailureWithVisibleData')
     && visual.includes("'http_error', 'network_error', 'decode_error', 'aborted'"),
     'cancelled or superseded Grafana requests must not erase cached data or cover a rendered panel with a false network error');
+const reportCollectorStart = visual.indexOf('const collectPanelReportSnapshot');
+const reportCollectorEnd = visual.indexOf('const getThresholdDebug', reportCollectorStart);
+const reportCollectorSource = visual.slice(reportCollectorStart, reportCollectorEnd);
+assert(!reportCollectorSource.includes("if (['http_error', 'network_error', 'decode_error', 'aborted'].includes(responseDataStatus.kind))")
+    && reportCollectorSource.includes("const failureKinds = new Set(['http_error', 'network_error', 'decode_error', 'aborted']);")
+    && reportCollectorSource.indexOf('records = tableRecords;')
+        < reportCollectorSource.indexOf('const failureKinds = new Set'),
+    'visible table/chart data must be collected before a transport status is treated as a report error');
 assert(dashboard.includes('value="cpu_capacity"')
     && dashboard.includes("config.sla.source === 'cpu_capacity'")
     && dashboard.includes("source: 'cpu_capacity', operator: 'gt', coefficient"),
