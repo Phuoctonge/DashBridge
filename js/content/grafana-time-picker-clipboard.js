@@ -2,27 +2,58 @@
     'use strict';
 
     const normalizeText = value => String(value || '').replace(/\s+/g, ' ').trim();
+    const LOCAL_DATE_TIME_RE = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})(?:\.\d+)?$/;
+    const ABSOLUTE_WITH_ZONE_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/i;
+    const EPOCH_MILLISECONDS_RE = /^\d{13}$/;
+    const pad = value => String(value).padStart(2, '0');
+    const formatLocalDateTime = milliseconds => {
+        const date = new Date(milliseconds);
+        if (!Number.isFinite(date.getTime())) return null;
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+            + ` ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+    };
+    const normalizeEndpoint = value => {
+        const text = normalizeText(value);
+        if (!text) return '';
+        const local = LOCAL_DATE_TIME_RE.exec(text);
+        if (local) return `${local[1]} ${local[2]}`;
+        if (ABSOLUTE_WITH_ZONE_RE.test(text) || EPOCH_MILLISECONDS_RE.test(text)) {
+            return formatLocalDateTime(EPOCH_MILLISECONDS_RE.test(text) ? Number(text) : Date.parse(text)) || text;
+        }
+        return text;
+    };
+    const normalizeRange = range => {
+        if (!range || typeof range !== 'object' || Array.isArray(range)) return null;
+        const from = normalizeEndpoint(range.from);
+        const to = normalizeEndpoint(range.to);
+        return from && to ? { from, to } : null;
+    };
     const parseRange = value => {
         const text = String(value || '').trim();
         if (!text) return null;
         try {
             const parsed = JSON.parse(text);
             if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-                const from = normalizeText(parsed.from);
-                const to = normalizeText(parsed.to);
-                if (from && to) return { from, to };
+                const range = normalizeRange(parsed);
+                if (range) return range;
             }
         } catch { /* A copied Grafana URL is also supported below. */ }
         try {
             const url = new URL(text);
             const from = normalizeText(url.searchParams.get('from'));
             const to = normalizeText(url.searchParams.get('to'));
-            return from && to ? { from, to } : null;
+            return from && to ? normalizeRange({ from, to }) : null;
         } catch { return null; }
     };
-    const serializeRange = range => JSON.stringify({ from: range.from, to: range.to });
+    const serializeRange = range => {
+        const normalized = normalizeRange(range);
+        if (!normalized) throw new TypeError('Invalid Grafana time range');
+        return JSON.stringify(normalized);
+    };
 
-    root.DashBridgeGrafanaTimePickerClipboard = Object.freeze({ parseRange, serializeRange });
+    root.DashBridgeGrafanaTimePickerClipboard = Object.freeze({
+        normalizeEndpoint, normalizeRange, parseRange, serializeRange
+    });
     if (!root.document || !root.MutationObserver) return;
 
     const buttonSelector = 'button, input[type="button"], input[type="submit"]';
@@ -71,6 +102,19 @@
             button.classList.remove('dashbridge-time-picker-failed', 'dashbridge-time-picker-success');
         }, 1400);
     };
+    const copyPickerRange = async (button, picker) => {
+        const range = normalizeRange({ from: picker.inputs[0].value, to: picker.inputs[1].value });
+        if (!range) throw new Error('empty-range');
+        await navigator.clipboard.writeText(serializeRange(range));
+        flash(button, 'Диапазон скопирован');
+    };
+    const pastePickerRange = async (button, picker) => {
+        const range = parseRange(await navigator.clipboard.readText());
+        if (!range) throw new Error('invalid-range');
+        setInputValue(picker.inputs[0], range.from);
+        setInputValue(picker.inputs[1], range.to);
+        flash(button, 'Диапазон вставлен');
+    };
     const createButton = (kind, picker) => {
         const button = document.createElement('button');
         button.type = 'button';
@@ -82,22 +126,39 @@
             event.preventDefault(); event.stopPropagation();
             try {
                 if (kind === 'copy') {
-                    const range = { from: picker.inputs[0].value.trim(), to: picker.inputs[1].value.trim() };
-                    if (!range.from || !range.to) throw new Error('empty-range');
-                    await navigator.clipboard.writeText(serializeRange(range));
-                    flash(button, 'Диапазон скопирован');
+                    await copyPickerRange(button, picker);
                 } else {
-                    const range = parseRange(await navigator.clipboard.readText());
-                    if (!range) throw new Error('invalid-range');
-                    setInputValue(picker.inputs[0], range.from);
-                    setInputValue(picker.inputs[1], range.to);
-                    flash(button, 'Диапазон вставлен');
+                    await pastePickerRange(button, picker);
                 }
             } catch {
                 flash(button, kind === 'copy' ? 'Не удалось скопировать' : 'В буфере нет диапазона', true);
             }
         });
         return button;
+    };
+    const bindNativeButton = (button, kind, picker) => {
+        if (button.dataset.dashbridgeTimeClipboardBound) return;
+        button.dataset.dashbridgeTimeClipboardBound = kind;
+        button.title = kind === 'copy'
+            ? 'Копировать совместимый диапазон времени'
+            : 'Вставить диапазон времени';
+        button.addEventListener('click', event => {
+            // Grafana 12 serializes absolute state as UTC ISO. Replace only the
+            // two native picker actions with the visible local values understood
+            // by both Grafana 10 and 12; Apply remains entirely native.
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            void (kind === 'copy' ? copyPickerRange(button, picker) : pastePickerRange(button, picker))
+                .catch(() => flash(button, kind === 'copy' ? 'Не удалось скопировать' : 'В буфере нет диапазона', true));
+        }, true);
+    };
+    const enhanceNativeClipboard = (nativeButtons, applyButton, picker) => {
+        const applyIndex = nativeButtons.indexOf(applyButton);
+        if (applyIndex < 2) return false;
+        const actions = nativeButtons.slice(applyIndex - 2, applyIndex);
+        bindNativeButton(actions[0], 'copy', picker);
+        bindNativeButton(actions[1], 'paste', picker);
+        return true;
     };
     const ensureStyle = () => {
         if (document.getElementById('dashbridge-time-picker-clipboard-style')) return;
@@ -116,13 +177,14 @@
         [...document.querySelectorAll(buttonSelector)].filter(isApplyButton).forEach(applyButton => {
             const actions = applyButton.parentElement;
             if (!actions || actions.querySelector('.dashbridge-time-picker-clipboard')) return;
+            const picker = findPicker(applyButton);
+            if (!picker) return;
             const nativeButtons = [...actions.children].filter(element =>
                 element.matches?.(buttonSelector)
                 && !element.classList?.contains('dashbridge-time-picker-clipboard'));
-            // Modern uPlot-era Grafana already renders Copy and Paste beside Apply.
-            if (nativeButtons.length > 1) return;
-            const picker = findPicker(applyButton);
-            if (!picker) return;
+            // Modern Grafana already renders Copy and Paste beside Apply. Keep
+            // its controls, but make their clipboard payload cross-version.
+            if (nativeButtons.length > 1 && enhanceNativeClipboard(nativeButtons, applyButton, picker)) return;
             ensureStyle();
             actions.insertBefore(createButton('copy', picker), applyButton);
             actions.insertBefore(createButton('paste', picker), applyButton);
