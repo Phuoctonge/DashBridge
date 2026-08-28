@@ -419,8 +419,6 @@
     visualMetadata.responseFilterReady ||= false;
     visualMetadata.responseTableRecords ||= [];
     visualMetadata.responseSeriesNames ||= [];
-    visualMetadata.responseReportSeriesStats ||= [];
-    visualMetadata.responseReportTruncated ||= 0;
     visualMetadata.responseDataStatus ||= { kind: 'unknown', text: '' };
     if (typeof visualMetadata.memoryConversionApplied !== 'boolean') visualMetadata.memoryConversionApplied = null;
     const PANEL_DATA_STATUS_TEXT = Object.freeze({
@@ -434,8 +432,7 @@
         const status = visualMetadata.responseDataStatus || { kind: 'unknown' };
         const overlayId = 'dashbridge-panel-data-status';
         const existing = document.getElementById(overlayId);
-        const hasCachedData = (visualMetadata.responseReportSeriesStats?.length || 0) > 0
-            || (visualMetadata.responseTableRecords?.length || 0) > 0;
+        const hasCachedData = (visualMetadata.responseTableRecords?.length || 0) > 0;
         const transportFailureWithVisibleData = hasCachedData
             && ['http_error', 'network_error', 'decode_error'].includes(status.kind);
         if (!status.text || ['data', 'unknown'].includes(status.kind) || transportFailureWithVisibleData) {
@@ -484,8 +481,6 @@
         if (['filtered_empty', 'empty_source'].includes(kind)) {
             visualMetadata.responseTableRecords = [];
             visualMetadata.responseSeriesNames = [];
-            visualMetadata.responseReportSeriesStats = [];
-            visualMetadata.responseReportTruncated = 0;
         }
         requestAnimationFrame(syncPanelDataStatusPresentation);
     };
@@ -2174,86 +2169,6 @@
         return names.filter(Boolean);
     };
 
-    const collectResponseReportSeriesStats = data => {
-        const records = [];
-        const MAX_REPORT_SERIES = 20_000;
-        let truncated = 0;
-        const generic = value => /^(?:value|series|metric|значение|серия|метрика)$/iu
-            .test(String(value || '').trim());
-        const createRecord = name => {
-            const safeName = String(name).substring(0, 500);
-            return safeName ? { name: safeName, count: 0, min: Infinity, max: -Infinity, sum: 0, latest: null } : null;
-        };
-        const addValue = (record, rawValue) => {
-            const value = Number(rawValue);
-            if (!record || !Number.isFinite(value)) return;
-            record.count += 1;
-            record.min = Math.min(record.min, value);
-            record.max = Math.max(record.max, value);
-            record.sum += value;
-            record.latest = value;
-        };
-        const retainRecord = record => {
-            if (!record?.count) return;
-            if (records.length >= MAX_REPORT_SERIES) {
-                truncated += 1;
-                return;
-            }
-            records.push(record);
-        };
-        Object.values(data?.results || {}).forEach(result => {
-            for (const frame of result.frames || []) {
-                const tableShape = getResponseTableFrameShape(frame);
-                if (tableShape) {
-                    const grouped = new Map();
-                    const available = Math.max(0, MAX_REPORT_SERIES - records.length);
-                    for (let index = 0; index < tableShape.rowCount; index += 1) {
-                        const name = String(tableShape.columns[tableShape.nameIndex]?.[index] ?? '').trim();
-                        if (!name) continue;
-                        let record = grouped.get(name);
-                        if (!record) {
-                            if (grouped.size >= available) {
-                                truncated = Math.max(1, truncated);
-                                continue;
-                            }
-                            record = createRecord(name);
-                            grouped.set(name, record);
-                        }
-                        addValue(record, tableShape.columns[tableShape.valueIndex]?.[index]);
-                    }
-                    grouped.forEach(retainRecord);
-                    continue;
-                }
-                const fields = frame.schema?.fields || [];
-                const columns = frame.data?.values || [];
-                fields.forEach((field, index) => {
-                    if (field.type === 'time' || field.name === 'Time') return;
-                    if (records.length >= MAX_REPORT_SERIES) {
-                        truncated += 1;
-                        return;
-                    }
-                    const candidates = [
-                        field.config?.displayNameFromDS,
-                        field.config?.displayName,
-                        frame.schema?.name,
-                        ...Object.values(field.labels || {}),
-                        field.name,
-                        frame.schema?.refId
-                    ].map(value => String(value || '').trim()).filter(Boolean);
-                    const name = candidates.find(value => !generic(value)) || candidates[0]
-                        || `Серия ${records.length + 1}`;
-                    const record = createRecord(name);
-                    const values = columns[index];
-                    if (values && typeof values[Symbol.iterator] === 'function') {
-                        for (const value of values) addValue(record, value);
-                    }
-                    retainRecord(record);
-                });
-            }
-        });
-        return { records, truncated };
-    };
-
     const collectResponseFilterVisibleNames = data => {
         const names = new Set();
         Object.values(data?.results || {}).forEach(result => {
@@ -2666,41 +2581,21 @@
             pushBoundedDiagnosticEvent(diagnostics, event, 500);
             return event;
         };
-        const reportCycle = { id: 0, active: new Map(), responses: new Map(), failures: [] };
-        const rebuildReportCycleCache = () => {
-            const records = [];
-            const names = [];
-            const tableRecords = [];
-            let truncated = 0;
-            reportCycle.responses.forEach(snapshot => {
-                const available = Math.max(0, 20_000 - records.length);
-                records.push(...snapshot.records.slice(0, available));
-                truncated += snapshot.truncated + Math.max(0, snapshot.records.length - available);
-                names.push(...snapshot.names);
-                tableRecords.push(...snapshot.tableRecords);
-            });
-            visualMetadata.responseReportSeriesStats = records;
-            visualMetadata.responseReportTruncated = truncated;
-            visualMetadata.responseSeriesNames = names.slice(0, 20_000);
-            visualMetadata.responseTableRecords = tableRecords.slice(0, 20_000);
-        };
+        const reportCycle = { active: new Set(), failures: [] };
         const beginRequest = (transport, url) => {
             const requestId = `query_${Date.now()}_${diagnostics.nextEventId + 1}`;
             if (!reportCycle.active.size) {
-                reportCycle.id += 1;
-                reportCycle.responses.clear();
                 reportCycle.failures = [];
                 visualMetadata.responseFilterEmptyIsNormal = false;
                 if (isDashboardIframe) setPanelDataStatus('loading');
             }
-            reportCycle.active.set(requestId, { cycleId: reportCycle.id, transport });
+            reportCycle.active.add(requestId);
             diagnostics.activeRequests = reportCycle.active.size;
             pushEvent('request-start', { requestId, transport, url: String(url || ''), activeRequests: diagnostics.activeRequests });
             return requestId;
         };
         const completeRequest = (requestId, transport, outcome, details = {}) => {
-            const requestState = reportCycle.active.get(requestId);
-            if (!requestState) return;
+            if (!reportCycle.active.has(requestId)) return;
             reportCycle.active.delete(requestId);
             diagnostics.activeRequests = reportCycle.active.size;
             if (['http-error', 'network-error', 'decode-error'].includes(outcome)) {
@@ -2714,74 +2609,14 @@
             else if (failure?.outcome === 'network-error') setPanelDataStatus('network_error');
             else if (failure?.outcome === 'decode-error') setPanelDataStatus('decode_error');
             else if (visualMetadata.responseFilterEmptyIsNormal) setPanelDataStatus('filtered_empty');
-            else if (visualMetadata.responseReportSeriesStats.length) setPanelDataStatus('data');
-            else if (reportCycle.responses.size) setPanelDataStatus('empty_source');
+            // A transform determines data/empty from its scoped response. Do
+            // not overwrite that result after the final parallel request.
+            else if (outcome === 'transformed') { /* status already set by transform */ }
             else if (outcome === 'aborted') setPanelDataStatus('aborted');
             else setPanelDataStatus('unknown');
             window.dispatchEvent(new Event('dashbridgePanelDataSettled'));
         };
-        const cacheReportResponse = (data, requestBody, request, { scoped = false } = {}) => {
-            if (!data?.results) return false;
-            const requestState = reportCycle.active.get(request?.requestId);
-            if (!requestState || requestState.cycleId !== reportCycle.id) return false;
-            const targetRefIds = scoped ? null : getTargetQueryRefIds(requestBody);
-            if (!scoped && !isDashboardIframe && (!targetRefIds || !targetRefIds.size)) return false;
-            const scopedData = scoped ? data : createResponseFilterWorkspace(data, targetRefIds).data;
-            const reportStats = collectResponseReportSeriesStats(scopedData);
-            const otherRecordCount = [...reportCycle.responses.entries()].reduce((sum, [id, snapshot]) =>
-                sum + (id === request.requestId ? 0 : snapshot.records.length), 0);
-            const otherNameCount = [...reportCycle.responses.entries()].reduce((sum, [id, snapshot]) =>
-                sum + (id === request.requestId ? 0 : snapshot.names.length), 0);
-            const otherTableCount = [...reportCycle.responses.entries()].reduce((sum, [id, snapshot]) =>
-                sum + (id === request.requestId ? 0 : snapshot.tableRecords.length), 0);
-            const recordLimit = Math.max(0, 20_000 - otherRecordCount);
-            const names = collectResponseSeriesNames(scopedData);
-            const tableRecords = collectResponseTableRecords(scopedData);
-            reportCycle.responses.set(request.requestId, {
-                records: reportStats.records.slice(0, recordLimit),
-                truncated: reportStats.truncated + Math.max(0, reportStats.records.length - recordLimit),
-                names: names.slice(0, Math.max(0, 20_000 - otherNameCount)),
-                tableRecords: tableRecords.slice(0, Math.max(0, 20_000 - otherTableCount))
-            });
-            rebuildReportCycleCache();
-            return true;
-        };
         const decodeNativeFetchResponse = response => response.clone().json();
-        const observeNativeFetchResponse = (
-            response, requestBody, request, analysisCapture = null, requestStartedAt = 0
-        ) => {
-            let settled = false;
-            const settle = (outcome, details) => {
-                if (settled) return;
-                settled = true;
-                completeRequest(request.requestId, request.transport, outcome, details);
-            };
-            // Consume a clone immediately and leave Grafana's native Response
-            // completely untouched. Decorating json/text/clone changed the
-            // response contract for some datasource clients and could leave a
-            // request marked active until the old 120-second fallback fired.
-            try {
-                decodeNativeFetchResponse(response).then(data => {
-                    try {
-                        if (analysisCapture
-                            && panelAnalysisRequestMatches(analysisCapture, requestBody, requestStartedAt)) {
-                            observePanelAnalysisResponse(analysisCapture, data, requestBody, requestStartedAt);
-                        }
-                        settle(cacheReportResponse(data, requestBody, request) ? 'completed' : 'decode-error');
-                    } catch (error) {
-                        pushEvent('report-cache-error', { ...request, reason: error?.message || String(error) });
-                        settle('decode-error');
-                    }
-                }, error => {
-                    pushEvent('decode-error', { ...request, reason: error?.message || String(error) });
-                    settle('decode-error');
-                });
-            } catch (error) {
-                pushEvent('report-observer-unavailable', { ...request, reason: error?.message || String(error) });
-                settle('decode-error');
-            }
-            return response;
-        };
         const transform = (data, requestBody, request) => {
             archiveResponse(request.requestId, 'decoded-before-transform', data, { transport: request.transport });
             if (!data?.results) {
@@ -2862,7 +2697,11 @@
             if (!memoryConversionFailed) filterLegendData(scopedData);
             visualMetadata.seriesThresholdHighlightRules = collectThresholdHighlightRules(scopedData);
             visualMetadata.seriesCpuCapacityEntries = collectCpuCapacityEntries(scopedData);
-            cacheReportResponse(scopedData, null, request, { scoped: true });
+            // Lightweight metadata is enough for chart/table fallbacks. Do not
+            // walk every value of every series during normal Grafana loading;
+            // full report evaluation belongs to an explicit report request.
+            visualMetadata.responseTableRecords = collectResponseTableRecords(scopedData);
+            visualMetadata.responseSeriesNames = collectResponseSeriesNames(scopedData);
             if (responseSeriesFilterIsEnabled()) {
                 visualMetadata.responseFilterVisibleNames = collectResponseFilterVisibleNames(scopedData);
                 visualMetadata.responseFilterReady = true;
@@ -2887,6 +2726,9 @@
                 && cpuCapacityFilter.afterSeries === 0;
             visualMetadata.responseFilterEmptyIsNormal = afterSeries === 0
                 && (sourceFilterRemovedEverything || cpuFilterRemovedEverything);
+            if (visualMetadata.responseFilterEmptyIsNormal) setPanelDataStatus('filtered_empty');
+            else if (beforeSeries === 0 && afterSeries === 0) setPanelDataStatus('empty_source');
+            else setPanelDataStatus('data');
             diagnostics.last = {
                 at: Date.now(), scope, targetRefIds: targetRefIds === null ? null : [...targetRefIds],
                 resultRefIds, beforeSeries, afterSeries, sourceFilter, cpuCapacityFilter,
@@ -2928,12 +2770,12 @@
             // OFF. E2E is the sole exception: a reset still has to observe the
             // selected panel's request in order to prove a safe baseline.
             const diagnosticObservationActive = window.__dashbridgeE2EDiagnostics?.installed === true;
-            const observeActive = isDashboardIframe || transformActive || hasPersistentVisualWork() || diagnosticObservationActive || analysisCaptureActive;
+            const observeActive = transformActive || hasPersistentVisualWork() || diagnosticObservationActive || analysisCaptureActive;
             if (!observeActive) return originalFetch(...args);
             const requestId = beginRequest('fetch', url);
             let effectiveArgs = args;
             let requestBody = null;
-            if (isDashboardIframe || transformActive || diagnosticObservationActive || analysisCaptureActive) {
+            if (transformActive || diagnosticObservationActive || analysisCaptureActive) {
                 requestBody = await window.DashBridgeGrafanaNetwork.readFetchBody(args[0], args[1]).catch(() => null);
             }
             if (tools.cpuCapacityFilterEnabled && requestBody !== null) {
@@ -2982,12 +2824,8 @@
                         scope,
                         targetRefIds: targetRefIds === null ? null : [...targetRefIds],
                     });
-                    return isDashboardIframe
-                        ? observeNativeFetchResponse(
-                            response, requestBody, { requestId, transport: 'fetch' },
-                            analysisCaptureActive ? analysisCapture : null, requestStartedAt
-                        )
-                        : response;
+                    completeRequest(requestId, 'fetch', 'completed');
+                    return response;
                 }
                 let originalResponseText = null;
                 try {
@@ -3032,7 +2870,7 @@
                 const analysisCaptureActive = !!analysisCapture && !analysisCapture.cancelled;
                 const requestStartedAt = performance.now();
                 const diagnosticObservationActive = window.__dashbridgeE2EDiagnostics?.installed === true;
-                const observeActive = isDashboardIframe || transformActive || hasPersistentVisualWork() || diagnosticObservationActive || analysisCaptureActive;
+                const observeActive = transformActive || hasPersistentVisualWork() || diagnosticObservationActive || analysisCaptureActive;
                 if (!observeActive) return originalSend.call(this, body);
                 if (tools.cpuCapacityFilterEnabled) {
                     const prepared = prepareCpuCapacityRequestBody(body);
@@ -3064,7 +2902,7 @@
                     }
                     const captureRequestMatches = analysisCaptureActive
                         && panelAnalysisRequestMatches(analysisCapture, body, requestStartedAt);
-                    if (!transformActive && !captureRequestMatches && !isDashboardIframe) {
+                    if (!transformActive && !captureRequestMatches) {
                         const targetRefIds = getTargetQueryRefIds(body);
                         const scope = targetRefIds === null
                             ? 'iframe'
@@ -3087,10 +2925,8 @@
                             observePanelAnalysisResponse(analysisCapture, decoded.data, body, requestStartedAt);
                         }
                         if (!transformActive) {
-                            const cached = isDashboardIframe
-                                ? cacheReportResponse(decoded.data, body, request) : false;
                             consumeVisualStylesAfterQuery();
-                            completeRequest(requestId, 'xhr', !isDashboardIframe || cached ? 'completed' : 'decode-error');
+                            completeRequest(requestId, 'xhr', 'completed');
                             return;
                         }
                         const json = transform(decoded.data, body, request);

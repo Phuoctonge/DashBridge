@@ -196,10 +196,10 @@ if (window.name === 'dashbridge-iframe') {
                         url.searchParams.set('refresh', event.data.refresh);
                         changed = true;
                     }
-                } else if (url.searchParams.get('refresh') !== 'off') {
-                    // A missing parameter restores the dashboard's saved
-                    // interval in Grafana. Keep an explicit override for Off.
-                    url.searchParams.set('refresh', 'off');
+                } else if (url.searchParams.get('refresh') !== '1y') {
+                    // Grafana 10.1 rejects `refresh=off` and never finishes
+                    // initializing. Keep a valid, effectively disabled value.
+                    url.searchParams.set('refresh', '1y');
                     changed = true;
                 }
 

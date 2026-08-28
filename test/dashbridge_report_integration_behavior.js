@@ -22,15 +22,14 @@ assert(tools.includes("event.data?.action === 'collectPanelReportSnapshot'")
     && tools.includes("action: 'panelReportSnapshot'")
     && tools.includes('snapshot = attachCpuCapacityToReportSnapshot(snapshot, event.data.sla || {});'),
     'Grafana MAIN runtime must expose a bounded report snapshot command');
-assert(tools.includes('const collectResponseReportSeriesStats = data =>')
-    && tools.includes('const observeNativeFetchResponse = (')
-    && tools.includes('const decodeNativeFetchResponse = response => response.clone().json();')
-    && tools.includes('decodeNativeFetchResponse(response).then(data =>')
-    && tools.includes('cacheReportResponse(data, requestBody, request)')
-    && !tools.includes("Object.defineProperty(target, 'json'")
+assert(tools.includes('const observeActive = transformActive || hasPersistentVisualWork()')
+    && !tools.includes('const observeActive = isDashboardIframe ||')
+    && !tools.includes('const observeNativeFetchResponse')
+    && !tools.includes('const collectResponseReportSeriesStats')
+    && tools.includes('visualMetadata.responseTableRecords = collectResponseTableRecords(scopedData);')
     && !tools.includes('refreshSelectedPanelData(targetPanel')
     && !tools.includes('dashbridgePanelReportDataCaptured'),
-    'report generation must observe normal datasource traffic without issuing a refresh or depending on chart DOM');
+    'ordinary Grafana loading must remain native while reports reuse current chart/table runtime data');
 assert(tools.includes("const terminalStatuses = new Set([")
     && tools.includes("'filtered_empty', 'empty_source', 'http_error', 'network_error', 'decode_error', 'aborted'")
     && tools.includes("const poll = setInterval(inspect, 500);")

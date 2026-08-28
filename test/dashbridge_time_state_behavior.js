@@ -39,7 +39,7 @@ assert.strictEqual(
     new URL(state.applyToUrl('https://grafana.example/d-solo/x?refresh=5s', {
         from: 'now-1h', to: 'now', refresh: 'unexpected'
     })).searchParams.get('refresh'),
-    'off'
+    '1y'
 );
 
 console.log('PASS DashBridge time state normalizes profile settings and reads legacy migration values');

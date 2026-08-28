@@ -117,9 +117,9 @@ assert(timeLabelSource.includes('timeLabel.replaceChildren(')
     && !timeLabelSource.includes('innerHTML'),
     'absolute time labels must render as text without parsing user-controlled markup');
 
-assert(iframeSource.includes("url.searchParams.set('refresh', 'off')")
+assert(iframeSource.includes("url.searchParams.set('refresh', '1y')")
     && !iframeSource.includes("url.searchParams.delete('refresh')"),
-    'Off must explicitly override the refresh interval saved in Grafana');
+    'Off must override the saved interval without using refresh=off rejected by Grafana 10.1');
 assert(iframeSource.includes("window.history.replaceState(null, '', url.toString())")
     && !iframeSource.includes("window.history.pushState(null, '', url.toString())"),
     'seamless time updates must replace the iframe URL instead of growing browser history');

@@ -3,7 +3,6 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
-const vm = require('vm');
 
 const toolsSource = fs.readFileSync(
     path.join(__dirname, '..', 'js', 'content', 'grafana-panel-tools.js'),
@@ -13,99 +12,34 @@ const visualSource = fs.readFileSync(
     path.join(__dirname, '..', 'js', 'content', 'grafana-visual-engine.js'),
     'utf8'
 );
-const helperStart = toolsSource.indexOf('    const getResponseTableFrameShape');
-const helperEnd = toolsSource.indexOf('    const collectResponseFilterVisibleNames', helperStart);
-assert(helperStart >= 0 && helperEnd > helperStart, 'response report extractor must remain testable');
 
-const context = { window: {} };
-vm.createContext(context);
-vm.runInContext(
-    `${toolsSource.slice(helperStart, helperEnd)}
-globalThis.collectResponseReportSeriesStatsForTest = collectResponseReportSeriesStats;`,
-    context
-);
+assert(toolsSource.includes('const observeActive = transformActive || hasPersistentVisualWork()')
+    && !toolsSource.includes('const observeActive = isDashboardIframe ||')
+    && !toolsSource.includes('const observeNativeFetchResponse')
+    && !toolsSource.includes('const cacheReportResponse')
+    && !toolsSource.includes('const collectResponseReportSeriesStats')
+    && !toolsSource.includes('responseReportSeriesStats')
+    && !toolsSource.includes('responseReportTruncated'),
+    'an ordinary dashboard iframe must not parse and aggregate every datasource response for a future report');
 
-const frame = (fields, values, name = '') => ({
-    schema: { name, refId: 'A', fields },
-    data: { values }
-});
-const data = {
-    results: {
-        A: {
-            frames: [
-                frame([
-                    { name: 'Time', type: 'time' },
-                    { name: 'Value', type: 'number', labels: { instance: 'host-a' } },
-                    { name: 'Value', type: 'number', labels: { instance: 'host-b' } }
-                ], [[1, 2], [10, 12], [20, 22]]),
-                frame([
-                    { name: 'Time', type: 'time' },
-                    { name: 'Metric', type: 'string' },
-                    { name: 'Value', type: 'number' }
-                ], [[1, 2, 3], ['host-c', 'host-d', 'host-c'], [30, 40, 35]])
-            ]
-        }
-    }
-};
-const result = JSON.parse(JSON.stringify(context.collectResponseReportSeriesStatsForTest(data)));
-const records = result.records;
-assert.deepStrictEqual(records, [
-    { name: 'host-a', count: 2, min: 10, max: 12, sum: 22, latest: 12 },
-    { name: 'host-b', count: 2, min: 20, max: 22, sum: 42, latest: 22 },
-    { name: 'host-c', count: 2, min: 30, max: 35, sum: 65, latest: 35 },
-    { name: 'host-d', count: 1, min: 40, max: 40, sum: 40, latest: 40 }
-], 'wide and long Grafana frames must produce bounded per-series report statistics');
-assert.strictEqual(result.truncated, 0, 'complete datasource responses must not be marked as truncated');
+assert(toolsSource.includes('visualMetadata.responseTableRecords = collectResponseTableRecords(scopedData);')
+    && toolsSource.includes('visualMetadata.responseSeriesNames = collectResponseSeriesNames(scopedData);')
+    && toolsSource.includes("completeRequest(requestId, 'fetch', data?.results ? 'transformed' : 'decode-error');"),
+    'active panel transforms must retain lightweight table/name metadata and return the transformed response');
 
-const duplicateFrames = context.collectResponseReportSeriesStatsForTest({
-    results: { A: { frames: [
-        frame([{ name: 'duplicate', type: 'number' }], [[1, 2]]),
-        frame([{ name: 'duplicate', type: 'number' }], [[10, 20]])
-    ] } }
-});
-assert.deepStrictEqual(JSON.parse(JSON.stringify(duplicateFrames.records)), [
-    { name: 'duplicate', count: 2, min: 1, max: 2, sum: 3, latest: 2 },
-    { name: 'duplicate', count: 2, min: 10, max: 20, sum: 30, latest: 20 }
-], 'equal labels from separate Grafana frames must remain separate report series');
-
-const manyNames = Array.from({ length: 20001 }, (_, index) => `series-${index}`);
-const manyValues = Array.from({ length: 20001 }, (_, index) => index);
-const bounded = context.collectResponseReportSeriesStatsForTest({
-    results: { A: { frames: [frame([
-        { name: 'Metric', type: 'string' },
-        { name: 'Value', type: 'number' }
-    ], [manyNames, manyValues])] } }
-});
-assert.strictEqual(bounded.records.length, 20000, 'the cache must use an explicit high-volume series cap');
-assert.strictEqual(bounded.truncated, 1, 'the cache must report every omitted series');
-assert(!Object.prototype.hasOwnProperty.call(bounded.records[0], 'values'),
-    'the cache must retain aggregates rather than complete point arrays');
-
-assert(toolsSource.includes('const observeNativeFetchResponse = (')
-    && toolsSource.includes('isDashboardIframe || transformActive')
-    && toolsSource.includes('const decodeNativeFetchResponse = response => response.clone().json();')
-    && toolsSource.includes('decodeNativeFetchResponse(response).then(data =>')
-    && toolsSource.includes('cacheReportResponse(data, requestBody, request)')
-    && !toolsSource.includes("Object.defineProperty(target, 'json'")
-    && !toolsSource.includes("Object.defineProperty(target, 'clone'")
-    && !toolsSource.includes("fallbackTimer = setTimeout(() => settle('decode-error'), 120_000)")
-    && toolsSource.includes("if (status === 'loading') return null;")
-    && toolsSource.includes('reportCycle.active.size')
-    && !toolsSource.includes('refreshSelectedPanelData(targetPanel')
-    && !toolsSource.includes('dashbridgePanelReportDataCaptured'),
-    'report generation must passively observe the iframe\'s normal datasource request without refreshing it');
-assert(toolsSource.includes("completeRequest(requestId, 'fetch', data?.results ? 'transformed' : 'decode-error');")
-    && !toolsSource.includes("completeRequest(requestId, 'fetch', json?.results ? 'transformed' : 'decode-error');"),
-    'a successful fetch transform must return the filtered response instead of falling back after a ReferenceError');
-assert(visualSource.includes("engine = 'response'")
-    && visualSource.includes('responseReportSeriesStats')
-    && visualSource.includes('evaluateStats(record.stats)')
-    && visualSource.includes('responseReportTruncated')
-    && visualSource.includes('const allSeries = records.map'),
-    'the report evaluator must prefer bounded datasource statistics over chart runtime data');
+assert(visualSource.includes('const collectPanelReportSnapshot')
+    && visualSource.includes("engine = 'flot'")
+    && visualSource.includes("engine = 'uplot'")
+    && visualSource.includes("engine = responseTableRecords.length ? 'table-response' : 'table-dom'")
+    && visualSource.includes('const summarizeValues = values =>')
+    && !visualSource.includes('responseReportSeriesStats')
+    && !visualSource.includes('responseReportTruncated'),
+    'report evaluation must run only on explicit request using the current chart/table runtime data');
 
 assert(!toolsSource.includes('responseReportRecords')
-    && !visualSource.includes('responseReportRecords'),
-    'the persistent report cache must not retain complete point arrays');
+    && !visualSource.includes('responseReportRecords')
+    && !toolsSource.includes('refreshSelectedPanelData(targetPanel')
+    && !toolsSource.includes('dashbridgePanelReportDataCaptured'),
+    'report generation must neither retain point arrays nor refresh Grafana panels');
 
-console.log('PASS report generation passively captures bounded Grafana datasource statistics');
+console.log('PASS ordinary Grafana loading stays on the native fast path until an explicit report request');

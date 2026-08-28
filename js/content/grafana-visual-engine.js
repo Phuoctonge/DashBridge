@@ -2417,21 +2417,10 @@
             ? sla.evaluation : 'period_max';
         const operator = ['gt', 'gte', 'lt', 'lte'].includes(sla.operator) ? sla.operator : 'gt';
         const source = ['graph', 'custom', 'cpu_capacity', 'none'].includes(sla.source) ? sla.source : 'none';
-        const evaluate = values => {
-            const finite = values.filter(Number.isFinite);
-            if (!finite.length) return null;
-            if (evaluation === 'latest') return finite[finite.length - 1];
-            if (evaluation === 'period_min') return Math.min(...finite);
-            if (evaluation === 'period_avg') return finite.reduce((sum, value) => sum + value, 0) / finite.length;
-            if (evaluation === 'period_sum') return finite.reduce((sum, value) => sum + value, 0);
-            return Math.max(...finite);
-        };
         let engine = 'unknown';
         let unit = '';
         let factor = 1;
         let records = [];
-        const responseSeriesStats = Array.isArray(window.__dashbridgePanelToolsVisualMetadata?.responseReportSeriesStats)
-            ? window.__dashbridgePanelToolsVisualMetadata.responseReportSeriesStats : [];
         const responseDataStatus = window.__dashbridgePanelToolsVisualMetadata?.responseDataStatus
             || { kind: 'unknown', text: '' };
         if (['http_error', 'network_error', 'decode_error', 'aborted'].includes(responseDataStatus.kind)) {
@@ -2443,19 +2432,6 @@
                 dataStatus: responseDataStatus.kind,
                 dataStatusText: responseErrorText,
                 error: responseErrorText
-            };
-        }
-        const responseReportTruncated = Number(
-            window.__dashbridgePanelToolsVisualMetadata?.responseReportTruncated
-        ) || 0;
-        if (responseReportTruncated > 0) {
-            const errorText = 'Ответ содержит больше 20 000 серий; полный расчёт SLA безопасно остановлен';
-            return {
-                state: 'error', source, evaluation, operator, engine: 'response', unit, series: [],
-                dataStatus: 'series_limit',
-                dataStatusText: errorText,
-                error: errorText,
-                omittedSeries: responseReportTruncated
             };
         }
         const parseLegendCalculation = value => {
@@ -2486,8 +2462,7 @@
             }
             return result;
         };
-        const legendMaximums = evaluation === 'period_max' && !responseSeriesStats.length
-            ? legendMaxByName() : new Map();
+        const legendMaximums = evaluation === 'period_max' ? legendMaxByName() : new Map();
         const reportLegendNames = expectedCount => {
             const names = window.DashBridgeGrafanaDom?.legendSeriesNames?.(root, { unique: false });
             // A complete legend is still only a fallback for series whose
@@ -2505,27 +2480,9 @@
                 ? (legend || native || `Серия ${index + 1}`)
                 : native;
         };
-        if (responseSeriesStats.length) {
-            engine = 'response';
-            const details = unitFromPanelDefinition(getCachedPanelDefinition());
-            unit = details.unit || '';
-            factor = Number(details.factor) || 1;
-            records = responseSeriesStats.map(item => ({
-                name: String(item?.name || ''),
-                visible: true,
-                stats: {
-                    count: Number(item?.count) || 0,
-                    min: Number(item?.min),
-                    max: Number(item?.max),
-                    sum: Number(item?.sum),
-                    latest: Number(item?.latest)
-                }
-            })).filter(item => item.name && item.stats.count > 0
-                && [item.stats.min, item.stats.max, item.stats.sum, item.stats.latest].every(Number.isFinite));
-        }
         const $ = window.jQuery || window.$;
         const plotHost = $ && $(root).find('.graph-panel__chart').toArray().find(el => !!$(el).data('plot'));
-        if (!records.length && plotHost) {
+        if (plotHost) {
             engine = 'flot';
             const plot = $(plotHost).data('plot');
             const details = mergeAxisAndPanelUnit(inferUnitFromAxisTicks(plot.getAxes?.().yaxis?.ticks), getCachedPanelDefinition());
@@ -2539,7 +2496,7 @@
                 values: (item.data || []).map(point => Number(point?.[1])).filter(Number.isFinite),
                 legendMaximum: legendMaximums.get(reportSeriesName(item.label, legendNames[index], index))
             }));
-        } else if (!records.length) {
+        } else {
             const uplot = findUPlotForThreshold(root);
             if (uplot) {
                 engine = 'uplot';
