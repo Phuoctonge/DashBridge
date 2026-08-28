@@ -2430,6 +2430,21 @@
         let unit = '';
         let factor = 1;
         let records = [];
+        const responseSeriesStats = Array.isArray(window.__dashbridgePanelToolsVisualMetadata?.responseReportSeriesStats)
+            ? window.__dashbridgePanelToolsVisualMetadata.responseReportSeriesStats : [];
+        const responseDataStatus = window.__dashbridgePanelToolsVisualMetadata?.responseDataStatus
+            || { kind: 'unknown', text: '' };
+        if (['http_error', 'network_error', 'decode_error', 'aborted'].includes(responseDataStatus.kind)) {
+            const responseErrorText = responseDataStatus.text || (responseDataStatus.kind === 'aborted'
+                ? 'Запрос Grafana был отменён'
+                : 'Ошибка при получении данных');
+            return {
+                state: 'error', source, evaluation, operator, engine: 'response', unit, series: [],
+                dataStatus: responseDataStatus.kind,
+                dataStatusText: responseErrorText,
+                error: responseErrorText
+            };
+        }
         const parseLegendCalculation = value => {
             const normalized = String(value || '').replace(/[\u00a0\u202f\s]/g, '').replace(',', '.');
             const match = normalized.match(/[-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?/i);
@@ -2458,7 +2473,8 @@
             }
             return result;
         };
-        const legendMaximums = evaluation === 'period_max' ? legendMaxByName() : new Map();
+        const legendMaximums = evaluation === 'period_max' && !responseSeriesStats.length
+            ? legendMaxByName() : new Map();
         const reportLegendNames = expectedCount => {
             const names = window.DashBridgeGrafanaDom?.legendSeriesNames?.(root, { unique: false });
             // A complete legend is still only a fallback for series whose
@@ -2476,9 +2492,27 @@
                 ? (legend || native || `Серия ${index + 1}`)
                 : native;
         };
+        if (responseSeriesStats.length) {
+            engine = 'response';
+            const details = unitFromPanelDefinition(getCachedPanelDefinition());
+            unit = details.unit || '';
+            factor = Number(details.factor) || 1;
+            records = responseSeriesStats.map(item => ({
+                name: String(item?.name || ''),
+                visible: true,
+                stats: {
+                    count: Number(item?.count) || 0,
+                    min: Number(item?.min),
+                    max: Number(item?.max),
+                    sum: Number(item?.sum),
+                    latest: Number(item?.latest)
+                }
+            })).filter(item => item.name && item.stats.count > 0
+                && [item.stats.min, item.stats.max, item.stats.sum, item.stats.latest].every(Number.isFinite));
+        }
         const $ = window.jQuery || window.$;
         const plotHost = $ && $(root).find('.graph-panel__chart').toArray().find(el => !!$(el).data('plot'));
-        if (plotHost) {
+        if (!records.length && plotHost) {
             engine = 'flot';
             const plot = $(plotHost).data('plot');
             const details = mergeAxisAndPanelUnit(inferUnitFromAxisTicks(plot.getAxes?.().yaxis?.ticks), getCachedPanelDefinition());
@@ -2492,7 +2526,7 @@
                 values: (item.data || []).map(point => Number(point?.[1])).filter(Number.isFinite),
                 legendMaximum: legendMaximums.get(reportSeriesName(item.label, legendNames[index], index))
             }));
-        } else {
+        } else if (!records.length) {
             const uplot = findUPlotForThreshold(root);
             if (uplot) {
                 engine = 'uplot';
@@ -2517,7 +2551,7 @@
                         values: [Number(item?.value)].filter(Number.isFinite)
                     })).filter(item => item.name && item.values.length)
                     : collectGrafanaTableRecords(root);
-                if (tableRecords.length) {
+                if (!records.length && tableRecords.length) {
                     engine = responseTableRecords.length ? 'table-response' : 'table-dom';
                     const details = unitFromPanelDefinition(getCachedPanelDefinition());
                     unit = details.unit || '';
@@ -2526,9 +2560,26 @@
                 }
             }
         }
-        records = records.filter(record => record.visible && record.values.length);
-        const allRawValues = records.flatMap(record => record.values);
-        if (!records.length || !allRawValues.length) {
+        const summarizeValues = values => {
+            let count = 0;
+            let min = Infinity;
+            let max = -Infinity;
+            let sum = 0;
+            let latest = null;
+            for (const rawValue of values || []) {
+                const value = Number(rawValue);
+                if (!Number.isFinite(value)) continue;
+                count += 1;
+                min = Math.min(min, value);
+                max = Math.max(max, value);
+                sum += value;
+                latest = value;
+            }
+            return count ? { count, min, max, sum, latest } : null;
+        };
+        records = records.map(record => ({ ...record, stats: record.stats || summarizeValues(record.values) }))
+            .filter(record => record.visible && record.stats?.count > 0);
+        if (!records.length) {
             const visualMetadata = window.__dashbridgePanelToolsVisualMetadata;
             const dataStatus = visualMetadata?.responseDataStatus || { kind: 'unknown', text: '' };
             if (visualMetadata?.responseFilterEmptyIsNormal === true) {
@@ -2568,7 +2619,12 @@
         const configuredWarningRawValue = sla.warningRawValue !== null && sla.warningRawValue !== '' && Number.isFinite(Number(sla.warningRawValue))
             ? Number(sla.warningRawValue) : null;
         if (!['none', 'cpu_capacity'].includes(source) && configuredValue === null && configuredRawValue === null) {
-            return { state: 'configuration_error', source, evaluation, operator, engine, unit, series: [] };
+            return {
+                state: 'configuration_error', source, evaluation, operator, engine, unit, series: [],
+                dataStatus: 'configuration_error',
+                dataStatusText: 'Не задан порог SLA для панели',
+                error: 'Не задан порог SLA для панели'
+            };
         }
         const rawThreshold = source === 'cpu_capacity' ? null : (configuredRawValue ?? (configuredValue * factor));
         const threshold = ['none', 'cpu_capacity'].includes(source) ? null : rawThreshold / factor;
@@ -2578,8 +2634,15 @@
             gt: value > target, gte: value >= target,
             lt: value < target, lte: value <= target
         })[operator];
+        const evaluateStats = stats => {
+            if (evaluation === 'latest') return stats.latest;
+            if (evaluation === 'period_min') return stats.min;
+            if (evaluation === 'period_avg') return stats.sum / stats.count;
+            if (evaluation === 'period_sum') return stats.sum;
+            return stats.max;
+        };
         const series = records.map(record => {
-            const rawValue = evaluate(record.values);
+            const rawValue = evaluateStats(record.stats);
             const hasLegendMaximum = evaluation === 'period_max' && Number.isFinite(record.legendMaximum);
             const value = hasLegendMaximum ? record.legendMaximum : (rawValue === null ? null : rawValue / factor);
             const critical = value !== null && !!compare(
@@ -2598,9 +2661,12 @@
             };
         }).filter(record => record.value !== null);
         if (series.length > 5000) series.length = 5000;
-        const displayValues = allRawValues.map(value => value / factor);
-        const lastValues = records.map(record => record.values[record.values.length - 1] / factor).filter(Number.isFinite);
         const evaluated = series.map(record => record.value).filter(Number.isFinite);
+        const totalCount = records.reduce((sum, record) => sum + record.stats.count, 0);
+        const totalSum = records.reduce((sum, record) => sum + record.stats.sum, 0);
+        const rawMinimum = Math.min(...records.map(record => record.stats.min));
+        const rawMaximum = Math.max(...records.map(record => record.stats.max));
+        const lastValues = records.map(record => record.stats.latest / factor).filter(Number.isFinite);
         const aggregateValue = evaluation === 'period_min' ? Math.min(...evaluated)
             : evaluation === 'period_avg' ? evaluated.reduce((sum, value) => sum + value, 0) / evaluated.length
                 : evaluation === 'period_sum' ? evaluated.reduce((sum, value) => sum + value, 0)
@@ -2613,11 +2679,11 @@
             source, evaluation, operator, engine, unit: resolvedUnit, threshold,
             criticalThreshold: threshold, warningThreshold,
             aggregateValue,
-            maxValue: evaluation === 'period_max' ? Math.max(...evaluated) : Math.max(...displayValues),
-            minValue: Math.min(...displayValues),
+            maxValue: evaluation === 'period_max' ? Math.max(...evaluated) : rawMaximum / factor,
+            minValue: rawMinimum / factor,
             lastValue: lastValues.length ? Math.max(...lastValues) : null,
-            averageValue: displayValues.reduce((sum, value) => sum + value, 0) / displayValues.length,
-            sumValue: displayValues.reduce((sum, value) => sum + value, 0),
+            averageValue: totalCount ? totalSum / totalCount / factor : null,
+            sumValue: totalSum / factor,
             series
         };
     };

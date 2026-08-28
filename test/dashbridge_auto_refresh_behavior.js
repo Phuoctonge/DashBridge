@@ -4,6 +4,9 @@ const assert = require('assert');
 const fs = require('fs');
 
 const source = fs.readFileSync('js/pages/dashbridge.js', 'utf8');
+const iframeSource = fs.readFileSync('js/content/grafana-iframe.js', 'utf8');
+const html = fs.readFileSync('dashbridge.html', 'utf8');
+const css = fs.readFileSync('css/dashbridge.css', 'utf8');
 
 const initStart = source.indexOf("document.addEventListener('DOMContentLoaded', async () => {");
 const initEnd = source.indexOf('function clearDragMarkers', initStart);
@@ -113,5 +116,14 @@ assert(timeLabelSource.includes('timeLabel.replaceChildren(')
     && timeLabelSource.includes('timezone.textContent = tzName;')
     && !timeLabelSource.includes('innerHTML'),
     'absolute time labels must render as text without parsing user-controlled markup');
+
+assert(iframeSource.includes("url.searchParams.set('refresh', 'off')")
+    && !iframeSource.includes("url.searchParams.delete('refresh')"),
+    'Off must explicitly override the refresh interval saved in Grafana');
+
+assert(html.includes('class="btn btn-outline gtp-clipboard-btn"')
+    && css.includes('flex: 0 0 2.25rem;')
+    && css.includes('.gtp-clipboard-btn svg'),
+    'time clipboard icons must retain a fixed visible slot beside the apply button');
 
 console.log('PASS DashBridge auto-refresh avoids duplicate navigation and restores panel analysis');

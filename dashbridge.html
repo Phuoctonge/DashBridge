@@ -124,17 +124,17 @@
                                     style="position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none;">
                             </div>
                         </div>
-                        <div style="display: flex; gap: 0.5rem; align-items: center; margin-top: 1.5rem;">
-                            <button id="copyTimeBtn" class="btn btn-outline" title="Copy time range"
-                                style="padding: 0.5rem; display: flex; align-items: center; justify-content: center;">
+                        <div class="gtp-actions">
+                            <button id="copyTimeBtn" class="btn btn-outline gtp-clipboard-btn" title="Copy time range"
+                                aria-label="Copy time range">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                                 </svg>
                             </button>
-                            <button id="pasteTimeBtn" class="btn btn-outline" title="Paste time range"
-                                style="padding: 0.5rem; display: flex; align-items: center; justify-content: center;">
+                            <button id="pasteTimeBtn" class="btn btn-outline gtp-clipboard-btn" title="Paste time range"
+                                aria-label="Paste time range">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2">
@@ -142,8 +142,7 @@
                                     <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
                                 </svg>
                             </button>
-                            <button id="applyAbsoluteTime" class="btn btn-primary"
-                                style="flex: 1; white-space: nowrap;">Apply time range</button>
+                            <button id="applyAbsoluteTime" class="btn btn-primary gtp-apply-btn">Apply time range</button>
                         </div>
                     </div>
 

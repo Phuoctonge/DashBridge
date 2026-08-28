@@ -204,6 +204,8 @@ const panelThresholdWaiters = new Map();
 const panelThresholdStates = new Map();
 const panelTitleWaiters = new Map();
 const panelReportWaiters = new Map();
+const DASHBRIDGE_REPORT_FRAME_TIMEOUT_MS = 90_000;
+const DASHBRIDGE_REPORT_RESPONSE_TIMEOUT_MS = 125_000;
 
 function requestPanelTitle(panel, iframe) {
     if (!panel || !iframe) return Promise.resolve('');
@@ -757,13 +759,17 @@ function getEffectivePanelSla(panel) {
     return { ...config.sla };
 }
 
-function waitForDashboardIframeReady(iframe) {
+function waitForDashboardIframeReady(iframe, timeoutMs = DASHBRIDGE_REPORT_FRAME_TIMEOUT_MS) {
     if (!iframe?.isConnected) return Promise.reject(new Error('Iframe панели удалён'));
     if (iframe.dataset.dashbridgeLoaded === 'true') return Promise.resolve(iframe);
     return new Promise((resolve, reject) => {
+        let settled = false;
         const finish = error => {
+            if (settled) return;
+            settled = true;
             frameObserver.disconnect();
             clearInterval(removalPoll);
+            clearTimeout(timeout);
             error ? reject(error) : resolve(iframe);
         };
         const inspect = () => {
@@ -773,6 +779,10 @@ function waitForDashboardIframeReady(iframe) {
         const frameObserver = new MutationObserver(inspect);
         frameObserver.observe(iframe, { attributes: true, attributeFilter: ['data-dashbridge-loaded'] });
         const removalPoll = setInterval(inspect, 500);
+        const timeout = setTimeout(
+            () => finish(new Error('Панель не загрузилась за 90 секунд')),
+            timeoutMs
+        );
         inspect();
     });
 }
@@ -811,6 +821,7 @@ async function requestPanelReportSnapshot(panel) {
             settled = true;
             frameObserver.disconnect();
             clearInterval(removalPoll);
+            clearTimeout(timeout);
             panelReportWaiters.delete(requestId);
             resolve(snapshot);
         };
@@ -826,6 +837,11 @@ async function requestPanelReportSnapshot(panel) {
         const frameObserver = new MutationObserver(inspect);
         frameObserver.observe(iframe, { attributes: true, attributeFilter: ['data-dashbridge-loaded'] });
         const removalPoll = setInterval(inspect, 500);
+        const timeout = setTimeout(() => finish({
+            state: 'timeout', dataStatus: 'timeout',
+            dataStatusText: 'Панель не ответила за 125 секунд',
+            error: 'Панель не ответила за 125 секунд', series: []
+        }), DASHBRIDGE_REPORT_RESPONSE_TIMEOUT_MS);
         panelReportWaiters.set(requestId, { iframe, resolve: finish });
         if (!postToDashboardFrame(iframe, { action: 'collectPanelReportSnapshot', requestId, sla })) {
             finish({
@@ -860,8 +876,16 @@ async function generateProfileReport(output, status, warnings) {
     if (!reportPanels.length) throw new Error('В настройках сообщения не выбрана ни одна панель.');
     status.textContent = `Получаем данные панелей: ${reportPanels.length}…`;
     reportPanels.forEach(panel => setDashboardPanelDataStatus(panel, null));
-    const snapshots = await Promise.all(reportPanels.map(requestPanelReportSnapshot));
-    reportPanels.forEach((panel, index) => setDashboardPanelDataStatus(panel, snapshots[index]));
+    let completedPanels = 0;
+    const snapshots = await Promise.all(reportPanels.map(async panel => {
+        const snapshot = await requestPanelReportSnapshot(panel);
+        completedPanels += 1;
+        setDashboardPanelDataStatus(panel, snapshot);
+        if (status.isConnected) {
+            status.textContent = `Получаем данные панелей: ${completedPanels} из ${reportPanels.length}…`;
+        }
+        return snapshot;
+    }));
     const context = {
         period: document.getElementById('timePickerLabel')?.textContent?.trim() || `${globalTimeFrom} — ${globalTimeTo}`,
         generatedAt: new Date().toLocaleString('ru-RU')
@@ -896,14 +920,25 @@ function openReportPreview() {
     const output = overlay.querySelector('.report-preview-output');
     const status = overlay.querySelector('.report-preview-status');
     const warnings = overlay.querySelector('.report-preview-warnings');
+    const regenerate = overlay.querySelector('.report-regenerate');
+    let running = false;
     const run = async () => {
+        if (running) return;
+        running = true;
+        regenerate.disabled = true;
+        warnings.hidden = true;
+        warnings.textContent = '';
         try { await generateProfileReport(output, status, warnings); }
         catch (error) { status.textContent = error.message || String(error); }
+        finally {
+            running = false;
+            if (regenerate.isConnected) regenerate.disabled = false;
+        }
     };
     const close = () => overlay.remove();
     overlay.querySelector('.report-close').addEventListener('click', close);
     overlay.addEventListener('click', event => { if (event.target === overlay) close(); });
-    overlay.querySelector('.report-regenerate').addEventListener('click', run);
+    regenerate.addEventListener('click', run);
     overlay.querySelector('.report-copy').addEventListener('click', async event => {
         try { await navigator.clipboard.writeText(output.value); event.currentTarget.textContent = 'Скопировано'; }
         catch { event.currentTarget.textContent = 'Ошибка копирования'; }

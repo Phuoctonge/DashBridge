@@ -22,11 +22,18 @@ assert(tools.includes("event.data?.action === 'collectPanelReportSnapshot'")
     && tools.includes("action: 'panelReportSnapshot'")
     && tools.includes('snapshot = attachCpuCapacityToReportSnapshot(snapshot, event.data.sla || {});'),
     'Grafana MAIN runtime must expose a bounded report snapshot command');
-assert(tools.includes("new Set(['filtered_empty', 'empty_source', 'http_error', 'network_error', 'decode_error'])")
-    && tools.includes("const poll = setInterval(inspect, 200);")
+assert(tools.includes('const collectResponseReportSeriesStats = data =>')
+    && tools.includes('const observeNativeFetchResponse = (response, requestBody, request) =>')
+    && tools.includes('cacheReportResponse(decoded.data, body)')
+    && !tools.includes('refreshSelectedPanelData(targetPanel')
+    && !tools.includes('dashbridgePanelReportDataCaptured'),
+    'report generation must observe normal datasource traffic without issuing a refresh or depending on chart DOM');
+assert(tools.includes("const terminalStatuses = new Set([")
+    && tools.includes("'filtered_empty', 'empty_source', 'http_error', 'network_error', 'decode_error', 'aborted'")
+    && tools.includes("const poll = setInterval(inspect, 500);")
     && tools.includes("window.addEventListener('dashbridgePanelDataSettled', inspect)")
-    && !tools.includes('panel-report-data-timeout'),
-    'report snapshots must wait for a completed datasource/render state without a deadline');
+    && tools.includes("dataStatusText: 'Штатный запрос Grafana не завершился за 120 секунд'"),
+    'report snapshots must wait for datasource settlement and return a bounded timeout result');
 assert(visual.includes('const collectPanelReportSnapshot')
     && visual.includes("hasCritical ? 'critical' : (hasWarning ? 'warning' : 'ok')")
     && visual.includes("level: critical ? 'critical' : (warning ? 'warning' : 'normal')"),
@@ -41,7 +48,7 @@ assert(tools.includes('const overlay = existing || document.createElement')
 assert(schema.includes('normalizePanelReport') && schema.includes('normalizeProfileReport'),
     'import validation must cover profile and panel report settings');
 const reportRequestSource = dashboard.slice(
-    dashboard.indexOf('function waitForDashboardIframeReady(iframe)'),
+    dashboard.indexOf('function waitForDashboardIframeReady('),
     dashboard.indexOf('function setDashboardPanelDataStatus(panel, snapshot)')
 );
 assert(dashboard.includes("state: 'configuration_error'")
@@ -52,9 +59,9 @@ assert(reportRequestSource.includes("iframe.dataset.dashbridgeLoaded === 'true'"
     && reportRequestSource.includes('new MutationObserver(inspect)')
     && reportRequestSource.includes('const removalPoll = setInterval(inspect, 500);')
     && !reportRequestSource.includes('documentObserver')
-    && !reportRequestSource.includes('setTimeout(')
-    && !dashboard.includes('Панель не ответила за 4 секунды'),
-    'report collection must wait for slow Grafana iframes without an arbitrary deadline');
+    && reportRequestSource.includes('DASHBRIDGE_REPORT_FRAME_TIMEOUT_MS')
+    && reportRequestSource.includes('DASHBRIDGE_REPORT_RESPONSE_TIMEOUT_MS'),
+    'report collection must allow slow Grafana iframes while retaining bounded failure results');
 assert(dashboard.includes('function setDashboardPanelDataStatus(panel, snapshot)')
     && dashboard.includes("new Set(['timeout', 'iframe_unavailable', 'request_error', 'configuration_error'])")
     && css.includes('.dashbridge-panel-data-status'),
@@ -80,6 +87,12 @@ assert(tools.includes("filtered_empty: 'Нет превышений по зад�
     && visual.includes("dataStatus: 'filtered_empty'")
     && visual.includes("new Set(['http_error', 'network_error', 'decode_error'])"),
     'Grafana panels and report snapshots must preserve distinct empty and transport outcomes');
+assert(tools.includes("error?.name === 'AbortError' ? 'aborted' : 'network-error'")
+    && tools.includes("this.__dashbridgeRequestAborted ? 'aborted' : 'network-error'")
+    && tools.includes("if (['filtered_empty', 'empty_source'].includes(kind))")
+    && tools.includes('transportFailureWithVisibleData')
+    && visual.includes("'http_error', 'network_error', 'decode_error', 'aborted'"),
+    'cancelled or superseded Grafana requests must not erase cached data or cover a rendered panel with a false network error');
 assert(dashboard.includes('value="cpu_capacity"')
     && dashboard.includes("config.sla.source === 'cpu_capacity'")
     && dashboard.includes("source: 'cpu_capacity', operator: 'gt', coefficient"),

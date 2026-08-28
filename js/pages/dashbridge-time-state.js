@@ -43,7 +43,9 @@ const DashBridgeTimeState = {
             url.searchParams.set('from', this.formatForUrl(urlValue, from));
             url.searchParams.set('to', this.formatForUrl(urlValue, to));
             if (DashBridgeRefreshIntervals.has(refresh) && refresh) url.searchParams.set('refresh', refresh);
-            else url.searchParams.delete('refresh');
+            // Omitting the parameter lets Grafana fall back to the refresh
+            // interval saved in the dashboard. `off` explicitly overrides it.
+            else url.searchParams.set('refresh', 'off');
             return url.toString();
         } catch (_) { return urlValue; }
     }

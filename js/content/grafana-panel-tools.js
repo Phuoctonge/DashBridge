@@ -419,6 +419,7 @@
     visualMetadata.responseFilterReady ||= false;
     visualMetadata.responseTableRecords ||= [];
     visualMetadata.responseSeriesNames ||= [];
+    visualMetadata.responseReportSeriesStats ||= [];
     visualMetadata.responseDataStatus ||= { kind: 'unknown', text: '' };
     if (typeof visualMetadata.memoryConversionApplied !== 'boolean') visualMetadata.memoryConversionApplied = null;
     const PANEL_DATA_STATUS_TEXT = Object.freeze({
@@ -432,7 +433,11 @@
         const status = visualMetadata.responseDataStatus || { kind: 'unknown' };
         const overlayId = 'dashbridge-panel-data-status';
         const existing = document.getElementById(overlayId);
-        if (!status.text || ['data', 'unknown'].includes(status.kind)) {
+        const hasCachedData = (visualMetadata.responseReportSeriesStats?.length || 0) > 0
+            || (visualMetadata.responseTableRecords?.length || 0) > 0;
+        const transportFailureWithVisibleData = hasCachedData
+            && ['http_error', 'network_error', 'decode_error'].includes(status.kind);
+        if (!status.text || ['data', 'unknown'].includes(status.kind) || transportFailureWithVisibleData) {
             document.querySelectorAll?.('[data-dashbridge-native-no-data]').forEach(element => {
                 element.style.removeProperty('visibility');
                 delete element.dataset.dashbridgeNativeNoData;
@@ -470,9 +475,15 @@
             : baseText;
         visualMetadata.responseDataStatus = { kind, text, at: Date.now(),
             httpStatus: Number.isFinite(httpStatus) && httpStatus > 0 ? httpStatus : null };
-        if (kind !== 'data') {
+        // Loading and transport failures may happen after Grafana has already
+        // rendered a successful response (for example, when it aborts a
+        // superseded request). Preserve that bounded cache for visual fallback,
+        // while responseDataStatus still tells report generation that the most
+        // recent request did not complete successfully.
+        if (['filtered_empty', 'empty_source'].includes(kind)) {
             visualMetadata.responseTableRecords = [];
             visualMetadata.responseSeriesNames = [];
+            visualMetadata.responseReportSeriesStats = [];
         }
         requestAnimationFrame(syncPanelDataStatusPresentation);
     };
@@ -2156,6 +2167,63 @@
         return names.filter(Boolean);
     };
 
+    const collectResponseReportSeriesStats = data => {
+        const records = [];
+        const recordByName = new Map();
+        const MAX_REPORT_SERIES = 5000;
+        const generic = value => /^(?:value|series|metric|значение|серия|метрика)$/iu
+            .test(String(value || '').trim());
+        const addValue = (name, rawValue) => {
+            const value = Number(rawValue);
+            if (!name || !Number.isFinite(value)) return;
+            const safeName = String(name).substring(0, 500);
+            let record = recordByName.get(safeName);
+            if (!record) {
+                if (records.length >= MAX_REPORT_SERIES) return;
+                record = { name: safeName, count: 0, min: value, max: value, sum: 0, latest: value };
+                recordByName.set(safeName, record);
+                records.push(record);
+            }
+            record.count += 1;
+            record.min = Math.min(record.min, value);
+            record.max = Math.max(record.max, value);
+            record.sum += value;
+            record.latest = value;
+        };
+        Object.values(data?.results || {}).forEach(result => {
+            for (const frame of result.frames || []) {
+                const tableShape = getResponseTableFrameShape(frame);
+                if (tableShape) {
+                    for (let index = 0; index < tableShape.rowCount; index += 1) {
+                        const name = String(tableShape.columns[tableShape.nameIndex]?.[index] ?? '').trim();
+                        addValue(name, tableShape.columns[tableShape.valueIndex]?.[index]);
+                    }
+                    continue;
+                }
+                const fields = frame.schema?.fields || [];
+                const columns = frame.data?.values || [];
+                fields.forEach((field, index) => {
+                    if (field.type === 'time' || field.name === 'Time') return;
+                    const candidates = [
+                        field.config?.displayNameFromDS,
+                        field.config?.displayName,
+                        frame.schema?.name,
+                        ...Object.values(field.labels || {}),
+                        field.name,
+                        frame.schema?.refId
+                    ].map(value => String(value || '').trim()).filter(Boolean);
+                    const name = candidates.find(value => !generic(value)) || candidates[0]
+                        || `Серия ${records.length + 1}`;
+                    const values = columns[index];
+                    if (values && typeof values[Symbol.iterator] === 'function') {
+                        for (const value of values) addValue(name, value);
+                    }
+                });
+            }
+        });
+        return records;
+    };
+
     const collectResponseFilterVisibleNames = data => {
         const names = new Set();
         Object.values(data?.results || {}).forEach(result => {
@@ -2571,6 +2639,7 @@
         const beginRequest = (transport, url) => {
             const requestId = `query_${Date.now()}_${diagnostics.nextEventId + 1}`;
             diagnostics.activeRequests += 1;
+            if (isDashboardIframe) setPanelDataStatus('loading');
             pushEvent('request-start', { requestId, transport, url: String(url || ''), activeRequests: diagnostics.activeRequests });
             return requestId;
         };
@@ -2581,8 +2650,53 @@
             }
             if (outcome === 'network-error') setPanelDataStatus('network_error');
             if (outcome === 'decode-error') setPanelDataStatus('decode_error');
+            if (outcome === 'aborted') setPanelDataStatus('aborted');
             pushEvent('request-complete', { requestId, transport, outcome, activeRequests: diagnostics.activeRequests });
             window.dispatchEvent(new Event('dashbridgePanelDataSettled'));
+        };
+        const cacheReportResponse = (data, requestBody) => {
+            if (!data?.results) return false;
+            const targetRefIds = getTargetQueryRefIds(requestBody);
+            if (!isDashboardIframe && (!targetRefIds || !targetRefIds.size)) return false;
+            const scopedData = createResponseFilterWorkspace(data, targetRefIds).data;
+            visualMetadata.responseReportSeriesStats = collectResponseReportSeriesStats(scopedData);
+            visualMetadata.responseSeriesNames = collectResponseSeriesNames(scopedData);
+            visualMetadata.responseTableRecords = collectResponseTableRecords(scopedData);
+            setPanelDataStatus(visualMetadata.responseReportSeriesStats.length ? 'data' : 'empty_source');
+            window.dispatchEvent(new Event('dashbridgePanelDataSettled'));
+            return true;
+        };
+        const observeNativeFetchResponse = (response, requestBody, request) => {
+            let observed = false;
+            let body = requestBody;
+            const observe = data => {
+                if (observed) return;
+                observed = true;
+                try { cacheReportResponse(data, body); }
+                catch (error) { pushEvent('report-cache-error', { ...request, reason: error?.message || String(error) }); }
+                body = null;
+            };
+            const originalJson = response.json?.bind(response);
+            if (originalJson) Object.defineProperty(response, 'json', {
+                configurable: true,
+                value: async () => {
+                    const data = await originalJson();
+                    observe(data);
+                    return data;
+                }
+            });
+            const originalText = response.text?.bind(response);
+            if (originalText) Object.defineProperty(response, 'text', {
+                configurable: true,
+                value: async () => {
+                    const text = await originalText();
+                    if (!observed) {
+                        try { observe(JSON.parse(text)); } catch { body = null; }
+                    }
+                    return text;
+                }
+            });
+            return response;
         };
         const transform = (data, requestBody, request) => {
             archiveResponse(request.requestId, 'decoded-before-transform', data, { transport: request.transport });
@@ -2666,6 +2780,7 @@
             visualMetadata.seriesCpuCapacityEntries = collectCpuCapacityEntries(scopedData);
             visualMetadata.responseTableRecords = collectResponseTableRecords(scopedData);
             visualMetadata.responseSeriesNames = collectResponseSeriesNames(scopedData);
+            visualMetadata.responseReportSeriesStats = collectResponseReportSeriesStats(scopedData);
             if (responseSeriesFilterIsEnabled()) {
                 visualMetadata.responseFilterVisibleNames = collectResponseFilterVisibleNames(scopedData);
                 visualMetadata.responseFilterReady = true;
@@ -2734,12 +2849,12 @@
             // OFF. E2E is the sole exception: a reset still has to observe the
             // selected panel's request in order to prove a safe baseline.
             const diagnosticObservationActive = window.__dashbridgeE2EDiagnostics?.installed === true;
-            const observeActive = transformActive || hasPersistentVisualWork() || diagnosticObservationActive || analysisCaptureActive;
+            const observeActive = isDashboardIframe || transformActive || hasPersistentVisualWork() || diagnosticObservationActive || analysisCaptureActive;
             if (!observeActive) return originalFetch(...args);
             const requestId = beginRequest('fetch', url);
             let effectiveArgs = args;
             let requestBody = null;
-            if (transformActive || diagnosticObservationActive || analysisCaptureActive) {
+            if (isDashboardIframe || transformActive || diagnosticObservationActive || analysisCaptureActive) {
                 requestBody = await window.DashBridgeGrafanaNetwork.readFetchBody(args[0], args[1]).catch(() => null);
             }
             if (tools.cpuCapacityFilterEnabled && requestBody !== null) {
@@ -2772,7 +2887,8 @@
                     const requestBody = await requestBodyPromise;
                     if (analysisCaptureActive && panelAnalysisRequestMatches(analysisCapture, requestBody, requestStartedAt)) {
                         try {
-                            observePanelAnalysisResponse(analysisCapture, await response.clone().json(), requestBody, requestStartedAt);
+                            const decoded = await response.clone().json();
+                            observePanelAnalysisResponse(analysisCapture, decoded, requestBody, requestStartedAt);
                         } catch { /* DOM fallback remains available when a datasource response is not JSON. */ }
                     }
                     const targetRefIds = getTargetQueryRefIds(requestBody);
@@ -2788,7 +2904,9 @@
                         targetRefIds: targetRefIds === null ? null : [...targetRefIds],
                     });
                     completeRequest(requestId, 'fetch', 'completed');
-                    return response;
+                    return isDashboardIframe
+                        ? observeNativeFetchResponse(response, requestBody, { requestId, transport: 'fetch' })
+                        : response;
                 }
                 let originalResponseText = null;
                 try {
@@ -2816,7 +2934,7 @@
                 }
             } catch (error) {
                 pushEvent('query-error', { requestId, transport: 'fetch', reason: error.message || String(error) });
-                completeRequest(requestId, 'fetch', 'network-error');
+                completeRequest(requestId, 'fetch', error?.name === 'AbortError' ? 'aborted' : 'network-error');
                 throw error;
             }
         };
@@ -2833,7 +2951,7 @@
                 const analysisCaptureActive = !!analysisCapture && !analysisCapture.cancelled;
                 const requestStartedAt = performance.now();
                 const diagnosticObservationActive = window.__dashbridgeE2EDiagnostics?.installed === true;
-                const observeActive = transformActive || hasPersistentVisualWork() || diagnosticObservationActive || analysisCaptureActive;
+                const observeActive = isDashboardIframe || transformActive || hasPersistentVisualWork() || diagnosticObservationActive || analysisCaptureActive;
                 if (!observeActive) return originalSend.call(this, body);
                 if (tools.cpuCapacityFilterEnabled) {
                     const prepared = prepareCpuCapacityRequestBody(body);
@@ -2841,6 +2959,7 @@
                 }
                 const requestId = beginRequest('xhr', this.__dashbridgeRequestUrl);
                 if (transformActive) archiveRequest(requestId, 'xhr', this.__dashbridgeRequestUrl, body ?? null);
+                this.addEventListener('abort', () => { this.__dashbridgeRequestAborted = true; }, { once: true });
                 this.addEventListener('readystatechange', () => {
                     if (this.readyState !== 4 || this.__dashbridgeRequestFinished) return;
                     this.__dashbridgeRequestFinished = true;
@@ -2856,14 +2975,16 @@
                     });
                     if (this.status < 200 || this.status >= 300) {
                         pushEvent('query-error', { ...request, status: this.status });
-                        if (this.status === 0) setPanelDataStatus('network_error');
-                        else setPanelDataStatus('http_error', { httpStatus: this.status });
-                        completeRequest(requestId, 'xhr', this.status === 0 ? 'network-error' : 'http-error');
+                        const outcome = this.status === 0
+                            ? (this.__dashbridgeRequestAborted ? 'aborted' : 'network-error')
+                            : 'http-error';
+                        if (outcome === 'http-error') setPanelDataStatus('http_error', { httpStatus: this.status });
+                        completeRequest(requestId, 'xhr', outcome);
                         return;
                     }
                     const captureRequestMatches = analysisCaptureActive
                         && panelAnalysisRequestMatches(analysisCapture, body, requestStartedAt);
-                    if (!transformActive && !captureRequestMatches) {
+                    if (!transformActive && !captureRequestMatches && !isDashboardIframe) {
                         const targetRefIds = getTargetQueryRefIds(body);
                         const scope = targetRefIds === null
                             ? 'iframe'
@@ -2886,6 +3007,7 @@
                             observePanelAnalysisResponse(analysisCapture, decoded.data, body, requestStartedAt);
                         }
                         if (!transformActive) {
+                            if (isDashboardIframe) cacheReportResponse(decoded.data, body);
                             consumeVisualStylesAfterQuery();
                             completeRequest(requestId, 'xhr', 'completed');
                             return;
@@ -2968,35 +3090,43 @@
                     root, sla: event.data.sla || {}
                 }) || { state: 'no_data', series: [] };
                 const readySnapshot = () => {
-                    const diagnostics = window.__dashbridgeDataInterceptorDiagnostic;
-                    if (Number(diagnostics?.activeRequests) > 0) return null;
+                    const status = window.__dashbridgePanelToolsVisualMetadata?.responseDataStatus?.kind || 'unknown';
+                    const terminalStatuses = new Set([
+                        'filtered_empty', 'empty_source', 'http_error', 'network_error', 'decode_error', 'aborted'
+                    ]);
                     const current = collect();
                     if (Array.isArray(current.series) && current.series.length) return current;
-                    const status = window.__dashbridgePanelToolsVisualMetadata?.responseDataStatus?.kind || 'unknown';
                     // A completed chart with every series hidden is still a
                     // valid final state; it must not keep report generation
                     // waiting forever merely because the public series list is empty.
-                    if (status === 'data' && ['flot', 'uplot'].includes(current.engine)) return current;
-                    if (new Set(['filtered_empty', 'empty_source', 'http_error', 'network_error', 'decode_error']).has(status)) {
+                    if (status === 'data' && ['flot', 'uplot', 'response'].includes(current.engine)) return current;
+                    if (terminalStatuses.has(status)) {
                         return current;
                     }
                     const nativeNoData = Array.from(root?.querySelectorAll?.('div, span') || []).some(element =>
                         element.children.length === 0 && /^No data$/i.test(String(element.textContent || '').trim()));
                     return nativeNoData ? current : null;
                 };
-                snapshot = readySnapshot() || await new Promise(resolve => {
+                snapshot = await new Promise(resolve => {
                     let settled = false;
+                    let timeout = null;
                     const finish = current => {
                         if (settled || !current) return;
                         settled = true;
                         clearInterval(poll);
+                        clearTimeout(timeout);
                         window.removeEventListener('dashbridgePanelDataSettled', inspect);
                         resolve(current);
                     };
                     const inspect = () => finish(readySnapshot());
-                    // This is a readiness poll, not a deadline: large Grafana
-                    // panels remain eligible for as long as their query needs.
-                    const poll = setInterval(inspect, 200);
+                    const poll = setInterval(inspect, 500);
+                    timeout = setTimeout(() => finish({
+                        state: 'timeout',
+                        dataStatus: 'timeout',
+                        dataStatusText: 'Штатный запрос Grafana не завершился за 120 секунд',
+                        error: 'Штатный запрос Grafana не завершился за 120 секунд',
+                        series: []
+                    }), 120_000);
                     window.addEventListener('dashbridgePanelDataSettled', inspect);
                     inspect();
                 });

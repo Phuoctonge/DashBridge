@@ -38,8 +38,8 @@ assert.deepStrictEqual(JSON.parse(JSON.stringify(state.normalize({
 assert.strictEqual(
     new URL(state.applyToUrl('https://grafana.example/d-solo/x?refresh=5s', {
         from: 'now-1h', to: 'now', refresh: 'unexpected'
-    })).searchParams.has('refresh'),
-    false
+    })).searchParams.get('refresh'),
+    'off'
 );
 
 console.log('PASS DashBridge time state normalizes profile settings and reads legacy migration values');
