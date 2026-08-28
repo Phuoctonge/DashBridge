@@ -458,6 +458,35 @@
             font-weight: 500;
         }
 
+        .tdm-toggle-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: center;
+            column-gap: 0.75rem;
+            font-size: 0.75rem;
+        }
+
+        .tdm-toggle-row-first {
+            margin-top: 0.625rem;
+            border-top: 1px solid var(--border);
+            padding-top: 0.5rem;
+            font-size: 0.8125rem;
+        }
+
+        .tdm-toggle-row .switch {
+            grid-column: 2;
+        }
+
+        .tdm-user-filter {
+            margin-top: 0.5rem;
+            border-top: 1px solid var(--border);
+            padding-top: 0.5rem;
+        }
+
+        .tdm-user-filter-input {
+            margin-top: 0.625rem;
+        }
+
         /* Modal (фон подложки — общий, из theme.css: --modal-overlay-bg) */
         #modalOverlay {
             display: none;

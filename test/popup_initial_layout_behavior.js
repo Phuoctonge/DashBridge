@@ -78,5 +78,10 @@ assert(buttonIcon('openTrafficRecorderBtn')
     && buttonIcon('transferWorklogBtn')
     && buttonIcon('openTrafficRecorderBtn') !== buttonIcon('transferWorklogBtn'),
     'Traffic Recorder and WorkLog transfer must use distinct action icons');
+assert(html.includes('class="tdm-toggle-row tdm-toggle-row-first"')
+    && html.includes('id="tdmFilterUserContainer" class="tdm-user-filter"')
+    && css.includes('grid-template-columns: minmax(0, 1fr) auto;')
+    && css.includes('.tdm-toggle-row .switch'),
+    'TDM switches must share one right-aligned grid column');
 
 console.log('PASS popup uses responsive controls, natural tab height and bounded scrolling');

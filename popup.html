@@ -326,8 +326,7 @@
                     <option value="both">Оба (HTML + JSON)</option>
                 </select>
             </div>
-            <div
-                style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8125rem; margin-top: 0.625rem; border-top: 1px solid var(--border); padding-top: 0.5rem;">
+            <div class="tdm-toggle-row tdm-toggle-row-first">
                 <span style="color: var(--text-color); font-weight: 500;">Сохранять фотографии</span>
                 <label class="switch">
                     <input type="checkbox" id="tdmExportPhotos" checked>
@@ -335,19 +334,20 @@
                 </label>
             </div>
 
-            <div id="tdmFilterUserContainer"
-                style="margin-top: 0.5rem; border-top: 1px solid var(--border); padding-top: 0.5rem; display: flex; align-items: center; justify-content: space-between; font-size: 0.75rem;">
-                <span style="color: var(--text-color); font-weight: 500; display: flex; align-items: center; gap: 0.25rem;">
-                    Игнорировать фото от пользователя
-                    <span
-                        title="Введите ФИО пользователя как в чате (например, Иванов Иван Иванович) или напишите 'Я', чтобы исключить ваши собственные фотографии."
-                        style="color: var(--primary); cursor: help; font-weight: bold; border: 1px solid var(--primary); border-radius: 50%; width: 0.875rem; height: 0.875rem; display: inline-flex; align-items: center; justify-content: center; font-size: 0.625rem;">i</span>
-                </span>
-                <label class="switch">
-                    <input type="checkbox" id="tdmExcludeUserCheckbox">
-                    <span class="slider"></span>
-                </label>
-                <div style="margin-top: 0.625rem;">
+            <div id="tdmFilterUserContainer" class="tdm-user-filter">
+                <div class="tdm-toggle-row">
+                    <span style="color: var(--text-color); font-weight: 500; display: flex; align-items: center; gap: 0.25rem;">
+                        Игнорировать фото от пользователя
+                        <span
+                            title="Введите ФИО пользователя как в чате (например, Иванов Иван Иванович) или напишите 'Я', чтобы исключить ваши собственные фотографии."
+                            style="color: var(--primary); cursor: help; font-weight: bold; border: 1px solid var(--primary); border-radius: 50%; width: 0.875rem; height: 0.875rem; display: inline-flex; align-items: center; justify-content: center; font-size: 0.625rem;">i</span>
+                    </span>
+                    <label class="switch">
+                        <input type="checkbox" id="tdmExcludeUserCheckbox">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="tdm-user-filter-input">
                     <input type="text" id="tdmExcludeUserText" placeholder="Введите ФИО или 'Я'"
                         style="display: none; width: 100%; padding: 0.5rem; box-sizing: border-box; border-radius: 0.5rem; border: 1px solid var(--border); font-size: 0.8125rem;">
                 </div>
