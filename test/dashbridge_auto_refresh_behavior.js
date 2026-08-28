@@ -120,6 +120,9 @@ assert(timeLabelSource.includes('timeLabel.replaceChildren(')
 assert(iframeSource.includes("url.searchParams.set('refresh', 'off')")
     && !iframeSource.includes("url.searchParams.delete('refresh')"),
     'Off must explicitly override the refresh interval saved in Grafana');
+assert(iframeSource.includes("window.history.replaceState(null, '', url.toString())")
+    && !iframeSource.includes("window.history.pushState(null, '', url.toString())"),
+    'seamless time updates must replace the iframe URL instead of growing browser history');
 
 assert(html.includes('class="btn btn-outline gtp-clipboard-btn"')
     && css.includes('flex: 0 0 2.25rem;')

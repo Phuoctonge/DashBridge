@@ -30,7 +30,7 @@ checks = {
         and "const pushEvent = (stage, details = {}) =>" in PANEL_TOOLS
         and "diagnostics.events.splice" not in PANEL_TOOLS
         and "const beginRequest = (transport, url) =>" in PANEL_TOOLS
-        and "const completeRequest = (requestId, transport, outcome) =>" in PANEL_TOOLS
+        and "const completeRequest = (requestId, transport, outcome, details = {}) =>" in PANEL_TOOLS
     ),
     "interceptor records query lifecycle terminal states": all(token in PANEL_TOOLS for token in [
         "pushEvent('request-start'", "pushEvent('response'", "pushEvent('query-error'",

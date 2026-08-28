@@ -24,7 +24,7 @@ assert(tools.includes("event.data?.action === 'collectPanelReportSnapshot'")
     'Grafana MAIN runtime must expose a bounded report snapshot command');
 assert(tools.includes('const collectResponseReportSeriesStats = data =>')
     && tools.includes('const observeNativeFetchResponse = (response, requestBody, request) =>')
-    && tools.includes('cacheReportResponse(decoded.data, body)')
+    && tools.includes('cacheReportResponse(decoded.data, body, request)')
     && !tools.includes('refreshSelectedPanelData(targetPanel')
     && !tools.includes('dashbridgePanelReportDataCaptured'),
     'report generation must observe normal datasource traffic without issuing a refresh or depending on chart DOM');
@@ -56,12 +56,19 @@ assert(dashboard.includes("state: 'configuration_error'")
     && reportRequestSource.includes("dataStatus: 'request_error'"),
     'unavailable data must never be treated as a successful SLA evaluation');
 assert(reportRequestSource.includes("iframe.dataset.dashbridgeLoaded === 'true'")
-    && reportRequestSource.includes('new MutationObserver(inspect)')
-    && reportRequestSource.includes('const removalPoll = setInterval(inspect, 500);')
+    && reportRequestSource.includes('frameObserver = new MutationObserver(inspect)')
+    && reportRequestSource.includes('removalPoll = setInterval(inspect, 500);')
     && !reportRequestSource.includes('documentObserver')
     && reportRequestSource.includes('DASHBRIDGE_REPORT_FRAME_TIMEOUT_MS')
     && reportRequestSource.includes('DASHBRIDGE_REPORT_RESPONSE_TIMEOUT_MS'),
     'report collection must allow slow Grafana iframes while retaining bounded failure results');
+assert(reportRequestSource.includes("action: 'cancelPanelReportSnapshot'")
+    && reportRequestSource.includes("signal?.addEventListener('abort', abort, { once: true })")
+    && dashboard.includes('Math.min(2, reportPanels.length)')
+    && dashboard.includes('runController?.abort()')
+    && tools.includes("event.data?.action === 'cancelPanelReportSnapshot'")
+    && tools.includes('panelReportSnapshotCancellers.delete(requestId)'),
+    'closing a report must release parent and iframe waiters while panel collection stays concurrency-bounded');
 assert(dashboard.includes('function setDashboardPanelDataStatus(panel, snapshot)')
     && dashboard.includes("new Set(['timeout', 'iframe_unavailable', 'request_error', 'configuration_error'])")
     && css.includes('.dashbridge-panel-data-status'),

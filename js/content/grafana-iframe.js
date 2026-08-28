@@ -205,7 +205,7 @@ if (window.name === 'dashbridge-iframe') {
 
                 // Если URL изменился, пытаемся обновить его через History API без моргания
                 if (changed) {
-                    window.history.pushState(null, '', url.toString());
+                    window.history.replaceState(null, '', url.toString());
                     // Симулируем событие изменения URL, чтобы React/Grafana роутер его подхватил
                     window.dispatchEvent(new PopStateEvent('popstate', { state: null }));
 

@@ -20,14 +20,17 @@ const stored = {
     dashbridge_activeProfileId: 'legacy-profile-1'
 };
 const context = {
-    URL, console, Date,
+    URL, console, Date, structuredClone,
     crypto: { randomUUID: () => '00000000-0000-4000-8000-000000000001' },
-    chrome: { storage: { local: {
+    chrome: { runtime: {
+        lastError: null,
+        sendMessage(message, callback) { persisted.push(message); callback({ ok: true }); }
+    }, storage: { local: {
         async get() { return stored; },
         async set(values) { backups.push(values); }
     } } },
-    DashBridgeStorageWriter: { createLocal: () => ({
-        async write(values) { persisted.push(values); return { current: true }; },
+    DashBridgeStorageWriter: { create: (_area, options) => ({
+        async write(values) { return options.durableWrite(structuredClone(values), 1); },
         async flush() {}, async checkpoint() {}
     }) }
 };
@@ -47,7 +50,13 @@ for (const file of ['js/shared/local-state-schema.js', 'js/shared/dashbridge-pro
     assert.strictEqual(loaded.profiles[0].panels[0].tools.futureToolField, 'keep');
     assert.strictEqual(loaded.profiles[0].panels[0].tools.thresholdIncludeHidden, true, 'retired keys remain inert instead of triggering a storage migration');
     assert.strictEqual(backups.length, 1, 'rejected legacy state must be backed up once');
+    loaded.profiles[0].name = 'Updated';
     await store.save(loaded.profiles, loaded.activeProfileId);
-    assert.strictEqual(persisted[0].dashbridge_profiles, loaded.profiles, 'ordinary save must not deep-normalize all profiles');
+    assert.strictEqual(persisted[0].type, 'dashbridge-profile-commit');
+    assert.strictEqual(persisted[0].upserts.length, 1);
+    assert.strictEqual(persisted[0].upserts[0].futureProfileField, 'keep',
+        'profile patches must preserve unknown forward-compatible fields');
+    assert.strictEqual(persisted[0].upserts[0].panels[0].futurePanelField, 'keep');
+    assert.strictEqual(persisted[0].deleteProfileIds.length, 0);
     console.log('PASS profile store preserves legacy fields and backs up rejected state');
 })().catch(error => { console.error(error); process.exit(1); });

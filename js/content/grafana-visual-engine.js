@@ -2445,6 +2445,19 @@
                 error: responseErrorText
             };
         }
+        const responseReportTruncated = Number(
+            window.__dashbridgePanelToolsVisualMetadata?.responseReportTruncated
+        ) || 0;
+        if (responseReportTruncated > 0) {
+            const errorText = 'Ответ содержит больше 20 000 серий; полный расчёт SLA безопасно остановлен';
+            return {
+                state: 'error', source, evaluation, operator, engine: 'response', unit, series: [],
+                dataStatus: 'series_limit',
+                dataStatusText: errorText,
+                error: errorText,
+                omittedSeries: responseReportTruncated
+            };
+        }
         const parseLegendCalculation = value => {
             const normalized = String(value || '').replace(/[\u00a0\u202f\s]/g, '').replace(',', '.');
             const match = normalized.match(/[-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?/i);
@@ -2641,7 +2654,7 @@
             if (evaluation === 'period_sum') return stats.sum;
             return stats.max;
         };
-        const series = records.map(record => {
+        const allSeries = records.map(record => {
             const rawValue = evaluateStats(record.stats);
             const hasLegendMaximum = evaluation === 'period_max' && Number.isFinite(record.legendMaximum);
             const value = hasLegendMaximum ? record.legendMaximum : (rawValue === null ? null : rawValue / factor);
@@ -2660,8 +2673,9 @@
                 level: critical ? 'critical' : (warning ? 'warning' : 'normal')
             };
         }).filter(record => record.value !== null);
-        if (series.length > 5000) series.length = 5000;
-        const evaluated = series.map(record => record.value).filter(Number.isFinite);
+        const series = allSeries.slice(0, 5000);
+        const omittedSeries = allSeries.length - series.length;
+        const evaluated = allSeries.map(record => record.value).filter(Number.isFinite);
         const totalCount = records.reduce((sum, record) => sum + record.stats.count, 0);
         const totalSum = records.reduce((sum, record) => sum + record.stats.sum, 0);
         const rawMinimum = Math.min(...records.map(record => record.stats.min));
@@ -2672,8 +2686,8 @@
                 : evaluation === 'period_sum' ? evaluated.reduce((sum, value) => sum + value, 0)
                     : Math.max(...evaluated);
         const resolvedUnit = String(sla.unit || unit || '').slice(0, 64);
-        const hasCritical = series.some(record => record.level === 'critical');
-        const hasWarning = series.some(record => record.level === 'warning');
+        const hasCritical = allSeries.some(record => record.level === 'critical');
+        const hasWarning = allSeries.some(record => record.level === 'warning');
         return {
             state: ['none', 'cpu_capacity'].includes(source) ? 'no_threshold' : (hasCritical ? 'critical' : (hasWarning ? 'warning' : 'ok')),
             source, evaluation, operator, engine, unit: resolvedUnit, threshold,
@@ -2684,7 +2698,8 @@
             lastValue: lastValues.length ? Math.max(...lastValues) : null,
             averageValue: totalCount ? totalSum / totalCount / factor : null,
             sumValue: totalSum / factor,
-            series
+            series,
+            omittedSeries
         };
     };
 

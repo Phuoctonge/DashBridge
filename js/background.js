@@ -53,6 +53,56 @@ function queueStorageCommit(values) {
     return storageCommitQueue;
 }
 
+async function commitDashBridgeProfilePatch(message, sender) {
+    if (!isTrustedExtensionPage(sender, 'dashbridge.html')
+        || !Array.isArray(message?.upserts)
+        || !Array.isArray(message?.deleteProfileIds)
+        || typeof message.activeProfileId !== 'string') {
+        throw new Error('Untrusted profile commit');
+    }
+    const deleteProfileIds = new Set(message.deleteProfileIds.map(id => String(id)));
+    if (deleteProfileIds.size !== message.deleteProfileIds.length
+        || [...deleteProfileIds].some(id => !id || id.length > 160)) {
+        throw new Error('Некорректный список удаляемых профилей.');
+    }
+    const normalizedUpserts = DashBridgeLocalStateSchema.normalizeProfiles(message.upserts, { mode: 'load' });
+    if (normalizedUpserts.skippedProfiles || normalizedUpserts.skippedPanels
+        || normalizedUpserts.items.length !== message.upserts.length
+        || normalizedUpserts.items.some(profile => deleteProfileIds.has(profile.id))) {
+        throw new Error('Некорректное изменение профилей.');
+    }
+
+    const stored = await chrome.storage.local.get(['dashbridge_profiles', 'dashbridge_activeProfileId']);
+    const normalizedStored = DashBridgeLocalStateSchema.normalizeProfiles(
+        Array.isArray(stored.dashbridge_profiles) ? stored.dashbridge_profiles : [], { mode: 'load' }
+    );
+    const profiles = normalizedStored.items.filter(profile => !deleteProfileIds.has(profile.id));
+    const indexById = new Map(profiles.map((profile, index) => [profile.id, index]));
+    normalizedUpserts.items.forEach(profile => {
+        const index = indexById.get(profile.id);
+        if (index === undefined) {
+            indexById.set(profile.id, profiles.length);
+            profiles.push(profile);
+        } else {
+            profiles[index] = profile;
+        }
+    });
+    if (!profiles.length) throw new Error('Нельзя удалить все профили DashBridge.');
+    const activeProfileId = profiles.some(profile => profile.id === message.activeProfileId)
+        ? message.activeProfileId
+        : profiles.some(profile => profile.id === stored.dashbridge_activeProfileId)
+            ? stored.dashbridge_activeProfileId : profiles[0].id;
+    await chrome.storage.local.set({ dashbridge_profiles: profiles, dashbridge_activeProfileId: activeProfileId });
+    return { profileCount: profiles.length, activeProfileId };
+}
+
+function queueDashBridgeProfilePatch(message, sender) {
+    let result;
+    storageCommitQueue = storageCommitQueue.catch(() => undefined)
+        .then(async () => { result = await commitDashBridgeProfilePatch(message, sender); });
+    return storageCommitQueue.then(() => result);
+}
+
 function normalizeSavedGrafanaPanelUrl(sourceUrl, panelId) {
     const url = new URL(sourceUrl);
     if (url.pathname.includes('/d/')) url.pathname = url.pathname.replace('/d/', '/d-solo/');
@@ -488,6 +538,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }
     if (message?.type === 'dashbridge-save-grafana-panel') {
         queueGrafanaPanelSave(message, _sender)
+            .then(result => sendResponse({ ok: true, ...result }))
+            .catch(error => sendResponse({ ok: false, error: error?.message || String(error) }));
+        return true;
+    }
+    if (message?.type === 'dashbridge-profile-commit') {
+        queueDashBridgeProfilePatch(message, _sender)
             .then(result => sendResponse({ ok: true, ...result }))
             .catch(error => sendResponse({ ok: false, error: error?.message || String(error) }));
         return true;

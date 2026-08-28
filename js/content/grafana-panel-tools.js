@@ -420,6 +420,7 @@
     visualMetadata.responseTableRecords ||= [];
     visualMetadata.responseSeriesNames ||= [];
     visualMetadata.responseReportSeriesStats ||= [];
+    visualMetadata.responseReportTruncated ||= 0;
     visualMetadata.responseDataStatus ||= { kind: 'unknown', text: '' };
     if (typeof visualMetadata.memoryConversionApplied !== 'boolean') visualMetadata.memoryConversionApplied = null;
     const PANEL_DATA_STATUS_TEXT = Object.freeze({
@@ -484,6 +485,7 @@
             visualMetadata.responseTableRecords = [];
             visualMetadata.responseSeriesNames = [];
             visualMetadata.responseReportSeriesStats = [];
+            visualMetadata.responseReportTruncated = 0;
         }
         requestAnimationFrame(syncPanelDataStatusPresentation);
     };
@@ -1981,16 +1983,20 @@
 
     const collectResponseTableRecords = data => {
         const records = [];
-        Object.values(data?.results || {}).forEach(result => (result.frames || []).forEach(frame => {
-            const shape = getResponseTableFrameShape(frame);
-            if (!shape || (shape.timeIndexes.length && !targetPanelUsesTable())) return;
-            for (let index = 0; index < shape.rowCount; index++) {
+        const MAX_TABLE_RECORDS = 5000;
+        outer: for (const result of Object.values(data?.results || {})) {
+            for (const frame of result.frames || []) {
+                const shape = getResponseTableFrameShape(frame);
+                if (!shape || (shape.timeIndexes.length && !targetPanelUsesTable())) continue;
+                for (let index = 0; index < shape.rowCount; index++) {
+                    if (records.length >= MAX_TABLE_RECORDS) break outer;
                 const name = String(shape.columns[shape.nameIndex]?.[index] ?? '').trim();
                 const value = Number(shape.columns[shape.valueIndex]?.[index]);
                 if (name && Number.isFinite(value)) records.push({ name: name.substring(0, 500), value });
+                }
             }
-        }));
-        return records.slice(0, 5000);
+        }
+        return records;
     };
 
     // Keeps only chart fields or table rows that reached the requested threshold. This runs
@@ -2148,10 +2154,11 @@
         const generic = value => /^(?:value|series|metric|значение|серия|метрика)$/iu
             .test(String(value || '').trim());
         const names = [];
-        Object.values(data?.results || {}).forEach(result => {
+        outer: for (const result of Object.values(data?.results || {})) {
             for (const frame of result.frames || []) {
                 for (const field of frame.schema?.fields || []) {
                     if (field.type === 'time' || field.name === 'Time') continue;
+                    if (names.length >= 20_000) break outer;
                     const candidates = [
                         field.config?.displayNameFromDS,
                         field.config?.displayName,
@@ -2163,47 +2170,68 @@
                     names.push(candidates.find(name => !generic(name)) || candidates[0] || '');
                 }
             }
-        });
+        }
         return names.filter(Boolean);
     };
 
     const collectResponseReportSeriesStats = data => {
         const records = [];
-        const recordByName = new Map();
-        const MAX_REPORT_SERIES = 5000;
+        const MAX_REPORT_SERIES = 20_000;
+        let truncated = 0;
         const generic = value => /^(?:value|series|metric|значение|серия|метрика)$/iu
             .test(String(value || '').trim());
-        const addValue = (name, rawValue) => {
-            const value = Number(rawValue);
-            if (!name || !Number.isFinite(value)) return;
+        const createRecord = name => {
             const safeName = String(name).substring(0, 500);
-            let record = recordByName.get(safeName);
-            if (!record) {
-                if (records.length >= MAX_REPORT_SERIES) return;
-                record = { name: safeName, count: 0, min: value, max: value, sum: 0, latest: value };
-                recordByName.set(safeName, record);
-                records.push(record);
-            }
+            return safeName ? { name: safeName, count: 0, min: Infinity, max: -Infinity, sum: 0, latest: null } : null;
+        };
+        const addValue = (record, rawValue) => {
+            const value = Number(rawValue);
+            if (!record || !Number.isFinite(value)) return;
             record.count += 1;
             record.min = Math.min(record.min, value);
             record.max = Math.max(record.max, value);
             record.sum += value;
             record.latest = value;
         };
+        const retainRecord = record => {
+            if (!record?.count) return;
+            if (records.length >= MAX_REPORT_SERIES) {
+                truncated += 1;
+                return;
+            }
+            records.push(record);
+        };
         Object.values(data?.results || {}).forEach(result => {
             for (const frame of result.frames || []) {
                 const tableShape = getResponseTableFrameShape(frame);
                 if (tableShape) {
+                    const grouped = new Map();
+                    const available = Math.max(0, MAX_REPORT_SERIES - records.length);
                     for (let index = 0; index < tableShape.rowCount; index += 1) {
                         const name = String(tableShape.columns[tableShape.nameIndex]?.[index] ?? '').trim();
-                        addValue(name, tableShape.columns[tableShape.valueIndex]?.[index]);
+                        if (!name) continue;
+                        let record = grouped.get(name);
+                        if (!record) {
+                            if (grouped.size >= available) {
+                                truncated = Math.max(1, truncated);
+                                continue;
+                            }
+                            record = createRecord(name);
+                            grouped.set(name, record);
+                        }
+                        addValue(record, tableShape.columns[tableShape.valueIndex]?.[index]);
                     }
+                    grouped.forEach(retainRecord);
                     continue;
                 }
                 const fields = frame.schema?.fields || [];
                 const columns = frame.data?.values || [];
                 fields.forEach((field, index) => {
                     if (field.type === 'time' || field.name === 'Time') return;
+                    if (records.length >= MAX_REPORT_SERIES) {
+                        truncated += 1;
+                        return;
+                    }
                     const candidates = [
                         field.config?.displayNameFromDS,
                         field.config?.displayName,
@@ -2214,14 +2242,16 @@
                     ].map(value => String(value || '').trim()).filter(Boolean);
                     const name = candidates.find(value => !generic(value)) || candidates[0]
                         || `Серия ${records.length + 1}`;
+                    const record = createRecord(name);
                     const values = columns[index];
                     if (values && typeof values[Symbol.iterator] === 'function') {
-                        for (const value of values) addValue(name, value);
+                        for (const value of values) addValue(record, value);
                     }
+                    retainRecord(record);
                 });
             }
         });
-        return records;
+        return { records, truncated };
     };
 
     const collectResponseFilterVisibleNames = data => {
@@ -2636,67 +2666,145 @@
             pushBoundedDiagnosticEvent(diagnostics, event, 500);
             return event;
         };
+        const reportCycle = { id: 0, active: new Map(), responses: new Map(), failures: [] };
+        const rebuildReportCycleCache = () => {
+            const records = [];
+            const names = [];
+            const tableRecords = [];
+            let truncated = 0;
+            reportCycle.responses.forEach(snapshot => {
+                const available = Math.max(0, 20_000 - records.length);
+                records.push(...snapshot.records.slice(0, available));
+                truncated += snapshot.truncated + Math.max(0, snapshot.records.length - available);
+                names.push(...snapshot.names);
+                tableRecords.push(...snapshot.tableRecords);
+            });
+            visualMetadata.responseReportSeriesStats = records;
+            visualMetadata.responseReportTruncated = truncated;
+            visualMetadata.responseSeriesNames = names.slice(0, 20_000);
+            visualMetadata.responseTableRecords = tableRecords.slice(0, 20_000);
+        };
         const beginRequest = (transport, url) => {
             const requestId = `query_${Date.now()}_${diagnostics.nextEventId + 1}`;
-            diagnostics.activeRequests += 1;
-            if (isDashboardIframe) setPanelDataStatus('loading');
+            if (!reportCycle.active.size) {
+                reportCycle.id += 1;
+                reportCycle.responses.clear();
+                reportCycle.failures = [];
+                visualMetadata.responseFilterEmptyIsNormal = false;
+                if (isDashboardIframe) setPanelDataStatus('loading');
+            }
+            reportCycle.active.set(requestId, { cycleId: reportCycle.id, transport });
+            diagnostics.activeRequests = reportCycle.active.size;
             pushEvent('request-start', { requestId, transport, url: String(url || ''), activeRequests: diagnostics.activeRequests });
             return requestId;
         };
-        const completeRequest = (requestId, transport, outcome) => {
-            diagnostics.activeRequests = Math.max(0, diagnostics.activeRequests - 1);
+        const completeRequest = (requestId, transport, outcome, details = {}) => {
+            const requestState = reportCycle.active.get(requestId);
+            if (!requestState) return;
+            reportCycle.active.delete(requestId);
+            diagnostics.activeRequests = reportCycle.active.size;
             if (['http-error', 'network-error', 'decode-error'].includes(outcome)) {
                 visualMetadata.responseFilterEmptyIsNormal = false;
+                reportCycle.failures.push({ outcome, ...details });
             }
-            if (outcome === 'network-error') setPanelDataStatus('network_error');
-            if (outcome === 'decode-error') setPanelDataStatus('decode_error');
-            if (outcome === 'aborted') setPanelDataStatus('aborted');
             pushEvent('request-complete', { requestId, transport, outcome, activeRequests: diagnostics.activeRequests });
+            if (reportCycle.active.size) return;
+            const failure = reportCycle.failures[0] || null;
+            if (failure?.outcome === 'http-error') setPanelDataStatus('http_error', { httpStatus: failure.httpStatus });
+            else if (failure?.outcome === 'network-error') setPanelDataStatus('network_error');
+            else if (failure?.outcome === 'decode-error') setPanelDataStatus('decode_error');
+            else if (visualMetadata.responseFilterEmptyIsNormal) setPanelDataStatus('filtered_empty');
+            else if (visualMetadata.responseReportSeriesStats.length) setPanelDataStatus('data');
+            else if (reportCycle.responses.size) setPanelDataStatus('empty_source');
+            else if (outcome === 'aborted') setPanelDataStatus('aborted');
+            else setPanelDataStatus('unknown');
             window.dispatchEvent(new Event('dashbridgePanelDataSettled'));
         };
-        const cacheReportResponse = (data, requestBody) => {
+        const cacheReportResponse = (data, requestBody, request, { scoped = false } = {}) => {
             if (!data?.results) return false;
-            const targetRefIds = getTargetQueryRefIds(requestBody);
-            if (!isDashboardIframe && (!targetRefIds || !targetRefIds.size)) return false;
-            const scopedData = createResponseFilterWorkspace(data, targetRefIds).data;
-            visualMetadata.responseReportSeriesStats = collectResponseReportSeriesStats(scopedData);
-            visualMetadata.responseSeriesNames = collectResponseSeriesNames(scopedData);
-            visualMetadata.responseTableRecords = collectResponseTableRecords(scopedData);
-            setPanelDataStatus(visualMetadata.responseReportSeriesStats.length ? 'data' : 'empty_source');
-            window.dispatchEvent(new Event('dashbridgePanelDataSettled'));
+            const requestState = reportCycle.active.get(request?.requestId);
+            if (!requestState || requestState.cycleId !== reportCycle.id) return false;
+            const targetRefIds = scoped ? null : getTargetQueryRefIds(requestBody);
+            if (!scoped && !isDashboardIframe && (!targetRefIds || !targetRefIds.size)) return false;
+            const scopedData = scoped ? data : createResponseFilterWorkspace(data, targetRefIds).data;
+            const reportStats = collectResponseReportSeriesStats(scopedData);
+            const otherRecordCount = [...reportCycle.responses.entries()].reduce((sum, [id, snapshot]) =>
+                sum + (id === request.requestId ? 0 : snapshot.records.length), 0);
+            const otherNameCount = [...reportCycle.responses.entries()].reduce((sum, [id, snapshot]) =>
+                sum + (id === request.requestId ? 0 : snapshot.names.length), 0);
+            const otherTableCount = [...reportCycle.responses.entries()].reduce((sum, [id, snapshot]) =>
+                sum + (id === request.requestId ? 0 : snapshot.tableRecords.length), 0);
+            const recordLimit = Math.max(0, 20_000 - otherRecordCount);
+            const names = collectResponseSeriesNames(scopedData);
+            const tableRecords = collectResponseTableRecords(scopedData);
+            reportCycle.responses.set(request.requestId, {
+                records: reportStats.records.slice(0, recordLimit),
+                truncated: reportStats.truncated + Math.max(0, reportStats.records.length - recordLimit),
+                names: names.slice(0, Math.max(0, 20_000 - otherNameCount)),
+                tableRecords: tableRecords.slice(0, Math.max(0, 20_000 - otherTableCount))
+            });
+            rebuildReportCycleCache();
             return true;
         };
         const observeNativeFetchResponse = (response, requestBody, request) => {
-            let observed = false;
+            let settled = false;
             let body = requestBody;
-            const observe = data => {
-                if (observed) return;
-                observed = true;
-                try { cacheReportResponse(data, body); }
-                catch (error) { pushEvent('report-cache-error', { ...request, reason: error?.message || String(error) }); }
+            let fallbackTimer = null;
+            const settle = (outcome, details) => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(fallbackTimer);
                 body = null;
+                completeRequest(request.requestId, request.transport, outcome, details);
             };
-            const originalJson = response.json?.bind(response);
-            if (originalJson) Object.defineProperty(response, 'json', {
-                configurable: true,
-                value: async () => {
-                    const data = await originalJson();
-                    observe(data);
-                    return data;
+            const observe = data => {
+                if (settled) return;
+                try {
+                    settle(cacheReportResponse(data, body, request) ? 'completed' : 'decode-error');
+                } catch (error) {
+                    pushEvent('report-cache-error', { ...request, reason: error?.message || String(error) });
+                    settle('decode-error');
                 }
-            });
-            const originalText = response.text?.bind(response);
-            if (originalText) Object.defineProperty(response, 'text', {
-                configurable: true,
-                value: async () => {
-                    const text = await originalText();
-                    if (!observed) {
-                        try { observe(JSON.parse(text)); } catch { body = null; }
-                    }
-                    return text;
+            };
+            const decorate = target => {
+                try {
+                    const originalJson = target.json?.bind(target);
+                    if (originalJson) Object.defineProperty(target, 'json', {
+                        configurable: true,
+                        value: async () => {
+                            try {
+                                const data = await originalJson();
+                                observe(data);
+                                return data;
+                            } catch (error) {
+                                settle('decode-error');
+                                throw error;
+                            }
+                        }
+                    });
+                    const originalText = target.text?.bind(target);
+                    if (originalText) Object.defineProperty(target, 'text', {
+                        configurable: true,
+                        value: async () => {
+                            const text = await originalText();
+                            try { observe(JSON.parse(text)); }
+                            catch { settle('decode-error'); }
+                            return text;
+                        }
+                    });
+                    const originalClone = target.clone?.bind(target);
+                    if (originalClone) Object.defineProperty(target, 'clone', {
+                        configurable: true,
+                        value: () => decorate(originalClone())
+                    });
+                } catch (error) {
+                    pushEvent('report-observer-unavailable', { ...request, reason: error?.message || String(error) });
+                    settle('decode-error');
                 }
-            });
-            return response;
+                return target;
+            };
+            fallbackTimer = setTimeout(() => settle('decode-error'), 120_000);
+            return decorate(response);
         };
         const transform = (data, requestBody, request) => {
             archiveResponse(request.requestId, 'decoded-before-transform', data, { transport: request.transport });
@@ -2778,9 +2886,7 @@
             if (!memoryConversionFailed) filterLegendData(scopedData);
             visualMetadata.seriesThresholdHighlightRules = collectThresholdHighlightRules(scopedData);
             visualMetadata.seriesCpuCapacityEntries = collectCpuCapacityEntries(scopedData);
-            visualMetadata.responseTableRecords = collectResponseTableRecords(scopedData);
-            visualMetadata.responseSeriesNames = collectResponseSeriesNames(scopedData);
-            visualMetadata.responseReportSeriesStats = collectResponseReportSeriesStats(scopedData);
+            cacheReportResponse(scopedData, null, request, { scoped: true });
             if (responseSeriesFilterIsEnabled()) {
                 visualMetadata.responseFilterVisibleNames = collectResponseFilterVisibleNames(scopedData);
                 visualMetadata.responseFilterReady = true;
@@ -2805,9 +2911,6 @@
                 && cpuCapacityFilter.afterSeries === 0;
             visualMetadata.responseFilterEmptyIsNormal = afterSeries === 0
                 && (sourceFilterRemovedEverything || cpuFilterRemovedEverything);
-            if (visualMetadata.responseFilterEmptyIsNormal) setPanelDataStatus('filtered_empty');
-            else if (beforeSeries === 0 && afterSeries === 0) setPanelDataStatus('empty_source');
-            else setPanelDataStatus('data');
             diagnostics.last = {
                 at: Date.now(), scope, targetRefIds: targetRefIds === null ? null : [...targetRefIds],
                 resultRefIds, beforeSeries, afterSeries, sourceFilter, cpuCapacityFilter,
@@ -2879,8 +2982,7 @@
                 });
                 if (!response.ok) {
                     pushEvent('query-error', { requestId, transport: 'fetch', status: response.status });
-                    setPanelDataStatus('http_error', { httpStatus: response.status });
-                    completeRequest(requestId, 'fetch', 'http-error');
+                    completeRequest(requestId, 'fetch', 'http-error', { httpStatus: response.status });
                     return response;
                 }
                 if (!transformActive) {
@@ -2903,7 +3005,6 @@
                         scope,
                         targetRefIds: targetRefIds === null ? null : [...targetRefIds],
                     });
-                    completeRequest(requestId, 'fetch', 'completed');
                     return isDashboardIframe
                         ? observeNativeFetchResponse(response, requestBody, { requestId, transport: 'fetch' })
                         : response;
@@ -2923,7 +3024,7 @@
                     }
                     const data = transform(decoded, requestBody, { requestId, transport: 'fetch' });
                     consumeVisualStylesAfterQuery();
-                    completeRequest(requestId, 'fetch', 'transformed');
+                    completeRequest(requestId, 'fetch', json?.results ? 'transformed' : 'decode-error');
                     return window.DashBridgeGrafanaNetwork.createJsonResponse(data, response);
                 } catch (error) {
                     pushEvent('decode-error', { requestId, transport: 'fetch', reason: error.message || String(error) });
@@ -2978,8 +3079,7 @@
                         const outcome = this.status === 0
                             ? (this.__dashbridgeRequestAborted ? 'aborted' : 'network-error')
                             : 'http-error';
-                        if (outcome === 'http-error') setPanelDataStatus('http_error', { httpStatus: this.status });
-                        completeRequest(requestId, 'xhr', outcome);
+                        completeRequest(requestId, 'xhr', outcome, { httpStatus: this.status });
                         return;
                     }
                     const captureRequestMatches = analysisCaptureActive
@@ -3007,9 +3107,10 @@
                             observePanelAnalysisResponse(analysisCapture, decoded.data, body, requestStartedAt);
                         }
                         if (!transformActive) {
-                            if (isDashboardIframe) cacheReportResponse(decoded.data, body);
+                            const cached = isDashboardIframe
+                                ? cacheReportResponse(decoded.data, body, request) : false;
                             consumeVisualStylesAfterQuery();
-                            completeRequest(requestId, 'xhr', 'completed');
+                            completeRequest(requestId, 'xhr', !isDashboardIframe || cached ? 'completed' : 'decode-error');
                             return;
                         }
                         const json = transform(decoded.data, body, request);
@@ -3019,7 +3120,7 @@
                             Object.defineProperty(this, 'responseText', { configurable: true, value: serialized });
                             Object.defineProperty(this, 'response', { configurable: true, value: serialized });
                         }
-                        completeRequest(requestId, 'xhr', 'transformed');
+                        completeRequest(requestId, 'xhr', json?.results ? 'transformed' : 'decode-error');
                     } catch (error) {
                         pushEvent('decode-error', { ...request, reason: error.message || String(error) });
                         completeRequest(requestId, 'xhr', 'decode-error');
@@ -3037,6 +3138,9 @@
     window.__dashbridgePanelToolsMessageHandler && window.removeEventListener(
         'message', window.__dashbridgePanelToolsMessageHandler
     );
+    window.__dashbridgePanelReportSnapshotCancellers?.forEach(cancel => cancel());
+    const panelReportSnapshotCancellers = new Map();
+    window.__dashbridgePanelReportSnapshotCancellers = panelReportSnapshotCancellers;
     window.__dashbridgePanelToolsRuntimeGeneration = (window.__dashbridgePanelToolsRuntimeGeneration || 0) + 1;
     const processPanelToolsMessage = async event => {
         if (event.origin !== extensionOrigin) return;
@@ -3079,6 +3183,11 @@
             window.dispatchEvent(new Event('resize'));
             return;
         }
+        if (event.data?.action === 'cancelPanelReportSnapshot') {
+            const requestId = typeof event.data.requestId === 'string' ? event.data.requestId.slice(0, 160) : '';
+            panelReportSnapshotCancellers.get(requestId)?.();
+            return;
+        }
         if (event.data?.action === 'collectPanelReportSnapshot') {
             const requestId = typeof event.data.requestId === 'string' ? event.data.requestId.slice(0, 160) : '';
             if (!isDashboardIframe || !requestId) return;
@@ -3091,6 +3200,7 @@
                 }) || { state: 'no_data', series: [] };
                 const readySnapshot = () => {
                     const status = window.__dashbridgePanelToolsVisualMetadata?.responseDataStatus?.kind || 'unknown';
+                    if (status === 'loading') return null;
                     const terminalStatuses = new Set([
                         'filtered_empty', 'empty_source', 'http_error', 'network_error', 'decode_error', 'aborted'
                     ]);
@@ -3107,17 +3217,22 @@
                         element.children.length === 0 && /^No data$/i.test(String(element.textContent || '').trim()));
                     return nativeNoData ? current : null;
                 };
+                panelReportSnapshotCancellers.get(requestId)?.();
                 snapshot = await new Promise(resolve => {
                     let settled = false;
                     let timeout = null;
-                    const finish = current => {
-                        if (settled || !current) return;
+                    const finish = (current, force = false) => {
+                        if (settled || (!current && !force)) return;
                         settled = true;
                         clearInterval(poll);
                         clearTimeout(timeout);
                         window.removeEventListener('dashbridgePanelDataSettled', inspect);
+                        if (panelReportSnapshotCancellers.get(requestId) === cancel) {
+                            panelReportSnapshotCancellers.delete(requestId);
+                        }
                         resolve(current);
                     };
+                    const cancel = () => finish(null, true);
                     const inspect = () => finish(readySnapshot());
                     const poll = setInterval(inspect, 500);
                     timeout = setTimeout(() => finish({
@@ -3127,9 +3242,11 @@
                         error: 'Штатный запрос Grafana не завершился за 120 секунд',
                         series: []
                     }), 120_000);
+                    panelReportSnapshotCancellers.set(requestId, cancel);
                     window.addEventListener('dashbridgePanelDataSettled', inspect);
                     inspect();
                 });
+                if (!snapshot) return;
                 snapshot = attachCpuCapacityToReportSnapshot(snapshot, event.data.sla || {});
             } catch (error) {
                 snapshot = { state: 'error', error: String(error?.message || error).slice(0, 480), series: [] };

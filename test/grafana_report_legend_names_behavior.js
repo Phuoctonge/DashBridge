@@ -48,6 +48,8 @@ assert(visualSource.includes('const legendMaxByName = () =>')
     'period Max values must be matched by the final resolved series name');
 assert(toolsSource.includes('legendSeriesNames?.(getTargetPanel())')
     && toolsSource.includes('legendSeriesNames?.(panel)')
-    && toolsSource.includes('visualMetadata.responseSeriesNames = collectResponseSeriesNames(scopedData);'),
+    && toolsSource.includes('const names = collectResponseSeriesNames(scopedData)')
+    && toolsSource.includes('names: names.slice(0, Math.max(0, 20_000 - otherNameCount))')
+    && toolsSource.includes('visualMetadata.responseSeriesNames = names.slice(0, 20_000);'),
     'the series picker and report collector must share one legend-name contract');
 console.log('PASS report snapshots reuse Flot/uPlot legend series names');

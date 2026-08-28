@@ -204,6 +204,7 @@ const panelThresholdWaiters = new Map();
 const panelThresholdStates = new Map();
 const panelTitleWaiters = new Map();
 const panelReportWaiters = new Map();
+let activeReportPreview = null;
 const DASHBRIDGE_REPORT_FRAME_TIMEOUT_MS = 90_000;
 const DASHBRIDGE_REPORT_RESPONSE_TIMEOUT_MS = 125_000;
 
@@ -759,35 +760,51 @@ function getEffectivePanelSla(panel) {
     return { ...config.sla };
 }
 
-function waitForDashboardIframeReady(iframe, timeoutMs = DASHBRIDGE_REPORT_FRAME_TIMEOUT_MS) {
+function reportAbortError() {
+    return new DOMException('Формирование сообщения отменено', 'AbortError');
+}
+
+function throwIfReportAborted(signal) {
+    if (signal?.aborted) throw reportAbortError();
+}
+
+function waitForDashboardIframeReady(iframe, timeoutMs = DASHBRIDGE_REPORT_FRAME_TIMEOUT_MS, signal = null) {
+    throwIfReportAborted(signal);
     if (!iframe?.isConnected) return Promise.reject(new Error('Iframe панели удалён'));
     if (iframe.dataset.dashbridgeLoaded === 'true') return Promise.resolve(iframe);
     return new Promise((resolve, reject) => {
         let settled = false;
+        let frameObserver = null;
+        let removalPoll = null;
+        let timeout = null;
         const finish = error => {
             if (settled) return;
             settled = true;
-            frameObserver.disconnect();
+            frameObserver?.disconnect();
             clearInterval(removalPoll);
             clearTimeout(timeout);
+            signal?.removeEventListener('abort', abort);
             error ? reject(error) : resolve(iframe);
         };
+        const abort = () => finish(reportAbortError());
         const inspect = () => {
             if (!iframe.isConnected) return finish(new Error('Iframe панели удалён во время загрузки'));
             if (iframe.dataset.dashbridgeLoaded === 'true') finish();
         };
-        const frameObserver = new MutationObserver(inspect);
+        frameObserver = new MutationObserver(inspect);
         frameObserver.observe(iframe, { attributes: true, attributeFilter: ['data-dashbridge-loaded'] });
-        const removalPoll = setInterval(inspect, 500);
-        const timeout = setTimeout(
+        removalPoll = setInterval(inspect, 500);
+        timeout = setTimeout(
             () => finish(new Error('Панель не загрузилась за 90 секунд')),
             timeoutMs
         );
+        signal?.addEventListener('abort', abort, { once: true });
         inspect();
     });
 }
 
-async function requestPanelReportSnapshot(panel) {
+async function requestPanelReportSnapshot(panel, signal = null) {
+    throwIfReportAborted(signal);
     if (panel.paused) return Promise.resolve({
         state: 'unavailable', dataStatus: 'paused',
         dataStatusText: 'Панель находится на паузе', error: 'Панель находится на паузе', series: []
@@ -805,8 +822,9 @@ async function requestPanelReportSnapshot(panel) {
         });
     }
     try {
-        await waitForDashboardIframeReady(iframe);
+        await waitForDashboardIframeReady(iframe, DASHBRIDGE_REPORT_FRAME_TIMEOUT_MS, signal);
     } catch (error) {
+        if (signal?.aborted || error?.name === 'AbortError') throw error;
         return {
             state: 'unavailable', dataStatus: 'iframe_unavailable',
             dataStatusText: error.message || 'Iframe панели недоступен',
@@ -814,16 +832,32 @@ async function requestPanelReportSnapshot(panel) {
         };
     }
     const requestId = `panel-report-${panel.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    return new Promise(resolve => {
+    throwIfReportAborted(signal);
+    return new Promise((resolve, reject) => {
         let settled = false;
+        let frameObserver = null;
+        let removalPoll = null;
+        let timeout = null;
         const finish = snapshot => {
             if (settled) return;
             settled = true;
-            frameObserver.disconnect();
+            frameObserver?.disconnect();
             clearInterval(removalPoll);
             clearTimeout(timeout);
+            signal?.removeEventListener('abort', abort);
             panelReportWaiters.delete(requestId);
             resolve(snapshot);
+        };
+        const abort = () => {
+            if (settled) return;
+            settled = true;
+            frameObserver?.disconnect();
+            clearInterval(removalPoll);
+            clearTimeout(timeout);
+            signal?.removeEventListener('abort', abort);
+            panelReportWaiters.delete(requestId);
+            postToDashboardFrame(iframe, { action: 'cancelPanelReportSnapshot', requestId });
+            reject(reportAbortError());
         };
         const inspect = () => {
             if (!iframe.isConnected || iframe.dataset.dashbridgeLoaded !== 'true') {
@@ -834,15 +868,16 @@ async function requestPanelReportSnapshot(panel) {
                 });
             }
         };
-        const frameObserver = new MutationObserver(inspect);
+        frameObserver = new MutationObserver(inspect);
         frameObserver.observe(iframe, { attributes: true, attributeFilter: ['data-dashbridge-loaded'] });
-        const removalPoll = setInterval(inspect, 500);
-        const timeout = setTimeout(() => finish({
+        removalPoll = setInterval(inspect, 500);
+        timeout = setTimeout(() => finish({
             state: 'timeout', dataStatus: 'timeout',
             dataStatusText: 'Панель не ответила за 125 секунд',
             error: 'Панель не ответила за 125 секунд', series: []
         }), DASHBRIDGE_REPORT_RESPONSE_TIMEOUT_MS);
         panelReportWaiters.set(requestId, { iframe, resolve: finish });
+        signal?.addEventListener('abort', abort, { once: true });
         if (!postToDashboardFrame(iframe, { action: 'collectPanelReportSnapshot', requestId, sla })) {
             finish({
                 state: 'unavailable', dataStatus: 'request_error',
@@ -870,22 +905,33 @@ function setDashboardPanelDataStatus(panel, snapshot) {
     wrapper.appendChild(status);
 }
 
-async function generateProfileReport(output, status, warnings) {
+async function generateProfileReport(output, status, warnings, signal = null) {
+    throwIfReportAborted(signal);
     const profile = getActiveProfile();
     const reportPanels = panels.filter(panel => DashBridgeReport.normalizePanel(panel.report, panel).enabled);
     if (!reportPanels.length) throw new Error('В настройках сообщения не выбрана ни одна панель.');
     status.textContent = `Получаем данные панелей: ${reportPanels.length}…`;
     reportPanels.forEach(panel => setDashboardPanelDataStatus(panel, null));
     let completedPanels = 0;
-    const snapshots = await Promise.all(reportPanels.map(async panel => {
-        const snapshot = await requestPanelReportSnapshot(panel);
-        completedPanels += 1;
-        setDashboardPanelDataStatus(panel, snapshot);
-        if (status.isConnected) {
-            status.textContent = `Получаем данные панелей: ${completedPanels} из ${reportPanels.length}…`;
+    const snapshots = new Array(reportPanels.length);
+    let nextPanelIndex = 0;
+    const worker = async () => {
+        while (nextPanelIndex < reportPanels.length) {
+            throwIfReportAborted(signal);
+            const index = nextPanelIndex;
+            nextPanelIndex += 1;
+            const panel = reportPanels[index];
+            const snapshot = await requestPanelReportSnapshot(panel, signal);
+            snapshots[index] = snapshot;
+            completedPanels += 1;
+            setDashboardPanelDataStatus(panel, snapshot);
+            if (status.isConnected) {
+                status.textContent = `Получаем данные панелей: ${completedPanels} из ${reportPanels.length}…`;
+            }
         }
-        return snapshot;
-    }));
+    };
+    await Promise.all(Array.from({ length: Math.min(2, reportPanels.length) }, () => worker()));
+    throwIfReportAborted(signal);
     const context = {
         period: document.getElementById('timePickerLabel')?.textContent?.trim() || `${globalTimeFrom} — ${globalTimeTo}`,
         generatedAt: new Date().toLocaleString('ru-RU')
@@ -907,6 +953,10 @@ async function generateProfileReport(output, status, warnings) {
 }
 
 function openReportPreview() {
+    if (activeReportPreview?.isConnected) {
+        activeReportPreview.querySelector('.report-close')?.focus();
+        return;
+    }
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay report-preview-overlay';
     overlay.innerHTML = `<section class="modal-content report-preview-modal" role="dialog" aria-modal="true">
@@ -917,25 +967,38 @@ function openReportPreview() {
         <div class="modal-actions"><button type="button" class="btn btn-outline report-regenerate">Обновить данные</button><button type="button" class="btn btn-primary report-copy">Скопировать</button></div>
     </section>`;
     document.body.appendChild(overlay); overlay.style.display = 'flex';
+    activeReportPreview = overlay;
     const output = overlay.querySelector('.report-preview-output');
     const status = overlay.querySelector('.report-preview-status');
     const warnings = overlay.querySelector('.report-preview-warnings');
     const regenerate = overlay.querySelector('.report-regenerate');
     let running = false;
+    let runController = null;
     const run = async () => {
         if (running) return;
         running = true;
+        runController = new AbortController();
+        const controller = runController;
         regenerate.disabled = true;
         warnings.hidden = true;
         warnings.textContent = '';
-        try { await generateProfileReport(output, status, warnings); }
-        catch (error) { status.textContent = error.message || String(error); }
+        try { await generateProfileReport(output, status, warnings, controller.signal); }
+        catch (error) {
+            if (error?.name !== 'AbortError' && status.isConnected) status.textContent = error.message || String(error);
+        }
         finally {
-            running = false;
-            if (regenerate.isConnected) regenerate.disabled = false;
+            if (runController === controller) {
+                runController = null;
+                running = false;
+                if (regenerate.isConnected) regenerate.disabled = false;
+            }
         }
     };
-    const close = () => overlay.remove();
+    const close = () => {
+        runController?.abort();
+        if (activeReportPreview === overlay) activeReportPreview = null;
+        overlay.remove();
+    };
     overlay.querySelector('.report-close').addEventListener('click', close);
     overlay.addEventListener('click', event => { if (event.target === overlay) close(); });
     regenerate.addEventListener('click', run);
