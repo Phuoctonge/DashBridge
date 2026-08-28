@@ -1158,6 +1158,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         })
         .catch(error => console.warn('Could not prepare Grafana iframe rules:', error));
+    try {
+        await DashBridgeDataMigration.run();
+    } catch (error) {
+        // Keep the dashboard available. The schema marker is written last, so
+        // the migration is retried without data loss on the next page load.
+        console.error('Не удалось выполнить миграцию данных DashBridge:', error);
+    }
     const [storedSettings] = await Promise.all([
         chrome.storage.sync.get([...new Set([...getGrafanaSettingsStorageKeys(), 'grafanaCompactScreenshot'])]),
         loadProfiles(),
@@ -1338,25 +1345,11 @@ async function loadProfiles() {
     const tabActiveProfileId = getTabActiveProfileId();
     setTabActiveProfileId(profiles.some(profile => profile.id === tabActiveProfileId)
         ? tabActiveProfileId : stored.activeProfileId);
-    const legacyTimeState = DashBridgeTimeState.load();
-    let migratedTimeState = false;
     profiles.forEach(profile => {
-        if (!profile.timeState || typeof profile.timeState !== 'object') {
-            profile.timeState = { ...legacyTimeState };
-            migratedTimeState = true;
-        } else {
-            const normalizedTimeState = DashBridgeTimeState.normalize(profile.timeState);
-            if (profile.timeState.from !== normalizedTimeState.from
-                || profile.timeState.to !== normalizedTimeState.to
-                || profile.timeState.refresh !== normalizedTimeState.refresh) {
-                migratedTimeState = true;
-            }
-            profile.timeState = normalizedTimeState;
-        }
+        profile.timeState = DashBridgeTimeState.normalize(profile.timeState);
     });
     loadActiveProfileTimeState();
     panels = [...(getActiveProfile()?.panels || [])];
-    if (migratedTimeState) await saveProfiles();
     profilesLoaded = true;
     const skipped = (stored.skippedProfiles || 0) + (stored.skippedPanels || 0);
     if (skipped) {
@@ -1422,9 +1415,8 @@ async function syncProfilesFromStorage() {
     const stored = await DashBridgeProfileStore.load();
     if (syncVersion !== profileStorageSyncVersion) return;
     const nextProfiles = stored.profiles;
-    const legacyTimeState = DashBridgeTimeState.load();
     nextProfiles.forEach(profile => {
-        profile.timeState = DashBridgeTimeState.normalize(profile.timeState, legacyTimeState);
+        profile.timeState = DashBridgeTimeState.normalize(profile.timeState);
     });
     // Profile data is shared, but the selected profile belongs to this tab.
     // A save from another DashBridge tab must not navigate the current one.
