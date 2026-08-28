@@ -2,7 +2,8 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-visual-engine.js'), 'utf8');
+const source = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-visual-engine.js'), 'utf8')
+    .replace(/\r\n/g, '\n');
 
 assert(source.includes('const stopThresholdLayoutChanges = chartHost =>')
     && source.includes('controller.observer?.disconnect();')

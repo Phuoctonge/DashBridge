@@ -1,3 +1,13 @@
+function formatTdmExportProgress(message) {
+    const current = Number.isFinite(Number(message.current)) ? Number(message.current) : 0;
+    const hasKnownTotal = message.total !== undefined && message.total !== null
+        && Number.isFinite(Number(message.total));
+    const label = message.text || 'Сбор данных: обработано блоков';
+    return hasKnownTotal
+        ? label + ' ' + current + ' из ' + Number(message.total) + '...'
+        : label + ' ' + current + '...';
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     const photosCheck = document.getElementById("tdmExportPhotos");
     const excludeCheck = document.getElementById("tdmExcludeUserCheckbox");
@@ -132,11 +142,7 @@ async function tdmExport() {
     let photoQueue = Promise.resolve();
     const progressListener = (msg, sender, sendResponse) => {
         if (msg.action === "tdmExportProgress") {
-            if (msg.text) {
-                statusEl.textContent = `${msg.text} ${msg.current} из ${msg.total}...`;
-            } else {
-                statusEl.textContent = `Сбор данных: обработано блоков ${msg.current} из ${msg.total}...`;
-            }
+            statusEl.textContent = formatTdmExportProgress(msg);
         }
         if (msg.action === 'tdmExportPhoto' && msg.exportId === options.photoExportId
             && sender.tab?.id === activeTdmTabId && photoArchive) {
@@ -161,7 +167,7 @@ async function tdmExport() {
         }
         if (tabs[0]) {
             activeTdmTabId = tabs[0].id;
-            chrome.storage.sync.get({ tdmDomain: 'tdm.mos.ru' }, (settings) => {
+            chrome.storage.sync.get({ tdmDomain: 'web.tdm.mos.ru' }, (settings) => {
                 let activeUrl;
                 let tdmUrl;
                 try {
@@ -422,7 +428,7 @@ async function _tdmExportScriptInternal(options) {
                     }
                 }
                 extractedMessages.set(child.id, msgObj);
-                try { chrome.runtime.sendMessage({ action: "tdmExportProgress", current: extractedMessages.size, total: '...', text: "Сбор сообщений:" }); } catch (e) { }
+                try { chrome.runtime.sendMessage({ action: "tdmExportProgress", current: extractedMessages.size, text: "Сбор сообщений:" }); } catch (e) { }
             }
         }
     };

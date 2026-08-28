@@ -55,5 +55,9 @@ assert(optionsSource.includes('const saveError = chrome.runtime.lastError'),
     'Options must not report success when chrome.storage.sync.set fails');
 assert(optionsSource.includes('DashBridgeLocalStateSchema.normalizeCustomButtons(sync.customButtons)'),
     'Options import must validate every custom Grafana button');
+assert(optionsHtml.includes('placeholder="web.tdm.mos.ru"')
+    && optionsSource.includes("tdmDomain: 'web.tdm.mos.ru'")
+    && tdmSource.includes("tdmDomain: 'web.tdm.mos.ru'"),
+    'Options and TDM export must share web.tdm.mos.ru as the default host');
 
 console.log('PASS Options exposes only selected global user defaults with active consumers');

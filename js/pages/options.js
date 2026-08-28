@@ -55,7 +55,7 @@
         const defaults = {
             jiraBaseUrl: 'https://jira.lanit.ru',
             jiraTz: 'local',
-            tdmDomain: 'tdm.mos.ru',
+            tdmDomain: 'web.tdm.mos.ru',
             confluenceScrollFixEnabled: false,
             rememberLastTab: true,
             rememberLastSubTab: true,
@@ -250,7 +250,7 @@
         const memCrit = parseInt(document.getElementById("settingMemCrit").value, 10) || grafanaDefaults.memCritThreshold;
         const jiraInput = document.getElementById("settingJiraUrl").value.trim() || 'https://jira.lanit.ru';
         const jiraTz = document.getElementById("settingJiraTz").value || 'local';
-        const tdmInput = document.getElementById("settingTdmDomain").value.trim() || 'tdm.mos.ru';
+        const tdmInput = document.getElementById("settingTdmDomain").value.trim() || 'web.tdm.mos.ru';
         const tdmExcludeUserTextDefault = document.getElementById("settingTdmExcludeUserTextDefault").value.trim();
         const tplFull = document.getElementById("settingCpuTemplateFull").value || '{server} до {cpu}%';
         const tplTop3 = document.getElementById("settingCpuTemplateTop3").value || 'до {cpu1}% для {server1}, до {cpu2}% для {server2}, для остальных до {cpu3}%';
