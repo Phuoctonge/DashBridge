@@ -71,5 +71,12 @@ assert(core.includes('module_recorder: true')
 assert(html.includes('<rect x="3" y="5" width="18" height="14" rx="3" />')
     && html.includes('<circle cx="9" cy="12" r="3" fill="currentColor" stroke="none" />'),
     'Recorder must use a distinct recording icon instead of the Jira clock');
+const buttonIcon = id => html.match(new RegExp(
+    `<button[^>]*id="${id}"[\\s\\S]*?<svg[^>]*>([\\s\\S]*?)</svg>`
+))?.[1].replace(/\s/g, '');
+assert(buttonIcon('openTrafficRecorderBtn')
+    && buttonIcon('transferWorklogBtn')
+    && buttonIcon('openTrafficRecorderBtn') !== buttonIcon('transferWorklogBtn'),
+    'Traffic Recorder and WorkLog transfer must use distinct action icons');
 
 console.log('PASS popup uses responsive controls, natural tab height and bounded scrolling');
