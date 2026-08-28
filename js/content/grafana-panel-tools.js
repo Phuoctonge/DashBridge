@@ -2746,65 +2746,41 @@
             rebuildReportCycleCache();
             return true;
         };
-        const observeNativeFetchResponse = (response, requestBody, request) => {
+        const decodeNativeFetchResponse = response => response.clone().json();
+        const observeNativeFetchResponse = (
+            response, requestBody, request, analysisCapture = null, requestStartedAt = 0
+        ) => {
             let settled = false;
-            let body = requestBody;
-            let fallbackTimer = null;
             const settle = (outcome, details) => {
                 if (settled) return;
                 settled = true;
-                clearTimeout(fallbackTimer);
-                body = null;
                 completeRequest(request.requestId, request.transport, outcome, details);
             };
-            const observe = data => {
-                if (settled) return;
-                try {
-                    settle(cacheReportResponse(data, body, request) ? 'completed' : 'decode-error');
-                } catch (error) {
-                    pushEvent('report-cache-error', { ...request, reason: error?.message || String(error) });
-                    settle('decode-error');
-                }
-            };
-            const decorate = target => {
-                try {
-                    const originalJson = target.json?.bind(target);
-                    if (originalJson) Object.defineProperty(target, 'json', {
-                        configurable: true,
-                        value: async () => {
-                            try {
-                                const data = await originalJson();
-                                observe(data);
-                                return data;
-                            } catch (error) {
-                                settle('decode-error');
-                                throw error;
-                            }
+            // Consume a clone immediately and leave Grafana's native Response
+            // completely untouched. Decorating json/text/clone changed the
+            // response contract for some datasource clients and could leave a
+            // request marked active until the old 120-second fallback fired.
+            try {
+                decodeNativeFetchResponse(response).then(data => {
+                    try {
+                        if (analysisCapture
+                            && panelAnalysisRequestMatches(analysisCapture, requestBody, requestStartedAt)) {
+                            observePanelAnalysisResponse(analysisCapture, data, requestBody, requestStartedAt);
                         }
-                    });
-                    const originalText = target.text?.bind(target);
-                    if (originalText) Object.defineProperty(target, 'text', {
-                        configurable: true,
-                        value: async () => {
-                            const text = await originalText();
-                            try { observe(JSON.parse(text)); }
-                            catch { settle('decode-error'); }
-                            return text;
-                        }
-                    });
-                    const originalClone = target.clone?.bind(target);
-                    if (originalClone) Object.defineProperty(target, 'clone', {
-                        configurable: true,
-                        value: () => decorate(originalClone())
-                    });
-                } catch (error) {
-                    pushEvent('report-observer-unavailable', { ...request, reason: error?.message || String(error) });
+                        settle(cacheReportResponse(data, requestBody, request) ? 'completed' : 'decode-error');
+                    } catch (error) {
+                        pushEvent('report-cache-error', { ...request, reason: error?.message || String(error) });
+                        settle('decode-error');
+                    }
+                }, error => {
+                    pushEvent('decode-error', { ...request, reason: error?.message || String(error) });
                     settle('decode-error');
-                }
-                return target;
-            };
-            fallbackTimer = setTimeout(() => settle('decode-error'), 120_000);
-            return decorate(response);
+                });
+            } catch (error) {
+                pushEvent('report-observer-unavailable', { ...request, reason: error?.message || String(error) });
+                settle('decode-error');
+            }
+            return response;
         };
         const transform = (data, requestBody, request) => {
             archiveResponse(request.requestId, 'decoded-before-transform', data, { transport: request.transport });
@@ -2987,9 +2963,10 @@
                 }
                 if (!transformActive) {
                     const requestBody = await requestBodyPromise;
-                    if (analysisCaptureActive && panelAnalysisRequestMatches(analysisCapture, requestBody, requestStartedAt)) {
+                    if (!isDashboardIframe && analysisCaptureActive
+                        && panelAnalysisRequestMatches(analysisCapture, requestBody, requestStartedAt)) {
                         try {
-                            const decoded = await response.clone().json();
+                            const decoded = await decodeNativeFetchResponse(response);
                             observePanelAnalysisResponse(analysisCapture, decoded, requestBody, requestStartedAt);
                         } catch { /* DOM fallback remains available when a datasource response is not JSON. */ }
                     }
@@ -3006,7 +2983,10 @@
                         targetRefIds: targetRefIds === null ? null : [...targetRefIds],
                     });
                     return isDashboardIframe
-                        ? observeNativeFetchResponse(response, requestBody, { requestId, transport: 'fetch' })
+                        ? observeNativeFetchResponse(
+                            response, requestBody, { requestId, transport: 'fetch' },
+                            analysisCaptureActive ? analysisCapture : null, requestStartedAt
+                        )
                         : response;
                 }
                 let originalResponseText = null;
@@ -3024,7 +3004,7 @@
                     }
                     const data = transform(decoded, requestBody, { requestId, transport: 'fetch' });
                     consumeVisualStylesAfterQuery();
-                    completeRequest(requestId, 'fetch', json?.results ? 'transformed' : 'decode-error');
+                    completeRequest(requestId, 'fetch', data?.results ? 'transformed' : 'decode-error');
                     return window.DashBridgeGrafanaNetwork.createJsonResponse(data, response);
                 } catch (error) {
                     pushEvent('decode-error', { requestId, transport: 'fetch', reason: error.message || String(error) });

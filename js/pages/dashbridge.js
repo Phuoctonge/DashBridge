@@ -913,24 +913,16 @@ async function generateProfileReport(output, status, warnings, signal = null) {
     status.textContent = `Получаем данные панелей: ${reportPanels.length}…`;
     reportPanels.forEach(panel => setDashboardPanelDataStatus(panel, null));
     let completedPanels = 0;
-    const snapshots = new Array(reportPanels.length);
-    let nextPanelIndex = 0;
-    const worker = async () => {
-        while (nextPanelIndex < reportPanels.length) {
-            throwIfReportAborted(signal);
-            const index = nextPanelIndex;
-            nextPanelIndex += 1;
-            const panel = reportPanels[index];
-            const snapshot = await requestPanelReportSnapshot(panel, signal);
-            snapshots[index] = snapshot;
-            completedPanels += 1;
-            setDashboardPanelDataStatus(panel, snapshot);
-            if (status.isConnected) {
-                status.textContent = `Получаем данные панелей: ${completedPanels} из ${reportPanels.length}…`;
-            }
+    const snapshots = await Promise.all(reportPanels.map(async panel => {
+        throwIfReportAborted(signal);
+        const snapshot = await requestPanelReportSnapshot(panel, signal);
+        completedPanels += 1;
+        setDashboardPanelDataStatus(panel, snapshot);
+        if (status.isConnected) {
+            status.textContent = `Получаем данные панелей: ${completedPanels} из ${reportPanels.length}…`;
         }
-    };
-    await Promise.all(Array.from({ length: Math.min(2, reportPanels.length) }, () => worker()));
+        return snapshot;
+    }));
     throwIfReportAborted(signal);
     const context = {
         period: document.getElementById('timePickerLabel')?.textContent?.trim() || `${globalTimeFrom} — ${globalTimeTo}`,

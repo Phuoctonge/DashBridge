@@ -81,14 +81,22 @@ assert.strictEqual(bounded.truncated, 1, 'the cache must report every omitted se
 assert(!Object.prototype.hasOwnProperty.call(bounded.records[0], 'values'),
     'the cache must retain aggregates rather than complete point arrays');
 
-assert(toolsSource.includes('const observeNativeFetchResponse = (response, requestBody, request) =>')
+assert(toolsSource.includes('const observeNativeFetchResponse = (')
     && toolsSource.includes('isDashboardIframe || transformActive')
-    && toolsSource.includes('cacheReportResponse(decoded.data, body, request)')
+    && toolsSource.includes('const decodeNativeFetchResponse = response => response.clone().json();')
+    && toolsSource.includes('decodeNativeFetchResponse(response).then(data =>')
+    && toolsSource.includes('cacheReportResponse(data, requestBody, request)')
+    && !toolsSource.includes("Object.defineProperty(target, 'json'")
+    && !toolsSource.includes("Object.defineProperty(target, 'clone'")
+    && !toolsSource.includes("fallbackTimer = setTimeout(() => settle('decode-error'), 120_000)")
     && toolsSource.includes("if (status === 'loading') return null;")
     && toolsSource.includes('reportCycle.active.size')
     && !toolsSource.includes('refreshSelectedPanelData(targetPanel')
     && !toolsSource.includes('dashbridgePanelReportDataCaptured'),
     'report generation must passively observe the iframe\'s normal datasource request without refreshing it');
+assert(toolsSource.includes("completeRequest(requestId, 'fetch', data?.results ? 'transformed' : 'decode-error');")
+    && !toolsSource.includes("completeRequest(requestId, 'fetch', json?.results ? 'transformed' : 'decode-error');"),
+    'a successful fetch transform must return the filtered response instead of falling back after a ReferenceError');
 assert(visualSource.includes("engine = 'response'")
     && visualSource.includes('responseReportSeriesStats')
     && visualSource.includes('evaluateStats(record.stats)')

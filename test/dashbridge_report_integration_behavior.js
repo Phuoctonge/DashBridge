@@ -23,8 +23,11 @@ assert(tools.includes("event.data?.action === 'collectPanelReportSnapshot'")
     && tools.includes('snapshot = attachCpuCapacityToReportSnapshot(snapshot, event.data.sla || {});'),
     'Grafana MAIN runtime must expose a bounded report snapshot command');
 assert(tools.includes('const collectResponseReportSeriesStats = data =>')
-    && tools.includes('const observeNativeFetchResponse = (response, requestBody, request) =>')
-    && tools.includes('cacheReportResponse(decoded.data, body, request)')
+    && tools.includes('const observeNativeFetchResponse = (')
+    && tools.includes('const decodeNativeFetchResponse = response => response.clone().json();')
+    && tools.includes('decodeNativeFetchResponse(response).then(data =>')
+    && tools.includes('cacheReportResponse(data, requestBody, request)')
+    && !tools.includes("Object.defineProperty(target, 'json'")
     && !tools.includes('refreshSelectedPanelData(targetPanel')
     && !tools.includes('dashbridgePanelReportDataCaptured'),
     'report generation must observe normal datasource traffic without issuing a refresh or depending on chart DOM');
@@ -64,11 +67,12 @@ assert(reportRequestSource.includes("iframe.dataset.dashbridgeLoaded === 'true'"
     'report collection must allow slow Grafana iframes while retaining bounded failure results');
 assert(reportRequestSource.includes("action: 'cancelPanelReportSnapshot'")
     && reportRequestSource.includes("signal?.addEventListener('abort', abort, { once: true })")
-    && dashboard.includes('Math.min(2, reportPanels.length)')
+    && dashboard.includes('Promise.all(reportPanels.map(async panel =>')
+    && !dashboard.includes('Math.min(2, reportPanels.length)')
     && dashboard.includes('runController?.abort()')
     && tools.includes("event.data?.action === 'cancelPanelReportSnapshot'")
     && tools.includes('panelReportSnapshotCancellers.delete(requestId)'),
-    'closing a report must release parent and iframe waiters while panel collection stays concurrency-bounded');
+    'closing a report must release all waiters while panels share one parallel timeout window');
 assert(dashboard.includes('function setDashboardPanelDataStatus(panel, snapshot)')
     && dashboard.includes("new Set(['timeout', 'iframe_unavailable', 'request_error', 'configuration_error'])")
     && css.includes('.dashbridge-panel-data-status'),
