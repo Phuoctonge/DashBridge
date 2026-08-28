@@ -1,22 +1,45 @@
 // Isolates navigation and renderer readiness in the temporary Grafana tab.
 function createBatchPanelLoader({ log }) {
     const waitForPanelInMainWorld = panelId => new Promise(resolve => {
-        let attempts = 0;
         let previousRect = null;
         let stableFrames = 0;
-        const timer = setInterval(() => {
-            attempts++;
+        let frame = 0;
+        let timeout = null;
+        let observer = null;
+        let resizeObserver = null;
+        let observedPanel = null;
+        let settled = false;
+        let preparingCapture = false;
+        const cleanup = () => {
+            clearTimeout(timeout);
+            if (frame) cancelAnimationFrame(frame);
+            observer?.disconnect();
+            resizeObserver?.disconnect();
+        };
+        const finish = value => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            resolve(value);
+        };
+        const schedule = () => {
+            if (settled || frame) return;
+            frame = requestAnimationFrame(inspect);
+        };
+        const inspect = () => {
+            frame = 0;
+            if (preparingCapture) return;
             const panel = window.DashBridgeGrafanaDom?.findPanelById(panelId) || null;
             const loading = document.querySelectorAll('.panel-loading, [data-testid="spinner"]').length > 0;
-            if (attempts > 120) {
-                clearInterval(timer);
-                resolve(null);
-                return;
-            }
             if (loading || !panel) {
                 stableFrames = 0;
                 previousRect = null;
                 return;
+            }
+            if (observedPanel !== panel) {
+                resizeObserver?.disconnect();
+                observedPanel = panel;
+                resizeObserver?.observe(panel);
             }
             const rect = panel.getBoundingClientRect();
             if (rect.width <= 5 || rect.height <= 10) return;
@@ -26,8 +49,11 @@ function createBatchPanelLoader({ log }) {
             if (previousRect && currentRect.every((value, index) => value === previousRect[index])) stableFrames++;
             else stableFrames = 0;
             previousRect = currentRect;
-            if (stableFrames < 1) return;
-            clearInterval(timer);
+            if (stableFrames < 1) {
+                schedule();
+                return;
+            }
+            preparingCapture = true;
             let style = document.getElementById('dashbridge-batch-capture-style');
             if (!style) {
                 style = document.createElement('style');
@@ -77,11 +103,19 @@ function createBatchPanelLoader({ log }) {
             document.activeElement?.blur?.();
             requestAnimationFrame(() => requestAnimationFrame(() => {
                 const finalPanel = window.DashBridgeGrafanaDom?.findPanelById(panelId) || null;
-                if (!finalPanel) return resolve(null);
+                if (!finalPanel) return finish(null);
                 const finalRect = finalPanel.getBoundingClientRect();
-                resolve({ x: finalRect.x, y: finalRect.y, w: finalRect.width, h: finalRect.height, dpr: window.devicePixelRatio });
+                finish({ x: finalRect.x, y: finalRect.y, w: finalRect.width, h: finalRect.height, dpr: window.devicePixelRatio });
             }));
-        }, 250);
+        };
+        observer = new MutationObserver(schedule);
+        observer.observe(document.documentElement, {
+            childList: true, subtree: true, attributes: true,
+            attributeFilter: ['class', 'style', 'width', 'height']
+        });
+        resizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(schedule) : null;
+        timeout = setTimeout(() => finish(null), 30_000);
+        schedule();
     });
 
     return async (tabId, url, panelId, _seriesFilter, previousSeriesFilter = null, panelTools = null, signal = null) => {
@@ -110,15 +144,52 @@ function createBatchPanelLoader({ log }) {
 
         return new Promise(resolve => {
             let settled = false;
-            let readinessTimer = null;
+            let readinessTimeout = null;
+            let preparing = false;
             const finish = value => {
                 if (settled) return;
                 settled = true;
-                if (readinessTimer) clearInterval(readinessTimer);
+                clearTimeout(readinessTimeout);
+                chrome.tabs.onUpdated.removeListener(onUpdated);
                 signal?.removeEventListener('abort', abort);
                 resolve(value);
             };
             const abort = () => finish(false);
+            const prepareCompleteTab = async currentTab => {
+                if (settled || preparing || currentTab?.status !== 'complete') return;
+                preparing = true;
+                try {
+                    if (panelTools) {
+                        const refresh = panelTools.invertIdle === true || panelTools.convertMemToUsed === true;
+                        const applied = await applySharedGrafanaPanelTools(panelTools, { tabId, refresh });
+                        if (!applied?.ok) {
+                            log(`Не удалось применить настройки панели ${panelId}: ${applied?.reason || 'неизвестная ошибка'}`, true);
+                            finish(null);
+                            return;
+                        }
+                    }
+                    if (signal?.aborted) return finish(false);
+                    await chrome.scripting.executeScript({ target: { tabId }, world: 'MAIN', files: ['js/content/grafana-dom.js'] });
+                    const results = await chrome.scripting.executeScript({
+                        target: { tabId },
+                        world: 'MAIN',
+                        func: waitForPanelInMainWorld,
+                        args: [panelId]
+                    });
+                    finish(results?.[0]?.result || null);
+                } catch (error) {
+                    if (!signal?.aborted) log(`Не удалось подготовить панель ${panelId}: ${error.message}`, true);
+                    finish(null);
+                }
+            };
+            const onUpdated = (updatedTabId, changeInfo, currentTab) => {
+                if (updatedTabId !== tabId || settled) return;
+                if (changeInfo.status === 'complete' || currentTab?.status === 'complete') {
+                    void prepareCompleteTab(currentTab);
+                }
+            };
+            chrome.tabs.onUpdated.addListener(onUpdated);
+            readinessTimeout = setTimeout(() => finish(false), 30_000);
             signal?.addEventListener('abort', abort, { once: true });
 
             chrome.tabs.get(tabId, async tab => {
@@ -130,48 +201,14 @@ function createBatchPanelLoader({ log }) {
                 if (current.toString() !== target.toString()) {
                     target.searchParams.set('_t', Date.now());
                     try {
-                        await chrome.tabs.update(tabId, { url: target.toString() });
+                        const updatedTab = await chrome.tabs.update(tabId, { url: target.toString() });
+                        void prepareCompleteTab(updatedTab);
                     } catch {
                         finish(false);
-                        return;
                     }
+                    return;
                 }
-                let attempts = 0;
-                readinessTimer = setInterval(() => chrome.tabs.get(tabId, currentTab => {
-                    if (settled) return;
-                    if (chrome.runtime.lastError || !currentTab || signal?.aborted) return finish(false);
-                    if (currentTab.status !== 'complete') {
-                        if (++attempts >= 120) finish(false);
-                        return;
-                    }
-                    clearInterval(readinessTimer);
-                    readinessTimer = null;
-                    void (async () => {
-                        try {
-                            if (panelTools) {
-                                const refresh = panelTools.invertIdle === true || panelTools.convertMemToUsed === true;
-                                const applied = await applySharedGrafanaPanelTools(panelTools, { tabId, refresh });
-                                if (!applied?.ok) {
-                                    log(`Не удалось применить настройки панели ${panelId}: ${applied?.reason || 'неизвестная ошибка'}`, true);
-                                    finish(null);
-                                    return;
-                                }
-                            }
-                            if (signal?.aborted) return finish(false);
-                            await chrome.scripting.executeScript({ target: { tabId }, world: 'MAIN', files: ['js/content/grafana-dom.js'] });
-                            const results = await chrome.scripting.executeScript({
-                                target: { tabId },
-                                world: 'MAIN',
-                                func: waitForPanelInMainWorld,
-                                args: [panelId]
-                            });
-                            finish(results?.[0]?.result || null);
-                        } catch (error) {
-                            if (!signal?.aborted) log(`Не удалось подготовить панель ${panelId}: ${error.message}`, true);
-                            finish(null);
-                        }
-                    })();
-                }), 250);
+                void prepareCompleteTab(tab);
             });
         });
     };

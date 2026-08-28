@@ -31,7 +31,8 @@ checks = {
     "batch uses the shared panel lookup": "files: ['js/content/grafana-dom.js']" in BATCH_LOADER
         and "window.DashBridgeGrafanaDom?.findPanelById(panelId)" in BATCH_LOADER,
     "batch never falls back to an arbitrary panel": '[class*="panel-container"]' not in BATCH_LOADER,
-    "batch fails safely when panel loading times out": "attempts > 120" in BATCH_LOADER and "resolve(null)" in BATCH_LOADER,
+    "batch fails safely when panel loading times out": "setTimeout(() => finish(null), 30_000)" in BATCH_LOADER
+        and "observer = new MutationObserver(schedule)" in BATCH_LOADER,
     "batch crops captured screenshots": "captureGrafanaPanelImage" in BATCH and "drawImage(image, x, y, width, height" in (ROOT / "js/shared/grafana-panel-capture.js").read_text(encoding="utf-8"),
     "batch crop stays within the captured image": "image.naturalWidth - x" in (ROOT / "js/shared/grafana-panel-capture.js").read_text(encoding="utf-8")
         and "image.naturalHeight - y" in (ROOT / "js/shared/grafana-panel-capture.js").read_text(encoding="utf-8"),

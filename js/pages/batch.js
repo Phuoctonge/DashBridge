@@ -755,11 +755,8 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const waitForCapturedSeries = (tabId, token, timeoutMs = 45000, signal = null) => new Promise((resolve, reject) => {
-        const startedAt = Date.now();
         let settled = false;
-        let polling = false;
         const cleanup = () => {
-            clearInterval(timer);
             signal?.removeEventListener('abort', abort);
         };
         const succeed = value => {
@@ -774,41 +771,74 @@ document.addEventListener("DOMContentLoaded", () => {
             cleanup();
             reject(error);
         };
-        const abort = () => fail(new DOMException('Batch run cancelled', 'AbortError'));
-        const timer = setInterval(async () => {
-            if (settled || polling) return;
-            polling = true;
-            try {
-                const results = await chrome.scripting.executeScript({
-                    target: { tabId }, world: 'MAIN', args: [token],
-                    func: expectedToken => {
-                        const capture = window.__dashBridgeSeriesCapture;
-                        return capture?.token === expectedToken ? capture : null;
-                    }
-                });
-                const capture = results?.[0]?.result;
-                const names = capture?.names;
-                const settledAfterMatch = capture?.lastMatchAt && Date.now() - capture.lastMatchAt >= 400;
-                const coverageComplete = !capture?.expectedCount || capture.matchedIdentities?.length >= capture.expectedCount;
-                if (Array.isArray(names) && settledAfterMatch && coverageComplete) {
-                    succeed(names);
-                } else if (Date.now() - startedAt > timeoutMs) {
-                    const debug = capture?.debug;
-                    const reason = !capture
-                        ? 'перехватчик DashBridge не запустился'
-                        : !debug?.requests
-                            ? 'Grafana не выполнила запрос данных во временной вкладке'
-                            : 'ответы Grafana не совпали с запросами выбранной панели';
-                    fail(new Error(`${reason} (запросов: ${debug?.requests || 0}, совпадений: ${debug?.matched || 0})`));
-                }
-            } catch (error) {
-                fail(error);
-            } finally {
-                polling = false;
-            }
-        }, 250);
+        const abort = () => {
+            void chrome.scripting.executeScript({
+                target: { tabId }, world: 'MAIN', args: [token],
+                func: expectedToken => window.dispatchEvent(new CustomEvent('dashbridgeSeriesCaptureCancelled', {
+                    detail: { token: expectedToken }
+                }))
+            }).catch(() => undefined);
+            fail(new DOMException('Batch run cancelled', 'AbortError'));
+        };
         if (signal?.aborted) abort();
         else signal?.addEventListener('abort', abort, { once: true });
+        chrome.scripting.executeScript({
+            target: { tabId }, world: 'MAIN', args: [token, timeoutMs],
+            func: (expectedToken, budgetMs) => new Promise(resolveInPage => {
+                let done = false;
+                let settleTimer = null;
+                const finish = result => {
+                    if (done) return;
+                    done = true;
+                    clearTimeout(deadlineTimer);
+                    clearTimeout(settleTimer);
+                    window.removeEventListener('dashbridgeSeriesCaptureUpdated', onUpdate);
+                    window.removeEventListener('dashbridgeSeriesCaptureCancelled', onCancel);
+                    resolveInPage(result);
+                };
+                const inspect = () => {
+                    if (done) return;
+                    const capture = window.__dashBridgeSeriesCapture;
+                    if (capture?.token !== expectedToken) return;
+                    const names = capture.names;
+                    const coverageComplete = !capture.expectedCount
+                        || capture.matchedIdentities?.length >= capture.expectedCount;
+                    if (!Array.isArray(names) || !coverageComplete || !capture.lastMatchAt) return;
+                    const settleWait = Math.max(0, 400 - (Date.now() - capture.lastMatchAt));
+                    clearTimeout(settleTimer);
+                    if (settleWait > 0) settleTimer = setTimeout(inspect, settleWait);
+                    else finish({ ok: true, names });
+                };
+                const onUpdate = event => {
+                    if (event.detail?.token === expectedToken) inspect();
+                };
+                const onCancel = event => {
+                    if (event.detail?.token === expectedToken) finish({ ok: false, cancelled: true });
+                };
+                const deadlineTimer = setTimeout(() => {
+                    const capture = window.__dashBridgeSeriesCapture;
+                    finish({ ok: false, capture: capture?.token === expectedToken ? capture : null });
+                }, Math.max(1, Number(budgetMs) || 45_000));
+                window.addEventListener('dashbridgeSeriesCaptureUpdated', onUpdate);
+                window.addEventListener('dashbridgeSeriesCaptureCancelled', onCancel);
+                inspect();
+            })
+        }).then(results => {
+            if (settled) return;
+            const result = results?.[0]?.result;
+            if (result?.ok && Array.isArray(result.names)) {
+                succeed(result.names);
+                return;
+            }
+            const capture = result?.capture;
+            const debug = capture?.debug;
+            const reason = !capture
+                ? 'перехватчик DashBridge не запустился'
+                : !debug?.requests
+                    ? 'Grafana не выполнила запрос данных во временной вкладке'
+                    : 'ответы Grafana не совпали с запросами выбранной панели';
+            fail(new Error(`${reason} (запросов: ${debug?.requests || 0}, совпадений: ${debug?.matched || 0})`));
+        }).catch(fail);
     });
 
     const discoverSeriesForSlice = async ({ dashboardUrl, panelId, range, signatures, tabId = null, signal = null, onTabId = null, discoveryWindowId = null }) => {

@@ -53,7 +53,10 @@ check('Rule loading ignores stale URL responses', 'batchPanelRulesLoadVersion' i
 check('Cancel button is explicitly hidden outside an active run', '#cancelBtn[hidden]' in CSS and 'setProcessing(false)' in JS)
 check('Grafana base paths are preserved for dashboard API calls', 'basePath' in (ROOT / 'js/shared/grafana-url.js').read_text(encoding='utf-8'))
 check('Exact Batch capture cannot fall back to a different panel', 'targetPanelId === null' in (ROOT / 'js/shared/grafana-panel-capture.js').read_text(encoding='utf-8'))
-check('Batch waits for aggregated Series responses to settle', 'settledAfterMatch' in JS and 'state.batches' in (ROOT / 'js/content/grafana-series-capture.js').read_text(encoding='utf-8'))
+check('Batch waits for aggregated Series responses to settle',
+      'const settleWait = Math.max(0, 400 - (Date.now() - capture.lastMatchAt))' in JS
+      and "window.addEventListener('dashbridgeSeriesCaptureUpdated', onUpdate)" in JS
+      and 'state.batches' in (ROOT / 'js/content/grafana-series-capture.js').read_text(encoding='utf-8'))
 check('Batch filters actual Series names by include and ignore patterns',
       'BatchSeriesSelection.resolvePatterns(discovery.names, includePattern, ignorePattern)' in JS
       and 'id="seriesIncludeFilter"' in HTML and 'id="seriesIgnoreFilter"' in HTML)

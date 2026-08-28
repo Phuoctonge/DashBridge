@@ -10,6 +10,10 @@ const params = new URLSearchParams({
     dashbridgeSeriesTargets: JSON.stringify(signatures)
 });
 const responses = [];
+const captureEvents = [];
+class FakeCustomEvent {
+    constructor(type, options = {}) { this.type = type; this.detail = options.detail; }
+}
 class FakeRequest {}
 class FakeXhr {}
 FakeXhr.prototype.open = function () {};
@@ -18,8 +22,10 @@ FakeXhr.prototype.addEventListener = function () {};
 const context = {
     URLSearchParams,
     Request: FakeRequest,
+    CustomEvent: FakeCustomEvent,
     XMLHttpRequest: FakeXhr,
     location: { search: `?${params}` },
+    dispatchEvent: event => { captureEvents.push(event); return true; },
     fetch: async () => {
         const data = responses.shift();
         return { clone: () => ({ json: async () => data }) };
@@ -39,5 +45,9 @@ const frame = names => ({ frames: [{ schema: { fields: [{ name: 'Time', type: 't
     await new Promise(resolve => setTimeout(resolve, 0));
     assert.deepStrictEqual(JSON.parse(JSON.stringify(context.__dashBridgeSeriesCapture.names)), ['same', 'same', 'other']);
     assert.strictEqual(context.__dashBridgeSeriesCapture.debug.matched, 2);
+    assert.deepStrictEqual(captureEvents.map(event => [event.type, event.detail.token]), [
+        ['dashbridgeSeriesCaptureUpdated', 'test-token'],
+        ['dashbridgeSeriesCaptureUpdated', 'test-token']
+    ]);
     console.log('[OK] Grafana Series capture aggregates responses and preserves duplicates');
 })().catch(error => { console.error(error); process.exit(1); });

@@ -29,6 +29,8 @@
         window.__dashbridgeThresholdReadyObserver = null;
         window.__dashbridgeChartReadyObserver?.disconnect();
         window.__dashbridgeChartReadyObserver = null;
+        window.__dashbridgeChartReadyCancel?.();
+        window.__dashbridgeChartReadyCancel = null;
         window.__dashbridgeCalculatedTitleObserver?.disconnect();
         window.__dashbridgeCalculatedTitleObserver = null;
         if (typeof window.__dashbridgeThresholdDataListener === 'function') {
@@ -1649,10 +1651,24 @@
     // Grafana can report document readiness before its legend is complete.
     // Observe the mount and apply visual work once the chart structure agrees.
     const applyPopupVisualEngineWhenReady = () => new Promise(resolve => {
-        window.__dashbridgeChartReadyObserver?.disconnect();
+        window.__dashbridgeChartReadyCancel?.();
         let applying = false;
         let legendLayoutApplied = false;
         let legendLayoutApplying = false;
+        let settled = false;
+        let timeout = null;
+        const finish = () => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timeout);
+            window.__dashbridgeChartReadyObserver?.disconnect();
+            window.__dashbridgeChartReadyObserver = null;
+            if (window.__dashbridgeChartReadyCancel === finish) {
+                window.__dashbridgeChartReadyCancel = null;
+            }
+            resolve();
+        };
+        window.__dashbridgeChartReadyCancel = finish;
         const applyLegendLayoutBeforeChart = async targetPanel => {
             if (legendLayoutApplied || legendLayoutApplying) return;
             const root = window.DashBridgeGrafanaDom?.outerPanel(targetPanel) || targetPanel || document;
@@ -1669,16 +1685,24 @@
             }
         };
         const tryApply = async () => {
-            if (applying) return;
+            if (applying || settled) return;
             const targetPanel = getTargetPanel();
             const root = window.DashBridgeGrafanaDom?.outerPanel(targetPanel) || targetPanel || document;
             if (!isVisualEngineReady(targetPanel, root)) {
+                const renderedTable = Array.from(root.querySelectorAll?.('table,[role="table"],[role="grid"]') || [])
+                    .some(element => !element.closest?.('.graph-legend,.u-legend,[class*="legend" i]'));
+                const chartSurface = root.querySelector?.('canvas,.flot-base,.uplot,.graph-panel__chart');
+                // Table panels never mount a chart renderer. Waiting for one
+                // leaves a document-wide observer alive and delays the command
+                // until the outer 20-second bridge timeout.
+                if (renderedTable && !chartSurface) {
+                    finish();
+                    return;
+                }
                 await applyLegendLayoutBeforeChart(targetPanel);
                 return;
             }
             applying = true;
-            window.__dashbridgeChartReadyObserver?.disconnect();
-            window.__dashbridgeChartReadyObserver = null;
             const visualLegendFilter = getVisualLegendFilter(tools);
             const hidden = new Set((visualLegendFilter || []).map(name => String(name)));
             const seriesConfig = Object.fromEntries(getLegendSeries().map(name => [name, !hidden.has(name)]));
@@ -1700,12 +1724,13 @@
                 });
             }
             await startThresholdReporting();
-            resolve();
+            finish();
         };
         window.__dashbridgeChartReadyObserver = new MutationObserver(() => { void tryApply(); });
         window.__dashbridgeChartReadyObserver.observe(document.documentElement, {
             childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'width', 'height']
         });
+        timeout = setTimeout(finish, 18_000);
         void tryApply();
     });
 
@@ -2462,6 +2487,15 @@
         }
     };
 
+    let calculatedTitleFrame = 0;
+    const scheduleCalculatedTitleSync = () => {
+        if (calculatedTitleFrame) return;
+        calculatedTitleFrame = requestAnimationFrame(() => {
+            calculatedTitleFrame = 0;
+            markCalculatedTitle();
+            syncPanelDataStatusPresentation();
+        });
+    };
     const observeCalculatedTitle = () => {
         const observerRequired = !!tools.invertIdle || !!tools.convertMemToUsed
             || !!tools.cpuCapacityFilterEnabled || !!tools.seriesQueryFilterEnabled;
@@ -2471,18 +2505,21 @@
         if (!observerRequired) {
             existing?.disconnect();
             window.__dashbridgeCalculatedTitleObserver = null;
+            if (calculatedTitleFrame) cancelAnimationFrame(calculatedTitleFrame);
+            calculatedTitleFrame = 0;
             return;
         }
         if (existing && existing._dashbridgeActive) return;
         existing?.disconnect();
-        const obs = new MutationObserver(() => {
-            markCalculatedTitle();
-            syncPanelDataStatusPresentation();
-        });
+        const obs = new MutationObserver(scheduleCalculatedTitleSync);
         obs._dashbridgeActive = true;
         obs.observe(document.documentElement, { subtree: true, childList: true });
         window.__dashbridgeCalculatedTitleObserver = obs;
     };
+    registerRuntimeCleanup(() => {
+        if (calculatedTitleFrame) cancelAnimationFrame(calculatedTitleFrame);
+        calculatedTitleFrame = 0;
+    });
 
     // Monkey-patching (перехват сети): мы подменяем оригинальные window.fetch и XMLHttpRequest.
     // Это позволяет нам "на лету" перехватывать JSON-ответы от сервера Grafana (/api/ds/query) 
@@ -3041,12 +3078,15 @@
                 snapshot = await new Promise(resolve => {
                     let settled = false;
                     let timeout = null;
+                    let dataObserver = null;
+                    let inspectFrame = 0;
                     const finish = (current, force = false) => {
                         if (settled || (!current && !force)) return;
                         settled = true;
-                        clearInterval(poll);
                         clearTimeout(timeout);
-                        window.removeEventListener('dashbridgePanelDataSettled', inspect);
+                        if (inspectFrame) cancelAnimationFrame(inspectFrame);
+                        dataObserver?.disconnect();
+                        window.removeEventListener('dashbridgePanelDataSettled', scheduleInspect);
                         if (panelReportSnapshotCancellers.get(requestId) === cancel) {
                             panelReportSnapshotCancellers.delete(requestId);
                         }
@@ -3054,16 +3094,32 @@
                     };
                     const cancel = () => finish(null, true);
                     const inspect = () => finish(readySnapshot());
-                    const poll = setInterval(inspect, 500);
+                    const scheduleInspect = () => {
+                        if (inspectFrame || settled) return;
+                        inspectFrame = requestAnimationFrame(() => {
+                            inspectFrame = 0;
+                            inspect();
+                        });
+                    };
+                    const requestedTimeout = Number(event.data.timeoutMs);
+                    const reportTimeoutMs = Number.isFinite(requestedTimeout)
+                        ? Math.max(1, Math.min(120_000, requestedTimeout))
+                        : 120_000;
                     timeout = setTimeout(() => finish({
                         state: 'timeout',
                         dataStatus: 'timeout',
-                        dataStatusText: 'Штатный запрос Grafana не завершился за 120 секунд',
-                        error: 'Штатный запрос Grafana не завершился за 120 секунд',
+                        dataStatusText: 'Штатный запрос Grafana не завершился в отведённое время',
+                        error: 'Штатный запрос Grafana не завершился в отведённое время',
                         series: []
-                    }), 120_000);
+                    }), reportTimeoutMs);
                     panelReportSnapshotCancellers.set(requestId, cancel);
-                    window.addEventListener('dashbridgePanelDataSettled', inspect);
+                    window.addEventListener('dashbridgePanelDataSettled', scheduleInspect);
+                    if (typeof MutationObserver === 'function') {
+                        dataObserver = new MutationObserver(scheduleInspect);
+                        dataObserver.observe(root === document ? document.documentElement : root, {
+                            childList: true, subtree: true, characterData: true
+                        });
+                    }
                     inspect();
                 });
                 if (!snapshot) return;
@@ -4057,10 +4113,13 @@
     };
     // BUG-H fix: сохраняем ссылку на MutationObserver меню, чтобы отключать его при removePanelMenus.
     let panelMenuObserver = null;
+    let panelMenuFrame = 0;
     const removePanelMenus = () => {
         document.querySelectorAll('.dashbridge-panel-menu-host').forEach(host => host.remove());
         panelMenuObserver?.disconnect();
         panelMenuObserver = null;
+        if (panelMenuFrame) cancelAnimationFrame(panelMenuFrame);
+        panelMenuFrame = 0;
     };
     let placePanelMenus = null;
     const panelMenuExcludedPluginIds = new Set(['stat', 'michaeldmoore-multistat-panel']);
@@ -4618,7 +4677,13 @@
         };
         placePanelMenus();
         // BUG-H fix: сохраняем observer чтобы его можно было отключить позже.
-        panelMenuObserver = new MutationObserver(() => requestAnimationFrame(placePanelMenus));
+        panelMenuObserver = new MutationObserver(() => {
+            if (panelMenuFrame) return;
+            panelMenuFrame = requestAnimationFrame(() => {
+                panelMenuFrame = 0;
+                placePanelMenus();
+            });
+        });
         panelMenuObserver.observe(document.documentElement, { childList: true, subtree: true });
         const closePanelMenus = () => document.querySelectorAll('.dashbridge-panel-menu.open')
             .forEach(menu => menu.classList.remove('open'));
@@ -4626,6 +4691,8 @@
         registerRuntimeCleanup(() => {
             panelMenuObserver?.disconnect();
             panelMenuObserver = null;
+            if (panelMenuFrame) cancelAnimationFrame(panelMenuFrame);
+            panelMenuFrame = 0;
             document.removeEventListener('click', closePanelMenus);
             document.querySelectorAll('.dashbridge-panel-menu-host').forEach(host => host.remove());
         });

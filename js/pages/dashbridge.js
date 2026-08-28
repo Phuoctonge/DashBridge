@@ -206,7 +206,7 @@ const panelTitleWaiters = new Map();
 const panelReportWaiters = new Map();
 let activeReportPreview = null;
 const DASHBRIDGE_REPORT_FRAME_TIMEOUT_MS = 90_000;
-const DASHBRIDGE_REPORT_RESPONSE_TIMEOUT_MS = 125_000;
+const DASHBRIDGE_REPORT_TOTAL_TIMEOUT_MS = 125_000;
 
 function requestPanelTitle(panel, iframe) {
     if (!panel || !iframe) return Promise.resolve('');
@@ -775,13 +775,11 @@ function waitForDashboardIframeReady(iframe, timeoutMs = DASHBRIDGE_REPORT_FRAME
     return new Promise((resolve, reject) => {
         let settled = false;
         let frameObserver = null;
-        let removalPoll = null;
         let timeout = null;
         const finish = error => {
             if (settled) return;
             settled = true;
             frameObserver?.disconnect();
-            clearInterval(removalPoll);
             clearTimeout(timeout);
             signal?.removeEventListener('abort', abort);
             error ? reject(error) : resolve(iframe);
@@ -792,8 +790,11 @@ function waitForDashboardIframeReady(iframe, timeoutMs = DASHBRIDGE_REPORT_FRAME
             if (iframe.dataset.dashbridgeLoaded === 'true') finish();
         };
         frameObserver = new MutationObserver(inspect);
-        frameObserver.observe(iframe, { attributes: true, attributeFilter: ['data-dashbridge-loaded'] });
-        removalPoll = setInterval(inspect, 500);
+        const scope = iframe.closest('.panel-card')?.parentElement || iframe.parentElement || document.body;
+        frameObserver.observe(scope, {
+            childList: true, subtree: true, attributes: true,
+            attributeFilter: ['data-dashbridge-loaded']
+        });
         timeout = setTimeout(
             () => finish(new Error('Панель не загрузилась за 90 секунд')),
             timeoutMs
@@ -805,6 +806,7 @@ function waitForDashboardIframeReady(iframe, timeoutMs = DASHBRIDGE_REPORT_FRAME
 
 async function requestPanelReportSnapshot(panel, signal = null) {
     throwIfReportAborted(signal);
+    const deadline = Date.now() + DASHBRIDGE_REPORT_TOTAL_TIMEOUT_MS;
     if (panel.paused) return Promise.resolve({
         state: 'unavailable', dataStatus: 'paused',
         dataStatusText: 'Панель находится на паузе', error: 'Панель находится на паузе', series: []
@@ -822,7 +824,10 @@ async function requestPanelReportSnapshot(panel, signal = null) {
         });
     }
     try {
-        await waitForDashboardIframeReady(iframe, DASHBRIDGE_REPORT_FRAME_TIMEOUT_MS, signal);
+        await waitForDashboardIframeReady(iframe, Math.min(
+            DASHBRIDGE_REPORT_FRAME_TIMEOUT_MS,
+            Math.max(1, deadline - Date.now())
+        ), signal);
     } catch (error) {
         if (signal?.aborted || error?.name === 'AbortError') throw error;
         return {
@@ -836,13 +841,11 @@ async function requestPanelReportSnapshot(panel, signal = null) {
     return new Promise((resolve, reject) => {
         let settled = false;
         let frameObserver = null;
-        let removalPoll = null;
         let timeout = null;
         const finish = snapshot => {
             if (settled) return;
             settled = true;
             frameObserver?.disconnect();
-            clearInterval(removalPoll);
             clearTimeout(timeout);
             signal?.removeEventListener('abort', abort);
             panelReportWaiters.delete(requestId);
@@ -852,7 +855,6 @@ async function requestPanelReportSnapshot(panel, signal = null) {
             if (settled) return;
             settled = true;
             frameObserver?.disconnect();
-            clearInterval(removalPoll);
             clearTimeout(timeout);
             signal?.removeEventListener('abort', abort);
             panelReportWaiters.delete(requestId);
@@ -869,16 +871,22 @@ async function requestPanelReportSnapshot(panel, signal = null) {
             }
         };
         frameObserver = new MutationObserver(inspect);
-        frameObserver.observe(iframe, { attributes: true, attributeFilter: ['data-dashbridge-loaded'] });
-        removalPoll = setInterval(inspect, 500);
+        const scope = iframe.closest('.panel-card')?.parentElement || iframe.parentElement || document.body;
+        frameObserver.observe(scope, {
+            childList: true, subtree: true, attributes: true,
+            attributeFilter: ['data-dashbridge-loaded']
+        });
+        const responseTimeoutMs = Math.max(1, deadline - Date.now());
         timeout = setTimeout(() => finish({
             state: 'timeout', dataStatus: 'timeout',
-            dataStatusText: 'Панель не ответила за 125 секунд',
-            error: 'Панель не ответила за 125 секунд', series: []
-        }), DASHBRIDGE_REPORT_RESPONSE_TIMEOUT_MS);
+            dataStatusText: 'Панель не ответила за общий лимит 125 секунд',
+            error: 'Панель не ответила за общий лимит 125 секунд', series: []
+        }), responseTimeoutMs);
         panelReportWaiters.set(requestId, { iframe, resolve: finish });
         signal?.addEventListener('abort', abort, { once: true });
-        if (!postToDashboardFrame(iframe, { action: 'collectPanelReportSnapshot', requestId, sla })) {
+        if (!postToDashboardFrame(iframe, {
+            action: 'collectPanelReportSnapshot', requestId, sla, timeoutMs: responseTimeoutMs
+        })) {
             finish({
                 state: 'unavailable', dataStatus: 'request_error',
                 dataStatusText: 'Не удалось отправить запрос в iframe',

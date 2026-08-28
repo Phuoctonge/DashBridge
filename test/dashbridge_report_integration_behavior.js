@@ -32,9 +32,10 @@ assert(tools.includes('const observeActive = transformActive || hasPersistentVis
     'ordinary Grafana loading must remain native while reports reuse current chart/table runtime data');
 assert(tools.includes("const terminalStatuses = new Set([")
     && tools.includes("'filtered_empty', 'empty_source', 'http_error', 'network_error', 'decode_error', 'aborted'")
-    && tools.includes("const poll = setInterval(inspect, 500);")
-    && tools.includes("window.addEventListener('dashbridgePanelDataSettled', inspect)")
-    && tools.includes("dataStatusText: 'Штатный запрос Grafana не завершился за 120 секунд'"),
+    && !tools.includes("const poll = setInterval(inspect, 500);")
+    && tools.includes("window.addEventListener('dashbridgePanelDataSettled', scheduleInspect)")
+    && tools.includes('dataObserver = new MutationObserver(scheduleInspect)')
+    && tools.includes("dataStatusText: 'Штатный запрос Grafana не завершился в отведённое время'"),
     'report snapshots must wait for datasource settlement and return a bounded timeout result');
 const reportReadyStart = tools.indexOf('const readySnapshot = () => {');
 const reportReadyEnd = tools.indexOf('panelReportSnapshotCancellers.get(requestId)?.();', reportReadyStart);
@@ -68,10 +69,12 @@ assert(dashboard.includes("state: 'configuration_error'")
     'unavailable data must never be treated as a successful SLA evaluation');
 assert(reportRequestSource.includes("iframe.dataset.dashbridgeLoaded === 'true'")
     && reportRequestSource.includes('frameObserver = new MutationObserver(inspect)')
-    && reportRequestSource.includes('removalPoll = setInterval(inspect, 500);')
+    && !reportRequestSource.includes('removalPoll = setInterval(inspect, 500);')
+    && reportRequestSource.includes("const scope = iframe.closest('.panel-card')?.parentElement")
     && !reportRequestSource.includes('documentObserver')
     && reportRequestSource.includes('DASHBRIDGE_REPORT_FRAME_TIMEOUT_MS')
-    && reportRequestSource.includes('DASHBRIDGE_REPORT_RESPONSE_TIMEOUT_MS'),
+    && reportRequestSource.includes('DASHBRIDGE_REPORT_TOTAL_TIMEOUT_MS')
+    && reportRequestSource.includes('timeoutMs: responseTimeoutMs'),
     'report collection must allow slow Grafana iframes while retaining bounded failure results');
 assert(reportRequestSource.includes("action: 'cancelPanelReportSnapshot'")
     && reportRequestSource.includes("signal?.addEventListener('abort', abort, { once: true })")

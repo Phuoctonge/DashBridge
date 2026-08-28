@@ -84,6 +84,7 @@
     let lifecyclePort = null;
     let operationProgressController = null;
     let settingsSaveTimer = null;
+    let sessionIndicatorTimer = null;
 
     function connectLifecyclePort() {
         try {
@@ -159,6 +160,7 @@
         ui.bodySize.textContent = formatBytes(state.totalBodyBytes);
         updateNetworkMode();
         updateSessionIndicator();
+        syncSessionIndicatorTimer();
     }
 
     function updateNetworkMode() {
@@ -187,6 +189,16 @@
         const elapsed = `${String(Math.floor(elapsedSeconds / 60)).padStart(2, '0')}:${String(elapsedSeconds % 60).padStart(2, '0')}`;
         const step = state.activeStepId ? ` · шаг ${state.activeStepId}/${Math.max(state.steps.length, state.activeStepId)}` : '';
         ui.sessionProgress.textContent = `${elapsed}${step} · ${state.requests.size} запросов`;
+    }
+
+    function syncSessionIndicatorTimer() {
+        const active = ['recording', 'replaying'].includes(state.mode);
+        if (active && sessionIndicatorTimer === null) {
+            sessionIndicatorTimer = setInterval(updateSessionIndicator, 1_000);
+        } else if (!active && sessionIndicatorTimer !== null) {
+            clearInterval(sessionIndicatorTimer);
+            sessionIndicatorTimer = null;
+        }
     }
 
     function updateRecordingProgress() {
@@ -1790,10 +1802,11 @@
     window.addEventListener('beforeunload', () => { if (state.attached && Number.isInteger(state.tabId)) chrome.debugger.detach({ tabId: state.tabId }).catch(() => undefined); });
     window.addEventListener('pagehide', () => {
         clearTimeout(settingsSaveTimer);
+        clearInterval(sessionIndicatorTimer);
+        sessionIndicatorTimer = null;
         void saveRecorderSettings().catch(() => undefined);
         void operationProgressController?.release();
     });
-    setInterval(updateSessionIndicator, 1_000);
     operationProgressController = globalThis.DashBridgeOperationProgress?.create({ onCancel: () => stopActiveSession(true) }) || null;
     void restoreRecorderSettings().finally(() => {
         updateControls(); refreshIncognitoAccess(); renderSteps(); renderTraffic(); renderRequestDetails();

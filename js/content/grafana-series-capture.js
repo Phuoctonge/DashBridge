@@ -52,6 +52,11 @@
         state.matchedIdentities = [...new Set([...state.matchedIdentities, ...matchingIdentities])];
         state.names = Object.keys(state.batches).sort().flatMap(key => state.batches[key]);
         state.lastMatchAt = Date.now();
+        if (typeof window.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+            window.dispatchEvent(new CustomEvent('dashbridgeSeriesCaptureUpdated', {
+                detail: { token }
+            }));
+        }
     };
     const parseBody = body => { try { return JSON.parse(body || '{}'); } catch { return {}; } };
     const originalFetch = window.fetch;

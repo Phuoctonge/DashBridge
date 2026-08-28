@@ -400,6 +400,10 @@ if len(readiness_section) == 2:
     readiness_section = readiness_section[1].split("const isQueryUrl", 1)[0]
 else:
     readiness_section = ""
-checks["Visual engine readiness has no timer"] = "setTimeout" not in readiness_section
+checks["Visual engine readiness has bounded table-aware lifecycle"] = (
+    "setTimeout(finish, 18_000)" in readiness_section
+    and "renderedTable && !chartSurface" in readiness_section
+    and "window.__dashbridgeChartReadyCancel = finish" in readiness_section
+)
 
 run_checks(checks)
