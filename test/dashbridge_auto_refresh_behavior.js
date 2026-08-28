@@ -117,9 +117,19 @@ assert(timeLabelSource.includes('timeLabel.replaceChildren(')
     && !timeLabelSource.includes('innerHTML'),
     'absolute time labels must render as text without parsing user-controlled markup');
 
-assert(iframeSource.includes("url.searchParams.set('refresh', '1y')")
-    && !iframeSource.includes("url.searchParams.delete('refresh')"),
-    'Off must override the saved interval without using refresh=off rejected by Grafana 10.1');
+assert(iframeSource.includes('applyRefreshPolicyToUrl?.(url.toString(), event.data.refresh || \'\')')
+    && !iframeSource.includes("url.searchParams.set('refresh', '1y')")
+    && !iframeSource.includes("url.searchParams.set('refresh', 'off')"),
+    'Off must use the shared bootstrap policy instead of unsupported or clamped Grafana intervals');
+const refreshChoiceStart = source.indexOf("document.querySelectorAll('#refreshPopover .dropdown-item')");
+const refreshChoiceEnd = source.indexOf("document.getElementById('forceRefreshBtn')", refreshChoiceStart);
+const refreshChoiceSource = source.slice(refreshChoiceStart, refreshChoiceEnd);
+assert(refreshChoiceStart >= 0 && refreshChoiceEnd > refreshChoiceStart
+    && refreshChoiceSource.includes('const previousRefresh = globalRefresh;')
+    && refreshChoiceSource.includes('if (!globalRefresh && previousRefresh)')
+    && refreshChoiceSource.includes('void refreshAllPanels();')
+    && refreshChoiceSource.includes('else {\n                broadcastTimeUpdate();'),
+    'switching a live profile to Off must navigate once to destroy the existing Grafana scheduler');
 assert(iframeSource.includes("window.history.replaceState(null, '', url.toString())")
     && !iframeSource.includes("window.history.pushState(null, '', url.toString())"),
     'seamless time updates must replace the iframe URL instead of growing browser history');

@@ -2965,10 +2965,19 @@ function setupTimeControls() {
     document.querySelectorAll('#refreshPopover .dropdown-item').forEach(btn => {
         if (!btn.hasAttribute('data-refresh')) return;
         btn.addEventListener('click', (e) => {
+            const previousRefresh = globalRefresh;
             globalRefresh = e.target.dataset.refresh;
             saveActiveProfileTimeState();
             updateTimeLabels();
-            broadcastTimeUpdate();
+            if (!globalRefresh && previousRefresh) {
+                // Removing refresh from a live Grafana URL does not stop an
+                // already-created scheduler. A one-time navigation lets the
+                // document_start Off policy clear the saved dashboard value
+                // before Grafana creates the replacement scheduler.
+                void refreshAllPanels();
+            } else {
+                broadcastTimeUpdate();
+            }
             refreshPopover.style.display = 'none';
         });
     });

@@ -71,6 +71,7 @@
             "all_frames": true,
             "js": [
                 "js/shared/grafana-time.js",
+                "js/shared/grafana-panel-bootstrap.js",
                 "js/content/grafana-iframe.js"
             ],
             "run_at": "document_start"

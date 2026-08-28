@@ -2,6 +2,7 @@
     'use strict';
 
     const PARAM = 'dashbridgePanelTransforms';
+    const REFRESH_POLICY_PARAM = 'dashbridgeRefresh';
     const cleanKeyword = (value, fallback) => {
         const cleaned = String(value ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 160);
         return cleaned || fallback;
@@ -61,5 +62,44 @@
         }
     }
 
-    root.DashBridgeGrafanaPanelBootstrap = Object.freeze({ PARAM, buildState, applyToUrl, readFromUrl });
+    function applyRefreshPolicyToUrl(urlValue, refresh) {
+        try {
+            const url = new URL(urlValue);
+            const hashParams = new URLSearchParams(url.hash.slice(1));
+            const interval = typeof refresh === 'string' ? refresh : '';
+            if (interval) {
+                url.searchParams.set('refresh', interval);
+                hashParams.delete(REFRESH_POLICY_PARAM);
+            } else {
+                // An absent refresh query parameter makes Grafana restore the
+                // interval saved in the dashboard model. Keep the Off intent
+                // in the fragment so it never reaches Grafana or datasource
+                // requests, but is available to the document_start runtime.
+                url.searchParams.delete('refresh');
+                hashParams.set(REFRESH_POLICY_PARAM, 'off');
+            }
+            url.searchParams.delete(REFRESH_POLICY_PARAM);
+            url.hash = hashParams.toString();
+            return url.toString();
+        } catch {
+            return urlValue;
+        }
+    }
+
+    function readRefreshPolicyFromUrl(urlValue) {
+        try {
+            const url = new URL(urlValue);
+            const value = new URLSearchParams(url.hash.slice(1)).get(REFRESH_POLICY_PARAM)
+                || url.searchParams.get(REFRESH_POLICY_PARAM);
+            return value === 'off' ? 'off' : null;
+        } catch {
+            return null;
+        }
+    }
+
+    root.DashBridgeGrafanaPanelBootstrap = Object.freeze({
+        PARAM, REFRESH_POLICY_PARAM,
+        buildState, applyToUrl, readFromUrl,
+        applyRefreshPolicyToUrl, readRefreshPolicyFromUrl
+    });
 })(globalThis);

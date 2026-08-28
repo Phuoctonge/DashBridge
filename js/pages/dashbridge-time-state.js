@@ -42,12 +42,9 @@ const DashBridgeTimeState = {
             const url = new URL(urlValue);
             url.searchParams.set('from', this.formatForUrl(urlValue, from));
             url.searchParams.set('to', this.formatForUrl(urlValue, to));
-            if (DashBridgeRefreshIntervals.has(refresh) && refresh) url.searchParams.set('refresh', refresh);
-            // Grafana 10.1 rejects `refresh=off` during bootstrap. A one-year
-            // interval is valid across supported versions and effectively
-            // disables refresh without restoring the dashboard's saved value.
-            else url.searchParams.set('refresh', '1y');
-            return url.toString();
+            const interval = DashBridgeRefreshIntervals.has(refresh) ? refresh : '';
+            return globalThis.DashBridgeGrafanaPanelBootstrap?.applyRefreshPolicyToUrl?.(url.toString(), interval)
+                || url.toString();
         } catch (_) { return urlValue; }
     }
 };

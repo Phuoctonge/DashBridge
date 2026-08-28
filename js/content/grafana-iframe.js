@@ -196,10 +196,12 @@ if (window.name === 'dashbridge-iframe') {
                         url.searchParams.set('refresh', event.data.refresh);
                         changed = true;
                     }
-                } else if (url.searchParams.get('refresh') !== '1y') {
-                    // Grafana 10.1 rejects `refresh=off` and never finishes
-                    // initializing. Keep a valid, effectively disabled value.
-                    url.searchParams.set('refresh', '1y');
+                }
+
+                const refreshPolicyUrl = globalThis.DashBridgeGrafanaPanelBootstrap
+                    ?.applyRefreshPolicyToUrl?.(url.toString(), event.data.refresh || '') || url.toString();
+                if (refreshPolicyUrl !== url.toString()) {
+                    url.href = refreshPolicyUrl;
                     changed = true;
                 }
 
