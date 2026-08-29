@@ -1,6 +1,6 @@
 # DashBridge: ориентир для дальнейшей разработки
 
-> Проверено по исходному коду и тестам 2026-08-28. Архитектурный источник
+> Сверено с версией 2.4.1, исходным кодом и тестами 2026-08-29. Архитектурный источник
 > истины — [`extension-architecture.md`](../extension-architecture.md), карта
 > разрешений — [`permission-map.md`](permission-map.md), незавершённые
 > направления — [`plans/README.md`](../plans/README.md). История не описывает
@@ -11,9 +11,9 @@
 Расширение не требует сборки и загружается напрямую из исходной папки. На
 момент проверки проходят:
 
-- 92 JavaScript behavior-файла;
+- 96 JavaScript behavior-файлов;
 - 41 Python smoke/security/audit-файл;
-- `node --check` для всех 76 production JavaScript-файлов.
+- `node --check` для всех 78 production JavaScript-файлов.
 
 Автотесты хорошо фиксируют структурные и поведенческие контракты, но не
 заменяют живую проверку Chrome/Grafana: renderer, clipboard, capture,
@@ -46,6 +46,20 @@
     `screen.width` и DPR не управляют раскладкой; DPR используется только в
     canvas/capture. Геометрия контролов масштабируется через общие `rem`-токены
     и `uiScale`, а широкие data-workspace не получают произвольный desktop cap.
+12. Намерение DashBridge `Refresh Off` передаётся только во fragment и
+    применяется ранним one-shot MAIN wrapper к same-origin dashboard-definition
+    response. Query omission недостаточен: Grafana восстановит сохранённый
+    dashboard refresh.
+13. Versioned storage migration создаёт backup до изменения и пишет schema
+    marker последним. Удалять временный migration-модуль можно только вместе с
+    его script tag, startup call, backup/marker policy и legacy load fallback.
+14. Clipboard time range нормализуется между Grafana 10/12, читается и пишется
+    только по user action; невалидный payload не должен менять picker/state.
+15. Длительные Batch, Recorder и E2E-операции используют общий
+    `DashBridgeOperationProgress` на Document Picture-in-Picture. Запрос окна
+    выполняется до первого `await`, пока действует user activation; отсутствие
+    API не блокирует основной in-page lifecycle, а cancel вызывает владельца
+    операции, не создавая второй независимый state machine.
 
 ## Матрица влияния изменений
 
@@ -55,9 +69,12 @@
 | Renderer/легенда/threshold | uPlot и Flot, View/dashboard, refresh/remount, restore после capture | `grafana-visual-engine.js`, `grafana-panel-tools.js` |
 | Network transform | fetch и XHR semantics, panel scope, fail-open, отсутствие helper-серий | `grafana-network.js`, response filters |
 | DashBridge panel/profile | schema, import/export, pause, theme, time, drag/drop, source+origin | `dashbridge.js`, renderer, profile store |
+| Time/refresh | relative/absolute range, Grafana 10/12 clipboard, Off vs saved dashboard refresh, iframe reload | `dashbridge-time-state.js`, `grafana-time-picker-clipboard.js`, `grafana-panel-bootstrap.js`, `grafana-refresh-policy.js` |
 | Batch | отдельное окно, cancel/error cleanup, лимиты PNG/ZIP, Blob URL lifecycle | `batch.js`, loader/capture/lifecycle helpers |
+| Test Runner | порядок runtime scripts, OPFS spool, planned/completed/NOT RUN, PiP cancel и elapsed time, cleanup окна Grafana | `test-runner-*.js`, `operation-progress-window.js`, `test-runner.html` |
 | Capture | save и copy, prepared on/off, DPR/crop, success/error restore | shared capture helpers, content bridge, background |
 | Storage/import | legacy и hostile input, rejected backup, сериализация записей | `local-state-schema.js`, `storage-writer.js`, Options |
+| Storage migration | backup до commit, marker последним, повтор после partial failure, удаление legacy keys только после commit | `dashbridge-data-migration.js`, `dashbridge-time-state.js`, `dashbridge.html` |
 | Runtime message | sender, payload type/size, authority конкретного контекста | `background.js`, соответствующий sender |
 | Permission/DNR | минимальный сценарий, tab/host scope, документацию | `manifest.json`, `dnr-rules.js`, `permission-map.md` |
 | Новая page/popup UI | порядок scripts, раннюю тему, safe DOM rendering, keyboard/focus | HTML, `js/pages/` или `js/popup/`, CSS |
@@ -95,6 +112,25 @@ sender/source/origin и ограниченные payload. Каждый новы�
 fallback. MutationObserver обязан иметь владельца и cleanup либо доказанную
 одноразовую остановку.
 
+### Ранние transport wrappers
+
+`grafana-network.js` и `grafana-refresh-policy.js` намеренно работают в MAIN
+world до renderer. Для любого такого wrapper обязательны точный request scope,
+сохранение native semantics, отсутствие повторного оборачивания и ограниченный
+lifecycle. Refresh-policy — отдельный one-shot механизм: он допустим только для
+именованного DashBridge iframe с fragment policy `off` и same-origin GET
+dashboard definition; расширять его на datasource responses или direct
+Grafana нельзя.
+
+### Clipboard совместимость времени
+
+Grafana 12 копирует absolute range как UTC ISO, а legacy Grafana ожидает
+локальную форму. `grafana-time-picker-clipboard.js` поэтому перехватывает только
+native Copy/Paste рядом с Apply либо добавляет эти две кнопки в legacy picker;
+сам Apply остаётся Grafana-native. Изменение формата требует round-trip тестов
+для local datetime, ISO с zone, epoch milliseconds, JSON и URL, плюс проверки
+невалидного payload.
+
 ## Проверка изменения
 
 Полный dependency-free прогон:
@@ -126,6 +162,8 @@ foreach ($file in $files) { node --check $file }
 5. Для storage проверить новый, legacy и повреждённый state.
 6. Для URL/message/import добавить отрицательный тест, а не только happy path.
 7. Если менялось permission или DNR, обновить `permission-map.md`.
+8. Если менялось фактическое поведение, владелец логики или необычный guard,
+   обновить `extension-architecture.md` в том же изменении.
 
 ## Выпуск версии
 

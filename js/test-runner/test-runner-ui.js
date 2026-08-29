@@ -4,7 +4,8 @@
 // прогресс-бар, копирование отчёта.
 // Зависит от: test-runner-core.js (DashBridgeTestRunner),
 //             test-runner-suite.js (DASHBRIDGE_TEST_SUITE),
-//             test-runner-probe.js (dashbridgeRunProbe — загружается core'ом)
+//             test-runner-probe.js (dashbridgeRunProbe — загружается core'ом),
+//             operation-progress-window.js (DashBridgeOperationProgress)
 
 'use strict';
 
@@ -28,6 +29,13 @@ let elEmptyState = null;  // <div id="trEmptyState">
 
 // Последний снимок состояния для копирования отчёта
 let lastSnapshot = null;
+
+// Always-on-top progress window shared with Batch/Recorder. The controller is
+// optional: a browser without Document Picture-in-Picture keeps the in-page UI.
+let operationProgressController = null;
+let operationProgressTimer = null;
+let operationProgressStartedAt = null;
+let operationProgressSnapshot = null;
 
 // Full per-test evidence is deliberately not retained in the renderer heap.
 // A single Grafana dashboard can produce several GiB of diagnostics; keeping
@@ -379,6 +387,14 @@ function diagnosticSummary(test) {
     // Keep the result table compact. The diagnostic viewer exposes transition,
     // runtime, and canvas details; here we surface only capture problems.
     return captureErrors ? `ошибок снимка: ${captureErrors}` : '';
+}
+
+function formatElapsedDuration(ms) {
+    const totalSeconds = Math.max(0, Math.floor((Number(ms) || 0) / 1000));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return [hours, minutes, seconds].map(value => String(value).padStart(2, '0')).join(':');
 }
 
 function formatBytes(bytes) {
@@ -1108,6 +1124,65 @@ async function serializeJsonInChunks(value, writeChunk, onProgress = null) {
     return { nodes, characters, chunks, maxPendingChunks };
 }
 
+function stopOperationProgressTimer() {
+    if (operationProgressTimer !== null) clearInterval(operationProgressTimer);
+    operationProgressTimer = null;
+}
+
+function updateOperationProgressWindow(snapshot = operationProgressSnapshot) {
+    if (!operationProgressController || !operationProgressStartedAt) return;
+    if (snapshot) operationProgressSnapshot = snapshot;
+    const current = operationProgressSnapshot || {};
+    const planned = current.planned ?? current.total ?? 0;
+    const completed = current.completed ?? current.done ?? 0;
+    const profile = (current.mode || elRunMode?.value) === 'full' ? 'Полный профиль' : 'Быстрый профиль';
+    const skipped = Number(current.skipped) || 0;
+    const notRun = Number(current.abortedNotRun) || 0;
+    const details = [`Общее время: ${formatElapsedDuration(Date.now() - operationProgressStartedAt)}`];
+    if (skipped > 0) details.push(`пропущено: ${skipped}`);
+    if (notRun > 0) details.push(`не запущено: ${notRun}`);
+    operationProgressController.update({
+        done: completed,
+        total: planned,
+        unit: 'тестов',
+        success: Number(current.passed) || 0,
+        failed: Number(current.failed) || 0,
+        phase: current.aborted ? 'Аварийная остановка…' : `Выполнение тестов · ${profile}`,
+        message: details.join(' · '),
+    });
+}
+
+function openOperationProgressWindow(mode) {
+    operationProgressStartedAt = Date.now();
+    operationProgressSnapshot = { mode, planned: 0, completed: 0, passed: 0, failed: 0, skipped: 0 };
+    stopOperationProgressTimer();
+    // requestWindow is invoked inside the controller before its first await, so
+    // this call must remain before handleRun's first await to retain user activation.
+    const pendingWindow = operationProgressController?.openPictureInPicture({
+        title: 'Автопроверка DashBridge',
+        phase: 'Подготовка тестов',
+        width: 390,
+        height: 300,
+    }) || Promise.resolve(false);
+    operationProgressTimer = setInterval(() => updateOperationProgressWindow(), 1000);
+    return pendingWindow;
+}
+
+function finishOperationProgressWindow(snapshot, { error = null } = {}) {
+    stopOperationProgressTimer();
+    if (snapshot) operationProgressSnapshot = snapshot;
+    const elapsed = formatElapsedDuration(Date.now() - (operationProgressStartedAt || Date.now()));
+    const current = operationProgressSnapshot || {};
+    updateOperationProgressWindow(current);
+    const incomplete = current.aborted || (Number(current.abortedNotRun) || 0) > 0;
+    const status = error ? 'error' : (incomplete ? 'cancelled' : ((Number(current.failed) || 0) > 0 ? 'partial' : 'complete'));
+    const message = error
+        ? `Ошибка запуска · общее время: ${elapsed}`
+        : `${incomplete ? 'Прогон остановлен' : 'Прогон завершён'} · общее время: ${elapsed}`;
+    operationProgressController?.finish({ status, message });
+    operationProgressStartedAt = null;
+}
+
 async function createChunkedJsonBlob(value, onProgress = null) {
     const parts = [];
     await serializeJsonInChunks(value, chunk => { parts.push(chunk); }, onProgress);
@@ -1425,6 +1500,9 @@ async function handleRun() {
     }
 
     const mode = elRunMode?.value === 'full' ? 'full' : 'fast';
+    // Open the always-on-top view while the Run click still carries user
+    // activation. All validation that can reject without async work is above.
+    const progressWindowPromise = openOperationProgressWindow(mode);
     // Сохраняем ввод и выбранный профиль для следующего запуска.
     try { await chrome.storage.local.set({ trLastUrls: cleanedUrls, trRunMode: mode }); } catch (_) { }
 
@@ -1441,6 +1519,8 @@ async function handleRun() {
     try {
         await diagnosticSpool.begin(`run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
     } catch (error) {
+        await progressWindowPromise;
+        finishOperationProgressWindow(null, { error });
         diagnosticSpool = null;
         if (elStatusLine) {
             elStatusLine.textContent = `⚠ Невозможно подготовить безопасное хранилище диагностики: ${error?.message || String(error)}`;
@@ -1451,6 +1531,8 @@ async function handleRun() {
 
     setButtonState(true);
     if (elProgress) elProgress.style.display = 'flex';
+    await progressWindowPromise;
+    updateOperationProgressWindow();
 
     try {
         await DashBridgeTestRunner.run(urls, {
@@ -1472,6 +1554,7 @@ async function handleRun() {
             onProgress(snapshot) {
                 lastSnapshot = snapshot;
                 renderProgress(snapshot);
+                updateOperationProgressWindow(snapshot);
                 // A progress event can add several NOT RUN rows after an
                 // abort or unsafe reset; redraw to keep DOM and snapshot equal.
                 renderResultsTable(snapshot);
@@ -1482,6 +1565,7 @@ async function handleRun() {
                 renderResultsTable(snapshot);
                 renderSummary(snapshot);
                 setButtonState(false);
+                finishOperationProgressWindow(snapshot);
                 if (elStatusLine) {
                     const incomplete = snapshot.aborted || (snapshot.abortedNotRun || 0) > 0;
                     const ok = snapshot.failed === 0 && !incomplete;
@@ -1497,6 +1581,7 @@ async function handleRun() {
         });
     } catch (e) {
         setButtonState(false);
+        finishOperationProgressWindow(lastSnapshot, { error: e });
         if (elStatusLine) {
             elStatusLine.textContent = `⚠ Ошибка запуска: ${e.message || String(e)}`;
             elStatusLine.className = 'tr-status tr-status-warn';
@@ -1506,6 +1591,10 @@ async function handleRun() {
 
 function handleAbort() {
     DashBridgeTestRunner.abort();
+    if (operationProgressSnapshot) {
+        operationProgressSnapshot = { ...operationProgressSnapshot, aborted: true };
+        updateOperationProgressWindow(operationProgressSnapshot);
+    }
     if (elAbortBtn) elAbortBtn.disabled = true;
     if (elStatusLine) {
         elStatusLine.textContent = '⛔ Прерывание…';
@@ -1522,6 +1611,10 @@ function handleClear() {
     lastSnapshot = null;
     void diagnosticSpool?.clear();
     diagnosticSpool = null;
+    stopOperationProgressTimer();
+    operationProgressStartedAt = null;
+    operationProgressSnapshot = null;
+    void operationProgressController?.release();
     setButtonState(false);
 }
 
@@ -1543,6 +1636,10 @@ async function initTestRunnerUI() {
     elResultsTable = document.getElementById('trResultsBody');
     elSummaryRow = document.getElementById('trSummary');
     elEmptyState = document.getElementById('trEmptyState');
+    operationProgressController = globalThis.DashBridgeOperationProgress?.create({
+        onCancel: handleAbort,
+        closeDelayMs: 6000,
+    }) || null;
 
     // The report cannot be resumed after this page is closed (the UI snapshot
     // is intentionally memory-only), so reclaim an interrupted run's private
@@ -1577,7 +1674,11 @@ async function initTestRunnerUI() {
     elCopyFailBtn?.addEventListener('click', copyFailureReport);
     elExportDiagnosticsBtn?.addEventListener('click', exportDiagnostics);
     elClearBtn?.addEventListener('click', handleClear);
-    window.addEventListener('pagehide', () => { void diagnosticSpool?.clear(); }, { once: true });
+    window.addEventListener('pagehide', () => {
+        stopOperationProgressTimer();
+        void operationProgressController?.release();
+        void diagnosticSpool?.clear();
+    }, { once: true });
 
     // Ctrl+Enter в textarea → запуск
     elUrlInput?.addEventListener('keydown', e => {

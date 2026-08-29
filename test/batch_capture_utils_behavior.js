@@ -41,17 +41,17 @@ const archivePath = (rangeIndex, from, to) => utils.buildArchivePath({
 });
 assert.strictEqual(
     archivePath(0, localTimestamp(2026, 8, 27, 10, 0), localTimestamp(2026, 8, 27, 11, 0)),
-    `01_from27-08_10-00_to11-00/${first}`,
+    `01 [27.08] 10h00-11h00/${first}`,
     'a repeated date must appear only once'
 );
 assert.strictEqual(
     archivePath(1, localTimestamp(2026, 8, 27, 23, 0), localTimestamp(2026, 8, 28, 1, 0)),
-    `02_from27-08_23-00_to28-08_01-00/${first}`,
+    `02 [27.08 23h00] - [28.08 01h00]/${first}`,
     'different dates in the same month must both be visible'
 );
 assert.strictEqual(
     archivePath(2, localTimestamp(2026, 8, 31, 23, 0), localTimestamp(2026, 9, 1, 1, 0)),
-    `03_from31-08_23-00_to01-09_01-00/${first}`,
+    `03 [31.08 23h00] - [01.09 01h00]/${first}`,
     'different months must both be visible'
 );
 assert.strictEqual(archivePath(0, 'now-1h', 'now'), `01_fromnow-1h_tonow/${first}`,
@@ -60,4 +60,6 @@ const absoluteFolder = archivePath(0, localTimestamp(2026, 8, 27, 10, 15), local
     .split('/')[0];
 assert(!absoluteFolder.includes('2026') && !/\d{2}-\d{2}-\d{2}/.test(absoluteFolder),
     'absolute folders must omit years and seconds');
+assert(!/[\\/:*?"<>|]/.test(absoluteFolder),
+    'absolute range folders must remain valid Windows names');
 console.log('PASS Batch capture filenames are unique and Confluence-safe');

@@ -11,11 +11,26 @@ const context = {
 context.window = context;
 vm.createContext(context);
 const controllerSource = fs.readFileSync(path.join(__dirname, '..', 'js/pages/operation-progress-window.js'), 'utf8');
+const testRunnerHtml = fs.readFileSync(path.join(__dirname, '..', 'test-runner.html'), 'utf8');
+const testRunnerUi = fs.readFileSync(path.join(__dirname, '..', 'js/test-runner/test-runner-ui.js'), 'utf8');
 vm.runInContext(controllerSource, context);
 assert(controllerSource.includes('documentPictureInPicture.requestWindow') && controllerSource.includes('bindDocument'),
     'the shared progress controller must use an always-on-top Document Picture-in-Picture view');
 assert(!controllerSource.includes('chrome.windows.create') && !controllerSource.includes('operation-progress.html'),
     'the removed popup side window must not remain as a fallback');
+assert(testRunnerHtml.includes('js/pages/operation-progress-window.js')
+    && testRunnerHtml.indexOf('js/pages/operation-progress-window.js') < testRunnerHtml.indexOf('js/test-runner/test-runner-ui.js'),
+    'the E2E runner must load the shared progress controller before its UI');
+assert(testRunnerUi.includes('onCancel: handleAbort')
+    && testRunnerUi.includes("title: 'Автопроверка DashBridge'")
+    && testRunnerUi.includes('total: planned,')
+    && testRunnerUi.includes('done: completed,')
+    && testRunnerUi.includes('Общее время: ${formatElapsedDuration')
+    && testRunnerUi.includes('closeDelayMs: 6000'),
+    'the E2E runner PiP must expose emergency stop, test accounting, and total elapsed time');
+assert(testRunnerUi.indexOf('const progressWindowPromise = openOperationProgressWindow(mode);')
+    < testRunnerUi.indexOf('await chrome.storage.local.set'),
+    'the E2E runner must request Picture-in-Picture before its first await consumes user activation');
 
 (async () => {
     const pipElements = new Map();

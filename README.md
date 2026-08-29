@@ -289,8 +289,8 @@ node test/run-all-tests.js
 node test/run-js-tests.js
 ```
 
-Текущий полный набор включает 92 JavaScript behavior-теста и 41 исполняемую
-Python smoke/security/audit-проверку; все 76 production JavaScript-файлов также
+Текущий полный набор включает 96 JavaScript behavior-тестов и 41 исполняемую
+Python smoke/security/audit-проверку; все 78 production JavaScript-файлов также
 проходят `node --check`.
 
 Push тега `vX.Y.Z` запускает release workflow: он прогоняет полный набор тестов,
@@ -302,6 +302,10 @@ Push тега `vX.Y.Z` запускает release workflow: он прогоня�
 Для изменения runtime, storage schema или интеграций используйте
 [docs/development-guide.md](docs/development-guide.md): там собраны инварианты,
 матрица влияния и обязательные проверки перед выпуском.
+
+AI-анализ и ревью репозитория начинают с [AGENTS.md](AGENTS.md), который
+назначает [extension-architecture.md](extension-architecture.md) обязательной
+архитектурной точкой входа.
 
 ---
 

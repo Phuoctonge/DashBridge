@@ -1,6 +1,7 @@
 # Архитектура DashBridge
 
-> Актуально на 2026-08-24. Здесь описан фактически работающий код. Незавершённые
+> Сверено с версией 2.4.1, исходным кодом и тестами 2026-08-29. Здесь описан
+> фактически работающий код. Незавершённые
 > направления вынесены в `plans/README.md`, ключевые прежние решения — в
 > `docs/history/architecture-decisions.md`.
 
@@ -21,6 +22,7 @@ worklog, Traffic Recorder и Popup-инструменты для Grafana/Jira/Co
 
 ```text
 manifest.json
+├── AGENTS.md                   # Обязательная точка входа для AI-анализа
 ├── popup.html                  # Основной Popup
 ├── options.html                # Настройки, импорт/экспорт
 ├── dashbridge.html             # Единый дашборд Grafana
@@ -65,14 +67,18 @@ DashBridge ещё и `source === iframe.contentWindow`.
 
 `manifest.json` на `document_start` подключает:
 
-1. `grafana-settings.js`, `grafana-capture-output.js`, `content.js` в isolated
-   world верхнего документа. Конкретные функции дополнительно ограничены
-   доменом и сценарием.
-2. `grafana-time.js`, `grafana-iframe.js` во всех фреймах. Iframe-runtime
-   активен только при `window.name === 'dashbridge-iframe'`; управляющие
-   сообщения дополнительно принимаются только от `window.parent` с точным
-   extension origin. Уникальное имя является частью контракта создаваемого
-   DashBridge iframe и не должно использоваться сторонними фреймами.
+1. `grafana-settings.js`, `grafana-panel-identity.js`,
+   `grafana-capture-output.js`, `content.js` и
+   `grafana-time-picker-clipboard.js` в isolated world верхнего документа.
+   Конкретные функции дополнительно ограничены доменом и сценарием. Clipboard
+   time picker активируется только после установки разрешённого Grafana scope
+   и выполняет read/write исключительно по клику пользователя.
+2. `grafana-time.js`, `grafana-panel-bootstrap.js`, `grafana-iframe.js` во всех
+   фреймах. Iframe-runtime активен только при
+   `window.name === 'dashbridge-iframe'`; управляющие сообщения дополнительно
+   принимаются только от `window.parent` с точным extension origin. Уникальное
+   имя является частью контракта создаваемого DashBridge iframe и не должно
+   использоваться сторонними фреймами.
 
 ### Grafana MAIN-runtime
 
@@ -80,10 +86,13 @@ DashBridge ещё и `source === iframe.contentWindow`.
 `js/shared/grafana-runtime-manifest.js`:
 
 ```text
+grafana-panel-bootstrap.js
+grafana-refresh-policy.js
 grafana-legend-selection.js
 grafana-capture-output.js
 grafana-dom.js
 grafana-panel-state.js
+grafana-panel-analysis.js
 grafana-series-capture.js
 grafana-visual-engine.js
 grafana-compact-layout.js
@@ -123,6 +132,7 @@ grafana-panel-tools.js
 |---|---|---|
 | Grafana defaults | `grafana-settings.js` | Popup, Options, DashBridge, content, background. |
 | MAIN список/порядок | `grafana-runtime-manifest.js` | Background, Popup, Batch, runner. |
+| Bootstrap transform/refresh | `grafana-panel-bootstrap.js`, `grafana-refresh-policy.js` | DashBridge iframe MAIN startup. |
 | Запуск runtime | `background.js`, `grafana-runtime.js` | Все Grafana-сценарии. |
 | Команда в MAIN | `grafana-command.js`, `grafana-panel-tools-bridge.js` | Popup, Batch. |
 | Поиск панели/DOM | `grafana-dom.js` | Tools, capture, visual engine. |
@@ -140,6 +150,7 @@ grafana-panel-tools.js
 | URL/dashboard API | `grafana-url.js`, `grafana-dashboard-api.js` | Batch. |
 | Batch presets | `grafana-batch-panel-rules.js` | Batch. |
 | Profiles | `dashbridge-profile-store.js` | `dashbridge.js`. |
+| Версия данных DashBridge | `dashbridge-data-migration.js` | Startup `dashbridge.js`. |
 | Import/recovery | `local-state-schema.js` | Options, Worklog, profiles. |
 | Local writes | `storage-writer.js` | Profiles, Worklog, Batch. |
 | Sync input writes | `sync-input-writer.js` | Частые поля UI. |
@@ -147,6 +158,7 @@ grafana-panel-tools.js
 | ZIP/лимиты | `archive-download.js`, `archive-budget.js` | Batch, exports. |
 | Анализ CPU/RAM | `grafana-panel-analysis.js` | Кнопки панелей CPU Usage и Memory. |
 | Grafana time | `grafana-time.js` | DashBridge, iframe. |
+| Clipboard диапазона | `grafana-time-picker-clipboard.js`, `dashbridge-time-state.js` | Direct Grafana, DashBridge. |
 | Theme и UI scale | `theme.js`, `css/theme.css` | Все extension pages. |
 
 Похожий код остаётся раздельным при разном lifecycle. Например, Batch работает
@@ -200,9 +212,18 @@ grafana-iframe.js (isolated) ↔ grafana-panel-tools.js (MAIN)
 ```
 
 Поддерживаются профили, drag-and-drop, ширина 33/50/100%, высота, fullscreen,
-тема iframe `follow`/light/dark, пауза, общий период/refresh, курсор `line`/`off`,
-настройки, одиночные снимки и ZIP всех активных панелей текущего профиля.
+тема iframe `follow`/light/dark, пауза, общий период/refresh, копирование и
+вставка диапазона, курсор `line`/`off`, настройки, одиночные снимки и ZIP всех
+активных панелей текущего профиля.
 Правая легенда адаптивна и не резервирует половину ширины графика.
+
+`Refresh Off` не может быть выражен простым отсутствием query-параметра:
+Grafana тогда восстанавливает refresh, сохранённый в dashboard model. Поэтому
+DashBridge передаёт намерение `off` во fragment, который не уходит в HTTP, а
+ранний `grafana-refresh-policy.js` только в именованном DashBridge iframe
+одноразово перехватывает первый same-origin GET определения dashboard и меняет
+только `dashboard.refresh`. Остальные запросы, direct Grafana и интервалы,
+отличные от Off, проходят без изменений.
 
 Профиль также хранит шаблон сводного сообщения и контекст теста, а панель —
 SLA-карточку с источником `graph`/`custom`/`none`, режимом агрегации,
@@ -210,7 +231,8 @@ SLA-карточку с источником `graph`/`custom`/`none`, режим
 формулировками. По
 команде пользователя `dashbridge.js` параллельно отправляет каждому активному
 iframe запрос `collectPanelReportSnapshot`. MAIN-runtime читает видимые серии
-uPlot/Flot и возвращает коррелированный `panelReportSnapshot`; родитель
+uPlot/Flot, а для table-panel — уже отрисованные строки таблицы, и возвращает
+коррелированный `panelReportSnapshot`; родитель
 проверяет точные `origin`, `source` и iframe до принятия ответа. Timeout,
 отсутствие данных, пауза и ошибка конфигурации являются неизвестным результатом,
 а не успешным прохождением SLA. Шаблоны обрабатываются как простой текст без
@@ -219,6 +241,15 @@ uPlot/Flot и возвращает коррелированный `panelReportSn
 Профильный JSON экспортирует полные объекты панелей, включая `tools`, тему и
 паузу. Импорт назначает новые ID, валидирует известные поля и сохраняет
 неизвестные совместимые поля; legacy-поля игнорируются без delete-миграций.
+
+Перед чтением профилей `dashbridge-data-migration.js` выполняет идемпотентную
+миграцию schema v0→v1: переносит legacy time state в каждый профиль,
+нормализует выбранные Grafana settings и включает byte unit для подходящих
+legacy memory-панелей. Исходное состояние один раз сохраняется в
+`dashbridge_migration_backup_v0_to_v1`; schema marker записывается последним,
+поэтому частичный сбой безопасно повторяется при следующем открытии. Модуль,
+его script tag, startup-вызов, backup и marker удаляются только вместе после
+контролируемого rollout.
 
 Активные панели загружаются сразу: типичный профиль содержит 5–7 графиков, а
 отложенная загрузка делала невидимые threshold/данные непредсказуемыми. Пауза
@@ -321,6 +352,12 @@ Batch использует отдельное окно, ждёт нужную п
 освобождает Blob URL. Перед удалением массового iframe он переводится на
 `about:blank`, чтобы освободить контекст.
 
+При нескольких временных диапазонах каждый абсолютный диапазон получает
+отдельную читаемую папку ZIP: `01 [26.08] 23h00-23h48` внутри одного дня и
+`01 [26.08 23h00] - [27.08 00h48]` при смене даты. Формат использует только
+допустимые в Windows символы; относительные Grafana-диапазоны сохраняют
+технические значения `from`/`to`, поскольку календарной даты у них нет.
+
 ### Worklog, Jira, TDM, Confluence
 
 - Worklog хранит черновики/cache локально; import/recovery идут через schema.
@@ -421,6 +458,22 @@ Fallback нельзя удалять по результату одной Grafan
 - `unlimitedStorage` сохранён для существующих больших профилей; удалять его
   можно только после измерения пользовательских данных.
 
+## Намеренно необычные реализации и их границы
+
+| Механизм | Почему это функция | Ограничения и проверяемый контракт |
+|---|---|---|
+| MAIN fetch/XHR adapters | Преобразование ответа должно произойти до Grafana renderer. | Только настроенные Grafana hosts/routes; panel/request scope; generation cleanup; собственный wrapper не оборачивается повторно; helper-данные удаляются до renderer. |
+| `grafana-refresh-policy.js` меняет dashboard response | Иначе сохранённый Grafana refresh отменяет выбранный в DashBridge `Off`. | Только `dashbridge-iframe`, fragment policy `off`, same-origin GET `/api/dashboards/uid|db/...`, одно успешное применение; direct Grafana и datasource responses не затрагиваются. |
+| DNR снимает XFO/CSP | Иначе разрешённые Grafana dashboards нельзя встроить в DashBridge. | Только session rules, конкретный tab DashBridge и allowlisted Grafana host; закрытие вкладки удаляет rules; глобальное правило запрещено. |
+| `debugger`/CDP | Нужен Traffic Recorder для network bodies, streams и replay. | Attach только по Record/Replay к созданной Recorder вкладке; явные caps; detach при Stop, закрытии и lifecycle-разрыве; `.dashflow` предупреждает о секретах. |
+| Clipboard read/write | Перенос диапазона времени между Grafana 10/12 и DashBridge, копирование текста/PNG. | Только пользовательское действие и сфокусированный документ; time payload нормализуется и валидируется; ошибка не меняет диапазон. |
+| Временная перестройка renderer | Нужен предсказуемый PNG 1000×520 для uPlot и legacy Flot. | Изменяется только выбранная панель; исходные DOM/styles/renderer sizes сохраняются и восстанавливаются в `finally` при успехе и ошибке. |
+| Версионированная миграция storage | Нужен одноразовый переход существующих профилей без потери настроек. | Backup до commit, идемпотентная нормализация, marker последним, безопасный повтор после частичного сбоя. |
+
+Наличие механизма в этой таблице не является автоматическим доказательством
+безопасности. При ревью guards и cleanup сверяются с текущим кодом и
+отрицательными тестами; расхождение считается дефектом документации или кода.
+
 ## Производительность и lifecycle
 
 1. Повторная MAIN-установка очищает предыдущую generation.
@@ -444,12 +497,16 @@ node test/run-js-tests.js
 node test/run-python-smoke-tests.js
 ```
 
-На 2026-08-28: 92 JavaScript behavior-файла и 41 исполняемый Python
-smoke/security/audit-файл. Все 76 production JavaScript-файла проходят
+На 2026-08-29: 96 JavaScript behavior-файлов и 41 исполняемый Python
+smoke/security/audit-файл. Все 78 production JavaScript-файлов проходят
 `node --check`.
 `DASHBRIDGE_PYTHON` задаёт Python, если он не находится автоматически.
 
-Дополнительно: `test-runner.html` запускает живые E2E на Grafana;
+Дополнительно: `test-runner.html` запускает живые E2E на Grafana. По user action
+он открывает общий Document Picture-in-Picture progress controller с количеством
+завершённых/запланированных тестов, PASS/FAIL, общим временем и аварийной
+остановкой; при отсутствии Document PiP основной in-page прогресс остаётся
+рабочим. Отдельное focused Grafana-окно по-прежнему принадлежит core runner;
 `test/devtools-e2e-*-diagnostics.js` — диагностические probes, не CI tests;
 `test/fixtures/` содержит статические modern/legacy fixtures.
 

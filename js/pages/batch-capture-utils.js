@@ -58,8 +58,8 @@ const BatchCaptureUtils = {
             if (!Number.isNaN(date.getTime())) {
                 const pad = number => String(number).padStart(2, '0');
                 return {
-                    date: `${pad(date.getDate())}-${pad(date.getMonth() + 1)}`,
-                    time: `${pad(date.getHours())}-${pad(date.getMinutes())}`
+                    date: `${pad(date.getDate())}.${pad(date.getMonth() + 1)}`,
+                    time: `${pad(date.getHours())}h${pad(date.getMinutes())}`
                 };
             }
         }
@@ -70,8 +70,9 @@ const BatchCaptureUtils = {
         const start = this.formatRangeBoundary(from);
         const end = this.formatRangeBoundary(to);
         if (start.date && end.date) {
-            const endPart = start.date === end.date ? end.time : `${end.date}_${end.time}`;
-            return `${ordinal}_from${start.date}_${start.time}_to${endPart}`;
+            return start.date === end.date
+                ? `${ordinal} [${start.date}] ${start.time}-${end.time}`
+                : `${ordinal} [${start.date} ${start.time}] - [${end.date} ${end.time}]`;
         }
         const startPart = start.relative || `${start.date}_${start.time}`;
         const endPart = end.relative || `${end.date}_${end.time}`;
