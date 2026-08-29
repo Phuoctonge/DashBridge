@@ -21,6 +21,9 @@ jobs:
           python-version: '3.12'
       - name: Run tests
         run: node test/run-all-tests.js
+      - name: Test Windows installer
+        shell: pwsh
+        run: ./scripts/Install-DashBridge.ps1 -SelfTest
       - name: Build release archive
         shell: pwsh
         run: ./scripts/build-release.ps1 -ExpectedTag '${{ github.ref_name }}'
@@ -32,6 +35,8 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             "dist/DashBridge-$VERSION.zip" \
             "dist/DashBridge-$VERSION.zip.sha256" \
+            "dist/Install-DashBridge.ps1" \
+            "dist/Install-DashBridge.ps1.sha256" \
             --verify-tag \
             --generate-notes \
             --title "DashBridge $VERSION"

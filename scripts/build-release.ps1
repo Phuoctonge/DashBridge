@@ -39,4 +39,11 @@ Compress-Archive -LiteralPath $releasePaths -DestinationPath $archivePath -Compr
 
 $hash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
 Set-Content -LiteralPath "$archivePath.sha256" -Value "$hash  $archiveName" -Encoding ascii
+
+$installerName = 'Install-DashBridge.ps1'
+$installerSource = Join-Path (Join-Path $projectRoot 'scripts') $installerName
+$installerPath = Join-Path $outputRoot $installerName
+Copy-Item -LiteralPath $installerSource -Destination $installerPath -Force
+$installerHash = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash.ToLowerInvariant()
+Set-Content -LiteralPath "$installerPath.sha256" -Value "$installerHash  $installerName" -Encoding ascii
 Write-Output $archivePath

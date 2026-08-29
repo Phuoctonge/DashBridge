@@ -23,7 +23,13 @@ assert(source.includes('60 * 60 * 1000')
     'GitHub checks must be cached locally and have a bounded network lifetime');
 assert(source.includes('text.textContent =') && !source.includes('innerHTML'),
     'release metadata must be rendered as text');
-assert(source.includes('chrome.tabs.create({ url: release.downloadUrl })'),
-    'the explicit user action must open the validated release asset');
+assert(source.includes('chrome.tabs.create({ url: release.installerUrl })'),
+    'the explicit user action must open the validated installer asset');
+assert(source.includes("chrome.runtime.getURL('manifest.json')")
+    && source.includes("cache: 'no-store'")
+    && source.includes('localReloadRequired')
+    && source.includes('chrome.runtime.reload()')
+    && source.includes('Перезагрузить расширение'),
+'popup must prefer a locally staged version and reload the extension through the Chrome runtime API');
 
 console.log('PASS popup update notice is cached, safe and independent of module state');

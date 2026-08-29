@@ -50,11 +50,18 @@
                 && isTrustedReleaseUrl(candidate.browser_download_url,
                     `/Phuoctonge/DashBridge/releases/download/${tag}/${expectedName}`))
             : null;
-        if (!asset) return null;
+        const installerName = 'Install-DashBridge.ps1';
+        const installer = Array.isArray(payload.assets)
+            ? payload.assets.find(candidate => candidate?.name === installerName
+                && isTrustedReleaseUrl(candidate.browser_download_url,
+                    `/Phuoctonge/DashBridge/releases/download/${tag}/${installerName}`))
+            : null;
+        if (!asset || !installer) return null;
         return Object.freeze({
             version,
             pageUrl: payload.html_url,
             downloadUrl: asset.browser_download_url,
+            installerUrl: installer.browser_download_url,
             publishedAt: typeof payload.published_at === 'string' ? payload.published_at : null,
         });
     }

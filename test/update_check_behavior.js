@@ -25,12 +25,16 @@ const release = {
     assets: [{
         name: 'DashBridge-2.4.0.zip',
         browser_download_url: 'https://github.com/Phuoctonge/DashBridge/releases/download/v2.4.0/DashBridge-2.4.0.zip',
+    }, {
+        name: 'Install-DashBridge.ps1',
+        browser_download_url: 'https://github.com/Phuoctonge/DashBridge/releases/download/v2.4.0/Install-DashBridge.ps1',
     }],
 };
 assert.deepStrictEqual(JSON.parse(JSON.stringify(update.parseLatestRelease(release))), {
     version: '2.4.0',
     pageUrl: release.html_url,
     downloadUrl: release.assets[0].browser_download_url,
+    installerUrl: release.assets[1].browser_download_url,
     publishedAt: release.published_at,
 });
 assert.strictEqual(update.parseLatestRelease({ ...release, prerelease: true }), null);
@@ -38,7 +42,9 @@ assert.strictEqual(update.parseLatestRelease({ ...release, tag_name: 'v2.4.1' })
     'tag, page and archive version must be identical');
 assert.strictEqual(update.parseLatestRelease({
     ...release,
-    assets: [{ ...release.assets[0], browser_download_url: 'https://evil.example/DashBridge-2.4.0.zip' }],
+    assets: [{ ...release.assets[0], browser_download_url: 'https://evil.example/DashBridge-2.4.0.zip' }, release.assets[1]],
 }), null, 'download URL must be pinned to the official repository and release');
+assert.strictEqual(update.parseLatestRelease({ ...release, assets: [release.assets[0]] }), null,
+    'a release without the trusted installer must not be offered as an automatic update');
 
 console.log('PASS update metadata accepts only a newer trusted GitHub release');

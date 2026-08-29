@@ -5,15 +5,45 @@
     const CACHE_KEY = 'dashbridgeUpdateCheck';
     const CACHE_TTL_MS = 60 * 60 * 1000;
     const REQUEST_TIMEOUT_MS = 6000;
+    let localReloadRequired = false;
+
+    function showLocalReloadNotice(diskVersion, currentVersion) {
+        const notice = document.getElementById('updateNotice');
+        const text = document.getElementById('updateNoticeText');
+        const button = document.getElementById('downloadUpdateBtn');
+        if (!notice || !text || !button) return;
+        localReloadRequired = true;
+        text.textContent = `Файлы версии ${diskVersion} готовы (запущена ${currentVersion})`;
+        button.textContent = 'Перезагрузить расширение';
+        button.onclick = () => chrome.runtime.reload();
+        notice.hidden = false;
+    }
+
+    async function checkLocalFiles() {
+        const currentVersion = chrome.runtime.getManifest().version;
+        try {
+            const manifestUrl = `${chrome.runtime.getURL('manifest.json')}?disk-check=${Date.now()}`;
+            const response = await fetch(manifestUrl, { cache: 'no-store' });
+            if (!response.ok) return;
+            const manifest = await response.json();
+            if (manifest?.name === 'DashBridge'
+                && DashBridgeUpdateCheck.compareVersions(manifest.version, currentVersion) === 1) {
+                showLocalReloadNotice(manifest.version, currentVersion);
+            }
+        } catch (_error) {
+            // A failed disk check must not affect the normal popup startup.
+        }
+    }
 
     function showUpdateNotice(release) {
+        if (localReloadRequired) return;
         const notice = document.getElementById('updateNotice');
         const text = document.getElementById('updateNoticeText');
         const button = document.getElementById('downloadUpdateBtn');
         if (!notice || !text || !button) return;
         const currentVersion = chrome.runtime.getManifest().version;
         text.textContent = `Доступна версия ${release.version} (установлена ${currentVersion})`;
-        button.onclick = () => chrome.tabs.create({ url: release.downloadUrl });
+        button.onclick = () => chrome.tabs.create({ url: release.installerUrl });
         notice.hidden = false;
     }
 
@@ -58,5 +88,8 @@
         }
     }
 
-    document.addEventListener('DOMContentLoaded', () => { void checkForUpdates(); });
+    document.addEventListener('DOMContentLoaded', async () => {
+        await checkLocalFiles();
+        await checkForUpdates();
+    });
 })();

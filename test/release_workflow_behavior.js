@@ -25,5 +25,11 @@ for (const excluded of ['README.md', 'docs', 'plans', 'test']) {
 }
 assert(builder.includes('Get-FileHash') && workflow.includes('.zip.sha256'),
     'every release archive must publish its SHA-256 checksum');
+assert(builder.includes("'Install-DashBridge.ps1'")
+    && workflow.includes('./scripts/Install-DashBridge.ps1 -SelfTest')
+    && workflow.includes('dist/Install-DashBridge.ps1.sha256'),
+    'the release must test and publish the standalone installer with its checksum');
+assert(!builder.includes('"scripts\\$installerName"'),
+    'release builder must keep installer paths portable across Windows and GitHub Linux runners');
 
 console.log('PASS tagged releases test, package and publish a minimal extension archive');

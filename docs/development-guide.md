@@ -11,7 +11,7 @@
 Расширение не требует сборки и загружается напрямую из исходной папки. На
 момент проверки проходят:
 
-- 96 JavaScript behavior-файлов;
+- 97 JavaScript behavior-файлов;
 - 41 Python smoke/security/audit-файл;
 - `node --check` для всех 78 production JavaScript-файлов.
 
@@ -169,7 +169,8 @@ foreach ($file in $files) { node --check $file }
 
 Версия в `manifest.json`, README badge и Git tag должна совпадать. Скрипт
 `scripts/build-release.ps1` собирает минимальный ZIP расширения и SHA-256,
-исключая тесты, документацию и локальные артефакты:
+а также отдельный `Install-DashBridge.ps1` и его checksum. Installer не входит
+в extension ZIP:
 
 ```powershell
 ./scripts/build-release.ps1 -ExpectedTag 'v2.4.1'
@@ -177,13 +178,15 @@ foreach ($file in $files) { node --check $file }
 
 Push тега `vX.Y.Z` запускает `.github/workflows/release.yml`: полный набор
 тестов, проверку совпадения тега с версией manifest, сборку
-`DashBridge-X.Y.Z.zip` и SHA-256, затем публикацию GitHub Release с
+`DashBridge-X.Y.Z.zip`, installer и их SHA-256, затем публикацию GitHub Release с
 автоматически сформированными release notes. При открытии popup проверяет
 `releases/latest` не чаще одного раза в час, игнорирует draft/prerelease и
 принимает download URL лишь при полном совпадении стабильного тега, версии,
-GitHub-путей и имени архива. Это уведомление об обновлении, а не автоматическая
-установка: ZIP скачивается по действию пользователя, после чего распакованное
-расширение нужно заменить и обновить в браузере вручную.
+GitHub-путей и имён ZIP/installer assets. Popup скачивает installer только по
+явному действию. Installer сверяет checksum ZIP, делает staging/backup и не
+обходит ручное первичное подтверждение Chromium. После его изменения обязателен
+`pwsh ./scripts/Install-DashBridge.ps1 -SelfTest`; полный контракт находится в
+`docs/installer.md`.
 
 ## Политика комментариев
 

@@ -17,6 +17,8 @@
   функциями расширения.
 - [`dashflow-v2.md`](dashflow-v2.md) — формат записи Traffic Recorder,
   полнота данных и границы конвертации в HAR/JMX/WebPageTest/SAZ.
+- [`installer.md`](installer.md) — установка и обновление unpacked DashBridge,
+  поиск существующей папки, staging/backup и release trust boundary.
 - [`../plans/README.md`](../plans/README.md) — только актуальные незавершённые
   направления. Реализованные задачи там не хранятся.
 

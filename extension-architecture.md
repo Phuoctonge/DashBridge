@@ -160,6 +160,8 @@ grafana-panel-tools.js
 | Grafana time | `grafana-time.js` | DashBridge, iframe. |
 | Clipboard диапазона | `grafana-time-picker-clipboard.js`, `dashbridge-time-state.js` | Direct Grafana, DashBridge. |
 | Theme и UI scale | `theme.js`, `css/theme.css` | Все extension pages. |
+| Проверка обновлений | `update-check.js`, `popup-updates.js` | Popup. |
+| Windows install/update | `scripts/Install-DashBridge.ps1` | Отдельный пользовательский процесс, не extension runtime. |
 
 Похожий код остаётся раздельным при разном lifecycle. Например, Batch работает
 в отдельном окне для ZIP, а панельные кнопки временно перестраивают одну живую
@@ -497,7 +499,7 @@ node test/run-js-tests.js
 node test/run-python-smoke-tests.js
 ```
 
-На 2026-08-29: 96 JavaScript behavior-файлов и 41 исполняемый Python
+На 2026-08-29: 97 JavaScript behavior-файлов и 41 исполняемый Python
 smoke/security/audit-файл. Все 78 production JavaScript-файлов проходят
 `node --check`.
 `DASHBRIDGE_PYTHON` задаёт Python, если он не находится автоматически.
@@ -527,15 +529,26 @@ smoke/security/audit-файл. Все 78 production JavaScript-файлов пр
 
 Push тега `vX.Y.Z` запускает `.github/workflows/release.yml`. Workflow выполняет
 полный набор тестов, требует совпадения тега с версией `manifest.json`, собирает
-ZIP и SHA-256 через `scripts/build-release.ps1`, затем публикует GitHub Release
-с автоматически сформированными notes.
+ZIP расширения, Windows installer и SHA-256 через `scripts/build-release.ps1`,
+затем публикует GitHub Release с автоматически сформированными notes.
 
 Popup при открытии запрашивает только `releases/latest` репозитория
 `Phuoctonge/DashBridge`; успешный результат кэшируется в `storage.local` на один
-час. Draft/prerelease, неожиданный тег, GitHub URL или имя ZIP отклоняются.
-При более новой версии показывается ссылка на ZIP. Автоматической установки нет:
-для unpacked extension пользователь вручную заменяет файлы и нажимает
-**Обновить** на странице расширений браузера.
+час. Draft/prerelease, неожиданный тег, GitHub URL и отсутствие точных
+ZIP/installer assets отклоняются. При более новой версии показывается ссылка на
+installer. Его запуск остаётся явным действием пользователя.
+
+`scripts/Install-DashBridge.ps1` работает вне extension trust boundary: выбирает
+установленный Chrome/Edge/Яндекс Браузер, best-effort ищет прежний unpacked path
+в browser `Preferences`, либо использует `%LOCALAPPDATA%\DashBridge\Extension`.
+Он принимает только точный stable release, сверяет SHA-256 и manifest version,
+обновляет через sibling staging и сохраняет backup. Git checkout, корни диска и
+непустые чужие папки отклоняются; browser preferences не меняются, а процессы
+не завершаются принудительно. После live swap popup сравнивает загруженный
+manifest с файлом на диске и предлагает штатный `chrome.runtime.reload()`;
+локальная готовая версия имеет приоритет над повторным remote download notice.
+Первичная регистрация через **Загрузить распакованное** остаётся ручной. Полный
+контракт: `docs/installer.md`.
 
 ## Куда добавлять функцию
 
