@@ -43,6 +43,17 @@ assert.strictEqual(records[1].values[0], 949);
 assert.strictEqual(tableReport.parseGrafanaTableDisplayValue('−1,5 MiB'), -1.5 * 1024 ** 2);
 assert.strictEqual(tableReport.parseGrafanaTableDisplayValue('1.2e3'), 1200);
 assert.strictEqual(tableReport.parseGrafanaTableDisplayValue('No data'), null);
+const responseShape = tableReport.getResponseTableFrameShape({
+    schema: { fields: [{ name: 'Metric', type: 'string' }, { name: 'Value', type: 'number' }] },
+    data: { values: [['one', 'two'], [1, 2]] }
+});
+assert(responseShape && responseShape.nameIndex === 0 && responseShape.valueIndex === 1
+    && responseShape.rowCount === 2 && responseShape.timeIndexes.length === 0,
+    'response Metric/Value frame shape must share the table-report parser contract');
+assert.strictEqual(tableReport.getResponseTableFrameShape({
+    schema: { fields: [{ name: 'Metric', type: 'string' }, { name: 'Status', type: 'string' }] },
+    data: { values: [['one'], ['ok']] }
+}), null, 'response tables without a numeric value column must fail open');
 vm.runInContext(tableSource, context);
 assert.strictEqual(context.DashBridgeGrafanaTableReport, tableReport, 'reinstallation must preserve the table report API');
 assert(source.includes("engine = responseTableRecords.length ? 'table-response' : 'table-dom'")

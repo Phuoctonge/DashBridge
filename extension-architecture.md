@@ -148,7 +148,7 @@ grafana-panel-tools.js
 | Ответ до renderer | `grafana-series-capture.js` | Batch series mode. |
 | Определение панели и query signatures | `grafana-panel-definition.js` | Visual engine, panel tools, test runner. |
 | Разбор и согласование единиц Grafana | `grafana-unit.js` | Visual engine: axis/panel units, threshold, table report, uPlot/Flot. |
-| Чтение Grafana Table для отчёта | `grafana-table-report.js` | Visual engine report snapshot. |
+| Чтение Grafana Table | `grafana-table-report.js` | Response frame shape, Visual engine report snapshot. |
 | uPlot/Flot visuals | `grafana-visual-engine.js` | Direct Grafana, DashBridge. |
 | Настройки панели | `grafana-panel-settings-modal.js` | Direct Grafana, DashBridge. |
 | Allowlist легенды | `grafana-legend-selection.js` | Tools, карточки. |

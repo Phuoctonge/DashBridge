@@ -6,7 +6,8 @@ const vm = require('vm');
 
 const panelTools = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-panel-tools.js'), 'utf8');
 const cpuFilter = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-cpu-capacity-filter.js'), 'utf8');
-const start = panelTools.indexOf('const getResponseTableFrameShape =');
+const tableReport = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-table-report.js'), 'utf8');
+const start = panelTools.indexOf('    const targetPanelUsesTable =');
 const end = panelTools.indexOf('    const getFieldLegendNames', start);
 assert(start >= 0 && end > start, 'generic response-series filter must remain independently testable');
 assert(panelTools.includes("rawCandidate !== null && rawCandidate !== undefined && rawCandidate !== ''"),
@@ -23,9 +24,12 @@ const context = {
 };
 context.window = context;
 context.globalThis = context;
+context.DashBridgeGrafanaUnit = { parseAxisUnitLabel: () => null };
 vm.createContext(context);
 vm.runInContext(cpuFilter, context);
-vm.runInContext(`${panelTools.slice(start, end)}
+vm.runInContext(tableReport, context);
+vm.runInContext(`const getResponseTableFrameShape = globalThis.DashBridgeGrafanaTableReport.getResponseTableFrameShape;
+${panelTools.slice(start, end)}
 globalThis.filterSeries = filterSeriesByThreshold;`, context);
 
 const makeFrame = (name, values) => ({

@@ -1975,24 +1975,7 @@
         return { data, modifiedCount };
     };
 
-    const getResponseTableFrameShape = frame => {
-        const fields = frame?.schema?.fields || [];
-        const columns = frame?.data?.values || [];
-        const normalizedName = field => String(field?.config?.displayName || field?.name || '').trim();
-        const nameIndex = fields.findIndex(field => /^(?:metric|name|series|метрика|имя|серия|запрос)$/iu.test(normalizedName(field))
-            && field.type !== 'number');
-        const exactValueIndex = fields.findIndex((field, index) => /^(?:value|current|last|значение|текущее(?: значение)?|количество|count)$/iu.test(normalizedName(field))
-            && (field.type === 'number' || Array.from(columns[index] || []).some(Number.isFinite)));
-        const numericIndexes = fields.map((field, index) => field.type === 'number'
-            || Array.from(columns[index] || []).some(Number.isFinite) ? index : -1).filter(index => index >= 0);
-        const valueIndex = exactValueIndex >= 0 ? exactValueIndex : (numericIndexes.length === 1 ? numericIndexes[0] : -1);
-        if (nameIndex < 0 || valueIndex < 0 || nameIndex === valueIndex) return null;
-        const rowCount = Math.min(columns[nameIndex]?.length || 0, columns[valueIndex]?.length || 0);
-        if (!rowCount) return null;
-        const timeIndexes = fields.map((field, index) => field.type === 'time' || field.name === 'Time' ? index : -1)
-            .filter(index => index >= 0);
-        return { fields, columns, nameIndex, valueIndex, rowCount, timeIndexes };
-    };
+    const { getResponseTableFrameShape } = window.DashBridgeGrafanaTableReport;
 
     const targetPanelUsesTable = () => {
         const panel = window.DashBridgeGrafanaDom?.outerPanel?.(getTargetPanel()) || getTargetPanel();
