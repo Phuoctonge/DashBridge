@@ -5,7 +5,7 @@ import re
 
 ROOT = Path(__file__).resolve().parent.parent
 THEME = (ROOT / "css" / "theme.css").read_text(encoding="utf-8")
-DASHBRIDGE_CSS = (ROOT / "css" / "dashbridge.css").read_text(encoding="utf-8")
+DASHBRIDGE_CSS = (ROOT / "pages" / "dashbridge" / "dashbridge.css").read_text(encoding="utf-8")
 
 for token in (
     "--font-size-page-title: 1.375rem;",
@@ -42,7 +42,7 @@ tab_button_rule = re.search(r"\.tab-btn\s*\{(?P<body>.*?)\n\s*\}", popup, re.DOT
 assert tab_button_rule, "Popup must define the main tab button style"
 assert "cursor: pointer" in tab_button_rule.group("body"), "Popup tabs must use a pointer cursor"
 
-dashbridge = (ROOT / "css" / "dashbridge.css").read_text(encoding="utf-8")
+dashbridge = (ROOT / "pages" / "dashbridge" / "dashbridge.css").read_text(encoding="utf-8")
 assert ":root" not in dashbridge, "DashBridge retains a page-local token root"
 
 options = (ROOT / "pages/options/options.html").read_text(encoding="utf-8")

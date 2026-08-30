@@ -54,7 +54,7 @@ function queueStorageCommit(values) {
 }
 
 async function commitDashBridgeProfilePatch(message, sender) {
-    if (!isTrustedExtensionPage(sender, 'html/dashbridge.html')
+    if (!isTrustedExtensionPage(sender, 'pages/dashbridge/dashbridge.html')
         || !Array.isArray(message?.upserts)
         || !Array.isArray(message?.deleteProfileIds)
         || typeof message.activeProfileId !== 'string') {
@@ -308,7 +308,7 @@ async function backfillOpenGrafanaFrames() {
 }
 
 async function getDashBridgeTabIds() {
-    const dashbridgeUrl = chrome.runtime.getURL('html/dashbridge.html');
+    const dashbridgeUrl = chrome.runtime.getURL('pages/dashbridge/dashbridge.html');
     const tabs = await chrome.tabs.query({});
     return tabs.filter(tab => typeof tab.url === 'string' && tab.url.startsWith(dashbridgeUrl))
         .map(tab => tab.id).filter(Number.isInteger);
@@ -452,7 +452,7 @@ async function collectGuiScreenshotsInternal() {
         { name: '07_popup_jira.png', popup: ['tab-jira'] },
         { name: '09_popup_tdm.png', popup: ['tab-tdm'] },
         { name: '10_options.png', url: chrome.runtime.getURL('pages/options/options.html') },
-        { name: '11_dashbridge.png', url: chrome.runtime.getURL('html/dashbridge.html') },
+        { name: '11_dashbridge.png', url: chrome.runtime.getURL('pages/dashbridge/dashbridge.html') },
         { name: '12_batch.png', url: chrome.runtime.getURL('pages/batch/batch.html') },
         { name: '13_worklog.png', url: chrome.runtime.getURL('pages/worklog/worklog.html') }
     ];
@@ -581,7 +581,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         return true;
     }
     if (message && message.type === 'dashbridge-ensure-iframe-rules' && _sender.tab) {
-        const expectedUrl = chrome.runtime.getURL('html/dashbridge.html');
+        const expectedUrl = chrome.runtime.getURL('pages/dashbridge/dashbridge.html');
         if (typeof _sender.tab.url !== 'string' || !_sender.tab.url.startsWith(expectedUrl)) {
             sendResponse({ ok: false, error: 'Unexpected sender' });
             return undefined;

@@ -4,7 +4,7 @@ from support.smoke import run_checks
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = (ROOT / "js/content/grafana-visual-engine.js").read_text(encoding="utf-8")
-DASHBOARD = (ROOT / "js/pages/dashbridge.js").read_text(encoding="utf-8")
+DASHBOARD = (ROOT / "pages/dashbridge/dashbridge.js").read_text(encoding="utf-8")
 PANEL_SETTINGS = (ROOT / "js/shared/grafana-panel-settings-modal.js").read_text(encoding="utf-8")
 
 checks = {

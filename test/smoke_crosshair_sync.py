@@ -4,10 +4,10 @@ from support.smoke import run_checks
 
 
 ROOT = Path(__file__).resolve().parent.parent
-DASHBOARD = (ROOT / "js/pages/dashbridge.js").read_text(encoding="utf-8")
-CROSSHAIR = (ROOT / "js/pages/dashbridge-crosshair.js").read_text(encoding="utf-8")
+DASHBOARD = (ROOT / "pages/dashbridge/dashbridge.js").read_text(encoding="utf-8")
+CROSSHAIR = (ROOT / "pages/dashbridge/dashbridge-crosshair.js").read_text(encoding="utf-8")
 IFRAME = (ROOT / "js/content/grafana-iframe.js").read_text(encoding="utf-8")
-HTML = (ROOT / "html/dashbridge.html").read_text(encoding="utf-8")
+HTML = (ROOT / "pages/dashbridge/dashbridge.html").read_text(encoding="utf-8")
 MANIFEST = (ROOT / "manifest.json").read_text(encoding="utf-8")
 
 

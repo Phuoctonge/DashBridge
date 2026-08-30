@@ -289,6 +289,7 @@ DashBridge/
 ├── manifest.json            # Manifest V3
 ├── pages/                   # Feature-папки полноразмерных страниц
 │   ├── batch/               # HTML, CSS и lifecycle массового сбора
+│   ├── dashbridge/          # HTML, CSS, renderer и profiles дашборда
 │   ├── options/             # HTML, CSS и логика настроек расширения
 │   ├── recorder/            # HTML, CSS и логика Traffic Recorder
 │   ├── test-runner/         # UI, probe, suite и отчёты живых E2E
@@ -296,7 +297,6 @@ DashBridge/
 │   └── debug-easter-egg/    # Изолированная пасхалка и замаскированные assets
 ├── html/                    # Остальные страницы до их поэтапного переноса
 │   ├── popup.html           # Главное popup-окно
-│   ├── dashbridge.html      # Единый Grafana-дашборд
 ├── js/
 │   ├── content/             # Интеграция со страницами Grafana/Confluence
 │   ├── pages/               # Логика полноразмерных страниц

@@ -4,9 +4,9 @@ from support.smoke import run_checks
 
 
 ROOT = Path(__file__).resolve().parent.parent
-JS = (ROOT / "js/pages/dashbridge.js").read_text(encoding="utf-8")
-RENDERER = (ROOT / "js/pages/dashbridge-renderer.js").read_text(encoding="utf-8")
-CSS = (ROOT / "css/dashbridge.css").read_text(encoding="utf-8")
+JS = (ROOT / "pages/dashbridge/dashbridge.js").read_text(encoding="utf-8")
+RENDERER = (ROOT / "pages/dashbridge/dashbridge-renderer.js").read_text(encoding="utf-8")
+CSS = (ROOT / "pages/dashbridge/dashbridge.css").read_text(encoding="utf-8")
 
 
 checks = {

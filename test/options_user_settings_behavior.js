@@ -7,7 +7,7 @@ const optionsHtml = fs.readFileSync('pages/options/options.html', 'utf8');
 const optionsSource = fs.readFileSync('pages/options/options.js', 'utf8');
 const tdmSource = fs.readFileSync('js/popup/popup-tdm.js', 'utf8');
 const contentSource = fs.readFileSync('js/content/content.js', 'utf8');
-const dashboardSource = fs.readFileSync('js/pages/dashbridge.js', 'utf8');
+const dashboardSource = fs.readFileSync('pages/dashbridge/dashbridge.js', 'utf8');
 const popupCoreSource = fs.readFileSync('js/popup/popup-core.js', 'utf8');
 
 const contracts = [

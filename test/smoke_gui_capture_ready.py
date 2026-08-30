@@ -4,7 +4,7 @@ from support.smoke import CheckCollector
 
 
 ROOT = Path(__file__).resolve().parent.parent
-PAGE = (ROOT / 'js/pages/dashbridge.js').read_text(encoding='utf-8')
+PAGE = (ROOT / 'pages/dashbridge/dashbridge.js').read_text(encoding='utf-8')
 BACKGROUND = (ROOT / 'js/background.js').read_text(encoding='utf-8')
 IFRAME = (ROOT / 'js/content/grafana-iframe.js').read_text(encoding='utf-8')
 

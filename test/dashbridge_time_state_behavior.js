@@ -18,7 +18,7 @@ const context = {
 };
 vm.createContext(context);
 vm.runInContext(fs.readFileSync('js/shared/grafana-panel-bootstrap.js', 'utf8'), context);
-vm.runInContext(fs.readFileSync('js/pages/dashbridge-time-state.js', 'utf8'), context);
+vm.runInContext(fs.readFileSync('pages/dashbridge/dashbridge-time-state.js', 'utf8'), context);
 const state = vm.runInContext('DashBridgeTimeState', context);
 
 assert.deepStrictEqual(JSON.parse(JSON.stringify(state.defaults())), {

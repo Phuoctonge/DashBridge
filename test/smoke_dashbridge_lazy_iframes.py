@@ -5,9 +5,9 @@ from pathlib import Path
 from support.smoke import run_checks
 
 ROOT = Path(__file__).parent.parent
-src = (ROOT / 'js/pages/dashbridge.js').read_text(encoding='utf-8')
-renderer = (ROOT / 'js/pages/dashbridge-renderer.js').read_text(encoding='utf-8')
-html = (ROOT / 'html/dashbridge.html').read_text(encoding='utf-8')
+src = (ROOT / 'pages/dashbridge/dashbridge.js').read_text(encoding='utf-8')
+renderer = (ROOT / 'pages/dashbridge/dashbridge-renderer.js').read_text(encoding='utf-8')
+html = (ROOT / 'pages/dashbridge/dashbridge.html').read_text(encoding='utf-8')
 
 checks = {
     'custom lazy-load setting is removed':
@@ -26,7 +26,7 @@ checks = {
         'id="capturePreparedToggleBtn"' in html and 'btn-capture-toggle' in html
         and "setDashboardCapturePrepared(!defaultCapturePrepared)" in src,
     'DashBridge page loads ZIP dependencies before controller':
-        html.index('vendor/jszip.min.js') < html.index('js/shared/archive-download.js') < html.index('js/pages/dashbridge.js'),
+        html.index('vendor/jszip.min.js') < html.index('js/shared/archive-download.js') < html.index('dashbridge.js'),
     'archive capture is sequential':
         re.search(r"for \(let index = 0; index < activePanels\.length; index \+= 1\)[\s\S]+?await captureDashbridgePanel", src) is not None,
     'paused panels are excluded from archive':

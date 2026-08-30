@@ -3,7 +3,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'js', 'pages', 'dashbridge.js'), 'utf8');
+const source = fs.readFileSync(path.join(__dirname, '..', 'pages', 'dashbridge', 'dashbridge.js'), 'utf8');
 assert(source.includes("const DASHBRIDGE_TAB_ACTIVE_PROFILE_KEY = 'dashbridge_tab_activeProfileId';")
     && source.includes('sessionStorage.getItem(DASHBRIDGE_TAB_ACTIVE_PROFILE_KEY)')
     && source.includes('sessionStorage.setItem(DASHBRIDGE_TAB_ACTIVE_PROFILE_KEY, activeProfileId)'),

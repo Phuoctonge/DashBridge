@@ -5,8 +5,8 @@ from support.smoke import run_checks
 ROOT = Path(__file__).resolve().parent.parent
 tools = (ROOT / "js/content/grafana-panel-tools.js").read_text(encoding="utf-8")
 state = (ROOT / "js/content/grafana-panel-state.js").read_text(encoding="utf-8")
-dashboard = (ROOT / "js/pages/dashbridge.js").read_text(encoding="utf-8")
-renderer = (ROOT / "js/pages/dashbridge-renderer.js").read_text(encoding="utf-8")
+dashboard = (ROOT / "pages/dashbridge/dashbridge.js").read_text(encoding="utf-8")
+renderer = (ROOT / "pages/dashbridge/dashbridge-renderer.js").read_text(encoding="utf-8")
 batch = (ROOT / "pages/batch/batch.js").read_text(encoding="utf-8")
 runner = (ROOT / "pages/batch/batch-capture-runner.js").read_text(encoding="utf-8")
 layout = (ROOT / "js/content/grafana-compact-layout.js").read_text(encoding="utf-8")

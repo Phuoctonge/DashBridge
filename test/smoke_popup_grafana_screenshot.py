@@ -23,7 +23,7 @@ class DivBalanceParser(HTMLParser):
 if __name__ == "__main__":
     popup = read("html/popup.html")
     tools = read("js/content/grafana-panel-tools.js")
-    dashboard = read("js/pages/dashbridge.js")
+    dashboard = read("pages/dashbridge/dashbridge.js")
     content = read("js/content/content.js")
     background = read("js/background.js")
     output = read("js/shared/grafana-capture-output.js")

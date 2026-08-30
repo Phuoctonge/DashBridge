@@ -3,9 +3,9 @@
 const assert = require('assert');
 const fs = require('fs');
 
-const html = fs.readFileSync('html/dashbridge.html', 'utf8');
-const source = fs.readFileSync('js/pages/dashbridge.js', 'utf8');
-const css = fs.readFileSync('css/dashbridge.css', 'utf8');
+const html = fs.readFileSync('pages/dashbridge/dashbridge.html', 'utf8');
+const source = fs.readFileSync('pages/dashbridge/dashbridge.js', 'utf8');
+const css = fs.readFileSync('pages/dashbridge/dashbridge.css', 'utf8');
 
 assert(html.includes('id="quickAddPanelsBtn"')
     && html.includes('id="discoverDashboardPanelsBtn"')
@@ -16,7 +16,7 @@ assert(html.includes('Добавить панели')
     && html.includes('Выбрать из дашборда'),
     'panel addition actions must use distinct user-facing names');
 assert(html.indexOf('js/shared/grafana-url.js') < html.indexOf('js/shared/grafana-dashboard-api.js')
-    && html.indexOf('js/shared/grafana-dashboard-api.js') < html.indexOf('js/pages/dashbridge.js'),
+    && html.indexOf('js/shared/grafana-dashboard-api.js') < html.indexOf('dashbridge.js'),
     'DashBridge must load the same dashboard inventory API used by Batch before its controller');
 
 const pickerStart = source.indexOf('// Independent dashboard inventory picker.');

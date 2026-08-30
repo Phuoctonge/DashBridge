@@ -77,7 +77,7 @@
 | Test Runner | порядок runtime scripts, OPFS spool, planned/completed/NOT RUN, PiP cancel и elapsed time, cleanup окна Grafana | `pages/test-runner/test-runner-*.js`, `operation-progress-window.js`, `pages/test-runner/test-runner.html` |
 | Capture | save и copy, prepared on/off, DPR/crop, success/error restore | shared capture helpers, content bridge, background |
 | Storage/import | legacy и hostile input, rejected backup, сериализация записей | `local-state-schema.js`, `storage-writer.js`, Options |
-| Storage migration | backup до commit, marker последним, повтор после partial failure, удаление legacy keys только после commit | `dashbridge-data-migration.js`, `dashbridge-time-state.js`, `html/dashbridge.html` |
+| Storage migration | backup до commit, marker последним, повтор после partial failure, удаление legacy keys только после commit | `dashbridge-data-migration.js`, `dashbridge-time-state.js`, `pages/dashbridge/dashbridge.html` |
 | Runtime message | sender, payload type/size, authority конкретного контекста | `background.js`, соответствующий sender |
 | Permission/DNR | минимальный сценарий, tab/host scope, документацию | `manifest.json`, `dnr-rules.js`, `permission-map.md` |
 | Новая page/popup UI | порядок scripts, раннюю тему, safe DOM rendering, keyboard/focus | HTML, `js/pages/` или `js/popup/`, CSS |

@@ -11,7 +11,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnDashBridge = document.getElementById("openDashBridgeBtn");
     if (btnDashBridge) {
         btnDashBridge.onclick = () => {
-            chrome.tabs.create({ url: chrome.runtime.getURL("html/dashbridge.html") });
+            chrome.tabs.create({ url: chrome.runtime.getURL("pages/dashbridge/dashbridge.html") });
         };
     }
 

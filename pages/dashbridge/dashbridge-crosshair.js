@@ -1,4 +1,4 @@
-// Coalesces pointer broadcasts between Grafana iframes.
+// DashBridge coalesces pointer broadcasts between Grafana iframes.
 function createDashBridgeCrosshair({ frames, send, isEnabled }) {
     let animationFrame = null;
     let pending = null;

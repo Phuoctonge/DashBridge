@@ -22,7 +22,7 @@ for token in TOKENS:
     assert dark_index >= 0 and token in THEME[dark_index:], f"missing dark token {token}"
     print(f"  PASS {token} exists in both themes")
 
-for stylesheet in ("css/popup.css", "pages/options/options.css", "pages/worklog/worklog.css", "pages/batch/batch.css", "css/dashbridge.css"):
+for stylesheet in ("css/popup.css", "pages/options/options.css", "pages/worklog/worklog.css", "pages/batch/batch.css", "pages/dashbridge/dashbridge.css"):
     css = (ROOT / stylesheet).read_text(encoding="utf-8")
     assert not re.search(r"background(?:-color)?\s*:\s*#fff(?:\s*!important)?\s*;", css), (
         f"{stylesheet} still hard-codes a white surface"

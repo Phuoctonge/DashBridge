@@ -60,8 +60,8 @@ vm.createContext(context);
 for (const file of [
     'js/shared/grafana-settings.js',
     'js/shared/grafana-panel-bootstrap.js',
-    'js/pages/dashbridge-time-state.js',
-    'js/pages/dashbridge-data-migration.js'
+    'pages/dashbridge/dashbridge-time-state.js',
+    'pages/dashbridge/dashbridge-data-migration.js'
 ]) vm.runInContext(fs.readFileSync(file, 'utf8'), context);
 
 (async () => {

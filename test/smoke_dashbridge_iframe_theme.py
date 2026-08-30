@@ -3,7 +3,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
-DASHBOARD = (ROOT / "js" / "pages" / "dashbridge.js").read_text(encoding="utf-8")
+DASHBOARD = (ROOT / "pages" / "dashbridge" / "dashbridge.js").read_text(encoding="utf-8")
 THEME_RUNTIME = (ROOT / "js" / "theme.js").read_text(encoding="utf-8")
 
 for required in (

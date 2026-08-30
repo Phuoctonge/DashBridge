@@ -4,16 +4,16 @@ const fs = require('fs');
 const path = require('path');
 
 const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
-const html = read('html/dashbridge.html');
-const dashboard = read('js/pages/dashbridge.js');
+const html = read('pages/dashbridge/dashbridge.html');
+const dashboard = read('pages/dashbridge/dashbridge.js');
 const tools = read('js/content/grafana-panel-tools.js');
 const visual = read('js/content/grafana-visual-engine.js');
 const tableReport = read('js/content/grafana-table-report.js');
 const schema = read('js/shared/local-state-schema.js');
-const css = read('css/dashbridge.css');
+const css = read('pages/dashbridge/dashbridge.css');
 
 assert(html.includes('id="generateReportBtn"') && html.includes('id="configureReportBtn"'));
-assert(html.indexOf('js/shared/dashbridge-report.js') < html.indexOf('js/pages/dashbridge.js'),
+assert(html.indexOf('js/shared/dashbridge-report.js') < html.indexOf('dashbridge.js'),
     'report engine must load before the dashboard controller');
 assert(dashboard.includes("action: 'collectPanelReportSnapshot'")
     && dashboard.includes("e.data.action === 'panelReportSnapshot'")

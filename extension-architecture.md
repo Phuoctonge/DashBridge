@@ -6,7 +6,7 @@
 > `docs/history/architecture-decisions.md`.
 
 DashBridge — Chrome MV3-расширение с шестью контурами: инструменты обычной
-Grafana, единый дашборд `html/dashbridge.html`, пакетный экспорт `pages/batch/batch.html`, Jira
+Grafana, единый дашборд `pages/dashbridge/dashbridge.html`, пакетный экспорт `pages/batch/batch.html`, Jira
 worklog, Traffic Recorder и Popup-инструменты для Grafana/Jira/Confluence/TDM.
 
 Основные принципы:
@@ -25,6 +25,7 @@ manifest.json
 ├── AGENTS.md                   # Обязательная точка входа для AI-анализа
 ├── pages/                      # Feature-папки полноразмерных extension pages
 │   ├── batch/                  # Пакетный PNG/ZIP: UI и lifecycle-модули
+│   ├── dashbridge/             # Единый дашборд: renderer, profiles, time
 │   ├── options/                # HTML, CSS и контроллер настроек
 │   ├── recorder/               # Traffic Recorder: HTML, CSS и контроллер
 │   ├── test-runner/            # Живые E2E: UI, probe, suite, report
@@ -32,7 +33,6 @@ manifest.json
 │   └── debug-easter-egg/       # Изолированная пасхалка и замаскированные assets
 ├── html/                       # Остальные production HTML до их поэтапного переноса
 │   ├── popup.html              # Основной Popup
-│   ├── dashbridge.html         # Единый дашборд Grafana
 ├── js/background.js            # MV3 service worker
 ├── js/theme.js                 # Общая light/dark тема
 ├── js/shared/                  # Контракты, storage, URL, capture
@@ -269,7 +269,7 @@ legacy memory-панелей. Исходное состояние один ра�
 отложенная загрузка делала невидимые threshold/данные непредсказуемыми. Пауза
 остаётся явным долговременным способом полностью исключить iframe и запросы.
 
-DNR создаётся только для открытых вкладок `html/dashbridge.html` и разрешённых
+DNR создаётся только для открытых вкладок `pages/dashbridge/dashbridge.html` и разрешённых
 Grafana-хостов. Закрытие вкладки удаляет её session rules.
 
 ### Фильтр Load Average по vCPU
@@ -300,7 +300,7 @@ node_load1/5/15{... instance=...}
 - числовой фильтр и vCPU-фильтр взаимоисключающие;
 - переключение вызывает штатный refresh, а не polling.
 
-Один pipeline работает в direct Grafana и `html/dashbridge.html`.
+Один pipeline работает в direct Grafana и `pages/dashbridge/dashbridge.html`.
 
 ### Легенда
 

@@ -2,9 +2,9 @@ from pathlib import Path
 from support.smoke import CheckCollector
 
 ROOT = Path(__file__).resolve().parents[1]
-HTML = (ROOT / 'html/dashbridge.html').read_text(encoding='utf-8')
-PAGE = (ROOT / 'js/pages/dashbridge.js').read_text(encoding='utf-8')
-RENDERER = (ROOT / 'js/pages/dashbridge-renderer.js').read_text(encoding='utf-8')
+HTML = (ROOT / 'pages/dashbridge/dashbridge.html').read_text(encoding='utf-8')
+PAGE = (ROOT / 'pages/dashbridge/dashbridge.js').read_text(encoding='utf-8')
+RENDERER = (ROOT / 'pages/dashbridge/dashbridge-renderer.js').read_text(encoding='utf-8')
 
 
 check = CheckCollector()
@@ -22,7 +22,7 @@ check('global refresh does not process paused panels', 'refreshPausedPanels' not
 check('ordinary rendering eagerly loads only active panels', 'if (!panel.paused)' in PAGE and 'navigateDashboardFrame(iframeEl, iframeEl.dataset.src)' in PAGE)
 
 IFRAME = (ROOT / 'js/content/grafana-iframe.js').read_text(encoding='utf-8')
-CSS = (ROOT / 'css/dashbridge.css').read_text(encoding='utf-8')
+CSS = (ROOT / 'pages/dashbridge/dashbridge.css').read_text(encoding='utf-8')
 check('iframe reports Grafana panel title', "action: 'dashbridgePanelTitle'" in IFRAME)
 check('iframe waits for Grafana React title after page load',
       'readinessTimer = setTimeout(inspectReadiness, delay)' in IFRAME

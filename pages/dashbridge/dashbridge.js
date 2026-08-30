@@ -1150,6 +1150,7 @@ function openDashboardPanelAnalysis(panel, iframe, type) {
 //  Инициализация
 // ════════════════════════════════════════════════════════
 
+// DashBridge page controller.
 document.addEventListener('DOMContentLoaded', async () => {
     const rulesPromise = chrome.runtime.sendMessage({ type: 'dashbridge-ensure-iframe-rules' })
         .then(rulesReady => {

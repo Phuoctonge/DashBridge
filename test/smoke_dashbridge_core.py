@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Тесты для Фазы 1 оптимизации js/pages/dashbridge.js
+Тесты для Фазы 1 оптимизации pages/dashbridge/dashbridge.js
 Проверяют:
 1. setupTimeControls вызывается только один раз
 2. card.draggable сбрасывается после mouseup, не отменяя drag при mouseleave
@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
-DASHBRIDGE_JS = ROOT / "js/pages/dashbridge.js"
+DASHBRIDGE_JS = ROOT / "pages/dashbridge/dashbridge.js"
 
 passed = 0
 failed = 0
@@ -37,11 +37,11 @@ def read_file():
 
 
 print("=" * 70)
-print("ТЕСТЫ ФАЗЫ 1: js/pages/dashbridge.js — критичные баги")
+print("ТЕСТЫ ФАЗЫ 1: pages/dashbridge/dashbridge.js — критичные баги")
 print("=" * 70)
 
 content = read_file()
-renderer = (ROOT / "js/pages/dashbridge-renderer.js").read_text(encoding="utf-8")
+renderer = (ROOT / "pages/dashbridge/dashbridge-renderer.js").read_text(encoding="utf-8")
 
 # ════════════════════════════════════════════════════════
 # 1.1. setupTimeControls вызывается только один раз

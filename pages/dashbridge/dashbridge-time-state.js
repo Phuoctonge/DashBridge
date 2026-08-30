@@ -1,4 +1,4 @@
-// Pure time-range state and Grafana URL transformations for DashBridge.
+// DashBridge time-range state and Grafana URL transformations.
 const DashBridgeRefreshIntervals = new Set(['', 'auto', '5s', '10s', '30s', '1m', '5m', '15m', '30m', '1h', '2h', '1d']);
 const DashBridgeTimeState = {
     defaults() {

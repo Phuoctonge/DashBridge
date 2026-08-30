@@ -6,9 +6,9 @@ const fs = require('fs');
 const read = path => fs.readFileSync(path, 'utf8');
 const themeCss = read('css/theme.css');
 const themeJs = read('js/theme.js');
-const dashboardCss = read('css/dashbridge.css');
-const dashboardJs = read('js/pages/dashbridge.js');
-const renderer = read('js/pages/dashbridge-renderer.js');
+const dashboardCss = read('pages/dashbridge/dashbridge.css');
+const dashboardJs = read('pages/dashbridge/dashbridge.js');
+const renderer = read('pages/dashbridge/dashbridge-renderer.js');
 const optionsHtml = read('pages/options/options.html');
 const optionsJs = read('pages/options/options.js');
 
@@ -25,10 +25,10 @@ assert(optionsHtml.includes('id="settingUiScale"')
     && optionsJs.includes('uiScale: document.getElementById("settingUiScale").value'),
     'Options must expose and save the shared scale');
 
-for (const page of ['pages/batch/batch.html', 'html/dashbridge.html', 'pages/options/options.html', 'html/popup.html', 'pages/recorder/recorder.html', 'pages/test-runner/test-runner.html', 'pages/worklog/worklog.html']) {
+for (const page of ['pages/batch/batch.html', 'pages/dashbridge/dashbridge.html', 'pages/options/options.html', 'html/popup.html', 'pages/recorder/recorder.html', 'pages/test-runner/test-runner.html', 'pages/worklog/worklog.html']) {
     assert(read(page).includes('name="viewport"'), `${page} must declare its viewport`);
 }
-for (const page of ['pages/batch/batch.html', 'html/dashbridge.html', 'pages/options/options.html', 'pages/recorder/recorder.html', 'pages/test-runner/test-runner.html', 'pages/worklog/worklog.html', 'pages/debug-easter-egg/debug-easter-egg.html']) {
+for (const page of ['pages/batch/batch.html', 'pages/dashbridge/dashbridge.html', 'pages/options/options.html', 'pages/recorder/recorder.html', 'pages/test-runner/test-runner.html', 'pages/worklog/worklog.html', 'pages/debug-easter-egg/debug-easter-egg.html']) {
     assert(read(page).includes('data-ui-scale="auto"'), `${page} must scale correctly from its first frame`);
 }
 
@@ -86,7 +86,7 @@ assert(panelSettings.includes('const getInterfaceScale = () =>')
     && panelSettings.includes('@media (max-width:480px)'),
     'floating graph settings, threshold fields and Load Average controls must scale independently of their host and stay viewport-bound');
 
-const dashbridgeCss = read('css/dashbridge.css');
+const dashbridgeCss = read('pages/dashbridge/dashbridge.css');
 const grafanaPanelTools = read('js/content/grafana-panel-tools.js');
 const grafanaContent = read('js/content/content.js');
 assert(dashbridgeCss.includes('width: min(45rem, calc(100vw - 2.5rem))')

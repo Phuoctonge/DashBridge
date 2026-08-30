@@ -193,7 +193,7 @@ assert.strictEqual(analysis.serverNameForCopy('server-06.example:9182 replica', 
 
 const panelTools = fs.readFileSync('js/content/grafana-panel-tools.js', 'utf8');
 const contentBridge = fs.readFileSync('js/content/content.js', 'utf8');
-const dashboard = fs.readFileSync('js/pages/dashbridge.js', 'utf8');
+const dashboard = fs.readFileSync('pages/dashbridge/dashbridge.js', 'utf8');
 assert(panelTools.includes('const syncPanelAnalysisAction = (host, panel, header) =>')
     && panelTools.includes('analysis?.classifyTitle(getPanelAnalysisTitle(panel, header), readPanelAnalysisSettings())')
     && panelTools.includes("analysis.analyzePanel({ panel, type, mode: 'period', settings })")

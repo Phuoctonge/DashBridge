@@ -23,7 +23,7 @@ const document = { createElement: tag => new FakeElement(tag), getElementById: (
 const context = { document };
 context.globalThis = context;
 vm.createContext(context);
-vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'pages', 'dashbridge-renderer.js'), 'utf8') + '\nthis.renderer = DashBridgeRenderer;', context);
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'pages', 'dashbridge', 'dashbridge-renderer.js'), 'utf8') + '\nthis.renderer = DashBridgeRenderer;', context);
 
 const hostileId = '\"><svg data-owned="true">';
 const card = context.renderer.createPanelCard({
@@ -41,7 +41,7 @@ assert(!actions.children.some(button => button.className.includes('btn-capture-t
     'the card must rely on the single compact-capture toggle in the page header');
 const analysis = actions.children.find(button => button.className.includes('btn-analysis'));
 assert(analysis && analysis.hidden === false && analysis.dataset.analysisType === 'cpu');
-assert(fs.readFileSync(path.join(__dirname, '..', 'css', 'dashbridge.css'), 'utf8').includes('.btn-analysis[hidden]'),
+assert(fs.readFileSync(path.join(__dirname, '..', 'pages', 'dashbridge', 'dashbridge.css'), 'utf8').includes('.btn-analysis[hidden]'),
     'author styles must not override the hidden state on non-CPU/RAM panels');
 assert(actions.children.find(button => button.className.includes('btn-iframe-settings')).hidden === true);
 assert(actions.children.find(button => button.className.includes('btn-open')).hidden === true);

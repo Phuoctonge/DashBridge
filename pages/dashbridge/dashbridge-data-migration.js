@@ -1,6 +1,6 @@
 // Temporary, versioned migration for persisted DashBridge data.
 // Keep this module isolated so it can be removed after the controlled rollout.
-// Removal also includes its html/dashbridge.html script tag, the startup run() call,
+// Removal also includes its pages/dashbridge/dashbridge.html script tag, the startup run() call,
 // DashBridgeTimeState.load(), the v0 backup and the schema marker.
 (function initDashBridgeDataMigration(root) {
     'use strict';

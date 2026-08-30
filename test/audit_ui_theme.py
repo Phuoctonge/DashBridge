@@ -7,8 +7,8 @@
 2. Все HTML файлы подключают css/theme.css
 3. Ни один HTML файл не содержит дублирующий :root { ... } блок
 4. Все используют единые имена переменных (--primary, --bg, --text-main, --border)
-5. Кнопка темы есть в html/dashbridge.html
-6. Логика темы в js/pages/dashbridge.js (applyTheme, initTheme, themeToggle)
+5. Кнопка темы есть в pages/dashbridge/dashbridge.html
+6. Логика темы в pages/dashbridge/dashbridge.js (applyTheme, initTheme, themeToggle)
 7. Broadcast через chrome.storage.onChanged во всех HTML
 8. Алиасы для обратной совместимости в css/theme.css
 """
@@ -20,8 +20,8 @@ import sys
 # === Пути ===
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 THEME_CSS = os.path.join(ROOT, 'css/theme.css')
-HTML_FILES = ['html/dashbridge.html', 'html/popup.html', 'pages/options/options.html', 'pages/worklog/worklog.html', 'pages/batch/batch.html']
-CSS_FILES = ['css/dashbridge.css', 'pages/batch/batch.css']
+HTML_FILES = ['pages/dashbridge/dashbridge.html', 'html/popup.html', 'pages/options/options.html', 'pages/worklog/worklog.html', 'pages/batch/batch.html']
+CSS_FILES = ['pages/dashbridge/dashbridge.css', 'pages/batch/batch.css']
 JS_FILES = ['js/theme.js']
 
 # === Счётчики ===
@@ -148,13 +148,13 @@ for css_file in CSS_FILES:
 
 
 # ============================================================
-# 5. Кнопка темы в html/dashbridge.html
+# 5. Кнопка темы в pages/dashbridge/dashbridge.html
 # ============================================================
 print("\n=== 5. Кнопка темы ===")
 
-dashbridge_html = read_file(os.path.join(ROOT, 'html/dashbridge.html'))
+dashbridge_html = read_file(os.path.join(ROOT, 'pages/dashbridge/dashbridge.html'))
 if dashbridge_html:
-    test("html/dashbridge.html не содержит локальную кнопку themeToggle",
+    test("pages/dashbridge/dashbridge.html не содержит локальную кнопку themeToggle",
          'id="themeToggle"' not in dashbridge_html,
          "Переключение темы должно оставаться только в popup")
 
@@ -206,7 +206,7 @@ if theme_content:
 # ============================================================
 print("\n=== 5.2. Отсутствие дублирования в кнопке темы ===")
 
-# html/dashbridge.html: кнопка должна быть пустой (без захардкоженного SVG/текста)
+# pages/dashbridge/dashbridge.html: кнопка должна быть пустой (без захардкоженного SVG/текста)
 if dashbridge_html and 'id="themeToggle"' in dashbridge_html:
     # Ищем блок кнопки themeToggle
     btn_match = re.search(
@@ -215,11 +215,11 @@ if dashbridge_html and 'id="themeToggle"' in dashbridge_html:
     )
     if btn_match:
         btn_content = btn_match.group(1).strip()
-        test("html/dashbridge.html кнопка themeToggle пустая (без дублирования)",
+        test("pages/dashbridge/dashbridge.html кнопка themeToggle пустая (без дублирования)",
              btn_content == '',
              f"Кнопка содержит: '{btn_content[:80]}' (должна быть пустой)")
     else:
-        test("html/dashbridge.html кнопка themeToggle найдена", False,
+        test("pages/dashbridge/dashbridge.html кнопка themeToggle найдена", False,
              "Не удалось найти кнопку themeToggle")
 
 # html/popup.html: кнопка должна быть пустой (без захардкоженного SVG)
@@ -312,16 +312,16 @@ for html_file in HTML_FILES:
 
 
 # ============================================================
-# 8. Единые имена переменных в css/dashbridge.css
+# 8. Единые имена переменных в pages/dashbridge/dashbridge.css
 # ============================================================
 print("\n=== 8. Использование единых переменных ===")
 
-dashbridge_css = read_file(os.path.join(ROOT, 'css/dashbridge.css'))
+dashbridge_css = read_file(os.path.join(ROOT, 'pages/dashbridge/dashbridge.css'))
 if dashbridge_css:
     # Не должно быть определений :root
-    test("css/dashbridge.css не определяет :root",
+    test("pages/dashbridge/dashbridge.css не определяет :root",
          ':root' not in dashbridge_css or ':root' in dashbridge_css and '/*' in dashbridge_css[dashbridge_css.find(':root'):dashbridge_css.find(':root')+50],
-         "css/dashbridge.css всё ещё определяет :root")
+         "pages/dashbridge/dashbridge.css всё ещё определяет :root")
 
 batch_css = read_file(os.path.join(ROOT, 'pages/batch/batch.css'))
 if batch_css:

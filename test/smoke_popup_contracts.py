@@ -16,7 +16,7 @@ CASES = [
             'id="grafanaTimestampReadBtn"', 'id="grafanaTimestampFrom"', 'id="grafanaTimestampTo"',
         ],
         "sources": {
-            "js/popup/popup-grafana-router.js": ["openDashBridgeBtn", "html/dashbridge.html"],
+            "js/popup/popup-grafana-router.js": ["openDashBridgeBtn", "pages/dashbridge/dashbridge.html"],
             "js/popup/popup-grafana-links.js": [
                 "function renderButtons()", "function openGrafana(baseUrl)", "customButtons",
                 "setupGrafanaTimestampTool", "parseGrafanaUrlTimeRange", "navigator.clipboard.writeText",
