@@ -849,6 +849,11 @@ async function captureRuntimeDiagnostic(tabId, panelId, {
                 },
             }));
         })();
+        const visualMetadata = window.__dashbridgePanelToolsVisualMetadata || {};
+        const dataStatusKind = visualMetadata.responseDataStatus?.kind || 'unknown';
+        const intentionalEmpty = visualMetadata.responseFilterEmptyIsNormal === true
+            && dataStatusKind === 'filtered_empty'
+            && (state?.seriesQueryFilterEnabled === true || state?.cpuCapacityFilterEnabled === true);
         return {
             at: Date.now(), panelId: pid || null, panelFound: !!root, renderer,
             environment,
@@ -870,6 +875,10 @@ async function captureRuntimeDiagnostic(tabId, panelId, {
                 thickenLines: !!state?.thickenLines,
             }) || null,
             visualReapplyDiagnostic: visualReapplySnapshot,
+            dataStatus: {
+                kind: dataStatusKind,
+                intentionalEmpty,
+            },
             legacyVisualObserverDiagnostic: window.__dashbridgeLegacyVisualObserverDiagnostic
                 ? JSON.parse(JSON.stringify(window.__dashbridgeLegacyVisualObserverDiagnostic)) : null,
             dataLayoutReflowDiagnostic: window.__dashbridgeDataLayoutReflowDiagnostic
@@ -2550,6 +2559,14 @@ const matrixInvariants = {
         const status = threshold.status || {};
         const expectedPanel = String(env.panelId || '');
         const panelMatches = !expectedPanel || String(threshold.panelId || '') === expectedPanel;
+        const deferredForIntentionalEmpty = current.diagnostic?.dataStatus?.intentionalEmpty === true
+            && current.diagnostic?.tools?.thresholdEnabled === true
+            && threshold.enabled === true
+            && threshold.panelFound === true
+            && panelMatches
+            && status.enabled === true
+            && status.exceeded === false
+            && current.dom.thresholdApplied === false;
         const semanticApplied = current.dom.thresholdApplied
             && threshold.enabled === true
             && threshold.panelFound === true
@@ -2558,11 +2575,13 @@ const matrixInvariants = {
             && Number.isFinite(Number(status.rawThreshold))
             && Number.isFinite(Number(status.threshold));
         return {
-            pass: semanticApplied,
+            pass: semanticApplied || deferredForIntentionalEmpty,
             reason: semanticApplied
                 ? `порог вычислен для ${status.seriesName || 'серии'} (${status.engine})`
-                : 'не доказано вычисление порога для выбранной панели',
-            debug: semanticApplied ? '' : JSON.stringify({
+                : (deferredForIntentionalEmpty
+                    ? 'порог сохранён в filtered_empty без ложной линии и ложного превышения'
+                    : 'не доказано вычисление порога для выбранной панели'),
+            debug: semanticApplied || deferredForIntentionalEmpty ? '' : JSON.stringify({
                 thresholdApplied: current.dom.thresholdApplied,
                 expectedPanel,
                 threshold,
@@ -2586,10 +2605,17 @@ const matrixInvariants = {
         const target = env.visibilityTarget;
         const targetEntry = (markers.visibilityEntries || []).find(entry => entry.key === target?.key);
         const targetHidden = !!targetEntry && (targetEntry.hidden || targetEntry.dimmed || targetEntry.nativeHidden || targetEntry.visuallyHidden);
+        const deferredForIntentionalEmpty = current.diagnostic?.dataStatus?.intentionalEmpty === true
+            && current.diagnostic?.tools?.legendVisibility?.[target?.key] === false
+            && !targetEntry;
         return {
-            pass: targetHidden,
-            reason: targetHidden ? `серия ${target?.key} скрыта через легенду` : `не доказано скрытие выбранной серии ${target?.key || ''}`,
-            debug: targetHidden ? '' : JSON.stringify({ target, targetEntry, visibilityEntries: markers.visibilityEntries || [] }),
+            pass: targetHidden || deferredForIntentionalEmpty,
+            reason: targetHidden
+                ? `серия ${target?.key} скрыта через легенду`
+                : (deferredForIntentionalEmpty
+                    ? `видимость серии ${target?.key} сохранена и будет применена после выхода из filtered_empty`
+                    : `не доказано скрытие выбранной серии ${target?.key || ''}`),
+            debug: targetHidden || deferredForIntentionalEmpty ? '' : JSON.stringify({ target, targetEntry, visibilityEntries: markers.visibilityEntries || [] }),
         };
     },
     seriesVisibilityOff: (baseline, current, env) => {
@@ -2598,10 +2624,17 @@ const matrixInvariants = {
         const target = env.visibilityTarget;
         const targetEntry = (markers.visibilityEntries || []).find(entry => entry.key === target?.key);
         const targetStillHidden = !!targetEntry && (targetEntry.hidden || targetEntry.dimmed || targetEntry.nativeHidden || targetEntry.visuallyHidden);
-        const restored = !!targetEntry && !targetStillHidden;
+        const clearedDuringIntentionalEmpty = current.diagnostic?.dataStatus?.intentionalEmpty === true
+            && current.diagnostic?.tools?.legendVisibility?.[target?.key] !== false
+            && !targetEntry;
+        const restored = (!!targetEntry && !targetStillHidden) || clearedDuringIntentionalEmpty;
         return {
             pass: restored,
-            reason: restored ? `видимость серии ${target?.key} восстановлена` : `после отключения видимость серии ${target?.key || ''} не восстановлена`,
+            reason: restored
+                ? (clearedDuringIntentionalEmpty
+                    ? `отложенное скрытие серии ${target?.key} снято в состоянии filtered_empty`
+                    : `видимость серии ${target?.key} восстановлена`)
+                : `после отключения видимость серии ${target?.key || ''} не восстановлена`,
             debug: restored ? '' : JSON.stringify({ target, targetEntry, visibilityEntries: markers.visibilityEntries || [] }),
         };
     },
@@ -2718,11 +2751,11 @@ function matrixTest(id, name, states, runModes = ['full']) {
     return {
         id, category: 'H', name, runModes,
         expectedRefreshCount: refreshCount,
-        timeoutBudgetModel: 'max(30s, expectedRefreshCount * 3.5s + 15s)',
+        timeoutBudgetModel: 'max(30s, expectedRefreshCount * 5s + 15s)',
         // Each active transition proves two real graph refreshes and now waits
         // for the complete renderer-reapply generation. Long pair/high-risk
         // vectors therefore need a budget proportional to their state count.
-        timeoutMs: Math.max(30_000, refreshCount * 3_500 + 15_000),
+        timeoutMs: Math.max(30_000, refreshCount * 5_000 + 15_000),
         async run(tabId, env) {
             return runTransitionTest(tabId, env, makeMatrixTransitions(states));
         }

@@ -15,6 +15,7 @@ const resultsRoot = path.join(projectRoot, 'test-results');
 const reportPath = path.join(resultsRoot, 'live-grafana-e2e.json');
 const failureReportPath = path.join(resultsRoot, 'live-grafana-e2e-failures.txt');
 const MAX_EVIDENCE_ENTRIES = 200;
+const RUNNER_READY_TIMEOUT_MS = 10 * 60_000;
 const compactText = (value, maxLength = 2_000) => String(value || '').slice(0, maxLength);
 
 function pushBoundedEvidence(target, entry) {
@@ -139,6 +140,7 @@ async function readFailureDiagnostics(page) {
             tools: runtime.tools || null,
             markers: runtime.markers || null,
             visualStyleState: runtime.visualStyleState || null,
+            dataStatus: runtime.dataStatus || null,
             interceptor: runtime.interceptor ? {
                 queryResponses: runtime.interceptor.queryResponses || 0,
                 transformed: runtime.interceptor.transformed || 0,
@@ -274,7 +276,7 @@ async function main() {
         });
         await runnerPage.waitForFunction(() => (
             globalThis.document.documentElement.dataset.dashbridgeTestRunnerReady === 'true'
-        ), null, { timeout: 30_000 });
+        ), null, { timeout: RUNNER_READY_TIMEOUT_MS });
         await runnerPage.locator('#trUrlInput').fill(urls.join('\n'));
         await runnerPage.locator('#trRunMode').selectOption(mode);
         await runnerPage.locator('#trRunBtn').click();

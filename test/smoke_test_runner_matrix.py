@@ -370,7 +370,7 @@ checks = {
         "const timeoutPromise = coreSleeep(testTimeoutMs)" in CORE
         and "Math.max(CORE_TEST_TIMEOUT_MS, Number(test.timeoutMs))" in CORE
         and "const refreshCount = states.reduce(" in SUITE
-        and "timeoutMs: Math.max(30_000, refreshCount * 3_500 + 15_000)" in SUITE
+        and "timeoutMs: Math.max(30_000, refreshCount * 5_000 + 15_000)" in SUITE
         and "expectedRefreshCount: refreshCount" in SUITE
         and "timeoutProgress" in CORE
         and "await Promise.race([resultPromise, timeoutPromise])" in CORE

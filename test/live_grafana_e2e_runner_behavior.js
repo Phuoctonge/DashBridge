@@ -11,6 +11,11 @@ const runnerSource = fs.readFileSync(path.join(projectRoot, 'scripts/run-live-gr
 assert(uiSource.includes("dataset.dashbridgeTestRunnerReady = 'true'")
     && runnerSource.includes("document.documentElement.dataset.dashbridgeTestRunnerReady === 'true'"),
     'Playwright must wait until the asynchronous Test Runner UI initialization is complete');
+assert(runnerSource.includes('const RUNNER_READY_TIMEOUT_MS = 10 * 60_000;')
+    && runnerSource.includes('timeout: RUNNER_READY_TIMEOUT_MS'),
+    'Playwright must allow bounded stale OPFS cleanup before declaring the runner unavailable');
+assert(runnerSource.includes('dataStatus: runtime.dataStatus || null'),
+    'failed live diagnostics must retain the compact intentional-empty status');
 
 assert.deepStrictEqual(parseArguments([
     '--mode=fast',

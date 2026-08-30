@@ -64,10 +64,18 @@ assert(source.includes('let legendVisibilityRestoreAfterNextQuery = false;')
 assert(source.includes("visualMetadata.responseDataStatus?.kind === 'filtered_empty'")
     && source.includes("getLegendItems().length === 0")
     && source.includes("!targetRoot?.querySelector?.('canvas')")
+    && source.includes("tools.seriesQueryFilterEnabled === true")
+    && source.includes("tools.cpuCapacityFilterEnabled === true")
     && source.includes('!legendVisibilityApplied && !filteredEmptyLegendCanReturnAfterQuery')
     && source.includes('deferredLegendVisibilityRestored')
     && source.includes("recordVisualReapply('legend-visibility-restore-pending'"),
     'an intentional filtered-empty reset may defer legend restore, but the next full-data render must prove it before consuming the request');
+assert(source.includes('let thresholdRestoreAfterNextQuery = false;')
+    && source.includes('if (thresholdRestoreAfterNextQuery && tools.thresholdEnabled)')
+    && source.includes("status?.enabled === true && status.engine && status.engine !== 'unknown'")
+    && source.includes("visualMetadata.responseDataStatus?.kind === 'filtered_empty'")
+    && source.includes('if (tools.thresholdEnabled && !thresholdRestoreAfterNextQuery) await applyThresholdWhenChartReady();'),
+    'an enabled threshold must wait for the first full renderer after an intentionally empty response filter is disabled');
 assert(source.includes('commandDiagnostic.legendVisibilityDeferred = !legendVisibilityApplied')
     && source.includes('legendVisibilityDeferred: legendVisibilityRequested')
     && source.includes('!!commandDiagnostic.legendVisibilityDeferred'),

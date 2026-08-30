@@ -405,6 +405,7 @@
     const hasVisualWork = (state = tools) => hasLegendVisibilityWork(state)
         || !!state.removeFill || !!state.thickenLines || !!state.invertLegend;
     let legendVisibilityRestoreAfterNextQuery = false;
+    let thresholdRestoreAfterNextQuery = false;
     const hasPersistentVisualWork = (state = tools) => hasVisualWork(state)
         || hasExplicitLegendVisibilityWork(state)
         || (state === tools && legendVisibilityRestoreAfterNextQuery);
@@ -1087,10 +1088,12 @@
         }, 300);
         visualReapplyDiagnostic.nextEventId = visualReapplyDiagnostic.events.at(-1)?.id || visualReapplyDiagnostic.nextEventId || 0;
     };
-    const canDeferLegendVisibilityRestore = targetRoot => legendVisibilityRestoreAfterNextQuery
-        && visualMetadata.responseDataStatus?.kind === 'filtered_empty'
+    const canDeferLegendVisibilityApply = targetRoot => visualMetadata.responseDataStatus?.kind === 'filtered_empty'
         && getLegendItems().length === 0
-        && !targetRoot?.querySelector?.('canvas');
+        && !targetRoot?.querySelector?.('canvas')
+        && (legendVisibilityRestoreAfterNextQuery
+            || tools.seriesQueryFilterEnabled === true
+            || tools.cpuCapacityFilterEnabled === true);
     const applyPersistentVisualState = async () => {
         const targetPanel = getTargetPanel();
         const targetRoot = window.DashBridgeGrafanaDom?.outerPanel(targetPanel) || targetPanel || document;
@@ -1108,7 +1111,7 @@
         let legendVisibilityApplied = null;
         if (hasExplicitLegendVisibilityWork() || legendVisibilityRestoreAfterNextQuery) {
             legendVisibilityApplied = await applyLegendVisibilityByKey(tools.legendVisibility || {});
-            const filteredEmptyLegendCanReturnAfterQuery = canDeferLegendVisibilityRestore(targetRoot);
+            const filteredEmptyLegendCanReturnAfterQuery = canDeferLegendVisibilityApply(targetRoot);
             if (!legendVisibilityApplied && !filteredEmptyLegendCanReturnAfterQuery) {
                 throw new Error('legend-visibility-reapply-failed');
             }
@@ -1125,7 +1128,7 @@
             styleState,
             legendVisibilityApplied,
             legendVisibilityDeferred: legendVisibilityApplied === false
-                && legendVisibilityRestoreAfterNextQuery,
+                && canDeferLegendVisibilityApply(targetRoot),
         };
     };
     const observePersistentVisualState = () => {
@@ -1330,10 +1333,22 @@
         });
     };
     const consumeVisualStylesAfterQuery = () => {
-        if (!hasPersistentVisualWork()) return;
-        // Every Grafana data refresh (manual or automatic) can replace renderer
-        // objects, so reapply directly after each observed response.
-        reapplyVisualStylesAfterDataTransform();
+        if (hasPersistentVisualWork()) {
+            // Every Grafana data refresh (manual or automatic) can replace renderer
+            // objects, so reapply directly after each observed response.
+            reapplyVisualStylesAfterDataTransform();
+        }
+        if (thresholdRestoreAfterNextQuery && tools.thresholdEnabled) {
+            // A response filter is allowed to remove every series and therefore
+            // the renderer itself. Re-enable the saved threshold only after the
+            // first unfiltered response, when uPlot/Flot can be mounted again.
+            void applyThresholdWhenChartReady().then(() => {
+                const status = window.__dashbridgeThresholdDiagnostic?.status;
+                if (status?.enabled === true && status.engine && status.engine !== 'unknown') {
+                    thresholdRestoreAfterNextQuery = false;
+                }
+            }).catch(() => { /* A panel can unmount again while Grafana commits the response. */ });
+        }
     };
 
     const reportThreshold = async () => {
@@ -2777,7 +2792,8 @@
             // OFF. E2E is the sole exception: a reset still has to observe the
             // selected panel's request in order to prove a safe baseline.
             const diagnosticObservationActive = window.__dashbridgeE2EDiagnostics?.installed === true;
-            const observeActive = transformActive || hasPersistentVisualWork() || diagnosticObservationActive || analysisCaptureActive;
+            const observeActive = transformActive || hasPersistentVisualWork() || thresholdRestoreAfterNextQuery
+                || diagnosticObservationActive || analysisCaptureActive;
             if (!observeActive) return originalFetch(...args);
             const requestId = beginRequest('fetch', url);
             let effectiveArgs = args;
@@ -2877,7 +2893,8 @@
                 const analysisCaptureActive = !!analysisCapture && !analysisCapture.cancelled;
                 const requestStartedAt = performance.now();
                 const diagnosticObservationActive = window.__dashbridgeE2EDiagnostics?.installed === true;
-                const observeActive = transformActive || hasPersistentVisualWork() || diagnosticObservationActive || analysisCaptureActive;
+                const observeActive = transformActive || hasPersistentVisualWork() || thresholdRestoreAfterNextQuery
+                    || diagnosticObservationActive || analysisCaptureActive;
                 if (!observeActive) return originalSend.call(this, body);
                 if (tools.cpuCapacityFilterEnabled) {
                     const prepared = prepareCpuCapacityRequestBody(body);
@@ -3159,6 +3176,7 @@
             stateBefore: tools.legendVisibility,
         };
         Object.assign(tools, event.data.transformSettings || {}, commandTools);
+        if (!tools.thresholdEnabled) thresholdRestoreAfterNextQuery = false;
         if (convertMemWasEnabled !== !!tools.convertMemToUsed) visualMetadata.memoryConversionApplied = null;
         if (Object.prototype.hasOwnProperty.call(commandTools, 'convertMemToUsed')) {
             if (tools.convertMemToUsed) tools.forceMemByteUnit = false;
@@ -3179,8 +3197,13 @@
             discardThresholdHighlightRules('cpu-capacity-filter');
             visualMetadata.seriesCpuCapacityEntries = [];
         }
-        if ((seriesQueryFilterWasEnabled && !tools.seriesQueryFilterEnabled
-            || cpuCapacityFilterWasEnabled && !tools.cpuCapacityFilterEnabled) && legendVisibilityRequested) {
+        const responseFilterWasDisabled = seriesQueryFilterWasEnabled && !tools.seriesQueryFilterEnabled
+            || cpuCapacityFilterWasEnabled && !tools.cpuCapacityFilterEnabled;
+        if (responseFilterWasDisabled && tools.thresholdEnabled
+            && visualMetadata.responseDataStatus?.kind === 'filtered_empty') {
+            thresholdRestoreAfterNextQuery = true;
+        }
+        if (responseFilterWasDisabled && legendVisibilityRequested) {
             // The filtered legend may not contain a series whose native hidden
             // state must be restored. Repeat the explicit visibility command
             // after the first full-data response, when that series exists again.
@@ -3221,7 +3244,7 @@
             const legendVisibilityApplied = await applyLegendVisibilityByKey(visibility);
             commandDiagnostic.legendVisibilityApplied = legendVisibilityApplied;
             commandDiagnostic.legendVisibilityDeferred = !legendVisibilityApplied
-                && canDeferLegendVisibilityRestore(root);
+                && canDeferLegendVisibilityApply(root);
             commandDiagnostic.legendDiagnostic = window.__dashbridgeLegendVisibilityDiagnostic || null;
             window.__dashbridgePanelToolsCommandDiagnostic = commandDiagnostic;
             if (!legendVisibilityApplied) {
@@ -3256,7 +3279,8 @@
         } else {
             debugLog('Skipping visual engine: no current or previous visual work');
         }
-        if (tools.thresholdEnabled) await applyThresholdWhenChartReady();
+        if (tools.thresholdEnabled && !thresholdRestoreAfterNextQuery) await applyThresholdWhenChartReady();
+        else if (tools.thresholdEnabled) await startThresholdReporting();
         else if (thresholdWasEnabled) await startThresholdReporting();
         await new Promise(resolve => requestAnimationFrame(resolve));
         const layoutWork = hasVisualWork() || visualWorkWasEnabled
@@ -3560,6 +3584,13 @@
                         || JSON.stringify(state.legendFilter || []) !== JSON.stringify(nextState.legendFilter || [])
                         || JSON.stringify(state.legendVisibleSeries || []) !== JSON.stringify(nextState.legendVisibleSeries || []));
                 Object.assign(tools, nextState);
+                const responseFilterWasDisabled = state.seriesQueryFilterEnabled && !nextState.seriesQueryFilterEnabled
+                    || state.cpuCapacityFilterEnabled && !nextState.cpuCapacityFilterEnabled;
+                if (!tools.thresholdEnabled) thresholdRestoreAfterNextQuery = false;
+                else if (responseFilterWasDisabled
+                    && visualMetadata.responseDataStatus?.kind === 'filtered_empty') {
+                    thresholdRestoreAfterNextQuery = true;
+                }
                 if (state.convertMemToUsed !== nextState.convertMemToUsed) visualMetadata.memoryConversionApplied = null;
                 if (responseFilterChanged) {
                     visualMetadata.responseFilterVisibleNames = [];
@@ -3588,7 +3619,8 @@
                     const seriesConfig = Object.fromEntries(getPanelLegendSeries(panel).map(name => [name, !visualLegendFilter.includes(name)]));
                     await window.DashBridgeGrafanaVisualEngine?.apply({ panelId, seriesConfig: hasLegendVisibilityWork(nextState) ? seriesConfig : null, mode: nextState.legendMode, ...nextState });
                 }
-                if (tools.thresholdEnabled) await applyThresholdWhenChartReady();
+                if (tools.thresholdEnabled && !thresholdRestoreAfterNextQuery) await applyThresholdWhenChartReady();
+                else if (tools.thresholdEnabled) await startThresholdReporting();
                 else await startThresholdReporting();
                 if (dataTransformChanged || legendDataFilterChanged) {
                     refreshSelectedPanelData(panel);
