@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!closeButton || !clearButton || !target || !portrait || !fileInput || !hint || !header) return;
     portrait.draggable = false;
 
-    const spriteSources = Array.from({ length: 9 }, (_, index) => `html/ui/cache-${String(index + 1).padStart(2, '0')}.txt`);
+    const spriteSources = Array.from({ length: 9 }, (_, index) => `pages/debug-easter-egg/assets/cache-${String(index + 1).padStart(2, '0')}.txt`);
     const assetUrls = new Map();
     let selectedFileUrl = null;
     let spritesReady = false;

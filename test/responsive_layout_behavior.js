@@ -28,7 +28,7 @@ assert(optionsHtml.includes('id="settingUiScale"')
 for (const page of ['html/batch.html', 'html/dashbridge.html', 'pages/options/options.html', 'html/popup.html', 'html/recorder.html', 'html/test-runner.html', 'pages/worklog/worklog.html']) {
     assert(read(page).includes('name="viewport"'), `${page} must declare its viewport`);
 }
-for (const page of ['html/batch.html', 'html/dashbridge.html', 'pages/options/options.html', 'html/recorder.html', 'html/test-runner.html', 'pages/worklog/worklog.html', 'html/ui/debug-easter-egg.html']) {
+for (const page of ['html/batch.html', 'html/dashbridge.html', 'pages/options/options.html', 'html/recorder.html', 'html/test-runner.html', 'pages/worklog/worklog.html', 'pages/debug-easter-egg/debug-easter-egg.html']) {
     assert(read(page).includes('data-ui-scale="auto"'), `${page} must scale correctly from its first frame`);
 }
 
@@ -63,9 +63,9 @@ assert(read('pages/options/options.css').includes('@media (max-width: 560px)')
     && read('pages/options/options.css').includes('max-width: 40.625rem'),
     'Options must retain a readable form width and collapse on narrow screens');
 
-const debugCss = read('css/debug-easter-egg.css');
+const debugCss = read('pages/debug-easter-egg/debug-easter-egg.css');
 const debugController = read('js/popup/popup-debug-easter-egg.js');
-const debugWindow = read('js/debug-easter-egg.js');
+const debugWindow = read('pages/debug-easter-egg/debug-easter-egg.js');
 assert(debugCss.includes('width: 40rem') && debugCss.includes('max-width: calc(100vw - 2rem)')
     && debugController.includes('interfaceScale') && debugController.includes('?uiScale=')
     && debugWindow.includes('document.documentElement.dataset.uiScale = requestedScale'),

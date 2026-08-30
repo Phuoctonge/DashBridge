@@ -25,14 +25,14 @@ manifest.json
 ├── AGENTS.md                   # Обязательная точка входа для AI-анализа
 ├── pages/                      # Feature-папки полноразмерных extension pages
 │   ├── options/                # HTML, CSS и контроллер настроек
-│   └── worklog/                # Jira Worklog: HTML, CSS и контроллер
+│   ├── worklog/                # Jira Worklog: HTML, CSS и контроллер
+│   └── debug-easter-egg/       # Изолированная пасхалка и замаскированные assets
 ├── html/                       # Остальные production HTML до их поэтапного переноса
 │   ├── popup.html              # Основной Popup
 │   ├── dashbridge.html         # Единый дашборд Grafana
 │   ├── batch.html              # Пакетный PNG/ZIP и серии
 │   ├── test-runner.html        # Живые E2E-сценарии
 │   ├── recorder.html           # Traffic record/replay и .dashflow
-│   └── ui/                     # Изолированная debug UI-страница и sprites
 ├── js/background.js            # MV3 service worker
 ├── js/theme.js                 # Общая light/dark тема
 ├── js/shared/                  # Контракты, storage, URL, capture

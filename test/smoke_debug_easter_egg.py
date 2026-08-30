@@ -18,24 +18,24 @@ if __name__ == "__main__":
             "js/popup/popup-debug-easter-egg.js": [
                 "debugFreshCodeEasterEgg",
                 "chrome.windows.create",
-                "html/ui/debug-easter-egg.html",
+                "pages/debug-easter-egg/debug-easter-egg.html",
                 "updateNoticeMode",
                 "freshCodeNotice",
             ],
         },
     )
-    window_html = read("html/ui/debug-easter-egg.html")
+    window_html = read("pages/debug-easter-egg/debug-easter-egg.html")
     for marker in ('id="debugEasterEggClear"', 'id="debugEasterEggTarget"', 'id="debugEasterEggPortrait"', 'id="debugEasterEggFile"', 'id="debugEasterEggHint"', '.jpeg', '.avif'):
         if marker not in window_html:
             raise SystemExit(f"[FAIL] missing Easter egg window markup: {marker}")
-    window_controller = read("js/debug-easter-egg.js")
+    window_controller = read("pages/debug-easter-egg/debug-easter-egg.js")
     for marker in ("resetSplats", "requestAnimationFrame", "createImpactSplat", "animateProjectile", "spriteSources", "cache-", "throwGeneration", "poop.width = pixelSize", "poop.height = pixelSize", "randomAngle", "impactRotation", "flightRotation", "spriteBag", "shuffleSprites", "decodeAsset", "fetch(chrome.runtime.getURL", "URL.createObjectURL", "resizeWindowForImage", "chrome.windows.getCurrent", "screen.availWidth", "debugEasterEggFile", "debugEasterEggHint", "headerHeight", "imageScale", "portrait.draggable = false", "dragstart", "event.preventDefault", "requestedScale", "dataset.uiScale"):
         if marker not in window_controller:
             raise SystemExit(f"[FAIL] missing Easter egg window behavior: {marker}")
     for index in range(1, 10):
-        if not (ROOT / f"html/ui/cache-{index:02d}.txt").is_file():
+        if not (ROOT / f"pages/debug-easter-egg/assets/cache-{index:02d}.txt").is_file():
             raise SystemExit(f"[FAIL] missing disguised Easter egg asset {index}")
-    if (ROOT / "html/ui/cache-00.txt").exists():
+    if (ROOT / "pages/debug-easter-egg/assets/cache-00.txt").exists():
         raise SystemExit("[FAIL] default Easter egg portrait must not be packaged")
     if (ROOT / "assets/debug-easter-egg-portrait.png").exists() or list((ROOT / "assets").glob("new_poop_*.png")):
         raise SystemExit("[FAIL] unobscured Easter egg PNG assets must not remain")
@@ -48,7 +48,7 @@ if __name__ == "__main__":
         raise SystemExit("[FAIL] Easter egg must not load a default portrait")
     if "document.documentElement.scrollHeight" in window_controller:
         raise SystemExit("[FAIL] image window must use explicit image dimensions, not unreliable document scroll height")
-    styles = read("css/debug-easter-egg.css")
+    styles = read("pages/debug-easter-egg/debug-easter-egg.css")
     for marker in (".debug-easter-egg-window", ".debug-easter-egg-target", ".debug-easter-egg-actions", "width: 40rem", "max-width: calc(100vw - 2rem)", "-webkit-user-drag: none", ".debug-easter-egg-target > img[hidden]", "display: none !important", "flex-direction: column", "flex-wrap: wrap"):
         if marker not in styles:
             raise SystemExit(f"[FAIL] missing Easter egg style: {marker}")
