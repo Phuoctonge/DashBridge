@@ -186,6 +186,37 @@
         el.style.height = (el.scrollHeight) + 'px';
     }
 
+    function getAnalysisThresholdPairError(warning, critical, label) {
+        if (![warning, critical].every(value => Number.isFinite(value) && value >= 0 && value <= 100)) {
+            return `Пороги ${label} должны быть числами от 0 до 100.`;
+        }
+        if (warning >= critical) {
+            return `Предупредительный порог ${label} должен быть меньше критического.`;
+        }
+        return '';
+    }
+
+    const analysisThresholdPairs = Object.freeze([
+        ['cpuWarnThreshold', 'cpuCritThreshold', 'CPU'],
+        ['memWarnThreshold', 'memCritThreshold', 'RAM']
+    ]);
+
+    function validateEffectiveImportedThresholds(currentSync, importedSync) {
+        const effectiveSync = { ...getGrafanaSettingsDefaults(), ...currentSync, ...importedSync };
+        analysisThresholdPairs.forEach(([warningKey, criticalKey, label]) => {
+            if (importedSync[warningKey] === undefined && importedSync[criticalKey] === undefined) return;
+            const error = getAnalysisThresholdPairError(
+                effectiveSync[warningKey], effectiveSync[criticalKey], label
+            );
+            if (error) throw new Error(error);
+        });
+    }
+
+    function readAnalysisThreshold(inputId) {
+        const raw = document.getElementById(inputId).value.trim();
+        return raw === '' ? Number.NaN : Number(raw);
+    }
+
     // Авто-изменение высоты для текстового поля Wiki
     document.getElementById("settingWikiDomains").oninput = (e) => {
         autoResize(e.target);
@@ -244,10 +275,16 @@
         const dom = document.getElementById("settingGrafanaDomain").value.trim() || grafanaDefaults.grafanaTrimDomain;
         const trimDomainEnabled = document.getElementById("settingGrafanaTrimDomainEnabled").checked;
         const keepParams = document.getElementById("settingGrafanaKeepParams").value.trim() || grafanaDefaults.grafanaKeepParams;
-        const warn = parseInt(document.getElementById("settingCpuWarn").value, 10) || grafanaDefaults.cpuWarnThreshold;
-        const crit = parseInt(document.getElementById("settingCpuCrit").value, 10) || grafanaDefaults.cpuCritThreshold;
-        const memWarn = parseInt(document.getElementById("settingMemWarn").value, 10) || grafanaDefaults.memWarnThreshold;
-        const memCrit = parseInt(document.getElementById("settingMemCrit").value, 10) || grafanaDefaults.memCritThreshold;
+        const warn = readAnalysisThreshold('settingCpuWarn');
+        const crit = readAnalysisThreshold('settingCpuCrit');
+        const memWarn = readAnalysisThreshold('settingMemWarn');
+        const memCrit = readAnalysisThreshold('settingMemCrit');
+        const thresholdError = getAnalysisThresholdPairError(warn, crit, 'CPU')
+            || getAnalysisThresholdPairError(memWarn, memCrit, 'RAM');
+        if (thresholdError) {
+            showMaintStatus(thresholdError, 'red');
+            return;
+        }
         const jiraInput = document.getElementById("settingJiraUrl").value.trim() || 'https://jira.lanit.ru';
         const jiraTz = document.getElementById("settingJiraTz").value || 'local';
         const tdmInput = document.getElementById("settingTdmDomain").value.trim() || 'web.tdm.mos.ru';
@@ -445,12 +482,18 @@
             && (typeof sync.tdmExcludeUserTextDefault !== 'string' || sync.tdmExcludeUserTextDefault.length > 500)) {
             throw new Error('Некорректное имя пользователя TDM по умолчанию.');
         }
-        if (sync.cpuWarnThreshold !== undefined && (!Number.isFinite(sync.cpuWarnThreshold) || sync.cpuWarnThreshold < 0 || sync.cpuWarnThreshold > 100)) {
-            throw new Error('Некорректный порог CPU в импортируемых настройках.');
-        }
-        if (sync.cpuCritThreshold !== undefined && (!Number.isFinite(sync.cpuCritThreshold) || sync.cpuCritThreshold < 0 || sync.cpuCritThreshold > 100)) {
-            throw new Error('Некорректный критический порог CPU.');
-        }
+        analysisThresholdPairs.forEach(([warningKey, criticalKey, label]) => {
+            [warningKey, criticalKey].forEach(key => {
+                if (sync[key] !== undefined
+                    && (!Number.isFinite(sync[key]) || sync[key] < 0 || sync[key] > 100)) {
+                    throw new Error(`Некорректный порог ${label} в импортируемых настройках.`);
+                }
+            });
+            if (sync[warningKey] !== undefined && sync[criticalKey] !== undefined) {
+                const error = getAnalysisThresholdPairError(sync[warningKey], sync[criticalKey], label);
+                if (error) throw new Error(error);
+            }
+        });
         local = DashBridgeLocalStateSchema.normalizeImportedLocal(local);
         if (sync.customButtons !== undefined) {
             sync.customButtons = DashBridgeLocalStateSchema.normalizeCustomButtons(sync.customButtons).items;
@@ -517,6 +560,7 @@
                 const [currentSync, currentLocal] = await Promise.all([
                     chrome.storage.sync.get(null), chrome.storage.local.get(null)
                 ]);
+                validateEffectiveImportedThresholds(currentSync, imported.sync);
                 await setStorageValues(chrome.storage.local, {
                     dashbridge_import_backup: {
                         schemaVersion: IMPORT_SCHEMA_VERSION,

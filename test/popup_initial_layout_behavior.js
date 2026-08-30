@@ -74,10 +74,54 @@ assert(html.includes('<rect x="3" y="5" width="18" height="14" rx="3" />')
 const buttonIcon = id => html.match(new RegExp(
     `<button[^>]*id="${id}"[\\s\\S]*?<svg[^>]*>([\\s\\S]*?)</svg>`
 ))?.[1].replace(/\s/g, '');
+const sectionIcon = title => {
+    const heading = [...html.matchAll(/<h3[^>]*class="section-title"[^>]*>[\s\S]*?<\/h3>/g)]
+        .find(match => match[0].includes(title))?.[0] || '';
+    return heading.match(/<svg[^>]*>([\s\S]*?)<\/svg>/)?.[1].replace(/\s/g, '');
+};
+const tabIcon = tab => html.match(new RegExp(
+    `<button[^>]*class="tab-btn[^>]*data-tab="${tab}"[\\s\\S]*?<svg[^>]*>([\\s\\S]*?)</svg>`
+))?.[1].replace(/\s/g, '');
 assert(buttonIcon('openTrafficRecorderBtn')
     && buttonIcon('transferWorklogBtn')
     && buttonIcon('openTrafficRecorderBtn') !== buttonIcon('transferWorklogBtn'),
     'Traffic Recorder and WorkLog transfer must use distinct action icons');
+assert(sectionIcon('Время для Django')
+    && sectionIcon('Учет времени')
+    && sectionIcon('Время для Django') !== sectionIcon('Учет времени'),
+    'Django timestamp conversion must not reuse the Jira time-tracking icon');
+assert(sectionIcon('Traffic Recorder')
+    && tabIcon('tab-recorder')
+    && sectionIcon('Traffic Recorder') === tabIcon('tab-recorder')
+    && sectionIcon('Traffic Recorder') !== sectionIcon('Учет времени'),
+    'Traffic Recorder must reuse its recording icon instead of the Jira clock');
+assert(buttonIcon('grafanaTimestampReadBtn')
+    && buttonIcon('grafanaTimestampReadBtn').includes('<rectx="3"y="4"width="18"height="16"rx="2"/>'),
+    'the current-tab timestamp action must expose its own browser-import icon');
+assert(buttonIcon('transferWorklogBtn')
+    && buttonIcon('transferWorklogBtn').includes('<pathd="M57h11"/>')
+    && buttonIcon('transferWorklogBtn').includes('<pathd="M1917H8"/>')
+    && !buttonIcon('transferWorklogBtn').includes('<rect'),
+    'WorkLog transfer must use a legible bidirectional-arrow icon at popup size');
+for (const id of ['openBatchCaptureBtn', 'openTrafficRecorderBtn']) {
+    const openingTag = html.match(new RegExp(`<button[^>]*id="${id}"[^>]*>`))?.[0] || '';
+    assert(openingTag.includes('btn btn-outline popup-launch-btn'),
+        `${id} must use the shared popup launch-button variant`);
+    assert(!/style="[^"]*(?:background|border-color|color)\s*:/.test(openingTag),
+        `${id} must not override the shared outline colour palette inline`);
+}
+assert(/\.popup-launch-btn\s*\{[^}]*font-size:\s*0\.75rem;[^}]*padding:\s*0\.75rem/s.test(css),
+    'popup launch buttons must share compact geometry without duplicating colours');
+const dashboardsStart = html.indexOf('Мои дашборды');
+const dashboardsList = html.indexOf('id="customButtonsContainer"', dashboardsStart);
+const dashboardsAddAction = html.indexOf('class="popup-dashboard-add-action"', dashboardsList);
+const batchSection = html.indexOf('<!-- Подвкладка: Массовый сбор -->', dashboardsAddAction);
+assert(dashboardsStart >= 0 && dashboardsList > dashboardsStart
+    && dashboardsAddAction > dashboardsList && batchSection > dashboardsAddAction,
+    'the add-link action must remain inside the My dashboards section after its rendered list');
+assert(/\.popup-dashboard-add-action\s*\{[^}]*margin-top:\s*0\.75rem;[^}]*padding-top:\s*0\.75rem;[^}]*border-top:\s*1px solid var\(--border-light\)/s.test(css)
+    && /\.popup-dashboard-add-action \.btn\s*\{[^}]*font-size:\s*0\.75rem;[^}]*padding:\s*0\.625rem/s.test(css),
+    'the add-link action must use a themed divider and shared compact geometry');
 assert(html.includes('class="tdm-toggle-row tdm-toggle-row-first"')
     && html.includes('id="tdmFilterUserContainer" class="tdm-user-filter"')
     && css.includes('grid-template-columns: minmax(0, 1fr) auto;')

@@ -1,99 +1,16 @@
 // test_runner_generator_behavior.js
-// Проверка поведения generateSingleToggleTests и корректности структуры тестов.
+// Проверка активных runtime-контрактов тест-раннера.
 
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 
-// Загружаем test-runner-suite.js в изолированный контекст
 const suiteCode = fs.readFileSync(
     path.join(__dirname, '..', 'js/test-runner/test-runner-suite.js'),
     'utf8'
 );
 
-// Извлекаем функцию generateSingleToggleTests с учётом вложенных структур
-const funcStart = suiteCode.indexOf('function generateSingleToggleTests(');
-assert(funcStart !== -1, 'generateSingleToggleTests not found');
-
-// Найдём закрывающую скобку функции (учитывая вложенность)
-let depth = 0;
-let inFunc = false;
-let funcEnd = funcStart;
-for (let i = funcStart; i < suiteCode.length; i++) {
-    const char = suiteCode[i];
-    if (char === '{') {
-        depth++;
-        inFunc = true;
-    } else if (char === '}') {
-        depth--;
-        if (inFunc && depth === 0) {
-            funcEnd = i + 1;
-            break;
-        }
-    }
-}
-
-const funcCode = suiteCode.substring(funcStart, funcEnd);
-assert(funcCode.includes('return ['), 'function body extraction failed');
-
-// Создаём минимальные заглушки для зависимостей
-const mockContext = `
-async function runTransitionTest(tabId, env, transitions) {
-    return { pass: true, skip: false, details: 'mock' };
-}
-${funcCode}
-`;
-
-// Выполняем в изолированном контексте
-const vm = require('vm');
-const context = vm.createContext({
-    runTransitionTest: null,
-    generateSingleToggleTests: null
-});
-vm.runInContext(mockContext, context);
-
-// Минимальные заглушки для инвариантов
-const mockInvariantOn = (baseline, current) => ({ pass: true, reason: 'on' });
-const mockInvariantOff = (baseline, current) => ({ pass: true, reason: 'off' });
-
-// Тест 1: функция возвращает массив из 3 тестов
-const tests = context.generateSingleToggleTests(
-    'T1',
-    'mockToggle',
-    'X',
-    { visualSettings: { mockToggle: true } },
-    mockInvariantOn,
-    mockInvariantOff
-);
-
-assert.strictEqual(Array.isArray(tests), true, 'generateSingleToggleTests должна возвращать массив');
-assert.strictEqual(tests.length, 3, 'должно быть ровно 3 теста на каждый toggle');
-
-// Тест 2: каждый тест имеет правильную структуру
-tests.forEach((test, idx) => {
-    assert.strictEqual(typeof test.id, 'string', `test[${idx}].id должен быть строкой`);
-    assert.strictEqual(typeof test.name, 'string', `test[${idx}].name должен быть строкой`);
-    assert.strictEqual(test.category, 'X', `test[${idx}].category должна быть 'X'`);
-    assert.strictEqual(typeof test.run, 'function', `test[${idx}].run должна быть функцией`);
-});
-
-// Тест 3: ID тестов уникальны и следуют паттерну
-assert.strictEqual(tests[0].id, 'T1_1', 'первый тест должен иметь ID T1_1');
-assert.strictEqual(tests[1].id, 'T1_2', 'второй тест должен иметь ID T1_2');
-assert.strictEqual(tests[2].id, 'T1_3', 'третий тест должен иметь ID T1_3');
-
-// Тест 4: имена тестов содержат корректные метки переходов
-assert(tests[0].name.includes('OFF→ON'), 'первый тест должен проверять OFF→ON');
-assert(tests[1].name.includes('ON→OFF'), 'второй тест должен проверять ON→OFF');
-assert(tests[2].name.includes('OFF→ON→OFF→ON'), 'третий тест должен проверять идемпотентность');
-assert(tests[2].name.includes('идемпотентность'), 'третий тест должен упоминать идемпотентность');
-
-// Тест 5: имена тестов включают название toggle
-tests.forEach((test, idx) => {
-    assert(test.name.includes('mockToggle'), `test[${idx}].name должно включать 'mockToggle'`);
-});
-
-// Тест 6: контракт автоматической диагностики остаётся доступным в suite.
+// Контракт автоматической диагностики остаётся доступным в suite.
 [
     'async function installRuntimeDiagnostics(tabId)',
     'async function captureRuntimeDiagnostic(tabId, panelId, {',
@@ -131,7 +48,7 @@ const uiCode = fs.readFileSync(
 );
 [
     'DashBridgeTestReport.createArtifactStreamPlan',
-    'serializeArtifactPlan(plan,',
+    'serializeSpoolArtifact(lastSnapshot, diagnosticSpool, exportMetadata,',
     'function showDiagnostic(test, urlResult)',
     'Предупреждения Grafana (не влияют на PASS/FAIL)',
     'Доказательства переходов:',
@@ -220,9 +137,4 @@ const panelToolsCode = fs.readFileSync(
     assert(panelToolsCode.includes(fragment), `Отсутствует visibility-контракт: ${fragment}`);
 });
 
-console.log('[OK] Test runner generator behavior');
-console.log('  ✓ generateSingleToggleTests produces exactly 3 tests per toggle');
-console.log('  ✓ each test has correct structure (id, name, category, run)');
-console.log('  ✓ test IDs follow pattern (base_1, base_2, base_3)');
-console.log('  ✓ test names describe transition sequences correctly');
-console.log('  ✓ test names include toggle name');
+console.log('[OK] Test runner runtime contracts');

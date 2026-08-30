@@ -207,6 +207,17 @@ async function getGrafanaIframeHosts() {
         .filter(Boolean))].slice(0, 100);
 }
 
+async function isTrustedGrafanaContentSender(sender) {
+    if (sender?.id !== chrome.runtime.id || !sender.tab || sender.frameId !== 0
+        || typeof sender.url !== 'string') return false;
+    let url;
+    try { url = new URL(sender.url); } catch { return false; }
+    if (!['http:', 'https:'].includes(url.protocol)
+        || !/(?:^|\/)d(?:-solo)?(?:\/|$)/.test(url.pathname)) return false;
+    const allowedHosts = await getGrafanaIframeHosts();
+    return allowedHosts.some(host => host === url.host.toLowerCase() || host === url.hostname.toLowerCase());
+}
+
 async function syncGrafanaMainRuntimeRegistration() {
     const hosts = await getGrafanaIframeHosts();
     const hostnames = [...new Set(hosts.map(host => parseHttpUrl(host)?.hostname.toLowerCase()).filter(Boolean))];
@@ -518,8 +529,11 @@ async function collectGuiScreenshotsInBackground() {
 // Do not replace the branch-specific checks with a single "extension sender" test:
 // content scripts and extension pages intentionally have different authority.
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (message?.type === 'dashbridge-capture-visible-tab' && _sender.tab?.windowId) {
+    if (message?.type === 'dashbridge-capture-visible-tab') {
         (async () => {
+            if (!await isTrustedGrafanaContentSender(_sender) || !_sender.tab?.windowId) {
+                throw new Error('Недоверенный запрос снимка Grafana.');
+            }
             const waitMs = Math.max(0, 600 - (Date.now() - lastPanelVisibleCaptureAt));
             if (waitMs) await new Promise(resolve => setTimeout(resolve, waitMs));
             lastPanelVisibleCaptureAt = Date.now();
@@ -528,11 +542,19 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             .catch(error => sendResponse({ ok: false, error: error?.message || String(error) }));
         return true;
     }
-    if (message?.type === 'dashbridge-download-panel-capture' && _sender.tab
-        && typeof message.dataUrl === 'string' && message.dataUrl.startsWith('data:image/png;base64,')) {
-        const safeName = String(message.filename || 'grafana_panel.png').replace(/[\\/:*?"<>|]/g, '_').slice(0, 180);
-        chrome.downloads.download({ url: message.dataUrl, filename: safeName, saveAs: false })
-            .then(downloadId => sendResponse({ ok: Number.isInteger(downloadId), downloadId }))
+    if (message?.type === 'dashbridge-download-panel-capture') {
+        (async () => {
+            if (!await isTrustedGrafanaContentSender(_sender)
+                || typeof message.dataUrl !== 'string'
+                || !message.dataUrl.startsWith('data:image/png;base64,')) {
+                throw new Error('Недоверенный запрос сохранения снимка Grafana.');
+            }
+            const safeName = String(message.filename || 'grafana_panel.png').replace(/[\\/:*?"<>|]/g, '_').slice(0, 180);
+            const downloadId = await chrome.downloads.download({
+                url: message.dataUrl, filename: safeName, saveAs: false
+            });
+            return { ok: Number.isInteger(downloadId), downloadId };
+        })().then(sendResponse)
             .catch(error => sendResponse({ ok: false, error: error?.message || String(error) }));
         return true;
     }

@@ -21,6 +21,9 @@ assert(source.includes("panelsMode.value = 'whitelist'")
     && source.includes("document.getElementById('userPanels').value = selectedIds.join(', ')")
     && source.includes('seriesSelectedPanelIds = selectedIds'),
     'the redesigned picker must preserve main whitelist and Series selection behavior');
+assert(source.includes("mode === 'whitelist' && uPanels.length === 0")
+    && source.includes('Для белого списка укажите хотя бы один ID панели'),
+    'an empty whitelist must stop the run instead of silently capturing every dashboard panel');
 assert(source.includes('title.textContent = String(panel.title')
     && source.includes('meta.textContent = `ID ${panel.id}')
     && source.includes('panelsListContainer.replaceChildren()'),

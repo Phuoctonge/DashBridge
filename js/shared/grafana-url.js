@@ -73,10 +73,6 @@ function normalizeGrafanaTimeRanges(value) {
     return { ranges, errors };
 }
 
-function parseGrafanaTimeRanges(value) {
-    return normalizeGrafanaTimeRanges(value).ranges;
-}
-
 function applyGrafanaCaptureTheme(value, theme = 'current') {
     const url = new URL(value);
     if (theme === 'light' || theme === 'dark') url.searchParams.set('theme', theme);

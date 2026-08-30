@@ -1,6 +1,7 @@
 'use strict';
 const assert = require('assert');
 const fs = require('fs');
+const vm = require('vm');
 
 const optionsHtml = fs.readFileSync('options.html', 'utf8');
 const optionsSource = fs.readFileSync('js/pages/options.js', 'utf8');
@@ -59,5 +60,53 @@ assert(optionsHtml.includes('placeholder="web.tdm.mos.ru"')
     && optionsSource.includes("tdmDomain: 'web.tdm.mos.ru'")
     && tdmSource.includes("tdmDomain: 'web.tdm.mos.ru'"),
     'Options and TDM export must share web.tdm.mos.ru as the default host');
+
+const thresholdValidator = optionsSource.match(/function getAnalysisThresholdPairError\([\s\S]*?\n    \}/)?.[0];
+assert(thresholdValidator, 'Options must expose one shared CPU/RAM threshold-pair validator');
+const thresholdContext = {};
+vm.createContext(thresholdContext);
+vm.runInContext(`${thresholdValidator}\nthis.validateThresholds = getAnalysisThresholdPairError;`, thresholdContext);
+assert.strictEqual(thresholdContext.validateThresholds(50, 80, 'CPU'), '');
+assert.match(thresholdContext.validateThresholds(90, 80, 'CPU'), /меньше критического/);
+assert.match(thresholdContext.validateThresholds(-1, 80, 'CPU'), /от 0 до 100/);
+assert(optionsSource.includes("const raw = document.getElementById(inputId).value.trim()")
+    && optionsSource.includes("raw === '' ? Number.NaN : Number(raw)"),
+    'an empty threshold field must be rejected instead of being silently saved as zero');
+const thresholdPairs = optionsSource.match(/const analysisThresholdPairs = Object\.freeze\(\[[\s\S]*?\n    \]\);/)?.[0];
+const effectiveImportValidator = optionsSource.match(/function validateEffectiveImportedThresholds\([\s\S]*?\n    \}/)?.[0];
+assert(thresholdPairs && effectiveImportValidator,
+    'Options import must expose executable effective CPU/RAM threshold validation');
+const importThresholdContext = {
+    getGrafanaSettingsDefaults: () => ({
+        cpuWarnThreshold: 50,
+        cpuCritThreshold: 80,
+        memWarnThreshold: 80,
+        memCritThreshold: 90,
+    }),
+};
+vm.createContext(importThresholdContext);
+vm.runInContext(`${thresholdValidator}\n${thresholdPairs}\n${effectiveImportValidator}\n`
+    + 'this.validateEffectiveImport = validateEffectiveImportedThresholds;', importThresholdContext);
+assert.doesNotThrow(() => importThresholdContext.validateEffectiveImport(
+    { cpuCritThreshold: 85 }, { cpuWarnThreshold: 60 }
+), 'a valid partial CPU import must be checked against the current critical threshold');
+assert.throws(() => importThresholdContext.validateEffectiveImport(
+    { cpuCritThreshold: 70 }, { cpuWarnThreshold: 75 }
+), /меньше критического/, 'an invalid partial CPU import must be rejected');
+assert.doesNotThrow(() => importThresholdContext.validateEffectiveImport(
+    {}, { memCritThreshold: 95 }
+), 'a partial RAM import must fall back to the canonical warning threshold');
+assert.throws(() => importThresholdContext.validateEffectiveImport(
+    {}, { memCritThreshold: 75 }
+), /меньше критического/, 'an invalid partial RAM import must be rejected against canonical defaults');
+const importValidationCall = optionsSource.indexOf('validateEffectiveImportedThresholds(currentSync, imported.sync);');
+const importBackupWrite = optionsSource.indexOf('dashbridge_import_backup:', importValidationCall);
+const importSyncWrite = optionsSource.indexOf('await setStorageValues(chrome.storage.sync, imported.sync);', importBackupWrite);
+assert(importValidationCall >= 0 && importBackupWrite > importValidationCall && importSyncWrite > importBackupWrite,
+    'confirmed import must validate before creating its backup and writing sync settings');
+for (const id of ['settingCpuWarn', 'settingCpuCrit', 'settingMemWarn', 'settingMemCrit']) {
+    assert(new RegExp(`id="${id}"[^>]*min="0"[^>]*max="100"`).test(optionsHtml),
+        `${id} must expose its valid percentage range`);
+}
 
 console.log('PASS Options exposes only selected global user defaults with active consumers');

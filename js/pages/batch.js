@@ -607,6 +607,9 @@ document.addEventListener("DOMContentLoaded", () => {
             // Применяем whitelist/blacklist
             const mode = document.getElementById('panelsMode').value;
             const uPanels = document.getElementById('userPanels').value.split(',').map(s => s.trim()).filter(s => s);
+            if (mode === 'whitelist' && uPanels.length === 0) {
+                throw new Error('Для белого списка укажите хотя бы один ID панели');
+            }
             const orderedPanelIds = dashboardResult.panelList?.length
                 ? dashboardResult.panelList.map(panel => String(panel.id))
                 : Object.keys(panels);

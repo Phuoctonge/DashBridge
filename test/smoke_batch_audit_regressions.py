@@ -37,6 +37,7 @@ check('Batch uses the shared gradient page header',
       'class="batch-header"' in HTML and 'background: var(--header-grad)' in CSS)
 check('Batch panel picker buttons match adjacent URL field height',
       '.batch-url-actions .btn { height: 100%;' in CSS
+      and '.batch-url-actions .btn { height: 100%; min-height: var(--control-height-lg); margin-top: 0; }' in CSS
       and 'align-items: stretch' in CSS)
 check('Batch compact capture choices use accessible switches',
       HTML.count('class="batch-switch-slider"') == 2

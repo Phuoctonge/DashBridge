@@ -30,6 +30,9 @@
 4. Grafana runtime регистрируется только для настроенных hosts и маршрутов
    `/d/`/`/d-solo/`. `<all_urls>` в manifest не является разрешением включать
    функциональность на каждом сайте.
+   DOM dataset может сообщать scope MAIN world, но не может авторизовать Chrome
+   API: isolated bridge хранит authority в собственном closure, а service worker
+   повторно проверяет host/route привилегированного capture-запроса.
 5. DNR-правила остаются session- и tab-scoped. Нельзя возвращать глобальное
    снятие X-Frame-Options/CSP.
 6. Любое временное изменение DOM, размеров или renderer при capture

@@ -19,11 +19,7 @@
 
     function applyUiScale(value) {
         const scale = normalizeUiScale(value);
-        const previous = document.documentElement.getAttribute('data-ui-scale');
         document.documentElement.setAttribute('data-ui-scale', scale);
-        if (previous !== scale) {
-            window.dispatchEvent(new CustomEvent('dashbridge-ui-scale-change', { detail: { scale } }));
-        }
     }
 
     /**

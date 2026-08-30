@@ -8,8 +8,12 @@
         'cpuTemplateFull', 'cpuTemplateTop3', 'memTemplateFull', 'memTemplateTop3'
     ]);
     let currentGrafanaSettings = normalizeGrafanaSettings({});
+    // The page can mutate every DOM attribute. Keep authorization in the
+    // isolated-world closure and publish the dataset value only for MAIN UI.
+    let grafanaMenuScopeAllowed = false;
+    const hasActiveUserGesture = () => navigator.userActivation?.isActive === true;
     const syncGrafanaAnalysisSettings = () => {
-        if (document.documentElement.dataset.dashbridgeGrafanaMenuEnabled !== 'true') {
+        if (!grafanaMenuScopeAllowed) {
             delete document.documentElement.dataset.dashbridgeGrafanaAnalysisSettings;
             return;
         }
@@ -40,6 +44,7 @@
             // Match either exact host (with port) or hostname only
             return normalized === currentHost || normalized === location.hostname.toLowerCase();
         });
+        grafanaMenuScopeAllowed = allowed;
         syncGrafanaIconUrl(allowed);
         document.documentElement.dataset.dashbridgeGrafanaMenuEnabled = String(allowed);
         syncGrafanaAnalysisSettings();
@@ -66,7 +71,7 @@
         }
     });
     document.addEventListener('dashbridgeCapturePreparedSettingChanged', event => {
-        if (document.documentElement.dataset.dashbridgeGrafanaMenuEnabled !== 'true'
+        if (!grafanaMenuScopeAllowed || !hasActiveUserGesture()
             || typeof event.detail?.enabled !== 'boolean') return;
         chrome.storage.sync.set({ grafanaCompactScreenshot: event.detail.enabled });
     });
@@ -74,8 +79,8 @@
     let panelCaptureInProgress = false;
     document.addEventListener('dashbridgePanelCaptureRequest', async event => {
         const detail = event.detail || {};
-        if (document.documentElement.dataset.dashbridgeGrafanaMenuEnabled !== 'true'
-            || panelCaptureInProgress || !['download', 'copy'].includes(detail.action)
+        if (!grafanaMenuScopeAllowed || !hasActiveUserGesture() || panelCaptureInProgress
+            || !['download', 'copy'].includes(detail.action)
             || typeof detail.requestId !== 'string') return;
         panelCaptureInProgress = true;
         let result = { requestId: detail.requestId, ok: false, error: 'capture-failed' };
@@ -218,7 +223,7 @@
 
     document.addEventListener('dashbridgeSavePanelRequest', event => {
         const detail = event.detail || {};
-        if (document.documentElement.dataset.dashbridgeGrafanaMenuEnabled !== 'true'
+        if (!grafanaMenuScopeAllowed || !hasActiveUserGesture()
             || !/^\d+$/.test(String(detail.panelId || ''))) return;
         void openProfileSaveDialog({ panelId: String(detail.panelId), title: String(detail.title || '').slice(0, 240) });
     });

@@ -37,6 +37,28 @@ clipboard или временно перестраивает панель. Сн�
 
 ## Проверка изменений
 
+### Перед удалением или переносом кода
+
+Не считай отсутствие локальных вызовов доказательством, что код не используется.
+Перед удалением функции, глобала, обработчика, DOM-узла, storage-ключа или файла:
+
+1. обнови индекс без изменения файлов проекта:
+   `gitnexus analyze --index-only`;
+2. проверь обратное влияние: `gitnexus impact <symbol> --direction upstream`;
+3. получи контекст символа и при необходимости путь между владельцем и
+   потребителем: `gitnexus context <symbol>` и `gitnexus trace <from> <to>`;
+4. проверь незакоммиченные изменения: `gitnexus detect-changes`;
+5. запусти `node scripts/check-dependency-contracts.js` и проверь точным поиском
+   строковые контракты (message action/type, CustomEvent, storage key, DOM id и
+   selector). Для файла используй
+   `node scripts/check-dependency-contracts.js --explain <path>`;
+6. после правки снова выполни dependency guard и полный прогон тестов.
+
+GitNexus дополняет, но не заменяет `extension-architecture.md`: отсутствующий
+результат в графе не означает, что classic-script, runtime loader или строковый
+контракт не используется. Не удаляй код, пока все найденные потребители не
+классифицированы и не обновлены вместе с владельцем контракта.
+
 Канонический полный прогон:
 
 ```powershell

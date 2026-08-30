@@ -349,13 +349,8 @@ function esc(str) {
 
 function categoryLabel(cat) {
     const map = {
-        G: 'G · Auto-refresh',
         F: 'Storage',
         A: 'Environment',
-        B: 'Visuals',
-        C: 'Series Filter',
-        D: 'Combinatorial',
-        E: 'Data Pipeline',
         H: 'H · Matrix Transitions',
     };
     return map[cat] || cat;
@@ -365,12 +360,6 @@ function formatDuration(ms) {
     if (!ms && ms !== 0) return '';
     if (ms < 1000) return `${ms}ms`;
     return `${(ms / 1000).toFixed(1)}s`;
-}
-
-function formatDateTime(ts) {
-    if (!ts) return '';
-    const d = new Date(ts);
-    return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
 // --- Рендеринг таблицы ---
@@ -516,52 +505,6 @@ function renderResultsTable(snapshot) {
             const fullTest = test?.diagnosticRef ? await diagnosticSpool?.readTest(test.diagnosticRef) : test;
             if (fullTest?.diagnostic) showDiagnostic(fullTest, urlResult);
         });
-    });
-}
-
-/**
- * Инкрементальное добавление строк теста в конец таблицы
- * (вызывается из onProgress для живого обновления).
- */
-function appendLatestTestRow(snapshot) {
-    if (!elResultsTable) return;
-    if (!snapshot.results.length) return;
-
-    // Текущий URL — последний в results (добавляется до запуска тестов)
-    const urlIndex = snapshot.results.length - 1;
-    const urlResult = snapshot.results[urlIndex];
-    if (!urlResult) return;
-
-    if (!urlResult.tests.length) {
-        // Первый вызов для этого URL — добавляем заголовок
-        if (elEmptyState) elEmptyState.style.display = 'none';
-        elResultsTable.insertAdjacentHTML('beforeend', buildUrlHeader(urlResult, urlIndex));
-        return;
-    }
-
-    // Если заголовок ещё не добавлен — добавим
-    if (!elResultsTable.querySelector(`[data-url-index="${urlIndex}"].tr-url-header`)) {
-        elResultsTable.insertAdjacentHTML('beforeend', buildUrlHeader(urlResult, urlIndex));
-    } else {
-        // Обновляем счётчики в заголовке
-        const headerRow = elResultsTable.querySelector(`.tr-url-header[data-url-index="${urlIndex}"]`);
-        if (headerRow) {
-            // Replace the complete header so a newly encountered SKIP or
-            // aborted/not-run count gets its own element during live updates.
-            headerRow.outerHTML = buildUrlHeader(urlResult, urlIndex);
-        }
-    }
-
-    // Добавляем последнюю строку теста
-    const lastTest = urlResult.tests[urlResult.tests.length - 1];
-    const testIndex = urlResult.tests.length - 1;
-    elResultsTable.insertAdjacentHTML('beforeend', buildTestRow(lastTest, urlIndex, testIndex));
-    const row = elResultsTable.lastElementChild;
-    row?.querySelector('.tr-diagnostic-btn')?.addEventListener('click', async event => {
-        const button = event.currentTarget;
-        const test = lastSnapshot?.results?.[Number(button.dataset.urlIndex)]?.tests?.[Number(button.dataset.testIndex)];
-        const fullTest = test?.diagnosticRef ? await diagnosticSpool?.readTest(test.diagnosticRef) : test;
-        if (fullTest?.diagnostic) showDiagnostic(fullTest, urlResult);
     });
 }
 
@@ -1187,83 +1130,6 @@ async function createChunkedJsonBlob(value, onProgress = null) {
     const parts = [];
     await serializeJsonInChunks(value, chunk => { parts.push(chunk); }, onProgress);
     return new Blob(parts, { type: 'application/json' });
-}
-
-async function serializeArtifactPlan(plan, writeChunk, onProgress = null) {
-    const encoder = new TextEncoder();
-    const totals = { nodes: 0, characters: 0, chunks: 0 };
-    const report = (current = {}, complete = false) => onProgress?.({
-        nodes: totals.nodes + (current.nodes || 0),
-        characters: totals.characters + (current.characters || 0),
-        chunks: totals.chunks + (current.chunks || 0),
-        complete,
-    });
-    const writeRaw = async text => {
-        const encoded = encoder.encode(text);
-        await writeChunk(encoded);
-        totals.characters += text.length;
-        totals.chunks += 1;
-    };
-    const writeValue = async value => {
-        const result = await serializeJsonInChunks(value, writeChunk, progress => report(progress));
-        totals.nodes += result.nodes;
-        totals.characters += result.characters;
-        totals.chunks += result.chunks;
-    };
-
-    await writeRaw('{');
-    let rootFields = 0;
-    for (const [key, value] of Object.entries(plan.prelude || {})) {
-        if (rootFields++) await writeRaw(',');
-        await writeValue(key);
-        await writeRaw(':');
-        await writeValue(value);
-    }
-    if (rootFields++) await writeRaw(',');
-    await writeValue('results');
-    await writeRaw(':[');
-    for (let urlIndex = 0; urlIndex < plan.sourceResults.length; urlIndex += 1) {
-        if (urlIndex) await writeRaw(',');
-        const urlResult = plan.sourceResults[urlIndex];
-        const metadata = plan.compactUrlMetadata(urlResult);
-        await writeRaw('{');
-        let urlFields = 0;
-        for (const [key, value] of Object.entries(metadata)) {
-            if (urlFields++) await writeRaw(',');
-            await writeValue(key);
-            await writeRaw(':');
-            await writeValue(value);
-        }
-        if (urlFields++) await writeRaw(',');
-        await writeValue('tests');
-        await writeRaw(':[');
-        const tests = urlResult.tests || [];
-        for (let testIndex = 0; testIndex < tests.length; testIndex += 1) {
-            if (testIndex) await writeRaw(',');
-            // Compact exactly one test, write it immediately, then let the
-            // temporary object be collected before the next test. Holding the
-            // compacted form of all screenshots at once crashes Chromium near
-            // its per-tab heap limit on multi-gigabyte reports.
-            const compactTest = plan.compactTest(tests[testIndex]);
-            await writeValue(compactTest);
-            report();
-            await new Promise(resolve => setTimeout(resolve, 0));
-        }
-        await writeRaw(']}');
-    }
-    await writeRaw('],');
-    if (typeof plan.visualStates === 'function') {
-        await writeValue('visualStates');
-        await writeRaw(':');
-        await writeValue(plan.visualStates());
-        await writeRaw(',');
-    }
-    await writeValue('assets');
-    await writeRaw(':');
-    await writeValue(plan.assets());
-    await writeRaw('}');
-    report({}, true);
-    return { ...totals };
 }
 
 // Results and content-addressed assets are already in OPFS. Copy their JSON

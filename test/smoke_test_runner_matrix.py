@@ -50,12 +50,11 @@ checks = {
         "['transform', 'transform-skipped'].includes(event.stage)" in SUITE
         and "['iframe', 'query-signature', 'legend-fallback'].includes(event.scope)" in SUITE
     ),
-    "generated ON-to-OFF transitions use the shared strict executor": (
-          "const makeOffSettings = onSettings =>" in SUITE
-          and "{ label: 'OFF→ON (предусловие)', settings: onSettings, invariant: invariantOn }," in SUITE
-          and "{ label: 'ON→OFF', settings: makeOffSettings(onSettings), invariant: invariantOff }," in SUITE
-          and "await applySettingsAndWait(tabId, panelId, onSettings);" not in SUITE
-      ),
+    "retired single-toggle generator is absent from the active matrix": (
+        "generateSingleToggleTests" not in SUITE
+        and "makeOffSettings" not in SUITE
+        and "function generateLifecycleMatrixTests()" in SUITE
+    ),
       "runner reads journal and waits for a selected-panel response": (
         "async function readQueryLifecycle(tabId, afterEventId = 0)" in SUITE
         and "async function waitForTargetQueryLifecycle(tabId, afterEventId, timeoutMs = 12000)" in SUITE
@@ -302,7 +301,7 @@ checks = {
         and "debugLog('legend layout decision'" in VISUAL_ENGINE
     ),
     "active suite excludes deprecated timing-based categories": (
-        "const DASHBRIDGE_TEST_SUITE = [...suiteF.filter(test => test.id !== 'F3'), ...suiteA, ...suiteH];" in SUITE
+        "const DASHBRIDGE_TEST_SUITE = [...suiteF, ...suiteA, ...suiteH];" in SUITE
         and "...suiteB" not in SUITE.split("const DASHBRIDGE_TEST_SUITE =", 1)[1]
         and "...suiteC" not in SUITE.split("const DASHBRIDGE_TEST_SUITE =", 1)[1]
         and "...suiteD" not in SUITE.split("const DASHBRIDGE_TEST_SUITE =", 1)[1]
@@ -352,7 +351,7 @@ checks = {
     "diagnostic export has lifecycle accounting schema": (
         "dashbridge-e2e-diagnostics/v4" in REPORT
         and "DashBridgeTestReport.createArtifactStreamPlan" in UI
-        and "serializeArtifactPlan(plan," in UI
+        and "serializeSpoolArtifact(lastSnapshot, diagnosticSpool, exportMetadata," in UI
         and "reconciliation" in REPORT
         and "primaryFailure" in REPORT
         and "failureClusters" in REPORT

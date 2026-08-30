@@ -213,9 +213,25 @@ assert(modalStart >= 0 && modalEnd > modalStart
     && !modalSource.includes('innerHTML'),
     'analysis results must render external server names through DOM text only');
 assert(panelTools.includes('DashBridgeGrafanaPanelAnalysis?.serverNameForCopy?.(item.server, settings)')
-    && panelTools.includes('.replace(\'{server}\', copyServer(item))')
-    && panelTools.includes('.replace(`{server${index + 1}}`, copyServer(item))'),
+    && panelTools.includes('.replaceAll(\'{server}\', copyServer(item))')
+    && panelTools.includes('.replaceAll(`{server${index + 1}}`, copyServer(item))'),
     'both analysis copy formats must always trim the configured server suffix without changing displayed items');
+const copyFormatterStart = panelTools.indexOf('    const analysisThreshold =');
+const copyFormatterEnd = panelTools.indexOf('    const startEmbeddedPanelAnalysis =', copyFormatterStart);
+const copyFormatterContext = {
+    window: { DashBridgeGrafanaPanelAnalysis: { serverNameForCopy: value => value } }
+};
+vm.createContext(copyFormatterContext);
+vm.runInContext(`${panelTools.slice(copyFormatterStart, copyFormatterEnd)}
+globalThis.formatCopy = formatPanelAnalysisCopy;`, copyFormatterContext);
+assert.strictEqual(copyFormatterContext.formatCopy([
+    { server: 'server-01', value: 42 }
+], 'cpu', true, {}), 'server-01 до 42,00%',
+'TOP-3 with fewer than three rows must use the complete-list template without unresolved placeholders');
+assert.strictEqual(copyFormatterContext.formatCopy([
+    { server: 'server-01', value: 42 }
+], 'cpu', false, { cpuTemplateFull: '{server}: {cpu}; {server}: {cpu}' }),
+'server-01: 42,00; server-01: 42,00', 'every repeated template placeholder must be replaced');
 assert(modalSource.includes("document.createElementNS('http://www.w3.org/2000/svg', 'svg')")
     && modalSource.includes("closePath.setAttribute('d', 'M5 5l10 10M15 5L5 15')")
     && panelTools.includes('.dashbridge-panel-analysis-close svg'),

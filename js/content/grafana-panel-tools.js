@@ -2271,11 +2271,6 @@
     };
 
     const hasSourceSeriesFilterScope = refIds => isDashboardIframe || refIds instanceof Set && refIds.size > 0;
-    const getSourceFilterSignatures = (state, panelKey = '') => {
-        if (state?.targetQuerySignatures?.length) return state.targetQuerySignatures;
-        if (panelKey && panelKey === tools.targetPanelId) return tools.targetQuerySignatures || [];
-        return [];
-    };
     const hasDataTransform = () => !!tools.invertIdle || !!tools.convertMemToUsed || !!tools.forceMemByteUnit
         || tools.trimDomainEnabled === true || !!tools.seriesQueryFilterEnabled
         || !!tools.cpuCapacityFilterEnabled
@@ -4177,18 +4172,21 @@
         const metric = type === 'cpu' ? 'cpu' : 'mem';
         const copyServer = item => window.DashBridgeGrafanaPanelAnalysis?.serverNameForCopy?.(item.server, settings)
             ?? item.server;
-        if (!topOnly) {
+        // A TOP-3 sentence has no honest meaning when fewer than three rows are
+        // available. Reuse the full-list template instead of leaking unresolved
+        // placeholders into the clipboard.
+        if (!topOnly || items.length < 3) {
             const fallback = `{server} до {${metric}}%`;
             const template = String(settings?.[`${metric}TemplateFull`] || fallback).slice(0, 2000);
             return items.map(item => template
-                .replace('{server}', copyServer(item))
-                .replace(`{${metric}}`, item.value.toFixed(2).replace('.', ','))).join('\n');
+                .replaceAll('{server}', copyServer(item))
+                .replaceAll(`{${metric}}`, item.value.toFixed(2).replace('.', ','))).join('\n');
         }
         const fallback = `до {${metric}1}% для {server1}, до {${metric}2}% для {server2}, для остальных до {${metric}3}%`;
         let text = String(settings?.[`${metric}TemplateTop3`] || fallback).slice(0, 2000);
         items.slice(0, 3).forEach((item, index) => {
-            text = text.replace(`{server${index + 1}}`, copyServer(item))
-                .replace(`{${metric}${index + 1}}`, item.value.toFixed(2).replace('.', ','));
+            text = text.replaceAll(`{server${index + 1}}`, copyServer(item))
+                .replaceAll(`{${metric}${index + 1}}`, item.value.toFixed(2).replace('.', ','));
         });
         return text;
     };

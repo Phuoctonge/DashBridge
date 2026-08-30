@@ -343,6 +343,11 @@
             background: #f0f7ff;
         }
 
+        .popup-launch-btn {
+            font-size: 0.75rem;
+            padding: 0.75rem;
+        }
+
         .btn-jira {
             background: #0052cc;
             color: white;
@@ -353,6 +358,17 @@
             display: flex;
             flex-direction: column;
             gap: 0.5rem;
+        }
+
+        .popup-dashboard-add-action {
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border-light);
+        }
+
+        .popup-dashboard-add-action .btn {
+            font-size: 0.75rem;
+            padding: 0.625rem;
         }
 
         .button-row {

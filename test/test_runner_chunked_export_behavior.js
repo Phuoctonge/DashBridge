@@ -24,7 +24,7 @@ const context = {
     },
 };
 vm.createContext(context);
-vm.runInContext(`${source.slice(start, end)}\nthis.createChunkedJsonBlob = createChunkedJsonBlob; this.serializeJsonInChunks = serializeJsonInChunks; this.serializeArtifactPlan = serializeArtifactPlan; this.serializeSpoolArtifact = serializeSpoolArtifact; this.localExportTimestamp = localExportTimestamp; this.localIsoTimestamp = localIsoTimestamp;`, context);
+vm.runInContext(`${source.slice(start, end)}\nthis.createChunkedJsonBlob = createChunkedJsonBlob; this.serializeJsonInChunks = serializeJsonInChunks; this.serializeSpoolArtifact = serializeSpoolArtifact; this.localExportTimestamp = localExportTimestamp; this.localIsoTimestamp = localIsoTimestamp;`, context);
 
 (async () => {
     const value = {
@@ -36,20 +36,6 @@ vm.runInContext(`${source.slice(start, end)}\nthis.createChunkedJsonBlob = creat
     const text = await blob.text();
     assert.deepStrictEqual(JSON.parse(text), JSON.parse(JSON.stringify(value)));
     assert(blob.size > 2_000_000, 'large diagnostic payload was unexpectedly truncated');
-    const chunks = [];
-    const progress = await context.serializeArtifactPlan({
-        prelude: { schema: 'stream-test', generator: { serialization: 'test' } },
-        sourceResults: [{ url: 'https://example.test', tests: [{ id: 'A' }, { id: 'B' }] }],
-        compactUrlMetadata: result => ({ url: result.url }),
-        compactTest: test => ({ ...test, imageRef: `img-${test.id}` }),
-        assets: () => ({ images: { 'img-A': { dataUrl: 'x'.repeat(2_200_000) } } }),
-    }, async chunk => { chunks.push(chunk); });
-    const streamed = await new Blob(chunks).text();
-    const parsed = JSON.parse(streamed);
-    assert.strictEqual(parsed.results[0].tests[1].imageRef, 'img-B');
-    assert.strictEqual(parsed.assets.images['img-A'].dataUrl.length, 2_200_000);
-    assert(progress.characters > 2_000_000, 'streamed artifact progress must include assets');
-
     let writes = 0;
     const backpressure = await context.serializeJsonInChunks(
         Array.from({ length: 20 }, (_, index) => `${index}:`.padEnd(1_200_000, 'z')),

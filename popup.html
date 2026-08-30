@@ -129,13 +129,21 @@
             <div class="card grafana-timestamp-card">
                 <h3 class="section-title"><svg class="ic" viewBox="0 0 24 24" fill="none"
                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="9" />
-                        <path d="M12 7v5l3 2" />
+                        <path d="m8 9-3 3 3 3" />
+                        <path d="m16 9 3 3-3 3" />
+                        <path d="m14 5-4 14" />
                     </svg> Время для Django</h3>
                 <p class="grafana-timestamp-hint">Преобразует <code>from</code> и <code>to</code> текущей вкладки
                     Grafana в timestamp (миллисекунды). Значения сохраняются на 3 минуты.</p>
-                <button id="grafanaTimestampReadBtn" class="btn btn-outline" type="button">Получить из текущей
-                    вкладки</button>
+                <button id="grafanaTimestampReadBtn" class="btn btn-outline" type="button">
+                    <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="4" width="18" height="16" rx="2" />
+                        <path d="M3 9h18" />
+                        <path d="M12 12v5" />
+                        <path d="m9 14 3 3 3-3" />
+                    </svg> Получить из текущей вкладки
+                </button>
                 <div id="grafanaTimestampResult" class="grafana-timestamp-result" hidden>
                     <button class="grafana-timestamp-value" type="button" data-timestamp-copy="from"
                         aria-label="Скопировать начало теста">
@@ -158,16 +166,15 @@
                 <div id="customButtonsContainer">
                     <!-- Buttons rendered by JS -->
                 </div>
-            </div>
-
-            <div style="padding: 0 0.25rem;">
-                <button id="openAddModal" class="btn btn-dashed" style="font-size: 0.75rem; padding: 0.625rem;">
-                    <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="12" y1="5" x2="12" y2="19" />
-                        <line x1="5" y1="12" x2="19" y2="12" />
-                    </svg> Добавить ссылку
-                </button>
+                <div class="popup-dashboard-add-action">
+                    <button id="openAddModal" class="btn btn-dashed">
+                        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="12" y1="5" x2="12" y2="19" />
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                        </svg> Добавить ссылку
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -183,8 +190,7 @@
                     Пакетный сборщик отчетов. Сканирует дашборды, изолирует линии на графиках (series) и скачивает
                     десятки скриншотов за разные периоды одним ZIP-архивом.
                 </p>
-                <button id="openBatchCaptureBtn" class="btn btn-outline"
-                    style="width: 100%; font-size: 0.75rem; padding: 0.75rem; border-color: var(--primary); color: var(--primary); background: rgba(16, 185, 129, 0.05);">
+                <button id="openBatchCaptureBtn" class="btn btn-outline popup-launch-btn">
                     <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                         stroke-linecap="round" stroke-linejoin="round">
                         <path
@@ -238,15 +244,16 @@
             <h3 class="section-title">
                 <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                     stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="9" />
-                    <path d="M12 7v5l3 2" />
+                    <rect x="3" y="5" width="18" height="14" rx="3" />
+                    <circle cx="9" cy="12" r="3" fill="currentColor" stroke="none" />
+                    <path d="M15 9v6" />
+                    <path d="M18 10.5v3" />
                 </svg> Traffic Recorder
             </h3>
             <p style="font-size: 0.6875rem; color: var(--text-muted); margin: 0 0 0.75rem; line-height: 1.4;">
                 Запись действий и сетевого трафика, replay и сравнение изменений в сценариях .dashflow.
             </p>
-            <button id="openTrafficRecorderBtn" class="btn btn-outline" type="button"
-                style="width: 100%; font-size: 0.75rem; padding: 0.75rem; border-color: var(--primary); color: var(--primary); background: rgba(var(--primary-rgb), 0.05);">
+            <button id="openTrafficRecorderBtn" class="btn btn-outline popup-launch-btn" type="button">
                 <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                     stroke-linecap="round" stroke-linejoin="round">
                     <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" />
@@ -292,10 +299,10 @@
             <button id="transferWorklogBtn" class="btn btn-outline" style="border-color: #0052cc; color: #0052cc;">
                 <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                     stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="3" y="4" width="8" height="13" rx="2" />
-                    <rect x="13" y="7" width="8" height="13" rx="2" />
-                    <path d="M8 12h8" />
-                    <path d="m13 9 3 3-3 3" />
+                    <path d="M5 7h11" />
+                    <path d="m13 4 3 3-3 3" />
+                    <path d="M19 17H8" />
+                    <path d="m11 14-3 3 3 3" />
                 </svg> Копирование/перенос WorkLog в другую задачу
             </button>
         </div>

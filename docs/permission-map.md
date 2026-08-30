@@ -11,7 +11,7 @@
 | `tabs` | Поиск активной вкладки, backfill Grafana runtime, временные Batch/Recorder-вкладки, навигация capture и `captureVisibleTab`. |
 | `windows` | Отдельные окна Batch, GUI capture и Recorder; управление размером capture и clean incognito lifecycle. |
 | `scripting` | Dynamic/explicit MAIN-world runtime только на настроенных Grafana-hosts, узкие Jira/TDM actions и Recorder scenario injection. |
-| `downloads` | PNG/ZIP/JSON/HTML/`.dashflow` exports и release ZIP по явному действию пользователя. |
+| `downloads` | PNG/ZIP/JSON/HTML/`.dashflow` exports и release ZIP по явному действию пользователя. Для снимка direct Grafana isolated bridge хранит разрешённый scope вне DOM, требует user activation, а service worker повторно проверяет sender host и dashboard route. |
 | `declarativeNetRequestWithHostAccess` | Session rules для снятия XFO/CSP только во вкладках DashBridge. Одновременный `declarativeNetRequest` не требуется. |
 | `clipboardRead` | Вставка диапазона времени в native Grafana picker и DashBridge по клику пользователя. Payload парсится как ограниченный `{from,to}` JSON либо URL с `from`/`to`; невалидный буфер не применяется. |
 | `clipboardWrite` | Копирование диапазонов времени, отчётов, ссылок, diagnostics и PNG по пользовательскому действию. |

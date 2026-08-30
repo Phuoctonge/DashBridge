@@ -613,7 +613,7 @@ textarea:focus {
 .batch-url-row { display: flex; align-items: stretch; gap: 10px; flex-wrap: wrap; }
 .batch-url-input { flex: 1 1 18.75rem; min-width: min(18.75rem, 100%); }
 .batch-url-actions { display: flex; align-items: stretch; gap: 5px; }
-.batch-url-actions .btn { height: 100%; min-height: var(--control-height-lg); }
+.batch-url-actions .btn { height: 100%; min-height: var(--control-height-lg); margin-top: 0; }
 .batch-secondary-btn { width: auto; background: var(--surface-raised); color: var(--text-main); }
 .batch-load-series-btn { margin-top: 12px; }
 .batch-clear-logs { margin-top: 10px; }
@@ -720,8 +720,7 @@ h3 .ic {
     border-top: 1px solid var(--border);
 }
 
-.batch-panel-rules-header,
-.batch-panel-rules-actions {
+.batch-panel-rules-header {
     display: flex;
     gap: 12px;
     justify-content: space-between;
@@ -817,12 +816,6 @@ h3 .ic {
     white-space: nowrap;
 }
 
-.batch-panel-rules-actions {
-    justify-content: flex-start;
-    margin-top: 12px;
-}
-
-.batch-panel-rules-actions .btn,
 .batch-panel-rules-header .btn {
     width: auto;
     margin-top: 0;

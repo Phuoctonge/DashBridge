@@ -134,8 +134,11 @@ checks = {
         and "field.fieldNames.some(name => targetNames.has(name))" in COMMON,
     "visual uPlot and Flot threshold controllers are removed": "const applySeriesThreshold" not in VISUAL_ENGINE
         and "applySeriesThreshold" not in COMMON,
-    "remounted target panel reuses its saved source-query signatures": "const getSourceFilterSignatures" in COMMON
-        and "panelKey === tools.targetPanelId" in COMMON,
+    "remounted target panel restores saved visual state and active query signatures":
+        "const state = normalizePanelLegendState(panelVisualState?.get(panel))" in COMMON
+        and "panel.__dashbridgeVisualState = state;" in COMMON
+        and "const signatures = new Set(tools.targetQuerySignatures || []);" in COMMON
+        and "getSourceFilterSignatures" not in COMMON,
     "source-filtered native panels do not repaint uPlot colours without visual work": "if (hasVisualWork(state))" in COMMON
         and "const hasVisualWork = (state = tools) =>" in COMMON,
     "temporary datasource debug globals are not shipped": "__dashbridgeLegendFilterDebug" not in COMMON

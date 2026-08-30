@@ -503,9 +503,6 @@
 
             const applyColors = () => {
                 const uplot = findUPlot(outerPanel);
-                const legendIcons = Array.from(outerPanel ? outerPanel.querySelectorAll(
-                    '.graph-legend-icon, [class*="LegendIcon"], [data-testid="series-icon"]'
-                ) : []);
                 let needsRedraw = false;
                 let paletteColours = null;
 
@@ -657,7 +654,6 @@
                             const plot = $(this).data('plot');
                             if (plot && typeof plot.getData === 'function') {
                                 const seriesArray = plot.getData();
-                                let flotActiveIdx = 0;
                                 let needsFlotRedraw = false;
 
                                 seriesArray.forEach((s) => {
@@ -734,7 +730,6 @@
                 const charts = $(outerPanel).find('.graph-panel__chart, .flot-base, canvas').addBack('.graph-panel__chart');
                 charts.each(function () {
                     const plot = $(this).data('plot');
-                    const plotElem = this;
                     if (plot && typeof plot.draw === 'function') {
                         setTimeout(() => {
                             if (typeof plot.resize === 'function') plot.resize();
