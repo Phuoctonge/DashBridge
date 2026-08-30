@@ -116,18 +116,21 @@ assert(recorderCss.includes('.comparison-controls > :not(.sr-only) { flex: 1 1 1
     'comparison controls must fill narrow layouts without overflow');
 assert(recorderCss.includes('.network-switches { display: grid; grid-template-columns: minmax(0,1fr);'),
     'cache and cookie switches must be arranged vertically');
-for (const asset of ['vendor/jszip.min.js', 'js/shared/dashflow-schema.js', 'js/shared/dashflow-compare.js', 'js/shared/dashflow-xlsx.js', '../shared/operation-progress-window.js', 'recorder.js']) {
+for (const asset of ['vendor/jszip.min.js', 'js/shared/dashflow-schema.js', 'js/shared/dashflow-compare.js', 'js/shared/dashflow-xlsx.js', '../shared/operation-progress-window.js', 'recorder-dashflow-io.js', 'recorder.js']) {
     assert(html.includes(asset), `recorder page must load ${asset}`);
 }
 assert(html.indexOf('vendor/jszip.min.js') < html.indexOf('recorder.js'), 'JSZip must load before the recorder controller');
+assert(html.indexOf('recorder-dashflow-io.js') < html.indexOf('recorder.js'),
+    'DashFlow I/O must load before the recorder controller');
 
 const recorder = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recorder.js'), 'utf8');
+const dashflowIo = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recorder-dashflow-io.js'), 'utf8');
 assert(recorder.includes('Network.getResponseBody'), 'network recorder must capture response bodies through CDP');
 assert(recorder.includes('Network.getRequestPostData'), 'request bodies missing from requestWillBeSent must be retrieved through CDP');
 assert(recorder.includes('schema.classifyResponseBodyCapture'), 'response body capture must use the tested no-body and size policy');
 assert(recorder.includes('schema.base64DecodedByteLength'), 'binary response metadata must use exact Base64 padding-aware size');
 assert(recorder.includes('schema.buildHarTimings'), 'HAR export must use the tested CDP timing conversion');
-assert(recorder.includes('assertDashflowEntrySize') && recorder.includes('estimateDashflowWorkingSet'),
+assert(dashflowIo.includes('assertEntrySize') && recorder.includes('estimateDashflowWorkingSet'),
     'DashFlow import and save must reject oversized decompressed entries before expensive processing');
 assert(recorder.includes("zip.file('network.json'") && recorder.includes("zip.file('streams.json'"),
     'DashFlow v2 must persist canonical network data and streaming protocols separately from HAR');
@@ -183,9 +186,13 @@ assert(recorder.includes("String(url || '').toLowerCase().includes(fragment)"), 
 assert(recorder.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'), 'comparison export must download a real XLSX workbook');
 assert(recorder.includes('function postLifecycle(message)'), 'lifecycle messages must tolerate a disconnected extension port');
 assert(!recorder.includes("lifecyclePort.postMessage({ type: 'unbind' })"), 'cleanup must not write directly to a possibly disconnected port');
-assert(recorder.includes('state.importing') && recorder.includes('const importedRequests = new Map()'),
+assert(recorder.includes('state.importing') && dashflowIo.includes('const requests = new Map()'),
     'DashFlow import must validate into local state and disable concurrent controls before committing');
-assert(recorder.includes('assertDashflowWorkingSet'), 'DashFlow import must cap the aggregate decompressed working set');
+assert(dashflowIo.includes('assertWorkingSet'), 'DashFlow import must cap the aggregate decompressed working set');
+const importRead = recorder.indexOf('const imported = await dashflowIo.read(file)');
+const importCommit = recorder.indexOf('await stopActiveSession(false); resetSession();', importRead);
+assert(importRead >= 0 && importCommit > importRead,
+    'Recorder must not reset the live session until the archive has fully validated');
 assert(recorder.includes('earlyPlaceholder && !earlyPlaceholder.url') && recorder.includes('chain[index] = key'),
     'request placeholders must preserve out-of-order ExtraInfo, including redirect chains');
 assert(recorder.includes('request.associatedCookies !== undefined') && recorder.includes('request.blockedCookies !== undefined'),

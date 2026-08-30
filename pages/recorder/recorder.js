@@ -1233,41 +1233,24 @@
         return new TextEncoder().encode(request.responseBody || '');
     }
 
-    function bytesToBase64(bytes) {
-        let binary = '';
-        const chunkSize = 32 * 1024;
-        for (let offset = 0; offset < bytes.length; offset += chunkSize) {
-            binary += String.fromCharCode(...bytes.subarray(offset, Math.min(bytes.length, offset + chunkSize)));
+    const dashflowIo = DashBridgeDashflowIo.create({
+        JSZip,
+        schema,
+        sha256,
+        limits: {
+            fileBytes: 512 * 1024 * 1024,
+            workingSetBytes: MAX_DASHFLOW_WORKING_SET_BYTES,
+            manifestBytes: MAX_DASHFLOW_MANIFEST_BYTES,
+            flowBytes: MAX_DASHFLOW_FLOW_BYTES,
+            networkBytes: MAX_DASHFLOW_NETWORK_BYTES,
+            streamsBytes: MAX_DASHFLOW_STREAMS_BYTES,
+            requestBodyBytes: MAX_REQUEST_BODY_BYTES,
+            totalRequestBodyBytes: MAX_TOTAL_REQUEST_BODY_BYTES,
+            bodyBytes: MAX_BODY_BYTES,
+            totalBodyBytes: MAX_TOTAL_BODY_BYTES,
+            streamPayloadBytes: MAX_STREAM_PAYLOAD_BYTES
         }
-        return btoa(binary);
-    }
-
-    function dashflowEntryUncompressedSize(entry) {
-        const size = Number(entry?._data?.uncompressedSize);
-        return Number.isFinite(size) && size >= 0 ? size : null;
-    }
-
-    function assertDashflowEntrySize(entry, label, maxBytes) {
-        if (!entry) throw new TypeError(`В архиве отсутствует ${label}`);
-        const size = dashflowEntryUncompressedSize(entry);
-        if (size !== null && size > maxBytes) throw new RangeError(`${label} превышает безопасный распакованный размер`);
-        return size;
-    }
-
-    function assertDashflowWorkingSet(entries) {
-        const uniqueEntries = new Set();
-        let total = 0;
-        for (const entry of entries) {
-            if (!entry || uniqueEntries.has(entry)) continue;
-            uniqueEntries.add(entry);
-            const size = dashflowEntryUncompressedSize(entry);
-            if (size !== null) total += size;
-            if (total > MAX_DASHFLOW_WORKING_SET_BYTES) {
-                throw new RangeError('Распакованные данные .dashflow превышают безопасный общий размер');
-            }
-        }
-        return total;
-    }
+    });
 
     function estimateDashflowWorkingSet() {
         // During save, bodies coexist as strings/Base64, decoded bytes and ZIP
@@ -1368,82 +1351,9 @@
         if (state.importing || ['recording', 'replaying'].includes(state.mode)) return;
         state.importing = true; updateControls();
         try {
-            if (!file || file.size > 512 * 1024 * 1024) throw new RangeError('Файл превышает лимит 512 МиБ');
             setStatus('Чтение .dashflow…');
-            const zip = await JSZip.loadAsync(await file.arrayBuffer());
-            const manifestFile = zip.file('manifest.json'); const flowFile = zip.file('flow.json');
-            const networkFile = zip.file('network.json'); const streamsFile = zip.file('streams.json');
-            const harFile = zip.file('traffic.har');
-            if (!manifestFile || !flowFile || !networkFile || !harFile || !streamsFile) {
-                throw new TypeError('В архиве отсутствуют обязательные файлы DashFlow v2');
-            }
-            assertDashflowEntrySize(manifestFile, 'manifest.json', MAX_DASHFLOW_MANIFEST_BYTES);
-            assertDashflowEntrySize(flowFile, 'flow.json', MAX_DASHFLOW_FLOW_BYTES);
-            assertDashflowEntrySize(networkFile, 'network.json', MAX_DASHFLOW_NETWORK_BYTES);
-            assertDashflowEntrySize(streamsFile, 'streams.json', MAX_DASHFLOW_STREAMS_BYTES);
-            assertDashflowEntrySize(harFile, 'traffic.har', MAX_DASHFLOW_NETWORK_BYTES);
-            const archiveEntries = [manifestFile, flowFile, networkFile, streamsFile, harFile];
-            assertDashflowWorkingSet(archiveEntries);
-
-            const manifest = schema.validateManifest(JSON.parse(await manifestFile.async('string')));
-            const flow = schema.validateFlow(JSON.parse(await flowFile.async('string')));
-            const network = schema.validateNetwork(JSON.parse(await networkFile.async('string')));
-            const streams = schema.validateStreams(JSON.parse(await streamsFile.async('string')));
-            const derivedHar = JSON.parse(await harFile.async('string'));
-            if (!derivedHar?.log || derivedHar.log.version !== '1.2' || !Array.isArray(derivedHar.log.entries)) {
-                throw new TypeError('Некорректный traffic.har');
-            }
-            const importedRequests = new Map();
-            network.requests.forEach((request, index) => {
-                const key = String(request.requestId || `import-${index}`);
-                if (importedRequests.has(key)) throw new TypeError(`Повторяющийся requestId: ${key}`);
-                importedRequests.set(key, { ...request, requestId: key });
-            });
-
-            let importedRequestBodyBytes = 0;
-            for (const request of importedRequests.values()) {
-                if (request.postData === undefined) continue;
-                const bytes = new TextEncoder().encode(String(request.postData)).byteLength;
-                if (bytes > MAX_REQUEST_BODY_BYTES || importedRequestBodyBytes + bytes > MAX_TOTAL_REQUEST_BODY_BYTES) {
-                    throw new RangeError('Тела запросов превышают лимиты DashFlow');
-                }
-                importedRequestBodyBytes += bytes;
-            }
-
-            const bodyEntries = new Map();
-            for (const request of importedRequests.values()) {
-                if (!request.bodyPath) continue;
-                if (!/^bodies\/[a-zA-Z0-9_.-]+\.bin$/.test(request.bodyPath)) throw new TypeError('Некорректный путь тела ответа');
-                const bodyFile = zip.file(request.bodyPath);
-                if (!bodyFile) throw new TypeError(`В архиве отсутствует ${request.bodyPath}`);
-                assertDashflowEntrySize(bodyFile, request.bodyPath, MAX_BODY_BYTES);
-                bodyEntries.set(request.bodyPath, bodyFile);
-            }
-            archiveEntries.push(...bodyEntries.values());
-            assertDashflowWorkingSet(archiveEntries);
-
-            let importedBodyBytes = 0;
-            for (const request of importedRequests.values()) {
-                if (!request.bodyPath) continue;
-                const bytes = await bodyEntries.get(request.bodyPath).async('uint8array');
-                if (bytes.byteLength > MAX_BODY_BYTES || importedBodyBytes + bytes.byteLength > MAX_TOTAL_BODY_BYTES) {
-                    throw new RangeError('Тела ответов превышают лимиты DashFlow');
-                }
-                const digest = await sha256(bytes);
-                if (request.bodySha256 && request.bodySha256 !== digest) throw new TypeError(`Нарушена целостность ${request.bodyPath}`);
-                request.responseBody = bytesToBase64(bytes); request.bodyBase64 = true;
-                request.bodyBytes = bytes.byteLength; request.bodySha256 = digest;
-                importedBodyBytes += bytes.byteLength;
-            }
-
-            let importedStreamPayloadBytes = 0;
-            for (const event of streams.events) {
-                const payload = event?.response?.payloadData ?? event?.data ?? '';
-                importedStreamPayloadBytes += new TextEncoder().encode(String(payload)).byteLength;
-                if (importedStreamPayloadBytes > MAX_STREAM_PAYLOAD_BYTES) {
-                    throw new RangeError('Потоковые данные превышают лимиты DashFlow');
-                }
-            }
+            const imported = await dashflowIo.read(file);
+            const { manifest, flow, network, streams } = imported;
 
             // Commit only after every entry has passed structural, size and
             // integrity validation. A rejected file leaves the current state intact.
@@ -1452,10 +1362,11 @@
             state.title = String(flow.title || manifest.title || 'DashBridge recording');
             state.startUrl = manifest.startUrl || flow.steps.find(step => step.type === 'navigate')?.url || '';
             state.createdAt = manifest.createdAt || new Date().toISOString(); ui.startUrl.value = state.startUrl;
-            state.requests = importedRequests;
-            state.totalRequestBodyBytes = importedRequestBodyBytes; state.totalBodyBytes = importedBodyBytes;
+            state.requests = imported.requests;
+            state.totalRequestBodyBytes = imported.totalRequestBodyBytes;
+            state.totalBodyBytes = imported.totalBodyBytes;
             state.pageEvents = Array.isArray(network.pageEvents) ? network.pageEvents : [];
-            state.streams = streams.events; state.streamPayloadBytes = importedStreamPayloadBytes;
+            state.streams = streams.events; state.streamPayloadBytes = imported.streamPayloadBytes;
             state.environment = manifest.environment || null;
             state.captureFinishedAt = manifest.capture?.finishedAt || network.finishedAt || null;
             state.completeness = manifest.capture?.completeness || state.completeness;

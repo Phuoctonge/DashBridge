@@ -402,6 +402,11 @@ WebTransport-события, а `bodies/` — проверяемые по SHA-25
 drop-in совместимыми с Chrome Recorder. Всё упаковывается JSZip в `.dashflow`
 v2 с manifest, окружением, лимитами и показателями полноты. Полный контракт и
 границы конвертации описаны в `docs/dashflow-v2.md`.
+`recorder-dashflow-io.js` владеет недоверенной границей импорта: до возврата
+результата он проверяет ZIP-структуру, распакованные размеры, schema, пути тел,
+суммарные лимиты и SHA-256. `recorder.js` сохраняет lifecycle и применяет
+подготовленный результат к живому state только после успешного завершения этих
+проверок.
 Replay принимает только v2, открывает новое окно и повторяет поддерживаемые
 шаги. Переключатель `Disable Cache` перед
 первой навигацией record/replay вызывает CDP `Network.setCacheDisabled` и
@@ -516,8 +521,8 @@ node test/run-js-tests.js
 node test/run-python-smoke-tests.js
 ```
 
-На 2026-08-30: 101 JavaScript behavior-файл и 41 исполняемый Python
-smoke/security/audit-файл. Все 82 production JavaScript-файла проходят
+На 2026-08-30: 102 JavaScript behavior-файла и 41 исполняемый Python
+smoke/security/audit-файл. Все 83 production JavaScript-файла проходят
 `node --check`.
 `DASHBRIDGE_PYTHON` задаёт Python, если он не находится автоматически.
 
