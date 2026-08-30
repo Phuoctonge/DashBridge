@@ -1,7 +1,15 @@
 (function initDashBridgeDashflowIo(global) {
     'use strict';
 
-    const create = ({ JSZip, schema, sha256, limits, TextEncoderRef = TextEncoder, btoaFn = btoa } = {}) => {
+    const create = ({
+        JSZip,
+        schema,
+        sha256,
+        limits,
+        TextEncoderRef = TextEncoder,
+        btoaFn = btoa,
+        outputType = 'blob'
+    } = {}) => {
         if (typeof JSZip !== 'function' || !schema || typeof sha256 !== 'function') {
             throw new TypeError('DashFlow I/O requires JSZip, schema and SHA-256 adapters');
         }
@@ -48,6 +56,52 @@
                 }
             }
             return total;
+        };
+
+        const write = async ({ manifest, flow, network, har, streams, bodies = [], responseBodyBytes = 0 } = {}) => {
+            if (!manifest || !flow || !network || !har || !streams || !Array.isArray(bodies)) {
+                throw new TypeError('DashFlow export requires manifest, flow, network, HAR, streams and bodies');
+            }
+            const serialized = {
+                manifest: JSON.stringify(manifest, null, 2),
+                flow: JSON.stringify(flow, null, 2),
+                network: JSON.stringify(network, null, 2),
+                har: JSON.stringify(har, null, 2),
+                streams: JSON.stringify(streams, null, 2)
+            };
+            const serializedUpperBound = Object.values(serialized)
+                .reduce((total, value) => total + value.length * 2, 0);
+            if (Math.max(0, Number(responseBodyBytes) || 0) + serializedUpperBound > limits.workingSetBytes) {
+                throw new RangeError('Метаданные записи превышают безопасный размер одного .dashflow');
+            }
+
+            const zip = new JSZip();
+            const bodyPaths = new Set();
+            let bodyBytes = 0;
+            for (const body of bodies) {
+                if (!body || !/^bodies\/[a-zA-Z0-9_.-]+\.bin$/.test(body.path) || bodyPaths.has(body.path)) {
+                    throw new TypeError('Некорректный или повторяющийся путь тела ответа');
+                }
+                const byteLength = Number(body.bytes?.byteLength);
+                if (!Number.isFinite(byteLength) || byteLength < 0 || byteLength > limits.bodyBytes
+                    || bodyBytes + byteLength > limits.totalBodyBytes) {
+                    throw new RangeError('Тела ответов превышают лимиты DashFlow');
+                }
+                bodyPaths.add(body.path);
+                bodyBytes += byteLength;
+                zip.file(body.path, body.bytes);
+            }
+            zip.file('manifest.json', serialized.manifest);
+            zip.file('flow.json', serialized.flow);
+            zip.file('network.json', serialized.network);
+            zip.file('traffic.har', serialized.har);
+            zip.file('streams.json', serialized.streams);
+            return zip.generateAsync({
+                type: outputType,
+                mimeType: 'application/octet-stream',
+                compression: 'DEFLATE',
+                compressionOptions: { level: 6 }
+            });
         };
 
         const read = async file => {
@@ -149,7 +203,7 @@
             });
         };
 
-        return Object.freeze({ read });
+        return Object.freeze({ write, read });
     };
 
     global.DashBridgeDashflowIo = Object.freeze({ create });

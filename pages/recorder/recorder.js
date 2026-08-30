@@ -1266,7 +1266,7 @@
                 throw new RangeError('Запись слишком велика для безопасного сохранения одним .dashflow; уменьшите сценарий');
             }
             setStatus('Подготовка .dashflow…'); ui.save.disabled = true;
-            const zip = new JSZip();
+            const bodies = [];
             let bodyIndex = 0;
             for (const request of state.requests.values()) {
                 if (request.responseBody === undefined) continue;
@@ -1276,7 +1276,7 @@
                 bodyIndex += 1;
                 request.bodyPath = `bodies/${String(bodyIndex).padStart(6, '0')}_${safeId}.bin`;
                 request.bodySha256 = request.bodySha256 || await sha256(bytes);
-                zip.file(request.bodyPath, bytes);
+                bodies.push({ path: request.bodyPath, bytes });
             }
             const flow = {
                 title: state.title || 'DashBridge recording', timeout: 15_000, steps: state.steps,
@@ -1312,29 +1312,16 @@
                 },
                 completeness: state.completeness,
             });
-            const serialized = {
-                manifest: JSON.stringify(manifest, null, 2),
-                flow: JSON.stringify(flow, null, 2),
-                network: JSON.stringify(buildNetworkExport(), null, 2),
-                har: JSON.stringify(buildHar(), null, 2),
-                streams: JSON.stringify({
-                version: 1, payloadBytes: state.streamPayloadBytes, events: state.streams,
-                }, null, 2),
-            };
-            const serializedUpperBound = Object.values(serialized).reduce((total, value) => total + value.length * 2, 0);
-            if (state.totalBodyBytes + serializedUpperBound > MAX_DASHFLOW_WORKING_SET_BYTES) {
-                throw new RangeError('Метаданные записи превышают безопасный размер одного .dashflow');
-            }
-            zip.file('manifest.json', serialized.manifest);
-            zip.file('flow.json', serialized.flow);
-            zip.file('network.json', serialized.network);
-            zip.file('traffic.har', serialized.har);
-            zip.file('streams.json', serialized.streams);
             // The container is ZIP-compatible, but octet-stream prevents the
             // Windows save dialog from replacing the product extension with .zip.
-            const blob = await zip.generateAsync({
-                type: 'blob', mimeType: 'application/octet-stream',
-                compression: 'DEFLATE', compressionOptions: { level: 6 }
+            const blob = await dashflowIo.write({
+                manifest,
+                flow,
+                network: buildNetworkExport(),
+                har: buildHar(),
+                streams: { version: 1, payloadBytes: state.streamPayloadBytes, events: state.streams },
+                bodies,
+                responseBodyBytes: state.totalBodyBytes
             });
             const url = URL.createObjectURL(blob);
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');

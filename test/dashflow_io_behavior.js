@@ -30,11 +30,12 @@ const baseLimits = Object.freeze({
     totalBodyBytes: 4096,
     streamPayloadBytes: 4096
 });
-const createIo = overrides => context.DashBridgeDashflowIo.create({
+const createIo = (overrides, outputType = 'uint8array') => context.DashBridgeDashflowIo.create({
     JSZip,
     schema: context.DashBridgeFlowSchema,
     sha256,
-    limits: { ...baseLimits, ...overrides }
+    limits: { ...baseLimits, ...overrides },
+    outputType
 });
 const jsonEntries = ({ network, streams } = {}) => ({
     'manifest.json': {
@@ -86,6 +87,32 @@ async function archiveFile(entries, binaryEntries = {}) {
     assert.strictEqual(importedRequest.responseBody, Buffer.from(body).toString('base64'));
     assert.strictEqual(importedRequest.bodySha256, digest);
 
+    const exportedBytes = await createIo().write({
+        manifest: jsonEntries()['manifest.json'],
+        flow: jsonEntries()['flow.json'],
+        network: jsonEntries()['network.json'],
+        har: jsonEntries()['traffic.har'],
+        streams: jsonEntries()['streams.json'],
+        bodies: [{ path: 'bodies/000001_export.bin', bytes: body }],
+        responseBodyBytes: body.byteLength
+    });
+    const exportedZip = await JSZip.loadAsync(exportedBytes);
+    for (const name of ['manifest.json', 'flow.json', 'network.json', 'traffic.har', 'streams.json', 'bodies/000001_export.bin']) {
+        assert(exportedZip.file(name), `export must contain ${name}`);
+    }
+    assert.deepStrictEqual(
+        [...await exportedZip.file('bodies/000001_export.bin').async('uint8array')],
+        [...body],
+        'exported response bytes must remain unchanged'
+    );
+    await assert.rejects(createIo({ workingSetBytes: 1 }).write({
+        manifest: {}, flow: {}, network: {}, har: {}, streams: {}, bodies: []
+    }), /Метаданные записи превышают/);
+    await assert.rejects(createIo().write({
+        manifest: {}, flow: {}, network: {}, har: {}, streams: {},
+        bodies: [{ path: '../escape.bin', bytes: body }]
+    }), /Некорректный или повторяющийся путь/);
+
     const missingEntryFile = await archiveFile((() => {
         const entries = jsonEntries();
         delete entries['streams.json'];
@@ -115,7 +142,7 @@ async function archiveFile(entries, binaryEntries = {}) {
     await assert.rejects(createIo().read({ size: 4, arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer }),
         /zip|signature|archive|corrupt/i, 'invalid ZIP data must be rejected');
 
-    console.log('PASS DashFlow I/O validates archives before exposing an atomic import result');
+    console.log('PASS DashFlow I/O writes bounded archives and exposes only a validated import result');
 })().catch(error => {
     console.error(error);
     process.exitCode = 1;

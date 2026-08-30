@@ -132,7 +132,7 @@ assert(recorder.includes('schema.base64DecodedByteLength'), 'binary response met
 assert(recorder.includes('schema.buildHarTimings'), 'HAR export must use the tested CDP timing conversion');
 assert(dashflowIo.includes('assertEntrySize') && recorder.includes('estimateDashflowWorkingSet'),
     'DashFlow import and save must reject oversized decompressed entries before expensive processing');
-assert(recorder.includes("zip.file('network.json'") && recorder.includes("zip.file('streams.json'"),
+assert(dashflowIo.includes("zip.file('network.json'") && dashflowIo.includes("zip.file('streams.json'"),
     'DashFlow v2 must persist canonical network data and streaming protocols separately from HAR');
 assert(recorder.includes("String(bodyIndex).padStart(6, '0')"),
     'response body paths must remain unique even when sanitized CDP request IDs collide');
@@ -214,7 +214,7 @@ assert(recorder.includes('incognito: state.sessionOptions.disableCookies'), 'Dis
 assert(!/cookies\.(?:remove|set)|removeCookies/.test(recorder), 'Recorder must never delete or overwrite cookies in the normal user profile');
 assert(recorder.includes('containsSecrets'), 'the archive manifest must disclose sensitive content');
 assert(recorder.includes('.dashflow'), 'downloads must use the agreed recording extension');
-assert(recorder.includes("mimeType: 'application/octet-stream'"), 'Chrome save dialog must preserve the .dashflow extension');
+assert(dashflowIo.includes("mimeType: 'application/octet-stream'"), 'Chrome save dialog must preserve the .dashflow extension');
 const background = fs.readFileSync(path.join(root, 'js', 'background.js'), 'utf8');
 assert(background.includes('dashbridge-recorder-lifecycle'), 'service worker must detach CDP when the recorder page disappears');
 
