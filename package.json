@@ -4,6 +4,7 @@
   "private": true,
   "description": "Development-only analysis and browser verification for the DashBridge extension.",
   "scripts": {
+    "auth:grafana": "node scripts/setup-grafana-e2e-profile.js",
     "browser:install": "playwright install chromium",
     "lint": "eslint .",
     "test:unit": "node test/run-all-tests.js",

@@ -11,7 +11,7 @@
 Расширение не требует сборки и загружается напрямую из исходной папки. На
 момент проверки проходят:
 
-- 103 JavaScript behavior-файла;
+- 104 JavaScript behavior-файла;
 - 41 Python smoke/security/audit-файл;
 - `node --check` для всех 84 production JavaScript-файлов.
 - ESLint correctness-анализ production, tests и scripts;
@@ -164,6 +164,20 @@ smoke. Browser smoke использует отдельный временный 
 page и network diagnostics в `test-results/extension-smoke.json`, а снимки
 создаёт только для упавших страниц. Путь к другому тестовому Chromium можно
 явно задать через `DASHBRIDGE_CHROME_PATH`.
+
+Для живых Grafana используется один постоянный профиль, отдельный от обычного
+Chrome и от временного smoke-профиля:
+
+```powershell
+npm run auth:grafana -- 'https://grafana-one.example/d/...' 'https://grafana-two.example/d/...'
+```
+
+Команда открывает обе Grafana в официальном Playwright Chromium с загруженным
+DashBridge. Пользователь входит в обе системы один раз и закрывает окно;
+последующие E2E используют сохранённые browser cookies. Профиль по умолчанию
+находится в `%LOCALAPPDATA%\DashBridge\E2E\browser-profile`, то есть вне
+репозитория. URL не должны содержать username, password или token; секреты не
+передаются скрипту и не сохраняются в Git.
 
 Полный dependency-free прогон:
 
