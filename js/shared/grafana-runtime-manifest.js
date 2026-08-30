@@ -12,6 +12,7 @@
         'js/content/grafana-panel-state.js',
         'js/shared/grafana-panel-analysis.js',
         'js/content/grafana-series-capture.js',
+        'js/content/grafana-unit.js',
         'js/content/grafana-visual-engine.js',
         'js/content/grafana-compact-layout.js',
         'js/shared/grafana-panel-settings-modal.js',

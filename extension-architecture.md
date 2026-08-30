@@ -98,6 +98,7 @@ grafana-dom.js
 grafana-panel-state.js
 grafana-panel-analysis.js
 grafana-series-capture.js
+grafana-unit.js
 grafana-visual-engine.js
 grafana-compact-layout.js
 grafana-panel-settings-modal.js
@@ -143,6 +144,7 @@ grafana-panel-tools.js
 | Live panel state | `grafana-panel-state.js` | Tools, visual engine. |
 | Transport adapter | `grafana-network.js` | CPU/RAM, фильтры, diagnostics. |
 | Ответ до renderer | `grafana-series-capture.js` | Batch series mode. |
+| Разбор единиц осей Grafana | `grafana-unit.js` | Visual engine: threshold, table report, uPlot/Flot. |
 | uPlot/Flot visuals | `grafana-visual-engine.js` | Direct Grafana, DashBridge. |
 | Настройки панели | `grafana-panel-settings-modal.js` | Direct Grafana, DashBridge. |
 | Allowlist легенды | `grafana-legend-selection.js` | Tools, карточки. |

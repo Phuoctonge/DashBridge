@@ -5,16 +5,16 @@ const path = require('path');
 const vm = require('vm');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-visual-engine.js'), 'utf8');
-const parserStart = source.indexOf('    const parseAxisUnitLabel');
-const parserEnd = source.indexOf('    const inferUnitFromAxisLabels', parserStart);
+const unitSource = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-unit.js'), 'utf8');
 const tableStart = source.indexOf('    const parseGrafanaTableDisplayValue');
 const tableEnd = source.indexOf('    const collectPanelReportSnapshot', tableStart);
-assert(parserStart >= 0 && parserEnd > parserStart && tableStart >= 0 && tableEnd > tableStart,
+assert(tableStart >= 0 && tableEnd > tableStart,
     'table report helpers must remain independently testable');
 
 const context = {};
 vm.createContext(context);
-vm.runInContext(`${source.slice(parserStart, parserEnd)}\n${source.slice(tableStart, tableEnd)}\n`
+vm.runInContext(unitSource, context);
+vm.runInContext(`const { parseAxisUnitLabel } = globalThis.DashBridgeGrafanaUnit;\n${source.slice(tableStart, tableEnd)}\n`
     + 'globalThis.collectTable = collectGrafanaTableRecords;', context);
 
 const cell = value => ({ textContent: value });
