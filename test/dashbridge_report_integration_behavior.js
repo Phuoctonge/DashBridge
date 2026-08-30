@@ -6,6 +6,7 @@ const path = require('path');
 const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
 const html = read('pages/dashbridge/dashbridge.html');
 const dashboard = read('pages/dashbridge/dashbridge.js');
+const reportTransport = read('pages/dashbridge/dashbridge-report-transport.js');
 const tools = read('js/content/grafana-panel-tools.js');
 const visual = read('js/content/grafana-visual-engine.js');
 const tableReport = read('js/content/grafana-table-report.js');
@@ -15,9 +16,12 @@ const css = read('pages/dashbridge/dashbridge.css');
 assert(html.includes('id="generateReportBtn"') && html.includes('id="configureReportBtn"'));
 assert(html.indexOf('js/shared/dashbridge-report.js') < html.indexOf('dashbridge.js'),
     'report engine must load before the dashboard controller');
-assert(dashboard.includes("action: 'collectPanelReportSnapshot'")
+assert(html.indexOf('dashbridge-report-transport.js') < html.indexOf('dashbridge.js'),
+    'report transport must load before the dashboard controller');
+assert(reportTransport.includes("action: 'collectPanelReportSnapshot'")
     && dashboard.includes("e.data.action === 'panelReportSnapshot'")
-    && dashboard.includes('waiter.iframe === sourceIframe'),
+    && dashboard.includes('dashBridgeReportTransport.acceptSnapshot')
+    && reportTransport.includes('waiter.iframe !== sourceIframe'),
     'dashboard must correlate every report response with its exact iframe');
 assert(tools.includes("event.data?.action === 'collectPanelReportSnapshot'")
     && tools.includes("action: 'panelReportSnapshot'")
@@ -60,21 +64,21 @@ assert(tools.includes('const overlay = existing || document.createElement')
     'the panel status observer must reuse its overlay instead of creating a mutation loop');
 assert(schema.includes('normalizePanelReport') && schema.includes('normalizeProfileReport'),
     'import validation must cover profile and panel report settings');
-const reportRequestSource = dashboard.slice(
-    dashboard.indexOf('function waitForDashboardIframeReady('),
-    dashboard.indexOf('function setDashboardPanelDataStatus(panel, snapshot)')
+const reportRequestSource = reportTransport.slice(
+    reportTransport.indexOf('const waitForIframeReady ='),
+    reportTransport.indexOf('const acceptSnapshot =')
 );
-assert(dashboard.includes("state: 'configuration_error'")
+assert(reportTransport.includes("state: 'configuration_error'")
     && reportRequestSource.includes("dataStatus: 'iframe_unavailable'")
     && reportRequestSource.includes("dataStatus: 'request_error'"),
     'unavailable data must never be treated as a successful SLA evaluation');
 assert(reportRequestSource.includes("iframe.dataset.dashbridgeLoaded === 'true'")
-    && reportRequestSource.includes('frameObserver = new MutationObserver(inspect)')
+    && reportRequestSource.includes('frameObserver = observeFrame(iframe, inspect)')
     && !reportRequestSource.includes('removalPoll = setInterval(inspect, 500);')
-    && reportRequestSource.includes("const scope = iframe.closest('.panel-card')?.parentElement")
+    && reportTransport.includes("iframe.closest?.('.panel-card')?.parentElement")
     && !reportRequestSource.includes('documentObserver')
-    && reportRequestSource.includes('DASHBRIDGE_REPORT_FRAME_TIMEOUT_MS')
-    && reportRequestSource.includes('DASHBRIDGE_REPORT_TOTAL_TIMEOUT_MS')
+    && dashboard.includes('frameTimeoutMs: DASHBRIDGE_REPORT_FRAME_TIMEOUT_MS')
+    && dashboard.includes('totalTimeoutMs: DASHBRIDGE_REPORT_TOTAL_TIMEOUT_MS')
     && reportRequestSource.includes('timeoutMs: responseTimeoutMs'),
     'report collection must allow slow Grafana iframes while retaining bounded failure results');
 assert(reportRequestSource.includes("action: 'cancelPanelReportSnapshot'")

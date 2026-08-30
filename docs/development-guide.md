@@ -1,6 +1,6 @@
 # DashBridge: ориентир для дальнейшей разработки
 
-> Сверено с версией 2.4.1, исходным кодом и тестами 2026-08-29. Архитектурный источник
+> Сверено с версией 2.4.1, исходным кодом и тестами 2026-08-30. Архитектурный источник
 > истины — [`extension-architecture.md`](../extension-architecture.md), карта
 > разрешений — [`permission-map.md`](permission-map.md), незавершённые
 > направления — [`roadmap.md`](roadmap.md). История не описывает
@@ -11,9 +11,9 @@
 Расширение не требует сборки и загружается напрямую из исходной папки. На
 момент проверки проходят:
 
-- 97 JavaScript behavior-файлов;
+- 101 JavaScript behavior-файл;
 - 41 Python smoke/security/audit-файл;
-- `node --check` для всех 78 production JavaScript-файлов.
+- `node --check` для всех 82 production JavaScript-файлов.
 
 Автотесты хорошо фиксируют структурные и поведенческие контракты, но не
 заменяют живую проверку Chrome/Grafana: renderer, clipboard, capture,
@@ -71,7 +71,7 @@
 | Grafana MAIN-модуль | порядок runtime, direct Grafana, DashBridge iframe, повторную установку | `grafana-runtime-manifest.js`, `background.js`, `js/content/` |
 | Renderer/легенда/threshold | uPlot и Flot, Table, View/dashboard, refresh/remount, restore после capture | `grafana-panel-definition.js`, `grafana-unit.js`, `grafana-table-report.js`, `grafana-visual-engine.js`, `grafana-panel-tools.js` |
 | Network transform | fetch и XHR semantics, panel scope, fail-open, отсутствие helper-серий | `grafana-network.js`, response filters |
-| DashBridge panel/profile | schema, import/export, pause, theme, time, drag/drop, source+origin | `dashbridge.js`, renderer, profile store |
+| DashBridge panel/profile | schema, import/export, pause, theme, time, drag/drop, source+origin | `dashbridge.js`, report transport, renderer, profile store |
 | Time/refresh | relative/absolute range, Grafana 10/12 clipboard, Off vs saved dashboard refresh, iframe reload | `dashbridge-time-state.js`, `grafana-time-picker-clipboard.js`, `grafana-panel-bootstrap.js`, `grafana-refresh-policy.js` |
 | Batch | отдельное окно, cancel/error cleanup, лимиты PNG/ZIP, Blob URL lifecycle | `batch.js`, loader/capture/lifecycle helpers |
 | Test Runner | порядок runtime scripts, OPFS spool, planned/completed/NOT RUN, PiP cancel и elapsed time, cleanup окна Grafana | `pages/test-runner/test-runner-*.js`, `pages/shared/operation-progress-window.js`, `pages/test-runner/test-runner.html` |

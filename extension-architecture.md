@@ -1,7 +1,8 @@
 # Архитектура DashBridge
 
 > Сверено с версией 2.4.1, исходным кодом и тестами 2026-08-29. Здесь описан
-> фактически работающий код. Незавершённые
+> фактически работающий код; структура и dependency graph повторно проверены
+> 2026-08-30. Незавершённые
 > направления вынесены в `docs/roadmap.md`, ключевые прежние решения — в
 > `docs/history/architecture-decisions.md`.
 
@@ -158,6 +159,7 @@ grafana-panel-tools.js
 | URL/dashboard API | `grafana-url.js`, `grafana-dashboard-api.js` | Batch. |
 | Batch presets | `grafana-batch-panel-rules.js` | Batch. |
 | Profiles | `dashbridge-profile-store.js` | `dashbridge.js`. |
+| Transport сводного отчёта | `dashbridge-report-transport.js` | Ожидание iframe, request ID, timeout/abort и точная корреляция ответа. |
 | Версия данных DashBridge | `dashbridge-data-migration.js` | Startup `dashbridge.js`. |
 | Import/recovery | `local-state-schema.js` | Options, Worklog, profiles. |
 | Local writes | `storage-writer.js` | Profiles, Worklog, Batch. |
@@ -215,6 +217,7 @@ disabled-пункты показывают профили, в которых п�
 dashbridge-profile-store.js
   → dashbridge.js
      ├── dashbridge-renderer.js
+     ├── dashbridge-report-transport.js
      ├── dashbridge-time-state.js
      └── dashbridge-crosshair.js
   ↔ postMessage конкретного iframe
@@ -513,8 +516,8 @@ node test/run-js-tests.js
 node test/run-python-smoke-tests.js
 ```
 
-На 2026-08-29: 97 JavaScript behavior-файлов и 41 исполняемый Python
-smoke/security/audit-файл. Все 78 production JavaScript-файлов проходят
+На 2026-08-30: 101 JavaScript behavior-файл и 41 исполняемый Python
+smoke/security/audit-файл. Все 82 production JavaScript-файла проходят
 `node --check`.
 `DASHBRIDGE_PYTHON` задаёт Python, если он не находится автоматически.
 

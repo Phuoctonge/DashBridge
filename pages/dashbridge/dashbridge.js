@@ -203,7 +203,6 @@ const panelLegendWaiters = new Map();
 const panelThresholdWaiters = new Map();
 const panelThresholdStates = new Map();
 const panelTitleWaiters = new Map();
-const panelReportWaiters = new Map();
 let activeReportPreview = null;
 const DASHBRIDGE_REPORT_FRAME_TIMEOUT_MS = 90_000;
 const DASHBRIDGE_REPORT_TOTAL_TIMEOUT_MS = 125_000;
@@ -760,140 +759,28 @@ function getEffectivePanelSla(panel) {
     return { ...config.sla };
 }
 
+const dashBridgeReportTransport = DashBridgeReportTransport.create({
+    forceLoadPanel,
+    getEffectivePanelSla,
+    postToDashboardFrame,
+    frameTimeoutMs: DASHBRIDGE_REPORT_FRAME_TIMEOUT_MS,
+    totalTimeoutMs: DASHBRIDGE_REPORT_TOTAL_TIMEOUT_MS
+});
+
 function reportAbortError() {
-    return new DOMException('Формирование сообщения отменено', 'AbortError');
+    return dashBridgeReportTransport.abortError();
 }
 
 function throwIfReportAborted(signal) {
-    if (signal?.aborted) throw reportAbortError();
+    dashBridgeReportTransport.throwIfAborted(signal);
 }
 
 function waitForDashboardIframeReady(iframe, timeoutMs = DASHBRIDGE_REPORT_FRAME_TIMEOUT_MS, signal = null) {
-    throwIfReportAborted(signal);
-    if (!iframe?.isConnected) return Promise.reject(new Error('Iframe панели удалён'));
-    if (iframe.dataset.dashbridgeLoaded === 'true') return Promise.resolve(iframe);
-    return new Promise((resolve, reject) => {
-        let settled = false;
-        let frameObserver = null;
-        let timeout = null;
-        const finish = error => {
-            if (settled) return;
-            settled = true;
-            frameObserver?.disconnect();
-            clearTimeout(timeout);
-            signal?.removeEventListener('abort', abort);
-            error ? reject(error) : resolve(iframe);
-        };
-        const abort = () => finish(reportAbortError());
-        const inspect = () => {
-            if (!iframe.isConnected) return finish(new Error('Iframe панели удалён во время загрузки'));
-            if (iframe.dataset.dashbridgeLoaded === 'true') finish();
-        };
-        frameObserver = new MutationObserver(inspect);
-        const scope = iframe.closest('.panel-card')?.parentElement || iframe.parentElement || document.body;
-        frameObserver.observe(scope, {
-            childList: true, subtree: true, attributes: true,
-            attributeFilter: ['data-dashbridge-loaded']
-        });
-        timeout = setTimeout(
-            () => finish(new Error('Панель не загрузилась за 90 секунд')),
-            timeoutMs
-        );
-        signal?.addEventListener('abort', abort, { once: true });
-        inspect();
-    });
+    return dashBridgeReportTransport.waitForIframeReady(iframe, timeoutMs, signal);
 }
 
 async function requestPanelReportSnapshot(panel, signal = null) {
-    throwIfReportAborted(signal);
-    const deadline = Date.now() + DASHBRIDGE_REPORT_TOTAL_TIMEOUT_MS;
-    if (panel.paused) return Promise.resolve({
-        state: 'unavailable', dataStatus: 'paused',
-        dataStatusText: 'Панель находится на паузе', error: 'Панель находится на паузе', series: []
-    });
-    const sla = getEffectivePanelSla(panel);
-    if (sla.error) return Promise.resolve({
-        state: 'configuration_error', dataStatus: 'configuration_error',
-        dataStatusText: sla.error, error: sla.error, series: []
-    });
-    const iframe = forceLoadPanel(panel.id);
-    if (!iframe) {
-        return Promise.resolve({
-            state: 'unavailable', dataStatus: 'iframe_unavailable',
-            dataStatusText: 'Iframe панели отсутствует', error: 'Iframe панели отсутствует', series: []
-        });
-    }
-    try {
-        await waitForDashboardIframeReady(iframe, Math.min(
-            DASHBRIDGE_REPORT_FRAME_TIMEOUT_MS,
-            Math.max(1, deadline - Date.now())
-        ), signal);
-    } catch (error) {
-        if (signal?.aborted || error?.name === 'AbortError') throw error;
-        return {
-            state: 'unavailable', dataStatus: 'iframe_unavailable',
-            dataStatusText: error.message || 'Iframe панели недоступен',
-            error: error.message || 'Iframe панели недоступен', series: []
-        };
-    }
-    const requestId = `panel-report-${panel.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    throwIfReportAborted(signal);
-    return new Promise((resolve, reject) => {
-        let settled = false;
-        let frameObserver = null;
-        let timeout = null;
-        const finish = snapshot => {
-            if (settled) return;
-            settled = true;
-            frameObserver?.disconnect();
-            clearTimeout(timeout);
-            signal?.removeEventListener('abort', abort);
-            panelReportWaiters.delete(requestId);
-            resolve(snapshot);
-        };
-        const abort = () => {
-            if (settled) return;
-            settled = true;
-            frameObserver?.disconnect();
-            clearTimeout(timeout);
-            signal?.removeEventListener('abort', abort);
-            panelReportWaiters.delete(requestId);
-            postToDashboardFrame(iframe, { action: 'cancelPanelReportSnapshot', requestId });
-            reject(reportAbortError());
-        };
-        const inspect = () => {
-            if (!iframe.isConnected || iframe.dataset.dashbridgeLoaded !== 'true') {
-                finish({
-                    state: 'unavailable', dataStatus: 'iframe_unavailable',
-                    dataStatusText: 'Iframe панели был закрыт или перезагружен во время получения данных',
-                    error: 'Iframe панели был закрыт или перезагружен во время получения данных', series: []
-                });
-            }
-        };
-        frameObserver = new MutationObserver(inspect);
-        const scope = iframe.closest('.panel-card')?.parentElement || iframe.parentElement || document.body;
-        frameObserver.observe(scope, {
-            childList: true, subtree: true, attributes: true,
-            attributeFilter: ['data-dashbridge-loaded']
-        });
-        const responseTimeoutMs = Math.max(1, deadline - Date.now());
-        timeout = setTimeout(() => finish({
-            state: 'timeout', dataStatus: 'timeout',
-            dataStatusText: 'Панель не ответила за общий лимит 125 секунд',
-            error: 'Панель не ответила за общий лимит 125 секунд', series: []
-        }), responseTimeoutMs);
-        panelReportWaiters.set(requestId, { iframe, resolve: finish });
-        signal?.addEventListener('abort', abort, { once: true });
-        if (!postToDashboardFrame(iframe, {
-            action: 'collectPanelReportSnapshot', requestId, sla, timeoutMs: responseTimeoutMs
-        })) {
-            finish({
-                state: 'unavailable', dataStatus: 'request_error',
-                dataStatusText: 'Не удалось отправить запрос в iframe',
-                error: 'Не удалось отправить запрос в iframe', series: []
-            });
-        }
-    });
+    return dashBridgeReportTransport.requestPanelSnapshot(panel, signal);
 }
 
 function setDashboardPanelDataStatus(panel, snapshot) {
@@ -3246,13 +3133,7 @@ window.addEventListener('message', (e) => {
     if (!sourceIframe || getFrameOrigin(sourceIframe) !== e.origin) return;
 
     if (e.data.action === 'panelReportSnapshot' && typeof e.data.requestId === 'string') {
-        const waiter = panelReportWaiters.get(e.data.requestId);
-        if (waiter && waiter.iframe === sourceIframe) {
-            panelReportWaiters.delete(e.data.requestId);
-            const snapshot = e.data.snapshot && typeof e.data.snapshot === 'object'
-                ? e.data.snapshot : { state: 'error', error: 'Некорректный ответ панели.', series: [] };
-            waiter.resolve(snapshot);
-        }
+        dashBridgeReportTransport.acceptSnapshot(e.data.requestId, sourceIframe, e.data.snapshot);
         return;
     }
 
