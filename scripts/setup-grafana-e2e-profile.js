@@ -110,4 +110,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { resolveProfileRoot, validateGrafanaUrls };
+module.exports = { projectRoot, resolveProfileRoot, validateGrafanaUrls, waitForExtensionWorker };

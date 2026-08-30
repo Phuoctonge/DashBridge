@@ -6,6 +6,7 @@
   "scripts": {
     "auth:grafana": "node scripts/setup-grafana-e2e-profile.js",
     "browser:install": "playwright install chromium",
+    "check:grafana-session": "node scripts/check-grafana-e2e-session.js",
     "lint": "eslint .",
     "test:unit": "node test/run-all-tests.js",
     "test:browser": "node test/run-extension-browser-smoke.js",
