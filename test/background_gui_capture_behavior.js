@@ -35,8 +35,8 @@ assert.strictEqual(typeof waitForGuiCaptureReady, 'function', 'background must e
 assert.strictEqual(reserveGuiCaptureBytes(5, 4, 10), 9);
 assert.throws(() => reserveGuiCaptureBytes(5, 6, 10), /безопасный лимит/);
 assert.throws(() => assertGuiCaptureArchiveSize({ size: 11 }, 10), /ZIP GUI/);
-assert.strictEqual(isTrustedExtensionPage({ id: 'extension-id', url: 'chrome-extension://extension-id/html/popup.html' }, 'html/popup.html'), true);
-assert.strictEqual(isTrustedExtensionPage({ id: 'extension-id', url: 'https://example.test/html/popup.html' }, 'html/popup.html'), false);
+assert.strictEqual(isTrustedExtensionPage({ id: 'extension-id', url: 'chrome-extension://extension-id/pages/popup/popup.html' }, 'pages/popup/popup.html'), true);
+assert.strictEqual(isTrustedExtensionPage({ id: 'extension-id', url: 'https://example.test/pages/popup/popup.html' }, 'pages/popup/popup.html'), false);
 
 const grafanaSender = (url, frameId = 0) => ({
     id: 'extension-id', frameId, url, tab: { id: 7, windowId: 3 }

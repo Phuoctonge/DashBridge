@@ -7,7 +7,7 @@ CASES = [
     {
         "name": "Grafana Batch section",
         "html": ['id="grafana-batch"', 'id="openBatchCaptureBtn"'],
-        "sources": {"js/popup/popup-grafana-router.js": ["openBatchCaptureBtn", "pages/batch/batch.html"]},
+        "sources": {"pages/popup/popup-grafana-router.js": ["openBatchCaptureBtn", "pages/batch/batch.html"]},
     },
     {
         "name": "Grafana links section",
@@ -16,8 +16,8 @@ CASES = [
             'id="grafanaTimestampReadBtn"', 'id="grafanaTimestampFrom"', 'id="grafanaTimestampTo"',
         ],
         "sources": {
-            "js/popup/popup-grafana-router.js": ["openDashBridgeBtn", "pages/dashbridge/dashbridge.html"],
-            "js/popup/popup-grafana-links.js": [
+            "pages/popup/popup-grafana-router.js": ["openDashBridgeBtn", "pages/dashbridge/dashbridge.html"],
+            "pages/popup/popup-grafana-links.js": [
                 "function renderButtons()", "function openGrafana(baseUrl)", "customButtons",
                 "setupGrafanaTimestampTool", "parseGrafanaUrlTimeRange", "navigator.clipboard.writeText",
             ],
@@ -30,17 +30,17 @@ CASES = [
             'Открыть Traffic Recorder', '<rect x="3" y="5" width="18" height="14" rx="3" />',
         ],
         "sources": {
-            "js/popup/popup-core.js": [
+            "pages/popup/popup-core.js": [
                 'module_recorder: true', '"tab-recorder": modules.module_recorder',
                 "openTrafficRecorderBtn", "pages/recorder/recorder.html",
             ],
-            "js/popup/popup-grafana-router.js": ["!openTrafficRecorderBtn"],
+            "pages/popup/popup-grafana-router.js": ["!openTrafficRecorderBtn"],
         },
     },
     {
         "name": "Jira section",
         "html": ['data-tab="tab-jira"', 'id="tab-jira"', 'id="openJiraPage"', 'id="transferWorklogBtn"'],
-        "sources": {"js/popup/popup-jira.js": ["openJiraPage", "transferWorklogBtn", "pages/worklog/worklog.html"]},
+        "sources": {"pages/popup/popup-jira.js": ["openJiraPage", "transferWorklogBtn", "pages/worklog/worklog.html"]},
     },
     {
         "name": "TDM export section",
@@ -49,7 +49,7 @@ CASES = [
             'id="tdmExportEnd"', 'id="tdmExportFormat"', 'id="tdmExportPhotos"',
             'id="tdmExcludeUserCheckbox"', 'id="tdmExportBtn"',
         ],
-        "sources": {"js/popup/popup-tdm.js": ["tdmExportBtn", "async function tdmExport()", "tdmExportFormat"]},
+        "sources": {"pages/popup/popup-tdm.js": ["tdmExportBtn", "async function tdmExport()", "tdmExportFormat"]},
     },
     {
         "name": "Grafana diagnostics section",
@@ -60,7 +60,7 @@ CASES = [
             '!id="grafanaDebugDashboardBtn"', '!id="grafanaDebugGraphBtn"',
         ],
         "sources": {
-            "js/popup/popup-grafana-debug.js": [
+            "pages/popup/popup-grafana-debug.js": [
                 "const fullReportButton", "const collectDiagnostics = async ()",
                 "chrome.scripting.executeScript", "navigator.clipboard.writeText",
                 "const safeUrl", "[redacted]", "reportType: 'full'",
@@ -86,8 +86,8 @@ CASES = [
             "!popup-grafana-cpu.js", "!popup-grafana-mem.js", "!grafana-metric-ui.js",
         ],
         "sources": {
-            "js/popup/popup-core.js": ['"tab-grafana"', '"tab-recorder"', "lastActiveTab"],
-            "js/popup/popup-grafana-router.js": [
+            "pages/popup/popup-core.js": ['"tab-grafana"', '"tab-recorder"', "lastActiveTab"],
+            "pages/popup/popup-grafana-router.js": [
                 'const subBtns = document.querySelectorAll(".grafana-sub-btn")',
                 'const subContents = document.querySelectorAll(".grafana-sub-content")',
                 "lastActiveGrafanaSubTab", "dashbridge-popup-capture-size",

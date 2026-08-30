@@ -11,7 +11,7 @@ PANEL_DEFINITION = (ROOT / "js/content/grafana-panel-definition.js").read_text(e
 CPU_CAPACITY_FILTER = (ROOT / "js/content/grafana-cpu-capacity-filter.js").read_text(encoding="utf-8")
 DASHBOARD = (ROOT / "pages/dashbridge/dashbridge.js").read_text(encoding="utf-8")
 IFRAME = (ROOT / "js/content/grafana-iframe.js").read_text(encoding="utf-8")
-POPUP = (ROOT / "html/popup.html").read_text(encoding="utf-8")
+POPUP = (ROOT / "pages/popup/popup.html").read_text(encoding="utf-8")
 OPTIONS = (ROOT / "pages/options/options.js").read_text(encoding="utf-8")
 LEGEND_ENGINE = (ROOT / "js/shared/grafana-legend-engine.js").read_text(encoding="utf-8")
 BRIDGE = (ROOT / "js/shared/grafana-panel-tools-bridge.js").read_text(encoding="utf-8")
@@ -19,7 +19,7 @@ COMMAND = (ROOT / "js/shared/grafana-command.js").read_text(encoding="utf-8")
 PANEL_SETTINGS = (ROOT / "js/shared/grafana-panel-settings-modal.js").read_text(encoding="utf-8")
 LEGEND_SELECTION = (ROOT / "js/shared/grafana-legend-selection.js").read_text(encoding="utf-8")
 CONTENT = (ROOT / "js/content/content.js").read_text(encoding="utf-8")
-DEBUG = (ROOT / "js/popup/popup-grafana-debug.js").read_text(encoding="utf-8")
+DEBUG = (ROOT / "pages/popup/popup-grafana-debug.js").read_text(encoding="utf-8")
 MANIFEST = json.loads((ROOT / "manifest.json").read_text(encoding="utf-8"))
 main_content = next(entry["js"] for entry in MANIFEST["content_scripts"] if "js/content/content.js" in entry["js"])
 BACKGROUND = (ROOT / "js/background.js").read_text(encoding="utf-8")
@@ -197,8 +197,8 @@ checks = {
     "DashBridge uses the shared visual engine": "DashBridgeGrafanaVisualEngine" in COMMON,
     "Popup CPU/RAM reports were removed after panel migration": "popup-grafana-cpu.js" not in POPUP
         and "popup-grafana-mem.js" not in POPUP
-        and not (ROOT / "js/popup/popup-grafana-cpu.js").exists()
-        and not (ROOT / "js/popup/popup-grafana-mem.js").exists(),
+        and not (ROOT / "pages/popup/popup-grafana-cpu.js").exists()
+        and not (ROOT / "pages/popup/popup-grafana-mem.js").exists(),
     "MAIN-world runtime is installed once": "__dashbridgePanelToolsRuntimeLoaded" in COMMON,
     "Panel tools do not install on non-Grafana pages": "const isGrafanaDashboardRoute" in COMMON
         and "if (!isGrafanaDashboardRoute && !isDashboardIframe) return;" in COMMON,

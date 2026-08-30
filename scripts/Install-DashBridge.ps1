@@ -130,7 +130,7 @@ function Test-DashBridgeDirectory([string]$Path) {
     try {
         $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
         return [string]$manifest.name -eq 'DashBridge' -and
-            (Test-Path -LiteralPath (Join-Path $Path 'html\popup.html') -PathType Leaf) -and
+            (Test-Path -LiteralPath (Join-Path $Path 'pages\popup\popup.html') -PathType Leaf) -and
             (Test-Path -LiteralPath (Join-Path $Path 'js\background.js') -PathType Leaf)
     } catch {
         return $false
@@ -398,7 +398,7 @@ function Invoke-SelfTest {
             New-Item -ItemType Directory -Path (Join-Path $directory 'js') -Force | Out-Null
             New-Item -ItemType Directory -Path (Join-Path $directory 'html') -Force | Out-Null
             '{"name":"DashBridge","version":"1.0.0"}' | Set-Content -LiteralPath (Join-Path $directory 'manifest.json')
-            '' | Set-Content -LiteralPath (Join-Path $directory 'html\popup.html')
+            '' | Set-Content -LiteralPath (Join-Path $directory 'pages\popup\popup.html')
             '' | Set-Content -LiteralPath (Join-Path $directory 'js\background.js')
         }
         $userData = Join-Path $testRoot 'User Data'

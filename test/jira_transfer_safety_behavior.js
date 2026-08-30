@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'js', 'popup', 'popup-jira.js'), 'utf8');
+const source = fs.readFileSync(path.join(__dirname, '..', 'pages', 'popup', 'popup-jira.js'), 'utf8');
 
 function createContext(overrides = {}) {
     const alerts = [];

@@ -27,17 +27,15 @@ manifest.json
 │   ├── batch/                  # Пакетный PNG/ZIP: UI и lifecycle-модули
 │   ├── dashbridge/             # Единый дашборд: renderer, profiles, time
 │   ├── options/                # HTML, CSS и контроллер настроек
+│   ├── popup/                  # Основной Popup: HTML, CSS и page-модули
 │   ├── recorder/               # Traffic Recorder: HTML, CSS и контроллер
 │   ├── test-runner/            # Живые E2E: UI, probe, suite, report
 │   ├── worklog/                # Jira Worklog: HTML, CSS и контроллер
 │   └── debug-easter-egg/       # Изолированная пасхалка и замаскированные assets
-├── html/                       # Остальные production HTML до их поэтапного переноса
-│   ├── popup.html              # Основной Popup
 ├── js/background.js            # MV3 service worker
 ├── js/theme.js                 # Общая light/dark тема
 ├── js/shared/                  # Контракты, storage, URL, capture
 ├── js/content/                 # MAIN/isolated runtime сайтов
-├── js/popup/                   # Модули Popup
 ├── js/pages/                   # Контроллеры extension pages
 ├── css/                        # Общие и постраничные стили
 ├── test/                       # Node behavior, Python smoke, probes
@@ -570,7 +568,7 @@ manifest с файлом на диске и предлагает штатный 
 
 ## Куда добавлять функцию
 
-- Popup UI: `js/popup/` + порядок `html/popup.html`.
+- Popup UI: `pages/popup/` + порядок `pages/popup/popup.html`.
 - Новая page: HTML + `js/pages/` + CSS + ранний `theme.js`.
 - Общая чистая логика pages: `js/shared/`.
 - Данные/renderer Grafana: MAIN-модуль `js/content/`, runtime manifest, UI-команда.

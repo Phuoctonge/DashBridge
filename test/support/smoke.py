@@ -74,8 +74,13 @@ def verify_contract(
     require_all(page_html, html, page)
     for source, expected in sources.items():
         if source.startswith(script_prefixes):
-            page_depth = len(Path(page).parent.parts)
-            script_reference = "../" * page_depth + source
+            page_parent = Path(page).parent
+            source_path = Path(source)
+            if source_path.parent == page_parent:
+                script_reference = source_path.name
+            else:
+                page_depth = len(page_parent.parts)
+                script_reference = "../" * page_depth + source
             require_all(page_html, [f'<script src="{script_reference}"></script>'], page)
         require_all(read(source), expected, source)
 
@@ -125,10 +130,10 @@ def run_popup_contract(
 ) -> None:
     run_contract(
         name,
-        page="html/popup.html",
+        page="pages/popup/popup.html",
         html=html,
         sources=sources,
-        script_prefixes=("js/popup/",),
+        script_prefixes=("pages/popup/",),
     )
 
 
@@ -138,10 +143,10 @@ def run_popup_contracts(cases: Iterable[ContractCase]) -> None:
     for case in cases:
         try:
             verify_contract(
-                page="html/popup.html",
+                page="pages/popup/popup.html",
                 html=case["html"],
                 sources=case["sources"],
-                script_prefixes=("js/popup/",),
+                script_prefixes=("pages/popup/",),
             )
             print(f"  PASS {case['name']}")
         except AssertionError as error:

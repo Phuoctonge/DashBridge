@@ -6,7 +6,7 @@ from support.smoke import run_checks
 
 ROOT = Path(__file__).resolve().parent.parent
 THEME = (ROOT / "js/theme.js").read_text(encoding="utf-8")
-PAGES = ["html/popup.html", "pages/options/options.html", "pages/dashbridge/dashbridge.html", "pages/batch/batch.html", "pages/worklog/worklog.html"]
+PAGES = ["pages/popup/popup.html", "pages/options/options.html", "pages/dashbridge/dashbridge.html", "pages/batch/batch.html", "pages/worklog/worklog.html"]
 
 
 def loads_shared_theme(page):

@@ -6,7 +6,7 @@ from support.smoke import ROOT, read, run_popup_contract
 
 
 if __name__ == "__main__":
-    controller = read("js/popup/popup-debug-easter-egg.js")
+    controller = read("pages/popup/popup-debug-easter-egg.js")
     run_popup_contract(
         "debug Easter egg",
         html=[
@@ -15,7 +15,7 @@ if __name__ == "__main__":
             'id="freshCodeNoticeText"',
         ],
         sources={
-            "js/popup/popup-debug-easter-egg.js": [
+            "pages/popup/popup-debug-easter-egg.js": [
                 "debugFreshCodeEasterEgg",
                 "chrome.windows.create",
                 "pages/debug-easter-egg/debug-easter-egg.html",
@@ -52,7 +52,7 @@ if __name__ == "__main__":
     for marker in (".debug-easter-egg-window", ".debug-easter-egg-target", ".debug-easter-egg-actions", "width: 40rem", "max-width: calc(100vw - 2rem)", "-webkit-user-drag: none", ".debug-easter-egg-target > img[hidden]", "display: none !important", "flex-direction: column", "flex-wrap: wrap"):
         if marker not in styles:
             raise SystemExit(f"[FAIL] missing Easter egg style: {marker}")
-    popup_styles = read("css/popup.css")
+    popup_styles = read("pages/popup/popup.css")
     if "text-decoration: none" not in popup_styles:
         raise SystemExit("[FAIL] debug warning link must look like ordinary text")
     print("[OK] debug Easter egg stays local and isolated")

@@ -80,7 +80,7 @@
 | Storage migration | backup до commit, marker последним, повтор после partial failure, удаление legacy keys только после commit | `dashbridge-data-migration.js`, `dashbridge-time-state.js`, `pages/dashbridge/dashbridge.html` |
 | Runtime message | sender, payload type/size, authority конкретного контекста | `background.js`, соответствующий sender |
 | Permission/DNR | минимальный сценарий, tab/host scope, документацию | `manifest.json`, `dnr-rules.js`, `permission-map.md` |
-| Новая page/popup UI | порядок scripts, раннюю тему, safe DOM rendering, keyboard/focus | HTML, `js/pages/` или `js/popup/`, CSS |
+| Новая page/popup UI | порядок scripts, раннюю тему, safe DOM rendering, keyboard/focus | feature-каталог в `pages/`, общие модули в `js/shared/` |
 
 ## Зоны повышенного риска
 

@@ -3,7 +3,7 @@
 // и раскомментируй обработчик ниже:
 //
 // chrome.action.onClicked.addListener(() => {
-//     chrome.windows.create({ url: "html/popup.html", type: "popup", width: 300, height: 400 });
+//     chrome.windows.create({ url: "pages/popup/popup.html", type: "popup", width: 300, height: 400 });
 // });
 
 importScripts('../vendor/jszip.min.js', 'shared/grafana-settings.js', 'shared/url-validation.js', 'shared/dnr-rules.js', 'shared/grafana-runtime-manifest.js', 'shared/local-state-schema.js', 'shared/grafana-panel-identity.js');
@@ -443,7 +443,7 @@ const waitForGuiCaptureTab = (tabId) => new Promise(resolve => {
 async function collectGuiScreenshotsInternal() {
     await chrome.storage.local.set({ guiCaptureStatus: { state: 'running', message: 'Сбор скриншотов запущен', updatedAt: Date.now() } });
     if (typeof JSZip !== 'function') throw new Error('Модуль упаковки ZIP не загружен');
-    const popupUrl = chrome.runtime.getURL('html/popup.html');
+    const popupUrl = chrome.runtime.getURL('pages/popup/popup.html');
     const pages = [
         { name: '01_popup_grafana_dashboards.png', popup: ['tab-grafana', 'grafana-links'] },
         { name: '04_popup_grafana_links.png', popup: ['tab-grafana', 'grafana-links'] },
@@ -608,7 +608,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         return undefined;
     }
     if (message && message.type === 'dashbridge-capture-gui') {
-        if (!isTrustedExtensionPage(_sender, 'html/popup.html')) {
+        if (!isTrustedExtensionPage(_sender, 'pages/popup/popup.html')) {
             sendResponse({ ok: false, error: 'Unexpected sender' });
             return undefined;
         }

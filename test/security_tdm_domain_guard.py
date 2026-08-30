@@ -5,7 +5,7 @@ from support.smoke import CheckCollector
 
 
 ROOT = Path(__file__).resolve().parent.parent
-SOURCE = (ROOT / "js/popup/popup-tdm.js").read_text(encoding="utf-8")
+SOURCE = (ROOT / "pages/popup/popup-tdm.js").read_text(encoding="utf-8")
 
 
 check = CheckCollector()

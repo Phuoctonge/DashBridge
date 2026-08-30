@@ -291,16 +291,14 @@ DashBridge/
 │   ├── batch/               # HTML, CSS и lifecycle массового сбора
 │   ├── dashbridge/          # HTML, CSS, renderer и profiles дашборда
 │   ├── options/             # HTML, CSS и логика настроек расширения
+│   ├── popup/               # Главное popup-окно: HTML, CSS и page-модули
 │   ├── recorder/            # HTML, CSS и логика Traffic Recorder
 │   ├── test-runner/         # UI, probe, suite и отчёты живых E2E
 │   ├── worklog/             # HTML, CSS и логика Jira Worklog
 │   └── debug-easter-egg/    # Изолированная пасхалка и замаскированные assets
-├── html/                    # Остальные страницы до их поэтапного переноса
-│   ├── popup.html           # Главное popup-окно
 ├── js/
 │   ├── content/             # Интеграция со страницами Grafana/Confluence
 │   ├── pages/               # Логика полноразмерных страниц
-│   ├── popup/               # Модули popup-окна
 │   ├── shared/              # Общие компоненты и хранилища
 │   └── test-runner/         # Логика диагностики и E2E-проверок
 ├── css/                     # Стили интерфейса

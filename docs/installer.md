@@ -12,7 +12,7 @@
 2. Для существующей установки installer best-effort читает `Preferences` и
    `Secure Preferences`
    профилей выбранного Chromium-браузера и проверяет найденный `path` по
-   `manifest.json`, `html/popup.html` и `js/background.js`. Browser preferences не
+   `manifest.json`, `pages/popup/popup.html` и `js/background.js`. Browser preferences не
    изменяются.
 3. Если установка не найдена, используется постоянная папка
    `%LOCALAPPDATA%\DashBridge\Extension`. Installer показывает этот default и

@@ -3,9 +3,9 @@
 const assert = require('assert');
 const fs = require('fs');
 
-const html = fs.readFileSync('html/popup.html', 'utf8');
-const css = fs.readFileSync('css/popup.css', 'utf8');
-const source = fs.readFileSync('js/popup/popup-updates.js', 'utf8');
+const html = fs.readFileSync('pages/popup/popup.html', 'utf8');
+const css = fs.readFileSync('pages/popup/popup.css', 'utf8');
+const source = fs.readFileSync('pages/popup/popup-updates.js', 'utf8');
 
 assert(html.includes('id="updateNotice"')
     && html.includes('id="updateNoticeText"')
@@ -13,7 +13,7 @@ assert(html.includes('id="updateNotice"')
 'popup must provide one global update notice above its module tabs');
 assert(html.indexOf('id="updateNotice"') < html.indexOf('<nav class="tabs-nav">'),
     'update notice must stay visible independently of the active module');
-assert(html.indexOf('js/shared/update-check.js') < html.indexOf('js/popup/popup-updates.js'),
+assert(html.indexOf('js/shared/update-check.js') < html.indexOf('popup-updates.js'),
     'trusted metadata parser must load before the popup update controller');
 assert(/\.update-notice\[hidden\]\s*\{[^}]*display:\s*none/s.test(css),
     'the notice must not reserve popup space when no update exists');

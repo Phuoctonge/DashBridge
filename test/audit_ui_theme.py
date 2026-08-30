@@ -20,7 +20,7 @@ import sys
 # === Пути ===
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 THEME_CSS = os.path.join(ROOT, 'css/theme.css')
-HTML_FILES = ['pages/dashbridge/dashbridge.html', 'html/popup.html', 'pages/options/options.html', 'pages/worklog/worklog.html', 'pages/batch/batch.html']
+HTML_FILES = ['pages/dashbridge/dashbridge.html', 'pages/popup/popup.html', 'pages/options/options.html', 'pages/worklog/worklog.html', 'pages/batch/batch.html']
 CSS_FILES = ['pages/dashbridge/dashbridge.css', 'pages/batch/batch.css']
 JS_FILES = ['js/theme.js']
 
@@ -158,14 +158,14 @@ if dashbridge_html:
          'id="themeToggle"' not in dashbridge_html,
          "Переключение темы должно оставаться только в popup")
 
-popup_html = read_file(os.path.join(ROOT, 'html/popup.html'))
+popup_html = read_file(os.path.join(ROOT, 'pages/popup/popup.html'))
 if popup_html:
-    test("html/popup.html содержит кнопку themeToggleBtn",
+    test("pages/popup/popup.html содержит кнопку themeToggleBtn",
          'id="themeToggleBtn"' in popup_html,
-         "Кнопка themeToggleBtn отсутствует в html/popup.html")
-    test("html/popup.html кнопка темы имеет класс btn-theme",
+         "Кнопка themeToggleBtn отсутствует в pages/popup/popup.html")
+    test("pages/popup/popup.html кнопка темы имеет класс btn-theme",
          'btn-theme' in popup_html,
-         "Кнопка темы в html/popup.html не имеет класса btn-theme")
+         "Кнопка темы в pages/popup/popup.html не имеет класса btn-theme")
 
 # ============================================================
 # 5.1. Стиль btn-theme в css/theme.css
@@ -222,7 +222,7 @@ if dashbridge_html and 'id="themeToggle"' in dashbridge_html:
         test("pages/dashbridge/dashbridge.html кнопка themeToggle найдена", False,
              "Не удалось найти кнопку themeToggle")
 
-# html/popup.html: кнопка должна быть пустой (без захардкоженного SVG)
+# pages/popup/popup.html: кнопка должна быть пустой (без захардкоженного SVG)
 if popup_html:
     btn_match = re.search(
         r'<button[^>]*id="themeToggleBtn"[^>]*>(.*?)</button>',
@@ -230,17 +230,17 @@ if popup_html:
     )
     if btn_match:
         btn_content = btn_match.group(1).strip()
-        test("html/popup.html кнопка themeToggleBtn пустая (без дублирования)",
+        test("pages/popup/popup.html кнопка themeToggleBtn пустая (без дублирования)",
              btn_content == '',
              f"Кнопка содержит: '{btn_content[:80]}' (должна быть пустой)")
     else:
-        test("html/popup.html кнопка themeToggleBtn найдена", False,
+        test("pages/popup/popup.html кнопка themeToggleBtn найдена", False,
              "Не удалось найти кнопку themeToggleBtn")
 
-    # html/popup.html: кнопка должна иметь data-compact
-    test("html/popup.html кнопка темы имеет data-compact (только иконка)",
+    # pages/popup/popup.html: кнопка должна иметь data-compact
+    test("pages/popup/popup.html кнопка темы имеет data-compact (только иконка)",
          'data-compact' in popup_html and 'themeToggleBtn' in popup_html,
-         "html/popup.html кнопка темы не имеет data-compact")
+         "pages/popup/popup.html кнопка темы не имеет data-compact")
 
 
 # ============================================================

@@ -18,13 +18,13 @@ for token in (
 ):
     assert token in THEME, f"missing shared token {token}"
 
-for stylesheet in ("css/popup.css", "pages/batch/batch.css"):
+for stylesheet in ("pages/popup/popup.css", "pages/batch/batch.css"):
     css = (ROOT / stylesheet).read_text(encoding="utf-8")
     assert "var(--tab-hover-bg)" in css, f"{stylesheet} misses tab hover token"
     assert "var(--tab-active-bg)" in css, f"{stylesheet} misses tab active token"
 
-popup = (ROOT / "css" / "popup.css").read_text(encoding="utf-8")
-popup_html = (ROOT / "html/popup.html").read_text(encoding="utf-8")
+popup = (ROOT / "pages" / "popup" / "popup.css").read_text(encoding="utf-8")
+popup_html = (ROOT / "pages/popup/popup.html").read_text(encoding="utf-8")
 assert "#f8fafc" not in popup, "Popup retains a light-only hover surface"
 assert "#f1f6ff" not in popup, "Popup retains a light-only active surface"
 
