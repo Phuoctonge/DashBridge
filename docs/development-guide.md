@@ -3,7 +3,7 @@
 > Сверено с версией 2.4.1, исходным кодом и тестами 2026-08-29. Архитектурный источник
 > истины — [`extension-architecture.md`](../extension-architecture.md), карта
 > разрешений — [`permission-map.md`](permission-map.md), незавершённые
-> направления — [`plans/README.md`](../plans/README.md). История не описывает
+> направления — [`roadmap.md`](roadmap.md). История не описывает
 > текущее поведение.
 
 ## Текущее состояние

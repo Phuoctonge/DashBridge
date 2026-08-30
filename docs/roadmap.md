@@ -3,7 +3,7 @@
 Здесь перечисляются только направления, которые ещё не завершены. Архитектура
 и реализованное поведение описаны в
 [`../extension-architecture.md`](../extension-architecture.md), правила
-изменений — в [`../docs/development-guide.md`](../docs/development-guide.md).
+изменений — в [`development-guide.md`](development-guide.md).
 
 ## P0 — ручной browser acceptance перед выпуском
 
@@ -32,7 +32,7 @@ clipboard, downloads и MV3 service-worker lifecycle зависят от бра�
 ## P1 — конвертеры Traffic Recorder
 
 - Реализовать отдельные экспортёры HAR, JMX и WebPageTest script/data по
-  контракту [`../docs/dashflow-v2.md`](../docs/dashflow-v2.md).
+  контракту [`dashflow-v2.md`](dashflow-v2.md).
 - Для JMX спроектировать correlation динамических CSRF/OAuth/session значений
   и явные предупреждения для multipart/WebSocket/browser-only поведения.
 - SAZ добавлять только при подтверждённой потребности совместимости с Fiddler;
