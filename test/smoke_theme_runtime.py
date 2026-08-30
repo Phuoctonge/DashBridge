@@ -5,14 +5,14 @@ from support.smoke import run_checks
 
 
 ROOT = Path(__file__).resolve().parent.parent
-THEME = (ROOT / "js/theme.js").read_text(encoding="utf-8")
+THEME = (ROOT / "pages/shared/theme.js").read_text(encoding="utf-8")
 PAGES = ["pages/popup/popup.html", "pages/options/options.html", "pages/dashbridge/dashbridge.html", "pages/batch/batch.html", "pages/worklog/worklog.html"]
 
 
 def loads_shared_theme(page):
     content = (ROOT / page).read_text(encoding="utf-8")
     return any(
-        (ROOT / page).parent.joinpath(reference).resolve() == (ROOT / "js/theme.js").resolve()
+        (ROOT / page).parent.joinpath(reference).resolve() == (ROOT / "pages/shared/theme.js").resolve()
         for reference in re.findall(r'<script\b[^>]*\bsrc=["\']([^"\']+)["\']', content, re.IGNORECASE)
     )
 

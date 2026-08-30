@@ -16,7 +16,7 @@ import sys
 sys.stdout.reconfigure(encoding='utf-8')
 
 WORKSPACE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-THEME_CSS = os.path.join(WORKSPACE, 'css/theme.css')
+THEME_CSS = os.path.join(WORKSPACE, 'pages/shared/theme.css')
 
 
 def hex_to_rgb(hex_color):

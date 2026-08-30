@@ -337,7 +337,7 @@ checks = {
         and "aria-label=\"${test.aborted ? 'Не запущен'" in UI
     ),
     "test runner shares the extension theme and diagnostic viewer follows it": (
-        references_local('href', 'css/theme.css')
+        references_local('href', 'pages/shared/theme.css')
         and references_local('href', 'pages/test-runner/test-runner.css')
         and 'id="themeToggle"' not in HTML
         and 'id="themeToggleBtn"' not in HTML

@@ -74,7 +74,7 @@
 | DashBridge panel/profile | schema, import/export, pause, theme, time, drag/drop, source+origin | `dashbridge.js`, renderer, profile store |
 | Time/refresh | relative/absolute range, Grafana 10/12 clipboard, Off vs saved dashboard refresh, iframe reload | `dashbridge-time-state.js`, `grafana-time-picker-clipboard.js`, `grafana-panel-bootstrap.js`, `grafana-refresh-policy.js` |
 | Batch | отдельное окно, cancel/error cleanup, лимиты PNG/ZIP, Blob URL lifecycle | `batch.js`, loader/capture/lifecycle helpers |
-| Test Runner | порядок runtime scripts, OPFS spool, planned/completed/NOT RUN, PiP cancel и elapsed time, cleanup окна Grafana | `pages/test-runner/test-runner-*.js`, `operation-progress-window.js`, `pages/test-runner/test-runner.html` |
+| Test Runner | порядок runtime scripts, OPFS spool, planned/completed/NOT RUN, PiP cancel и elapsed time, cleanup окна Grafana | `pages/test-runner/test-runner-*.js`, `pages/shared/operation-progress-window.js`, `pages/test-runner/test-runner.html` |
 | Capture | save и copy, prepared on/off, DPR/crop, success/error restore | shared capture helpers, content bridge, background |
 | Storage/import | legacy и hostile input, rejected backup, сериализация записей | `local-state-schema.js`, `storage-writer.js`, Options |
 | Storage migration | backup до commit, marker последним, повтор после partial failure, удаление legacy keys только после commit | `dashbridge-data-migration.js`, `dashbridge-time-state.js`, `pages/dashbridge/dashbridge.html` |

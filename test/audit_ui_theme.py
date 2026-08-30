@@ -3,14 +3,14 @@
 Тесты унификации GUI и глобальной темы.
 
 Проверяет:
-1. css/theme.css существует и содержит все нужные CSS-переменные
-2. Все HTML файлы подключают css/theme.css
+1. pages/shared/theme.css существует и содержит все нужные CSS-переменные
+2. Все HTML файлы подключают pages/shared/theme.css
 3. Ни один HTML файл не содержит дублирующий :root { ... } блок
 4. Все используют единые имена переменных (--primary, --bg, --text-main, --border)
 5. Кнопка темы есть в pages/dashbridge/dashbridge.html
 6. Логика темы в pages/dashbridge/dashbridge.js (applyTheme, initTheme, themeToggle)
 7. Broadcast через chrome.storage.onChanged во всех HTML
-8. Алиасы для обратной совместимости в css/theme.css
+8. Алиасы для обратной совместимости в pages/shared/theme.css
 """
 
 import os
@@ -19,10 +19,10 @@ import sys
 
 # === Пути ===
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-THEME_CSS = os.path.join(ROOT, 'css/theme.css')
+THEME_CSS = os.path.join(ROOT, 'pages/shared/theme.css')
 HTML_FILES = ['pages/dashbridge/dashbridge.html', 'pages/popup/popup.html', 'pages/options/options.html', 'pages/worklog/worklog.html', 'pages/batch/batch.html']
 CSS_FILES = ['pages/dashbridge/dashbridge.css', 'pages/batch/batch.css']
-JS_FILES = ['js/theme.js']
+JS_FILES = ['pages/shared/theme.js']
 
 # === Счётчики ===
 PASSED = 0
@@ -63,12 +63,12 @@ def references_file(html_file, attribute, target):
 
 
 # ============================================================
-# 1. css/theme.css существует и валиден
+# 1. pages/shared/theme.css существует и валиден
 # ============================================================
-print("\n=== 1. css/theme.css ===")
+print("\n=== 1. pages/shared/theme.css ===")
 
 content = read_file(THEME_CSS)
-test("css/theme.css существует", content is not None,
+test("pages/shared/theme.css существует", content is not None,
      f"Файл {THEME_CSS} не найден")
 
 if content:
@@ -79,11 +79,11 @@ if content:
         '--radius-lg', '--shadow', '--transition'
     ]
     for var in required_vars:
-        test(f"css/theme.css содержит {var}", var in content,
-             f"Переменная {var} отсутствует в css/theme.css")
+        test(f"pages/shared/theme.css содержит {var}", var in content,
+             f"Переменная {var} отсутствует в pages/shared/theme.css")
 
     # Dark theme
-    test("css/theme.css содержит [data-theme=\"dark\"]", '[data-theme="dark"]' in content,
+    test("pages/shared/theme.css содержит [data-theme=\"dark\"]", '[data-theme="dark"]' in content,
          "Блок dark theme отсутствует")
 
     # Базовые компоненты
@@ -91,20 +91,20 @@ if content:
                            '.form-input', '.modal-overlay', '.modal-content',
                            '.switch', '.slider', '.toast', '.ic']
     for comp in required_components:
-        test(f"css/theme.css содержит {comp}", comp in content,
+        test(f"pages/shared/theme.css содержит {comp}", comp in content,
              f"Компонент {comp} отсутствует")
 
     # Алиасы для обратной совместимости
     aliases = ['--bg-color', '--border-color', '--primary-dark', '--tab-inactive']
     for alias in aliases:
-        test(f"css/theme.css содержит алиас {alias}", alias in content,
+        test(f"pages/shared/theme.css содержит алиас {alias}", alias in content,
              f"Алиас {alias} отсутствует")
 
 
 # ============================================================
-# 2. Все HTML файлы подключают css/theme.css
+# 2. Все HTML файлы подключают pages/shared/theme.css
 # ============================================================
-print("\n=== 2. Подключение css/theme.css ===")
+print("\n=== 2. Подключение pages/shared/theme.css ===")
 
 for html_file in HTML_FILES:
     path = os.path.join(ROOT, html_file)
@@ -112,9 +112,9 @@ for html_file in HTML_FILES:
     test(f"{html_file} существует", content is not None,
          f"Файл {html_file} не найден")
     if content:
-        test(f"{html_file} подключает css/theme.css",
-             references_file(html_file, 'href', 'css/theme.css'),
-             f"css/theme.css не подключён в {html_file}")
+        test(f"{html_file} подключает pages/shared/theme.css",
+             references_file(html_file, 'href', 'pages/shared/theme.css'),
+             f"pages/shared/theme.css не подключён в {html_file}")
 
 
 # ============================================================
@@ -127,7 +127,7 @@ for html_file in HTML_FILES:
     content = read_file(path)
     if content:
         # Ищем :root { ... } внутри <style> блока
-        # Должен быть только в css/theme.css
+        # Должен быть только в pages/shared/theme.css
         has_root = bool(re.search(r':root\s*\{', content))
         test(f"{html_file} не содержит :root {{ }}", not has_root,
              f"{html_file} всё ещё содержит блок :root")
@@ -168,37 +168,37 @@ if popup_html:
          "Кнопка темы в pages/popup/popup.html не имеет класса btn-theme")
 
 # ============================================================
-# 5.1. Стиль btn-theme в css/theme.css
+# 5.1. Стиль btn-theme в pages/shared/theme.css
 # ============================================================
 print("\n=== 5.1. Стиль btn-theme ===")
 
-# Перечитываем css/theme.css (в секциях 2-4 переменная content была перезаписана)
+# Перечитываем pages/shared/theme.css (в секциях 2-4 переменная content была перезаписана)
 theme_content = read_file(THEME_CSS)
 if theme_content:
-    test("css/theme.css содержит стиль .btn-theme",
+    test("pages/shared/theme.css содержит стиль .btn-theme",
          '.btn-theme' in theme_content,
-         "Стиль .btn-theme отсутствует в css/theme.css")
-    test("css/theme.css btn-theme использует градиент",
+         "Стиль .btn-theme отсутствует в pages/shared/theme.css")
+    test("pages/shared/theme.css btn-theme использует градиент",
          'linear-gradient' in theme_content and 'btn-theme' in theme_content,
          "btn-theme не использует градиент")
-    test("css/theme.css btn-theme имеет белый текст",
+    test("pages/shared/theme.css btn-theme имеет белый текст",
          'btn-theme' in theme_content and '#ffffff' in theme_content,
          "btn-theme не имеет белого текста")
-    test("css/theme.css btn-theme имеет hover-стиль",
+    test("pages/shared/theme.css btn-theme имеет hover-стиль",
          '.btn-theme:hover' in theme_content,
          "btn-theme не имеет hover-стиля")
-    test("css/theme.css btn-theme имеет стиль для тёмной темы",
+    test("pages/shared/theme.css btn-theme имеет стиль для тёмной темы",
          '[data-theme="dark"] .btn-theme' in theme_content,
          "btn-theme не имеет переопределения для тёмной темы")
-    test("css/theme.css btn-theme имеет стили для .theme-icon и .theme-text",
+    test("pages/shared/theme.css btn-theme имеет стили для .theme-icon и .theme-text",
          '.theme-icon' in theme_content and '.theme-text' in theme_content,
          "btn-theme не имеет стилей для .theme-icon/.theme-text")
-    test("css/theme.css btn-theme имеет стили для compact-режима [data-compact]",
+    test("pages/shared/theme.css btn-theme имеет стили для compact-режима [data-compact]",
          '.btn-theme[data-compact]' in theme_content,
          "btn-theme не имеет стилей для compact-режима")
-    test("css/theme.css .date-input-group input имеет padding-right (нет наслоения иконки)",
+    test("pages/shared/theme.css .date-input-group input имеет padding-right (нет наслоения иконки)",
          '.date-input-group input' in theme_content and 'padding-right' in theme_content,
-         "css/theme.css не имеет padding-right для .date-input-group input (иконка календаря перекрывает текст)")
+         "pages/shared/theme.css не имеет padding-right для .date-input-group input (иконка календаря перекрывает текст)")
 
 
 # ============================================================
@@ -244,65 +244,65 @@ if popup_html:
 
 
 # ============================================================
-# 6. Логика темы в js/theme.js
+# 6. Логика темы в pages/shared/theme.js
 # ============================================================
-print("\n=== 6. Логика темы в js/theme.js ===")
+print("\n=== 6. Логика темы в pages/shared/theme.js ===")
 
-theme_js = read_file(os.path.join(ROOT, 'js/theme.js'))
+theme_js = read_file(os.path.join(ROOT, 'pages/shared/theme.js'))
 if theme_js:
-    test("js/theme.js существует", theme_js is not None,
-         "Файл js/theme.js не найден")
-    test("js/theme.js содержит applyTheme()",
+    test("pages/shared/theme.js существует", theme_js is not None,
+         "Файл pages/shared/theme.js не найден")
+    test("pages/shared/theme.js содержит applyTheme()",
          'function applyTheme' in theme_js,
          "Функция applyTheme отсутствует")
-    test("js/theme.js содержит updateThemeIcon()",
+    test("pages/shared/theme.js содержит updateThemeIcon()",
          'function updateThemeIcon' in theme_js,
          "Функция updateThemeIcon отсутствует")
-    test("js/theme.js содержит initTheme()",
+    test("pages/shared/theme.js содержит initTheme()",
          'function initTheme' in theme_js,
          "Функция initTheme отсутствует")
-    test("js/theme.js использует chrome.storage.sync для темы",
+    test("pages/shared/theme.js использует chrome.storage.sync для темы",
          'globalTheme' in theme_js and 'chrome.storage.sync' in theme_js,
          "Глобальная синхронизация темы не реализована")
-    test("js/theme.js слушает chrome.storage.onChanged",
+    test("pages/shared/theme.js слушает chrome.storage.onChanged",
          'chrome.storage.onChanged' in theme_js,
          "Listener onChanged отсутствует")
-    test("js/theme.js применяет тему к documentElement",
+    test("pages/shared/theme.js применяет тему к documentElement",
          "documentElement.setAttribute('data-theme'" in theme_js,
          "Тема применяется не к documentElement")
-    test("js/theme.js использует IIFE (изоляция scope)",
+    test("pages/shared/theme.js использует IIFE (изоляция scope)",
          "(function () {" in theme_js or "(function(){" in theme_js,
          "IIFE не используется")
-    test("js/theme.js использует span вместо innerHTML (не ломает стили)",
+    test("pages/shared/theme.js использует span вместо innerHTML (не ломает стили)",
          'theme-icon' in theme_js and 'theme-text' in theme_js,
-         "js/theme.js использует innerHTML вместо span (ломает стили btn-theme)")
-    test("js/theme.js не использует btn.innerHTML напрямую",
+         "pages/shared/theme.js использует innerHTML вместо span (ломает стили btn-theme)")
+    test("pages/shared/theme.js не использует btn.innerHTML напрямую",
          'btn.innerHTML' not in theme_js,
-         "js/theme.js использует btn.innerHTML (ломает стили btn-theme)")
-    test("js/theme.js очищает кнопку перед вставкой (btn.textContent = '')",
+         "pages/shared/theme.js использует btn.innerHTML (ломает стили btn-theme)")
+    test("pages/shared/theme.js очищает кнопку перед вставкой (btn.textContent = '')",
          "btn.textContent = ''" in theme_js or "btn.textContent=''" in theme_js,
-         "js/theme.js не очищает кнопку перед вставкой (дублирование контента)")
-    test("js/theme.js поддерживает data-compact (только иконка)",
+         "pages/shared/theme.js не очищает кнопку перед вставкой (дублирование контента)")
+    test("pages/shared/theme.js поддерживает data-compact (только иконка)",
          'data-compact' in theme_js,
-         "js/theme.js не поддерживает data-compact режим")
-    test("js/theme.js использует createElement (не innerHTML)",
+         "pages/shared/theme.js не поддерживает data-compact режим")
+    test("pages/shared/theme.js использует createElement (не innerHTML)",
          'createElement' in theme_js,
-         "js/theme.js не использует createElement")
+         "pages/shared/theme.js не использует createElement")
 
 
 # ============================================================
-# 7. Подключение js/theme.js во всех HTML (CSP-совместимость)
+# 7. Подключение pages/shared/theme.js во всех HTML (CSP-совместимость)
 # ============================================================
-print("\n=== 7. Подключение js/theme.js ===")
+print("\n=== 7. Подключение pages/shared/theme.js ===")
 
 for html_file in HTML_FILES:
     path = os.path.join(ROOT, html_file)
     html_content = read_file(path)
     if html_content:
         # CSP: inline scripts запрещены, должен быть внешний файл
-        test(f"{html_file} подключает js/theme.js через <script src>",
-             references_file(html_file, 'src', 'js/theme.js'),
-             f"js/theme.js не подключён в {html_file}")
+        test(f"{html_file} подключает pages/shared/theme.js через <script src>",
+             references_file(html_file, 'src', 'pages/shared/theme.js'),
+             f"pages/shared/theme.js не подключён в {html_file}")
         # Не должно быть inline scripts с chrome.storage.onChanged
         inline_pattern = re.compile(r'<script>(?!.*?src=).*?chrome\.storage\.onChanged.*?</script>', re.DOTALL)
         has_inline_theme_script = bool(inline_pattern.search(html_content))
@@ -334,7 +334,7 @@ if batch_css:
 
 
 # ============================================================
-# 9. manifest.json содержит css/theme.css в web_accessible_resources
+# 9. manifest.json содержит pages/shared/theme.css в web_accessible_resources
 # ============================================================
 print("\n=== 9. pages/worklog/worklog.html: ширина колонки Start Date ===")
 worklog = read_file(os.path.join(ROOT, 'pages', 'worklog', 'worklog.css'))
@@ -350,11 +350,11 @@ test("pages/worklog/worklog.html .col-date input text-align: left",
 
 
 # ============================================================
-# 10. css/theme.css: переопределения для pages/options/options.html inline-стилей
+# 10. pages/shared/theme.css: переопределения для pages/options/options.html inline-стилей
 # ============================================================
-print("\n=== 10. css/theme.css: переопределения inline-стилей pages/options/options.html ===")
+print("\n=== 10. pages/shared/theme.css: переопределения inline-стилей pages/options/options.html ===")
 
-# Перечитываем css/theme.css свежим чтением (на случай если content был перезаписан)
+# Перечитываем pages/shared/theme.css свежим чтением (на случай если content был перезаписан)
 content = read_file(THEME_CSS)
 if content:
     # Все переопределения должны быть с !important (inline-стили имеют специфичность 1,0,0,0)
@@ -407,14 +407,14 @@ if content:
                 break
 
         if found_body is None:
-            test(f"css/theme.css переопределяет {pattern}", False,
+            test(f"pages/shared/theme.css переопределяет {pattern}", False,
                  f"Правило с селектором содержащим {pattern} не найдено в dark-блоке")
             continue
 
-        test(f"css/theme.css переопределяет {pattern}",
+        test(f"pages/shared/theme.css переопределяет {pattern}",
              replacement in found_body,
              f"Нет переопределения для {pattern} -> {replacement}")
-        test(f"css/theme.css использует !important для {pattern}",
+        test(f"pages/shared/theme.css использует !important для {pattern}",
              '!important' in found_body,
              f"Без !important inline-стиль победит (специфичность 1,0,0,0)")
 
@@ -422,7 +422,7 @@ print("\n=== 9. manifest.json ===")
 
 manifest = read_file(os.path.join(ROOT, 'manifest.json'))
 if manifest:
-    # css/theme.css должен быть доступен для всех HTML страниц расширения
+    # pages/shared/theme.css должен быть доступен для всех HTML страниц расширения
     # В MV3 расширения файлы из корня доступны по chrome.runtime.getURL()
     # Не требуется явно указывать в web_accessible_resources
     test("manifest.json валиден (JSON)", manifest.count('{') > 0,
@@ -458,9 +458,9 @@ if options_content:
 
 
 # ============================================================
-# 12. css/theme.css: новые utility-классы для options
+# 12. pages/shared/theme.css: новые utility-классы для options
 # ============================================================
-print("\n=== 12. css/theme.css: новые utility-классы ===")
+print("\n=== 12. pages/shared/theme.css: новые utility-классы ===")
 
 content = read_file(THEME_CSS)
 if content:
@@ -480,8 +480,8 @@ if content:
         '.form-input-textarea', '.hidden', '.spacer-40'
     ]
     for cls in new_classes:
-        test(f"css/theme.css содержит класс {cls}", cls in content,
-             f"Класс {cls} отсутствует в css/theme.css")
+        test(f"pages/shared/theme.css содержит класс {cls}", cls in content,
+             f"Класс {cls} отсутствует в pages/shared/theme.css")
 
     # Проверяем, что новые классы имеют dark-переопределения
     dark_overrides_for_new = [
@@ -512,19 +512,19 @@ if content:
                 all_bodies.append(content[open_brace + 1:close_brace])
             search_pos = pos + len(pattern)
         if not all_bodies:
-            test(f"css/theme.css: dark-переопределение для {cls}", False,
+            test(f"pages/shared/theme.css: dark-переопределение для {cls}", False,
                  f"Правило {pattern} не найдено")
             continue
         # Проверяем, что хотя бы в одном теле есть нужное свойство
-        test(f"css/theme.css: dark-переопределение для {cls}",
+        test(f"pages/shared/theme.css: dark-переопределение для {cls}",
              any(dark_prop in body for body in all_bodies),
              f"Нет {dark_prop} ни в одном dark-правиле для {cls}")
 
 
 # ============================================================
-# 13. css/theme.css: новые utility-классы для иконок (замена inline-стилей)
+# 13. pages/shared/theme.css: новые utility-классы для иконок (замена inline-стилей)
 # ============================================================
-print("\n=== 13. css/theme.css: utility-классы для иконок ===")
+print("\n=== 13. pages/shared/theme.css: utility-классы для иконок ===")
 
 content = read_file(THEME_CSS)
 if content:
@@ -533,8 +533,8 @@ if content:
         '.arrow-icon', '.ic-muted', '.ic-white'
     ]
     for cls in icon_classes:
-        test(f"css/theme.css содержит класс {cls}", cls in content,
-             f"Класс {cls} отсутствует в css/theme.css")
+        test(f"pages/shared/theme.css содержит класс {cls}", cls in content,
+             f"Класс {cls} отсутствует в pages/shared/theme.css")
 
     # Проверяем, что .ic-header имеет нужные свойства
     pos = content.find('.ic-header {')

@@ -55,7 +55,7 @@ window.DashBridgeOperationProgress = (() => {
                 pipDocument.documentElement.style.fontSize = sourceFontSize;
             }
             pipDocument.title = 'Прогресс DashBridge';
-            for (const stylesheet of ['css/theme.css', 'css/operation-progress.css']) {
+            for (const stylesheet of ['pages/shared/theme.css', 'pages/shared/operation-progress.css']) {
                 const link = pipDocument.createElement('link');
                 link.rel = 'stylesheet';
                 link.href = chrome.runtime.getURL(stylesheet);

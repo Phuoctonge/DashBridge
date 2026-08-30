@@ -36,7 +36,7 @@ const context = {
     CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init.detail; } }
 };
 
-vm.runInNewContext(fs.readFileSync('js/theme.js', 'utf8'), context, { filename: 'theme.js' });
+vm.runInNewContext(fs.readFileSync('pages/shared/theme.js', 'utf8'), context, { filename: 'theme.js' });
 assert.strictEqual(attributes.get('data-theme'), 'light', 'a new installation must apply the light theme before DOM readiness');
 assert.ok(documentListeners.has('DOMContentLoaded'), 'theme button setup must wait for DOM readiness');
 

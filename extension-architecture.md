@@ -29,15 +29,13 @@ manifest.json
 │   ├── options/                # HTML, CSS и контроллер настроек
 │   ├── popup/                  # Основной Popup: HTML, CSS и page-модули
 │   ├── recorder/               # Traffic Recorder: HTML, CSS и контроллер
+│   ├── shared/                 # Общая тема и окно прогресса extension pages
 │   ├── test-runner/            # Живые E2E: UI, probe, suite, report
 │   ├── worklog/                # Jira Worklog: HTML, CSS и контроллер
 │   └── debug-easter-egg/       # Изолированная пасхалка и замаскированные assets
 ├── js/background.js            # MV3 service worker
-├── js/theme.js                 # Общая light/dark тема
 ├── js/shared/                  # Контракты, storage, URL, capture
 ├── js/content/                 # MAIN/isolated runtime сайтов
-├── js/pages/                   # Контроллеры extension pages
-├── css/                        # Общие и постраничные стили
 ├── test/                       # Node behavior, Python smoke, probes
 ├── docs/                       # Действующие пояснения и краткая история
 └── docs/roadmap.md             # Только актуальный незавершённый roadmap
@@ -123,11 +121,11 @@ grafana-panel-tools.js
 ### Extension pages
 
 Порядок обычных `<script>` в HTML значим: dependency ставится перед
-потребителем. `js/theme.js` находится в `<head>` до `<body>`, синхронно читает
+потребителем. `pages/shared/theme.js` находится в `<head>` до `<body>`, синхронно читает
 `localStorage`, затем согласует тему с `chrome.storage.sync`, исключая FOWT.
 
 `theme.js` тем же ранним путём применяет `uiScale`. Общие размеры контролов,
-иконок, отступов и читаемых областей принадлежат `css/theme.css` и задаются в
+иконок, отступов и читаемых областей принадлежат `pages/shared/theme.css` и задаются в
 `rem`; точные размеры capture остаются независимыми CSS-пикселями. Рабочие
 страницы реагируют на доступный viewport/container, а не на `screen.width` или
 физическое разрешение монитора. DashBridge хранит legacy `33%`/`50%`/`100%`,
@@ -169,7 +167,7 @@ grafana-panel-tools.js
 | Анализ CPU/RAM | `grafana-panel-analysis.js` | Расчёт, thresholds и clipboard-формат кнопок CPU Usage/Memory. |
 | Grafana time | `grafana-time.js` | DashBridge, iframe. |
 | Clipboard диапазона | `grafana-time-picker-clipboard.js`, `dashbridge-time-state.js` | Direct Grafana, DashBridge. |
-| Theme и UI scale | `theme.js`, `css/theme.css` | Все extension pages. |
+| Theme и UI scale | `pages/shared/theme.js`, `pages/shared/theme.css` | Все extension pages. |
 | Проверка обновлений | `update-check.js`, `popup-updates.js` | Popup. |
 | Windows install/update | `scripts/Install-DashBridge.ps1` | Отдельный пользовательский процесс, не extension runtime. |
 
@@ -569,7 +567,7 @@ manifest с файлом на диске и предлагает штатный 
 ## Куда добавлять функцию
 
 - Popup UI: `pages/popup/` + порядок `pages/popup/popup.html`.
-- Новая page: HTML + `js/pages/` + CSS + ранний `theme.js`.
+- Новая page: feature-каталог в `pages/`, общие UI-зависимости из `pages/shared/`, ранний `theme.js`.
 - Общая чистая логика pages: `js/shared/`.
 - Данные/renderer Grafana: MAIN-модуль `js/content/`, runtime manifest, UI-команда.
 - Chrome API для Grafana: isolated script и узкий event/message bridge.

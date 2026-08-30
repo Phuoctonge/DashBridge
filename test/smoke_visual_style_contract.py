@@ -4,7 +4,7 @@ import re
 
 
 ROOT = Path(__file__).resolve().parent.parent
-THEME = (ROOT / "css" / "theme.css").read_text(encoding="utf-8")
+THEME = (ROOT / "pages" / "shared" / "theme.css").read_text(encoding="utf-8")
 DASHBRIDGE_CSS = (ROOT / "pages" / "dashbridge" / "dashbridge.css").read_text(encoding="utf-8")
 
 for token in (

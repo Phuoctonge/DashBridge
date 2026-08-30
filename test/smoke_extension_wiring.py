@@ -40,7 +40,7 @@ checks = {
         for page in ("pages/popup/popup.html", "pages/batch/batch.html")
     ),
     "All interactive pages load canonical shared UI theme": all(
-        'css/theme.css' in (ROOT / page).read_text(encoding="utf-8")
+        '../shared/theme.css' in (ROOT / page).read_text(encoding="utf-8")
         for page in ("pages/popup/popup.html", "pages/batch/batch.html", "pages/dashbridge/dashbridge.html")
     ),
 }

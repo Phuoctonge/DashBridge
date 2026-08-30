@@ -14,7 +14,6 @@ if ($ExpectedTag -and $ExpectedTag -ne "v$version") {
 
 $releasePaths = @(
     (Join-Path $projectRoot 'manifest.json'),
-    (Join-Path $projectRoot 'css'),
     (Join-Path $projectRoot 'icons'),
     (Join-Path $projectRoot 'js'),
     (Join-Path $projectRoot 'pages'),

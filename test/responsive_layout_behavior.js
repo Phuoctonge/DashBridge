@@ -4,8 +4,8 @@ const assert = require('assert');
 const fs = require('fs');
 
 const read = path => fs.readFileSync(path, 'utf8');
-const themeCss = read('css/theme.css');
-const themeJs = read('js/theme.js');
+const themeCss = read('pages/shared/theme.css');
+const themeJs = read('pages/shared/theme.js');
 const dashboardCss = read('pages/dashbridge/dashbridge.css');
 const dashboardJs = read('pages/dashbridge/dashbridge.js');
 const renderer = read('pages/dashbridge/dashbridge-renderer.js');
@@ -71,8 +71,8 @@ assert(debugCss.includes('width: 40rem') && debugCss.includes('max-width: calc(1
     && debugWindow.includes('document.documentElement.dataset.uiScale = requestedScale'),
     'the external debug window must inherit scale and remain bounded by its viewport');
 
-const progressCss = read('css/operation-progress.css');
-const progressController = read('js/pages/operation-progress-window.js');
+const progressCss = read('pages/shared/operation-progress.css');
+const progressController = read('pages/shared/operation-progress-window.js');
 assert(progressCss.includes('min-width: 21.25rem') && progressCss.includes('font-size: 0.875rem')
     && progressController.includes('dataset.uiScale') && progressController.includes('interfaceScale'),
     'the Picture-in-Picture progress window must inherit and size itself to the interface scale');

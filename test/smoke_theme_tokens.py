@@ -4,7 +4,7 @@ import re
 
 
 ROOT = Path(__file__).resolve().parent.parent
-THEME = (ROOT / "css" / "theme.css").read_text(encoding="utf-8")
+THEME = (ROOT / "pages" / "shared" / "theme.css").read_text(encoding="utf-8")
 
 TOKENS = [
     "--surface",

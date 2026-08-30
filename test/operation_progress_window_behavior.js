@@ -10,7 +10,7 @@ const context = {
 };
 context.window = context;
 vm.createContext(context);
-const controllerSource = fs.readFileSync(path.join(__dirname, '..', 'js/pages/operation-progress-window.js'), 'utf8');
+const controllerSource = fs.readFileSync(path.join(__dirname, '..', 'pages/shared/operation-progress-window.js'), 'utf8');
 const testRunnerHtml = fs.readFileSync(path.join(__dirname, '..', 'pages/test-runner/test-runner.html'), 'utf8');
 const testRunnerUi = fs.readFileSync(path.join(__dirname, '..', 'pages/test-runner/test-runner-ui.js'), 'utf8');
 vm.runInContext(controllerSource, context);
@@ -18,8 +18,8 @@ assert(controllerSource.includes('documentPictureInPicture.requestWindow') && co
     'the shared progress controller must use an always-on-top Document Picture-in-Picture view');
 assert(!controllerSource.includes('chrome.windows.create') && !controllerSource.includes('operation-progress.html'),
     'the removed popup side window must not remain as a fallback');
-assert(testRunnerHtml.includes('js/pages/operation-progress-window.js')
-    && testRunnerHtml.indexOf('js/pages/operation-progress-window.js') < testRunnerHtml.indexOf('test-runner-ui.js'),
+assert(testRunnerHtml.includes('../shared/operation-progress-window.js')
+    && testRunnerHtml.indexOf('../shared/operation-progress-window.js') < testRunnerHtml.indexOf('test-runner-ui.js'),
     'the E2E runner must load the shared progress controller before its UI');
 assert(testRunnerUi.includes('onCancel: handleAbort')
     && testRunnerUi.includes("title: 'Автопроверка DashBridge'")

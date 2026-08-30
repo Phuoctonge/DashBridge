@@ -64,7 +64,7 @@ check('Batch filters actual Series names by include and ignore patterns',
 check('Batch writes a result manifest and handles an empty collection', 'manifest.json' in JS and 'if (!successfulJobs)' in JS)
 check('Panel loader receives the active cancellation signal', 'BatchRunLifecycle.signal(runId)' in JS and "signal?.addEventListener('abort'" in (ROOT / 'pages/batch/batch-panel-loader.js').read_text(encoding='utf-8'))
 check('Batch exposes an always-on-top cancellable PiP panel',
-      'js/pages/operation-progress-window.js' in HTML
+      '../shared/operation-progress-window.js' in HTML
       and 'openPictureInPicture' in JS
       and 'cancelActiveBatchRun' in JS)
 check('Removed popup progress window is not used as a fallback',
