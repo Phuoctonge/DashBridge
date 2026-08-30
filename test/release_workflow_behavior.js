@@ -16,8 +16,11 @@ assert(workflow.includes('permissions:') && workflow.includes('contents: write')
     'release job must declare only the GitHub permission it uses');
 assert(builder.includes('$ExpectedTag -ne "v$version"'),
     'archive builder must reject a tag that differs from manifest.version');
-for (const input of ['manifest.json', 'assets', 'css', 'icons', 'js', 'vendor', "'*.html'"]) {
+for (const input of ['manifest.json', 'css', 'html', 'icons', 'js', 'vendor']) {
     assert(builder.includes(input), `release archive must include ${input}`);
+}
+for (const staleInput of ["Join-Path $projectRoot 'assets'", "Filter '*.html'"]) {
+    assert(!builder.includes(staleInput), `release builder must not use stale input ${staleInput}`);
 }
 for (const excluded of ['README.md', 'docs', 'plans', 'test']) {
     assert(!builder.includes(`Join-Path $projectRoot '${excluded}'`),
@@ -31,5 +34,19 @@ assert(builder.includes("'Install-DashBridge.ps1'")
     'the release must test and publish the standalone installer with its checksum');
 assert(!builder.includes('"scripts\\$installerName"'),
     'release builder must keep installer paths portable across Windows and GitHub Linux runners');
+for (const manifestContract of [
+    'background.service_worker',
+    'action.default_popup',
+    'options_ui.page',
+    'content_scripts',
+    'web_accessible_resources'
+]) {
+    assert(builder.includes(manifestContract),
+        `release builder must verify manifest contract ${manifestContract}`);
+}
+assert(builder.includes('Assert-ArchiveEntry')
+    && builder.includes("EndsWith('.html'")
+    && builder.includes('$htmlReferencePattern'),
+    'release builder must verify packaged manifest paths and local HTML dependencies');
 
 console.log('PASS tagged releases test, package and publish a minimal extension archive');
