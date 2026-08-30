@@ -64,9 +64,48 @@
         return null;
     };
 
+    const unitFromPanelDefinition = panel => {
+        // Grafana 11 Time series and Grafana 10 Stat use fieldConfig;
+        // Grafana 10 legacy Graph keeps the unit in yaxes[0].format.
+        const code = String(
+            panel?.fieldConfig?.defaults?.unit
+            || panel?.yaxes?.[0]?.format
+            || ''
+        ).trim();
+        if (!code || /^(none|short)$/i.test(code)) return { unit: '', factor: 1, source: 'panel' };
+
+        const known = {
+            percent: '%',
+            percentunit: '%',
+            bytes: 'B',
+            Bps: 'B/s',
+            ms: 'ms',
+            s: 's',
+            opm: 'ops/m',
+            ops: 'ops/s',
+            reqps: 'req/s',
+            reqpm: 'req/m',
+            iops: 'IOPS'
+        };
+        const custom = code.match(/^(?:suffix|prefix):(.*)$/i);
+        return { unit: custom ? custom[1] : (known[code] || code), factor: 1, source: 'panel', code };
+    };
+
+    const mergeAxisAndPanelUnit = (axisUnit, panel) => {
+        // Prefer visible axis scale whenever it exists: it converts a user
+        // threshold in GiB/TiB or MB/s/GB/s to Grafana's raw value exactly.
+        if (axisUnit && Number.isFinite(axisUnit.factor)) {
+            const configured = unitFromPanelDefinition(panel);
+            return { ...axisUnit, unit: axisUnit.unit || configured.unit, source: 'axis' };
+        }
+        return unitFromPanelDefinition(panel);
+    };
+
     globalThis.DashBridgeGrafanaUnit = Object.freeze({
         parseAxisUnitLabel,
         inferUnitFromAxisLabels,
-        inferUnitFromAxisTicks
+        inferUnitFromAxisTicks,
+        unitFromPanelDefinition,
+        mergeAxisAndPanelUnit
     });
 })(globalThis);

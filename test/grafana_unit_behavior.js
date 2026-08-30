@@ -40,6 +40,35 @@ assert.deepStrictEqual(plain(unit.inferUnitFromAxisTicks([
 ])), { unit: 'MB', factor: 1e6 });
 assert.strictEqual(unit.inferUnitFromAxisTicks([{ label: 'No data', v: 1 }]), null);
 
+assert.deepStrictEqual(plain(unit.unitFromPanelDefinition(null)), { unit: '', factor: 1, source: 'panel' });
+assert.deepStrictEqual(plain(unit.unitFromPanelDefinition({ fieldConfig: { defaults: { unit: 'short' } } })), {
+    unit: '', factor: 1, source: 'panel'
+});
+assert.deepStrictEqual(plain(unit.unitFromPanelDefinition({ fieldConfig: { defaults: { unit: 'percent' } } })), {
+    unit: '%', factor: 1, source: 'panel', code: 'percent'
+});
+assert.deepStrictEqual(plain(unit.unitFromPanelDefinition({ fieldConfig: { defaults: { unit: 'Bps' } } })), {
+    unit: 'B/s', factor: 1, source: 'panel', code: 'Bps'
+});
+assert.deepStrictEqual(plain(unit.unitFromPanelDefinition({ fieldConfig: { defaults: { unit: 'suffix: requests' } } })), {
+    unit: ' requests', factor: 1, source: 'panel', code: 'suffix: requests'
+});
+assert.deepStrictEqual(plain(unit.unitFromPanelDefinition({ yaxes: [{ format: 'reqps' }] })), {
+    unit: 'req/s', factor: 1, source: 'panel', code: 'reqps'
+});
+assert.deepStrictEqual(plain(unit.unitFromPanelDefinition({ yaxes: [{ format: 'custom-code' }] })), {
+    unit: 'custom-code', factor: 1, source: 'panel', code: 'custom-code'
+});
+assert.deepStrictEqual(plain(unit.mergeAxisAndPanelUnit({ unit: 'GiB', factor: 1024 ** 3 }, {
+    fieldConfig: { defaults: { unit: 'bytes' } }
+})), { unit: 'GiB', factor: 1024 ** 3, source: 'axis' });
+assert.deepStrictEqual(plain(unit.mergeAxisAndPanelUnit({ unit: '', factor: 1 }, {
+    fieldConfig: { defaults: { unit: 'percent' } }
+})), { unit: '%', factor: 1, source: 'axis' });
+assert.deepStrictEqual(plain(unit.mergeAxisAndPanelUnit({ unit: 'MB', factor: Number.NaN }, {
+    fieldConfig: { defaults: { unit: 'bytes' } }
+})), { unit: 'B', factor: 1, source: 'panel', code: 'bytes' });
+
 vm.runInContext(source, context);
 assert.strictEqual(context.DashBridgeGrafanaUnit, unit, 'repeated runtime installation must preserve the original API object');
 console.log('PASS Grafana axis unit parsing is isolated behind a stable runtime API');
