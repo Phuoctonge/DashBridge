@@ -8,8 +8,8 @@ const { chromium } = require('@playwright/test');
 const projectRoot = path.resolve(__dirname, '..');
 
 function validateGrafanaUrls(values) {
-    if (values.length !== 2) {
-        throw new Error('Pass exactly two Grafana URLs: npm run auth:grafana -- <url-1> <url-2>');
+    if (values.length < 1 || values.length > 2) {
+        throw new Error('Pass one or two Grafana URLs: npm run auth:grafana -- <url-1> [url-2]');
     }
 
     const urls = values.map(value => {
@@ -23,7 +23,7 @@ function validateGrafanaUrls(values) {
         return parsed.href;
     });
     if (new Set(urls).size !== urls.length) {
-        throw new Error('The two Grafana URLs must be different.');
+        throw new Error('Grafana URLs must be different.');
     }
     return urls;
 }
@@ -85,17 +85,17 @@ async function main() {
         const extensionId = await waitForExtensionWorker(context);
         const pages = context.pages();
         const firstPage = pages[0] || await context.newPage();
-        const secondPage = await context.newPage();
-        await Promise.allSettled([
-            firstPage.goto(grafanaUrls[0], { waitUntil: 'domcontentloaded', timeout: 30_000 }),
-            secondPage.goto(grafanaUrls[1], { waitUntil: 'domcontentloaded', timeout: 30_000 })
-        ]);
+        const targetPages = [firstPage];
+        while (targetPages.length < grafanaUrls.length) targetPages.push(await context.newPage());
+        await Promise.allSettled(grafanaUrls.map((url, index) => (
+            targetPages[index].goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 })
+        )));
 
         const hosts = grafanaUrls.map(value => new URL(value).host).join(', ');
         console.log(`DashBridge ${extensionId} loaded in the persistent E2E profile.`);
         console.log(`Opened Grafana hosts: ${hosts}`);
         console.log(`Profile: ${profileRoot}`);
-        console.log('Sign in to both Grafana sites, verify both dashboards open, then close the browser window.');
+        console.log('Sign in to every opened Grafana site, verify its dashboard opens, then close the browser window.');
 
         await new Promise(resolve => context.once('close', resolve));
     } finally {

@@ -11,7 +11,17 @@ assert.deepStrictEqual(validateGrafanaUrls([
     'https://grafana-one.example/d/main',
     'https://grafana-two.example/d/legacy?orgId=1'
 ]);
-assert.throws(() => validateGrafanaUrls(['https://grafana-one.example']), /exactly two/);
+assert.deepStrictEqual(validateGrafanaUrls([
+    'https://grafana-one.example/d/main'
+]), [
+    'https://grafana-one.example/d/main'
+]);
+assert.throws(() => validateGrafanaUrls([]), /one or two/);
+assert.throws(() => validateGrafanaUrls([
+    'https://grafana-one.example',
+    'https://grafana-two.example',
+    'https://grafana-three.example'
+]), /one or two/);
 assert.throws(() => validateGrafanaUrls([
     'file:///tmp/grafana',
     'https://grafana-two.example'
