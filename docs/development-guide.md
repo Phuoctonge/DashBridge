@@ -11,9 +11,9 @@
 Расширение не требует сборки и загружается напрямую из исходной папки. На
 момент проверки проходят:
 
-- 102 JavaScript behavior-файла;
+- 103 JavaScript behavior-файла;
 - 41 Python smoke/security/audit-файл;
-- `node --check` для всех 83 production JavaScript-файлов.
+- `node --check` для всех 84 production JavaScript-файлов.
 
 Автотесты хорошо фиксируют структурные и поведенческие контракты, но не
 заменяют живую проверку Chrome/Grafana: renderer, clipboard, capture,
@@ -74,7 +74,7 @@
 | DashBridge panel/profile | schema, import/export, pause, theme, time, drag/drop, source+origin | `dashbridge.js`, report transport, renderer, profile store |
 | Time/refresh | relative/absolute range, Grafana 10/12 clipboard, Off vs saved dashboard refresh, iframe reload | `dashbridge-time-state.js`, `grafana-time-picker-clipboard.js`, `grafana-panel-bootstrap.js`, `grafana-refresh-policy.js` |
 | Batch | отдельное окно, cancel/error cleanup, лимиты PNG/ZIP, Blob URL lifecycle | `batch.js`, loader/capture/lifecycle helpers |
-| Recorder/DashFlow | CDP lifecycle, atomic import, ZIP working-set и entry caps, SHA-256 bodies, secrets warning | `recorder.js`, `recorder-dashflow-io.js`, `dashflow-schema.js` |
+| Recorder/DashFlow | CDP lifecycle, network/HAR projection, atomic import, ZIP working-set и entry caps, SHA-256 bodies, secrets warning | `recorder.js`, `recorder-dashflow-export.js`, `recorder-dashflow-io.js`, `dashflow-schema.js` |
 | Test Runner | порядок runtime scripts, OPFS spool, planned/completed/NOT RUN, PiP cancel и elapsed time, cleanup окна Grafana | `pages/test-runner/test-runner-*.js`, `pages/shared/operation-progress-window.js`, `pages/test-runner/test-runner.html` |
 | Capture | save и copy, prepared on/off, DPR/crop, success/error restore | shared capture helpers, content bridge, background |
 | Storage/import | legacy и hostile input, rejected backup, сериализация записей | `local-state-schema.js`, `storage-writer.js`, Options |

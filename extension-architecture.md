@@ -409,6 +409,10 @@ memory/body budget и создаёт DEFLATE-контейнер. При импо
 суммарные лимиты и SHA-256. `recorder.js` сохраняет CDP/UI/download lifecycle и
 применяет подготовленный импорт к живому state только после успешного
 завершения всех проверок.
+`recorder-dashflow-export.js` является чистой проекцией live CDP-запросов в
+канонический `network.json` и производный HAR 1.2: нормализует headers/cookies,
+query, body metadata, timings, cache/TLS/initiator и страницы сценария, не
+изменяя живые request-объекты.
 Replay принимает только v2, открывает новое окно и повторяет поддерживаемые
 шаги. Переключатель `Disable Cache` перед
 первой навигацией record/replay вызывает CDP `Network.setCacheDisabled` и
@@ -523,8 +527,8 @@ node test/run-js-tests.js
 node test/run-python-smoke-tests.js
 ```
 
-На 2026-08-30: 102 JavaScript behavior-файла и 41 исполняемый Python
-smoke/security/audit-файл. Все 83 production JavaScript-файла проходят
+На 2026-08-30: 103 JavaScript behavior-файла и 41 исполняемый Python
+smoke/security/audit-файл. Все 84 production JavaScript-файла проходят
 `node --check`.
 `DASHBRIDGE_PYTHON` задаёт Python, если он не находится автоматически.
 

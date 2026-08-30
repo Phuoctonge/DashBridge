@@ -20,7 +20,9 @@
 `network.json`, `flow.json`, `streams.json` и `bodies/` являются источником
 истины. `traffic.har` строится при сохранении и не должен использоваться вместо
 канонических данных, если конвертеру нужны точные статусы полноты или внешние
-тела.
+тела. Чистую проекцию live CDP state в `network.json` и HAR выполняет
+`pages/recorder/recorder-dashflow-export.js`; модуль не управляет CDP-сессией и
+не изменяет исходные request-объекты.
 
 ## Flow и replay
 
