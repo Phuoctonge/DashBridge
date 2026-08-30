@@ -83,8 +83,8 @@ assert(!extensionManifest.optional_permissions?.includes('debugger'), 'Chrome re
 assert(!extensionManifest.content_scripts.some(script => (script.js || []).includes('js/content/scenario-recorder.js')),
     'the generic action recorder must not run outside an explicitly controlled tab');
 
-const html = fs.readFileSync(path.join(root, 'html/recorder.html'), 'utf8');
-const recorderCss = fs.readFileSync(path.join(root, 'css', 'recorder.css'), 'utf8');
+const html = fs.readFileSync(path.join(root, 'pages/recorder/recorder.html'), 'utf8');
+const recorderCss = fs.readFileSync(path.join(root, 'pages/recorder/recorder.css'), 'utf8');
 assert(html.includes('id="disableCache"') && html.includes('id="disableCookies"'), 'Recorder must expose independent cache and cookie switches');
 assert(html.includes('id="incognitoSetup"') && html.includes('id="openIncognitoSettings"'), 'Recorder must expose conditional incognito setup help');
 assert(html.includes('incognito-instructions') && html.includes('Chrome перезапускает расширение'),
@@ -116,12 +116,12 @@ assert(recorderCss.includes('.comparison-controls > :not(.sr-only) { flex: 1 1 1
     'comparison controls must fill narrow layouts without overflow');
 assert(recorderCss.includes('.network-switches { display: grid; grid-template-columns: minmax(0,1fr);'),
     'cache and cookie switches must be arranged vertically');
-for (const asset of ['vendor/jszip.min.js', 'js/shared/dashflow-schema.js', 'js/shared/dashflow-compare.js', 'js/shared/dashflow-xlsx.js', 'js/pages/operation-progress-window.js', 'js/pages/recorder.js']) {
+for (const asset of ['vendor/jszip.min.js', 'js/shared/dashflow-schema.js', 'js/shared/dashflow-compare.js', 'js/shared/dashflow-xlsx.js', 'js/pages/operation-progress-window.js', 'recorder.js']) {
     assert(html.includes(asset), `recorder page must load ${asset}`);
 }
-assert(html.indexOf('vendor/jszip.min.js') < html.indexOf('js/pages/recorder.js'), 'JSZip must load before the recorder controller');
+assert(html.indexOf('vendor/jszip.min.js') < html.indexOf('recorder.js'), 'JSZip must load before the recorder controller');
 
-const recorder = fs.readFileSync(path.join(root, 'js', 'pages', 'recorder.js'), 'utf8');
+const recorder = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recorder.js'), 'utf8');
 assert(recorder.includes('Network.getResponseBody'), 'network recorder must capture response bodies through CDP');
 assert(recorder.includes('Network.getRequestPostData'), 'request bodies missing from requestWillBeSent must be retrieved through CDP');
 assert(recorder.includes('schema.classifyResponseBodyCapture'), 'response body capture must use the tested no-body and size policy');

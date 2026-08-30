@@ -289,14 +289,14 @@ DashBridge/
 ├── manifest.json            # Manifest V3
 ├── pages/                   # Feature-папки полноразмерных страниц
 │   ├── options/             # HTML, CSS и логика настроек расширения
+│   ├── recorder/            # HTML, CSS и логика Traffic Recorder
 │   ├── worklog/             # HTML, CSS и логика Jira Worklog
 │   └── debug-easter-egg/    # Изолированная пасхалка и замаскированные assets
 ├── html/                    # Остальные страницы до их поэтапного переноса
 │   ├── popup.html           # Главное popup-окно
 │   ├── dashbridge.html      # Единый Grafana-дашборд
 │   ├── batch.html           # Массовый сбор снимков
-│   ├── recorder.html        # Traffic Recorder
-│   ├── test-runner.html     # Диагностика и E2E-проверки
+│   └── test-runner.html     # Диагностика и E2E-проверки
 ├── js/
 │   ├── content/             # Интеграция со страницами Grafana/Confluence
 │   ├── pages/               # Логика полноразмерных страниц

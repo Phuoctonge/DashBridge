@@ -117,7 +117,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const recorderButton = document.getElementById("openTrafficRecorderBtn");
     if (recorderButton) {
-        recorderButton.onclick = () => chrome.tabs.create({ url: chrome.runtime.getURL("html/recorder.html") });
+        recorderButton.onclick = () => chrome.tabs.create({ url: chrome.runtime.getURL("pages/recorder/recorder.html") });
     }
 
     function openOptions() {

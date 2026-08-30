@@ -32,7 +32,7 @@ CASES = [
         "sources": {
             "js/popup/popup-core.js": [
                 'module_recorder: true', '"tab-recorder": modules.module_recorder',
-                "openTrafficRecorderBtn", "html/recorder.html",
+                "openTrafficRecorderBtn", "pages/recorder/recorder.html",
             ],
             "js/popup/popup-grafana-router.js": ["!openTrafficRecorderBtn"],
         },

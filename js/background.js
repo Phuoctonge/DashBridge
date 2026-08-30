@@ -35,7 +35,7 @@ function isTrustedExtensionPage(sender, page) {
 chrome.runtime.onConnect?.addListener(port => {
     if (port.name !== 'dashbridge-recorder-lifecycle'
         || port.sender?.id !== chrome.runtime.id
-        || port.sender?.url !== chrome.runtime.getURL('html/recorder.html')) return;
+        || port.sender?.url !== chrome.runtime.getURL('pages/recorder/recorder.html')) return;
     let recorderTabId = null;
     port.onMessage.addListener(message => {
         if (message?.type === 'bind' && Number.isInteger(message.tabId) && message.tabId >= 0) recorderTabId = message.tabId;

@@ -25,14 +25,14 @@ manifest.json
 ├── AGENTS.md                   # Обязательная точка входа для AI-анализа
 ├── pages/                      # Feature-папки полноразмерных extension pages
 │   ├── options/                # HTML, CSS и контроллер настроек
+│   ├── recorder/               # Traffic Recorder: HTML, CSS и контроллер
 │   ├── worklog/                # Jira Worklog: HTML, CSS и контроллер
 │   └── debug-easter-egg/       # Изолированная пасхалка и замаскированные assets
 ├── html/                       # Остальные production HTML до их поэтапного переноса
 │   ├── popup.html              # Основной Popup
 │   ├── dashbridge.html         # Единый дашборд Grafana
 │   ├── batch.html              # Пакетный PNG/ZIP и серии
-│   ├── test-runner.html        # Живые E2E-сценарии
-│   ├── recorder.html           # Traffic record/replay и .dashflow
+│   └── test-runner.html        # Живые E2E-сценарии
 ├── js/background.js            # MV3 service worker
 ├── js/theme.js                 # Общая light/dark тема
 ├── js/shared/                  # Контракты, storage, URL, capture
@@ -390,7 +390,7 @@ Batch использует отдельное окно, ждёт нужную п
 
 ### Traffic Recorder
 
-`html/recorder.html` владеет жизненным циклом контролируемой вкладки и CDP attach.
+`pages/recorder/recorder.html` владеет жизненным циклом контролируемой вкладки и CDP attach.
 Lifecycle-port с heartbeat удерживает service worker доступным для аварийного
 detach, если Recorder закрыт или перезагружен.
 Обобщённый `scenario-recorder.js` динамически инжектируется только в эту
