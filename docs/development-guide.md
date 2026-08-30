@@ -11,7 +11,7 @@
 Расширение не требует сборки и загружается напрямую из исходной папки. На
 момент проверки проходят:
 
-- 104 JavaScript behavior-файла;
+- 105 JavaScript behavior-файлов;
 - 41 Python smoke/security/audit-файл;
 - `node --check` для всех 84 production JavaScript-файлов.
 - ESLint correctness-анализ production, tests и scripts;
@@ -183,6 +183,21 @@ DashBridge. Пользователь входит в обе системы од�
 Сохранённую авторизацию без показа credentials проверяет
 `npm run check:grafana-session -- '<dashboard-url>'`: команда требует успешный
 `/api/user`, отсутствие login redirect и загруженный service worker DashBridge.
+
+Живой Fast-прогон запускается без ручного управления окнами:
+
+```powershell
+npm run test:grafana:live -- --mode=fast 'https://grafana-one.example/d/...'
+```
+
+Для двух уже авторизованных Grafana передаются два URL; Full используется перед
+выпуском после чистого Fast. Playwright здесь только управляет существующим
+`pages/test-runner/test-runner.html`: матрица сценариев и доказательство reset
+не дублируются в Node-скрипте. Результаты сохраняются локально в
+`test-results/live-grafana-e2e.json` и
+`test-results/live-grafana-e2e-failures.txt`. Полный JSON не следует выводить в
+AI-контекст: для штатной диагностики достаточно счётчиков и компактной записи
+проваленного теста; screenshot создаётся лишь при фатальной ошибке оркестратора.
 
 Полный dependency-free прогон:
 

@@ -1553,6 +1553,7 @@ async function initTestRunnerUI() {
             handleRun();
         }
     });
+    document.documentElement.dataset.dashbridgeTestRunnerReady = 'true';
 }
 
 document.addEventListener('DOMContentLoaded', initTestRunnerUI);

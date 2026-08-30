@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "test:unit": "node test/run-all-tests.js",
     "test:browser": "node test/run-extension-browser-smoke.js",
+    "test:grafana:live": "node scripts/run-live-grafana-e2e.js",
     "test:all": "npm run lint && npm run test:unit && npm run test:browser"
   },
   "engines": {

@@ -63,6 +63,29 @@ const createContext = ({ pathname = '/d/dashboard-uid/name', search = '?viewPane
     ], 'query signatures must be stable, deduplicated and omit unknown-only targets');
     assert.strictEqual(api.getQueryScopeSignature({ refId: 'A', rawSql: 'select 1', expr: 'x' }),
         '{"expr":"x","refId":"A"}', 'scope signatures must omit runtime-substituted query bodies');
+    const configuredInflux = {
+        refId: 'A',
+        alias: '$tag_transaction',
+        datasource: { type: 'influxdb', uid: '${dataSource}' },
+        measurement: 'jmeter_${project}',
+        resultFormat: 'time_series',
+        select: [[{ type: 'field', params: ['$field'] }]]
+    };
+    const runtimeInflux = {
+        ...configuredInflux,
+        alias: 'checkout',
+        datasource: { type: 'influxdb', uid: '000000039' },
+        measurement: 'jmeter_RussPass',
+        select: [[{ type: 'field', params: ['elapsed'] }]]
+    };
+    assert.strictEqual(api.queryMatchesConfiguredTarget(configuredInflux, runtimeInflux), true,
+        'structured Influx targets must match after Grafana substitutes dashboard variables');
+    assert.strictEqual(api.queryMatchesConfiguredTarget(configuredInflux, { ...runtimeInflux, refId: 'B' }), false,
+        'a substituted query must still retain the selected target refId');
+    assert.strictEqual(api.queryMatchesConfiguredTarget(configuredInflux, {
+        ...runtimeInflux,
+        measurement: 'unrelated_static_measurement'
+    }), false, 'non-template structured fields must not match an unrelated panel query');
 
     context.advance(5 * 60 * 1000 + 1);
     assert.strictEqual(api.getCachedPanelDefinition(), null, 'expired definitions must not leak through the synchronous cache');

@@ -61,6 +61,17 @@ assert(source.includes('let legendVisibilityRestoreAfterNextQuery = false;')
     && source.includes('hasExplicitLegendVisibilityWork() || legendVisibilityRestoreAfterNextQuery')
     && source.includes("recordVisualReapply('legend-visibility-restore-consumed'"),
     'source-filter OFF must restore visibility again after the complete native legend returns');
+assert(source.includes("visualMetadata.responseDataStatus?.kind === 'filtered_empty'")
+    && source.includes("getLegendItems().length === 0")
+    && source.includes("!targetRoot?.querySelector?.('canvas')")
+    && source.includes('!legendVisibilityApplied && !filteredEmptyLegendCanReturnAfterQuery')
+    && source.includes('deferredLegendVisibilityRestored')
+    && source.includes("recordVisualReapply('legend-visibility-restore-pending'"),
+    'an intentional filtered-empty reset may defer legend restore, but the next full-data render must prove it before consuming the request');
+assert(source.includes('commandDiagnostic.legendVisibilityDeferred = !legendVisibilityApplied')
+    && source.includes('legendVisibilityDeferred: legendVisibilityRequested')
+    && source.includes('!!commandDiagnostic.legendVisibilityDeferred'),
+    'the command acknowledgement must distinguish a proven legend failure from a filtered-empty restore deferred to the causal refresh');
 assert(source.includes('if (overlay.textContent !== status.text) overlay.textContent = status.text;')
     && !/\n\s*overlay\.textContent = status\.text;/.test(source),
     'the document-wide title observer must not create a self-sustaining panel-status mutation loop');

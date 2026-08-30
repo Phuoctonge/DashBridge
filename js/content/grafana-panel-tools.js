@@ -1087,8 +1087,13 @@
         }, 300);
         visualReapplyDiagnostic.nextEventId = visualReapplyDiagnostic.events.at(-1)?.id || visualReapplyDiagnostic.nextEventId || 0;
     };
+    const canDeferLegendVisibilityRestore = targetRoot => legendVisibilityRestoreAfterNextQuery
+        && visualMetadata.responseDataStatus?.kind === 'filtered_empty'
+        && getLegendItems().length === 0
+        && !targetRoot?.querySelector?.('canvas');
     const applyPersistentVisualState = async () => {
         const targetPanel = getTargetPanel();
+        const targetRoot = window.DashBridgeGrafanaDom?.outerPanel(targetPanel) || targetPanel || document;
         let engineResult = null;
         if (hasVisualWork()) {
             const visualLegendFilter = getVisualLegendFilter(tools);
@@ -1103,9 +1108,11 @@
         let legendVisibilityApplied = null;
         if (hasExplicitLegendVisibilityWork() || legendVisibilityRestoreAfterNextQuery) {
             legendVisibilityApplied = await applyLegendVisibilityByKey(tools.legendVisibility || {});
-            if (!legendVisibilityApplied) throw new Error('legend-visibility-reapply-failed');
+            const filteredEmptyLegendCanReturnAfterQuery = canDeferLegendVisibilityRestore(targetRoot);
+            if (!legendVisibilityApplied && !filteredEmptyLegendCanReturnAfterQuery) {
+                throw new Error('legend-visibility-reapply-failed');
+            }
         }
-        const targetRoot = window.DashBridgeGrafanaDom?.outerPanel(targetPanel) || targetPanel || document;
         const styleState = window.DashBridgeGrafanaVisualEngine?.getLocalStyleDebug?.({
             root: targetRoot,
             removeFill: !!tools.removeFill,
@@ -1117,6 +1124,8 @@
             engineResult,
             styleState,
             legendVisibilityApplied,
+            legendVisibilityDeferred: legendVisibilityApplied === false
+                && legendVisibilityRestoreAfterNextQuery,
         };
     };
     const observePersistentVisualState = () => {
@@ -1244,6 +1253,7 @@
             // commits the replacement renderer. Reapply as a short settling
             // burst so both an in-place data update and a later chart remount
             // receive the persisted settings.
+            let deferredLegendVisibilityRestored = !legendVisibilityRestoreAfterNextQuery;
             for (let attempt = 0; attempt < delays.length; attempt += 1) {
                 if (delays[attempt]) await new Promise(resolve => setTimeout(resolve, delays[attempt]));
                 if (generation !== visualStyleReapplyGeneration || !hasPersistentVisualWork()) {
@@ -1261,6 +1271,9 @@
                 }
                 try {
                     const appliedState = await applyPersistentVisualState();
+                    if (appliedState.legendVisibilityApplied === true) {
+                        deferredLegendVisibilityRestored = true;
+                    }
                     visualReapplyDiagnostic.completed += 1;
                     visualReapplyDiagnostic.attemptsFinished = attempt + 1;
                     visualReapplyDiagnostic.lastCompletedAt = Date.now();
@@ -1285,9 +1298,15 @@
             // after Grafana has rendered the first native response. Keep the
             // request active for the whole settling burst so an early attempt
             // against the old one-series legend cannot consume it.
-            if (generation === visualStyleReapplyGeneration && legendVisibilityRestoreAfterNextQuery) {
+            if (generation === visualStyleReapplyGeneration && legendVisibilityRestoreAfterNextQuery
+                && deferredLegendVisibilityRestored) {
                 legendVisibilityRestoreAfterNextQuery = false;
                 recordVisualReapply('legend-visibility-restore-consumed', { generation });
+            } else if (generation === visualStyleReapplyGeneration && legendVisibilityRestoreAfterNextQuery) {
+                recordVisualReapply('legend-visibility-restore-pending', {
+                    generation,
+                    reason: 'native-legend-not-restored',
+                });
             }
             const committed = await waitForCommittedVisualState(generation);
             recordVisualReapply(`commit-${committed.status}`, { generation, ...committed });
@@ -2259,35 +2278,6 @@
         || !!tools.cpuCapacityFilterEnabled
         || legendSelection.isCompleteHideActive(tools);
 
-    const expressionMatchesTargetTemplate = (template, expression) => {
-        const source = String(template || '');
-        if (!source || !expression) return false;
-        const variable = /\$\{[A-Za-z_][\w]*(?::[^}]*)?\}|\$[A-Za-z_][\w]*/g;
-        if (!variable.test(source)) return source === String(expression);
-        variable.lastIndex = 0;
-        const escape = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        let pattern = '';
-        let cursor = 0;
-        for (const match of source.matchAll(variable)) {
-            pattern += escape(source.slice(cursor, match.index)) + '.*?';
-            cursor = match.index + match[0].length;
-        }
-        pattern += escape(source.slice(cursor));
-        return new RegExp(`^${pattern}$`).test(String(expression));
-    };
-    const queryDatasourceKey = datasource => typeof datasource === 'string'
-        ? datasource
-        : String(datasource?.uid || datasource?.type || '');
-    const queryMatchesConfiguredTarget = (configured, runtime) => {
-        if (!configured?.expr || !runtime?.expr
-            || !expressionMatchesTargetTemplate(configured.expr, runtime.expr)) return false;
-        if (configured.refId && String(configured.refId) !== String(runtime.refId || '')) return false;
-        if (configured.alias && String(configured.alias) !== String(runtime.alias || '')) return false;
-        if (configured.legendFormat && String(configured.legendFormat) !== String(runtime.legendFormat || '')) return false;
-        const configuredDatasource = queryDatasourceKey(configured.datasource);
-        const runtimeDatasource = queryDatasourceKey(runtime.datasource);
-        return !configuredDatasource || !runtimeDatasource || configuredDatasource === runtimeDatasource;
-    };
     const getRequestQueries = requestBody => {
         try {
             const payload = typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
@@ -2334,7 +2324,8 @@
             }));
             const matched = candidates.filter(query => signatures.has(query.signature)
                 || scopeSignatures.has(query.scopeSignature)
-                || configuredQueries.some(configured => queryMatchesConfiguredTarget(configured, query.raw)));
+                || configuredQueries.some(configured => window.DashBridgeGrafanaPanelDefinition
+                    ?.queryMatchesConfiguredTarget?.(configured, query.raw)));
             return new Set(matched.map(query => query.refId).filter(Boolean));
         } catch {
             return new Set();
@@ -2357,7 +2348,8 @@
                 const signature = window.DashBridgeGrafanaVisualEngine?.getQuerySignature?.(query) || '';
                 const scopeSignature = getQueryScopeSignature?.(query) || '';
                 return configuredSignatures.has(signature) || scopeSignatures.has(scopeSignature)
-                    || configuredQueries.some(configured => queryMatchesConfiguredTarget(configured, query));
+                    || configuredQueries.some(configured => window.DashBridgeGrafanaPanelDefinition
+                        ?.queryMatchesConfiguredTarget?.(configured, query));
             }).map(query => String(query.refId || '')).filter(Boolean));
         } catch {
             return new Set();
@@ -3228,6 +3220,8 @@
             debugLog('Applying legend visibility:', visibility);
             const legendVisibilityApplied = await applyLegendVisibilityByKey(visibility);
             commandDiagnostic.legendVisibilityApplied = legendVisibilityApplied;
+            commandDiagnostic.legendVisibilityDeferred = !legendVisibilityApplied
+                && canDeferLegendVisibilityRestore(root);
             commandDiagnostic.legendDiagnostic = window.__dashbridgeLegendVisibilityDiagnostic || null;
             window.__dashbridgePanelToolsCommandDiagnostic = commandDiagnostic;
             if (!legendVisibilityApplied) {
@@ -3290,6 +3284,8 @@
             completedAt: Date.now(),
             legendVisibilityApplied: legendVisibilityRequested
                 ? !!commandDiagnostic.legendVisibilityApplied : null,
+            legendVisibilityDeferred: legendVisibilityRequested
+                ? !!commandDiagnostic.legendVisibilityDeferred : false,
         };
         // In an embedded DashBridge card the receiver is the extension page
         // (the parent). In a normal Grafana tab the acknowledgement is for the

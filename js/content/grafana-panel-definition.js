@@ -110,6 +110,44 @@
     )));
     const getQuerySignature = query => getQuerySignatureForKeys(query, querySignatureKeys);
     const getQueryScopeSignature = query => getQuerySignatureForKeys(query, queryScopeSignatureKeys);
+    const templateVariablePattern = /\$\{[A-Za-z_][\w]*(?::[^}]*)?\}|\$[A-Za-z_][\w]*/g;
+    const stringMatchesTemplate = (template, runtimeValue) => {
+        const source = String(template ?? '');
+        const actual = String(runtimeValue ?? '');
+        templateVariablePattern.lastIndex = 0;
+        if (!templateVariablePattern.test(source)) return source === actual;
+        templateVariablePattern.lastIndex = 0;
+        const escape = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        let pattern = '';
+        let cursor = 0;
+        for (const match of source.matchAll(templateVariablePattern)) {
+            pattern += escape(source.slice(cursor, match.index)) + '.*?';
+            cursor = match.index + match[0].length;
+        }
+        pattern += escape(source.slice(cursor));
+        return new RegExp(`^${pattern}$`).test(actual);
+    };
+    const valueMatchesTemplate = (configured, runtime) => {
+        if (typeof configured === 'string') return stringMatchesTemplate(configured, runtime);
+        if (Array.isArray(configured)) {
+            return Array.isArray(runtime) && configured.length === runtime.length
+                && configured.every((value, index) => valueMatchesTemplate(value, runtime[index]));
+        }
+        if (configured && typeof configured === 'object') {
+            return !!runtime && typeof runtime === 'object' && !Array.isArray(runtime)
+                && Object.keys(configured).every(key => Object.hasOwn(runtime, key)
+                    && valueMatchesTemplate(configured[key], runtime[key]));
+        }
+        return Object.is(configured, runtime);
+    };
+    const queryMatchesConfiguredTarget = (configured, runtime) => {
+        if (!configured || !runtime || typeof configured !== 'object' || typeof runtime !== 'object') return false;
+        if (!configured.refId || String(configured.refId) !== String(runtime.refId || '')) return false;
+        const comparableKeys = querySignatureKeys.filter(key => key !== 'refId' && Object.hasOwn(configured, key));
+        if (!comparableKeys.length) return false;
+        return comparableKeys.every(key => Object.hasOwn(runtime, key)
+            && valueMatchesTemplate(configured[key], runtime[key]));
+    };
     const getPanelQuerySignaturesAsync = async ({ root = document, panelId = '' } = {}) => {
         const panel = await getPanelDefinition({ root, panelId });
         return [...new Set((panel?.targets || []).map(getQuerySignature).filter(signature => signature !== '{}'))];
@@ -121,6 +159,7 @@
         getPanelDefinition,
         getQuerySignature,
         getQueryScopeSignature,
+        queryMatchesConfiguredTarget,
         getPanelQuerySignaturesAsync
     });
 })(globalThis);

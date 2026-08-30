@@ -163,7 +163,8 @@ async function applyPanelTools(tabId, tools) {
                 finish({
                     status: e.data.commandStatus === 'error'
                         ? 'command-error'
-                        : (e.data.legendVisibilityApplied === false ? 'native-legend-apply-failed' : 'applied'),
+                        : (e.data.legendVisibilityApplied === false && e.data.legendVisibilityDeferred !== true
+                            ? 'native-legend-apply-failed' : 'applied'),
                     state: window.__dashbridgePanelToolsState || null,
                     acknowledgement: e.data,
                     legendVisibilityDiagnostic: window.__dashbridgeLegendVisibilityDiagnostic || null,
@@ -1424,6 +1425,12 @@ async function waitForPanelStability(tabId, panelId, {
             const threshold = window.__dashbridgeThresholdDiagnostic || null;
             const visualReapply = window.__dashbridgeVisualReapplyDiagnostic || {};
             const dataLayoutReflow = window.__dashbridgeDataLayoutReflowDiagnostic || {};
+            const visualMetadata = window.__dashbridgePanelToolsVisualMetadata || {};
+            const dataStatusKind = visualMetadata.responseDataStatus?.kind || 'unknown';
+            const intentionalEmpty = visualMetadata.responseFilterEmptyIsNormal === true
+                && dataStatusKind === 'filtered_empty'
+                && (window.__dashbridgePanelToolsState?.seriesQueryFilterEnabled === true
+                    || window.__dashbridgePanelToolsState?.cpuCapacityFilterEnabled === true);
             const facts = {
                 rootFound: !!evidenceRoot,
                 rootConnected: !!evidenceRoot?.isConnected,
@@ -1438,6 +1445,10 @@ async function waitForPanelStability(tabId, panelId, {
                     thresholdEngine: evidenceRoot.getAttribute('data-dashbridge-threshold-engine') || '',
                 } : null,
                 tools: serialisableTools(),
+                dataStatus: {
+                    kind: dataStatusKind,
+                    intentionalEmpty,
+                },
                 query: {
                     activeRequests: Number(query.activeRequests) || 0,
                     nextEventId: Number(query.nextEventId) || 0,
@@ -1500,16 +1511,19 @@ async function waitForPanelStability(tabId, panelId, {
             const queryIdle = facts.query.activeRequests === 0;
             const visualReapplyIdle = facts.visualReapply.pending === false;
             const dataLayoutReflowIdle = facts.dataLayoutReflow.pending === false;
-            if (facts.rootFound && facts.rootConnected && canvas.length > 0
+            const renderStateReady = canvas.length > 0 || facts.dataStatus.intentionalEmpty;
+            if (facts.rootFound && facts.rootConnected && renderStateReady
                 && queryIdle && visualReapplyIdle && dataLayoutReflowIdle && quietLongEnough
                 && consecutiveStableFrames >= options.stableFrames) {
-                finish('stable', 'Observable panel geometry, legend, canvas, query activity and visual reapply lifecycle remained unchanged for the required window');
+                finish('stable', facts.dataStatus.intentionalEmpty
+                    ? 'The source filter produced a confirmed intentional empty state and panel lifecycle remained unchanged for the required window'
+                    : 'Observable panel geometry, legend, canvas, query activity and visual reapply lifecycle remained unchanged for the required window');
                 return;
             }
             if (now - startedAt >= options.timeoutMs) {
                 const blockers = [];
                 if (!facts.rootFound || !facts.rootConnected) blockers.push('panel-not-connected');
-                if (!canvas.length) blockers.push('canvas-missing');
+                if (!renderStateReady) blockers.push('canvas-missing');
                 if (!queryIdle) blockers.push('query-still-active');
                 if (!visualReapplyIdle) blockers.push('visual-reapply-pending');
                 if (!dataLayoutReflowIdle) blockers.push('data-layout-reflow-pending');

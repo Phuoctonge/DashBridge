@@ -528,7 +528,7 @@ node test/run-js-tests.js
 node test/run-python-smoke-tests.js
 ```
 
-На 2026-08-30: 104 JavaScript behavior-файла и 41 исполняемый Python
+На 2026-08-31: 105 JavaScript behavior-файлов и 41 исполняемый Python
 smoke/security/audit-файл. Все 84 production JavaScript-файла проходят
 `node --check`.
 `DASHBRIDGE_PYTHON` задаёт Python, если он не находится автоматически.
@@ -546,6 +546,15 @@ package-файлы, `node_modules` и результаты тестов не в�
 Живые Grafana E2E используют один отдельный постоянный профиль в
 `%LOCALAPPDATA%\DashBridge\E2E\browser-profile`; обе авторизации выполняются
 вручную один раз внутри браузера, без передачи credentials тестовому коду.
+`scripts/run-live-grafana-e2e.js` является внешним Playwright-оркестратором, а
+не вторым владельцем сценариев: он открывает существующий extension Test Runner,
+передаёт ему один или два dashboard URL и ждёт его публичный snapshot. Fast и
+Full матрицы, OFF→ON/reset, повторный refresh, uPlot/Flot invariants и cleanup
+остаются во владельце `pages/test-runner/test-runner-suite.js`. Оркестратор
+пишет полный локальный JSON и компактный failure-report в игнорируемый
+`test-results/`; в Node-процесс передаются только bounded console/network
+evidence и диагностика проваленных тестов без изображений и крупных payload.
+Снимок создаётся только при фатальной ошибке внешнего запуска.
 
 Дополнительно: `pages/test-runner/test-runner.html` запускает живые E2E на Grafana. По user action
 он открывает общий Document Picture-in-Picture progress controller с количеством

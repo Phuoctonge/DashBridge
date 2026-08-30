@@ -71,8 +71,10 @@ checks = {
     "native series filtering uses an exact selected-panel query scope": "const hasSourceSeriesFilterScope" in COMMON
         and "if (hasSourceSeriesFilterScope(targetRefIds)) {" in COMMON
         and "filterSeriesByThreshold(scopedData).metrics;" in COMMON,
-    "native query scope survives Grafana template-variable substitution": "expressionMatchesTargetTemplate" in COMMON
-        and "queryMatchesConfiguredTarget(configured, query.raw)" in COMMON
+    "native query scope survives Grafana template-variable substitution": "const stringMatchesTemplate" in PANEL_DEFINITION
+        and "const valueMatchesTemplate" in PANEL_DEFINITION
+        and "const queryMatchesConfiguredTarget" in PANEL_DEFINITION
+        and "?.queryMatchesConfiguredTarget?.(configured, query.raw)" in COMMON
         and "'expr', 'datasource'" in PANEL_DEFINITION,
     "Grafana View scopes its first query without delayed retries": "const isTargetPanelView" in COMMON
         and "if (isTargetPanelView())" in COMMON
