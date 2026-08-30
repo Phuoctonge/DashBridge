@@ -8,7 +8,7 @@ const path = require('path');
 const vm = require('vm');
 
 const code = fs.readFileSync(
-    path.join(__dirname, '..', 'js', 'test-runner', 'test-runner-report.js'),
+    path.join(__dirname, '..', 'pages', 'test-runner', 'test-runner-report.js'),
     'utf8'
 );
 const context = vm.createContext({ console, Date });

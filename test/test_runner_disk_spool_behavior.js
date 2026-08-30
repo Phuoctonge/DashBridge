@@ -7,8 +7,8 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const reportSource = fs.readFileSync(path.join(__dirname, '..', 'js', 'test-runner', 'test-runner-report.js'), 'utf8');
-const uiSource = fs.readFileSync(path.join(__dirname, '..', 'js', 'test-runner', 'test-runner-ui.js'), 'utf8');
+const reportSource = fs.readFileSync(path.join(__dirname, '..', 'pages', 'test-runner', 'test-runner-report.js'), 'utf8');
+const uiSource = fs.readFileSync(path.join(__dirname, '..', 'pages', 'test-runner', 'test-runner-ui.js'), 'utf8');
 const classStart = uiSource.indexOf('class DiagnosticSpool');
 const classEnd = uiSource.indexOf('// --- Утилиты ---', classStart);
 const serializerStart = uiSource.indexOf('async function serializeJsonInChunks(');

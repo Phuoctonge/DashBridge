@@ -1,4 +1,4 @@
-// test-runner-probe.js
+// Test Runner MAIN-world environment probe.
 // Выполняется в MAIN world Grafana через chrome.scripting.executeScript.
 // Возвращает снэпшот окружения: версию, движок, рантаймы, первую видимую панель.
 // НЕ импортирует ничего — работает как самодостаточная функция-аргумент.

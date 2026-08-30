@@ -1,4 +1,4 @@
-// test-runner-core.js
+// Test Runner orchestrator.
 // Оркестратор E2E-тестов DashBridge.
 // Для каждого URL: открыть НОВОЕ ОКНО с фокусом → дождаться загрузки → probe → тесты → закрыть.
 // ВАЖНО: chrome.tabs.create({ active: false }) не рендерит canvas и не инициализирует
@@ -108,7 +108,7 @@ async function runProbeInTab(tabId) {
         const results = await chrome.scripting.executeScript({
             target: { tabId },
             world: 'MAIN',
-            files: ['js/test-runner/test-runner-probe.js'],
+            files: ['pages/test-runner/test-runner-probe.js'],
         });
         // probe.js объявляет и сразу вызывает dashbridgeRunProbe(),
         // результат последнего выражения файла — возврат функции.

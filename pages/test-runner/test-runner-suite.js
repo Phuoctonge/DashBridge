@@ -1,4 +1,4 @@
-// test-runner-suite.js
+// Test Runner scenario suite.
 // Набор тест-сценариев A–F для E2E тестирования DashBridge в реальной Grafana.
 // Каждый сценарий: { id, category, name, run(tabId, env) → Promise<{ pass, details }> }
 // Все visual-тесты обратимы: read → modify → check DOM → restore.

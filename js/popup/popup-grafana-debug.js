@@ -221,7 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const testRunnerButton = document.getElementById('grafanaDebugTestRunnerBtn');
     if (testRunnerButton) {
         testRunnerButton.addEventListener('click', () => {
-            chrome.tabs.create({ url: chrome.runtime.getURL('html/test-runner.html') });
+            chrome.tabs.create({ url: chrome.runtime.getURL('pages/test-runner/test-runner.html') });
         });
     }
 });

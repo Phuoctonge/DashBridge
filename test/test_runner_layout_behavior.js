@@ -5,8 +5,8 @@ const fs = require('fs');
 const path = require('path');
 
 const root = path.join(__dirname, '..');
-const html = fs.readFileSync(path.join(root, 'html/test-runner.html'), 'utf8');
-const css = fs.readFileSync(path.join(root, 'css', 'test-runner.css'), 'utf8');
+const html = fs.readFileSync(path.join(root, 'pages/test-runner/test-runner.html'), 'utf8');
+const css = fs.readFileSync(path.join(root, 'pages/test-runner/test-runner.css'), 'utf8');
 
 for (const column of ['id', 'cat', 'name', 'status', 'details', 'dur']) {
     assert.match(html, new RegExp(`<col class="tr-col-${column}">`), `missing stable ${column} column`);

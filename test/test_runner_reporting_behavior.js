@@ -6,7 +6,7 @@ const path = require('path');
 const vm = require('vm');
 
 const coreCode = fs.readFileSync(
-    path.join(__dirname, '..', 'js', 'test-runner', 'test-runner-core.js'),
+    path.join(__dirname, '..', 'pages', 'test-runner', 'test-runner-core.js'),
     'utf8'
 );
 

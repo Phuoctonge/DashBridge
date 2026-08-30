@@ -290,13 +290,13 @@ DashBridge/
 ├── pages/                   # Feature-папки полноразмерных страниц
 │   ├── options/             # HTML, CSS и логика настроек расширения
 │   ├── recorder/            # HTML, CSS и логика Traffic Recorder
+│   ├── test-runner/         # UI, probe, suite и отчёты живых E2E
 │   ├── worklog/             # HTML, CSS и логика Jira Worklog
 │   └── debug-easter-egg/    # Изолированная пасхалка и замаскированные assets
 ├── html/                    # Остальные страницы до их поэтапного переноса
 │   ├── popup.html           # Главное popup-окно
 │   ├── dashbridge.html      # Единый Grafana-дашборд
 │   ├── batch.html           # Массовый сбор снимков
-│   └── test-runner.html     # Диагностика и E2E-проверки
 ├── js/
 │   ├── content/             # Интеграция со страницами Grafana/Confluence
 │   ├── pages/               # Логика полноразмерных страниц

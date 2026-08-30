@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 
 const suiteCode = fs.readFileSync(
-    path.join(__dirname, '..', 'js/test-runner/test-runner-suite.js'),
+    path.join(__dirname, '..', 'pages/test-runner/test-runner-suite.js'),
     'utf8'
 );
 
@@ -27,7 +27,7 @@ const suiteCode = fs.readFileSync(
 });
 
 const coreCode = fs.readFileSync(
-    path.join(__dirname, '..', 'js/test-runner/test-runner-core.js'),
+    path.join(__dirname, '..', 'pages/test-runner/test-runner-core.js'),
     'utf8'
 );
 [
@@ -43,7 +43,7 @@ const coreCode = fs.readFileSync(
 });
 
 const uiCode = fs.readFileSync(
-    path.join(__dirname, '..', 'js/test-runner/test-runner-ui.js'),
+    path.join(__dirname, '..', 'pages/test-runner/test-runner-ui.js'),
     'utf8'
 );
 [
@@ -65,7 +65,7 @@ const uiCode = fs.readFileSync(
 });
 
 const reportCode = fs.readFileSync(
-    path.join(__dirname, '..', 'js/test-runner/test-runner-report.js'),
+    path.join(__dirname, '..', 'pages/test-runner/test-runner-report.js'),
     'utf8'
 );
 [

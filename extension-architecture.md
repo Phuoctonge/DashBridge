@@ -26,20 +26,19 @@ manifest.json
 ├── pages/                      # Feature-папки полноразмерных extension pages
 │   ├── options/                # HTML, CSS и контроллер настроек
 │   ├── recorder/               # Traffic Recorder: HTML, CSS и контроллер
+│   ├── test-runner/            # Живые E2E: UI, probe, suite, report
 │   ├── worklog/                # Jira Worklog: HTML, CSS и контроллер
 │   └── debug-easter-egg/       # Изолированная пасхалка и замаскированные assets
 ├── html/                       # Остальные production HTML до их поэтапного переноса
 │   ├── popup.html              # Основной Popup
 │   ├── dashbridge.html         # Единый дашборд Grafana
 │   ├── batch.html              # Пакетный PNG/ZIP и серии
-│   └── test-runner.html        # Живые E2E-сценарии
 ├── js/background.js            # MV3 service worker
 ├── js/theme.js                 # Общая light/dark тема
 ├── js/shared/                  # Контракты, storage, URL, capture
 ├── js/content/                 # MAIN/isolated runtime сайтов
 ├── js/popup/                   # Модули Popup
 ├── js/pages/                   # Контроллеры extension pages
-├── js/test-runner/             # E2E runner и отчёты
 ├── css/                        # Общие и постраничные стили
 ├── test/                       # Node behavior, Python smoke, probes
 ├── docs/                       # Действующие пояснения и краткая история
@@ -523,7 +522,7 @@ smoke/security/audit-файл. Все 78 production JavaScript-файлов пр
 `node --check`.
 `DASHBRIDGE_PYTHON` задаёт Python, если он не находится автоматически.
 
-Дополнительно: `html/test-runner.html` запускает живые E2E на Grafana. По user action
+Дополнительно: `pages/test-runner/test-runner.html` запускает живые E2E на Grafana. По user action
 он открывает общий Document Picture-in-Picture progress controller с количеством
 завершённых/запланированных тестов, PASS/FAIL, общим временем и аварийной
 остановкой; при отсутствии Document PiP основной in-page прогресс остаётся

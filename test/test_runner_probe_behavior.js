@@ -22,7 +22,7 @@ const context = {
 context.window.window = context.window;
 context.window.parent = context.window;
 vm.createContext(context);
-vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js/test-runner/test-runner-probe.js'), 'utf8'), context);
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'pages/test-runner/test-runner-probe.js'), 'utf8'), context);
 const snapshot = context.dashbridgeRunProbe();
 assert.strictEqual(snapshot.ok, true);
 assert.strictEqual(snapshot.engine, 'uplot');

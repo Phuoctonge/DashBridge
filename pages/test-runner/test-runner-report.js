@@ -1,4 +1,4 @@
-// Self-diagnosing, lossless-evidence JSON artifact builder for DashBridge E2E.
+// Test Runner self-diagnosing, lossless-evidence JSON artifact builder.
 
 'use strict';
 
