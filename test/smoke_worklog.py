@@ -5,7 +5,7 @@ from support.smoke import run_page_contract
 if __name__ == "__main__":
     run_page_contract(
         "Jira worklog",
-        page="worklog.html",
+        page="html/worklog.html",
         html=['id="logTableBody"', 'id="addRow"', 'id="sendAll"', 'id="clearSent"', 'id="authDot"'],
         sources={
             "js/pages/worklog.js": [

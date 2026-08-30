@@ -3,7 +3,7 @@
 const assert = require('assert');
 const fs = require('fs');
 
-const html = fs.readFileSync('popup.html', 'utf8');
+const html = fs.readFileSync('html/popup.html', 'utf8');
 const css = fs.readFileSync('css/popup.css', 'utf8');
 const core = fs.readFileSync('js/popup/popup-core.js', 'utf8');
 const router = fs.readFileSync('js/popup/popup-grafana-router.js', 'utf8');

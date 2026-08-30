@@ -4,14 +4,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnBatchCapture = document.getElementById("openBatchCaptureBtn");
     if (btnBatchCapture) {
         btnBatchCapture.onclick = () => {
-            chrome.tabs.create({ url: chrome.runtime.getURL("batch.html") });
+            chrome.tabs.create({ url: chrome.runtime.getURL("html/batch.html") });
         };
     }
 
     const btnDashBridge = document.getElementById("openDashBridgeBtn");
     if (btnDashBridge) {
         btnDashBridge.onclick = () => {
-            chrome.tabs.create({ url: chrome.runtime.getURL("dashbridge.html") });
+            chrome.tabs.create({ url: chrome.runtime.getURL("html/dashbridge.html") });
         };
     }
 

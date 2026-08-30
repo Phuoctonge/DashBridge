@@ -11,7 +11,7 @@ PANEL_DEFINITION = (ROOT / "js/content/grafana-panel-definition.js").read_text(e
 CPU_CAPACITY_FILTER = (ROOT / "js/content/grafana-cpu-capacity-filter.js").read_text(encoding="utf-8")
 DASHBOARD = (ROOT / "js/pages/dashbridge.js").read_text(encoding="utf-8")
 IFRAME = (ROOT / "js/content/grafana-iframe.js").read_text(encoding="utf-8")
-POPUP = (ROOT / "popup.html").read_text(encoding="utf-8")
+POPUP = (ROOT / "html/popup.html").read_text(encoding="utf-8")
 OPTIONS = (ROOT / "js/pages/options.js").read_text(encoding="utf-8")
 LEGEND_ENGINE = (ROOT / "js/shared/grafana-legend-engine.js").read_text(encoding="utf-8")
 BRIDGE = (ROOT / "js/shared/grafana-panel-tools-bridge.js").read_text(encoding="utf-8")

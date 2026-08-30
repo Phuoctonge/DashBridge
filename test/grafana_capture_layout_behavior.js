@@ -31,7 +31,7 @@ assert(narrow.left >= 12 && narrow.top >= 12, 'prepared panel must stay inside t
 const tools = fs.readFileSync('js/content/grafana-panel-tools.js', 'utf8');
 const dashboard = fs.readFileSync('js/pages/dashbridge.js', 'utf8');
 const dashboardCss = fs.readFileSync('css/dashbridge.css', 'utf8');
-const dashboardHtml = fs.readFileSync('dashbridge.html', 'utf8');
+const dashboardHtml = fs.readFileSync('html/dashbridge.html', 'utf8');
 assert(tools.includes("await session?.restore?.()"), 'native capture must restore its temporary layout');
 assert(tools.includes("classList.remove('dashbridge-panel-capture-mode')"), 'capture-only tooltip suppression must always be removed');
 assert(tools.includes('html.dashbridge-panel-capture-mode [data-dashbridge-threshold-highlights] { z-index:2147483646 !important; }'),

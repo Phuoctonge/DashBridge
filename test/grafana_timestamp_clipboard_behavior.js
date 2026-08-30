@@ -25,7 +25,7 @@ assert.strictEqual(context.parseGrafanaUrlTimeRange(
     'https://grafana.example/d/test?from=1787777280000&to=1787774400000'
 ), null, 'reversed ranges must be rejected');
 
-const html = fs.readFileSync('popup.html', 'utf8');
+const html = fs.readFileSync('html/popup.html', 'utf8');
 const source = fs.readFileSync('js/popup/popup-grafana-links.js', 'utf8');
 assert(html.includes('id="grafanaTimestampReadBtn"')
     && html.includes('id="grafanaTimestampFrom"')

@@ -4,7 +4,7 @@ from support.smoke import CheckCollector
 
 
 ROOT = Path(__file__).resolve().parents[1]
-HTML = (ROOT / 'batch.html').read_text(encoding='utf-8')
+HTML = (ROOT / 'html/batch.html').read_text(encoding='utf-8')
 JS = (ROOT / 'js/pages/batch.js').read_text(encoding='utf-8')
 CAPTURE_UTILS = (ROOT / 'js/pages/batch-capture-utils.js').read_text(encoding='utf-8')
 CSS = (ROOT / 'css/batch.css').read_text(encoding='utf-8')

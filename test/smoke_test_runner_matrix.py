@@ -17,7 +17,7 @@ REPORT = (ROOT / "js/test-runner/test-runner-report.js").read_text(encoding="utf
 PANEL_TOOLS = (ROOT / "js/content/grafana-panel-tools.js").read_text(encoding="utf-8")
 GRAFANA_DOM = (ROOT / "js/content/grafana-dom.js").read_text(encoding="utf-8")
 VISUAL_ENGINE = (ROOT / "js/content/grafana-visual-engine.js").read_text(encoding="utf-8")
-HTML = (ROOT / "test-runner.html").read_text(encoding="utf-8")
+HTML = (ROOT / "html/test-runner.html").read_text(encoding="utf-8")
 
 checks = {
     "captureState keeps visual and DOM evidence": (
@@ -328,8 +328,8 @@ checks = {
         and "aria-label=\"${test.aborted ? 'Не запущен'" in UI
     ),
     "test runner shares the extension theme and diagnostic viewer follows it": (
-        'href="css/theme.css"' in HTML
-        and 'href="css/test-runner.css"' in HTML
+        'href="../css/theme.css"' in HTML
+        and 'href="../css/test-runner.css"' in HTML
         and 'id="themeToggle"' not in HTML
         and 'id="themeToggleBtn"' not in HTML
         and "const popupTheme = document.documentElement.getAttribute('data-theme') || 'light';" in UI

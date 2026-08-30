@@ -5,7 +5,7 @@ from support.smoke import run_page_contract
 if __name__ == "__main__":
     run_page_contract(
         "batch capture",
-        page="batch.html",
+        page="html/batch.html",
         html=['id="dashUrl"', 'id="timestamps"', 'id="startBtn"', 'id="getPanelsBtn"',
               'id="panelsModal"', 'id="selectAllPanelPickerBtn"', 'id="clearPanelPickerBtn"',
               'id="cancelPanelPickerBtn"', 'id="applyPanelPickerBtn"', 'id="seriesDashUrl"',

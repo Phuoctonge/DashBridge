@@ -7,7 +7,7 @@ from support.smoke import run_checks
 ROOT = Path(__file__).parent.parent
 src = (ROOT / 'js/pages/dashbridge.js').read_text(encoding='utf-8')
 renderer = (ROOT / 'js/pages/dashbridge-renderer.js').read_text(encoding='utf-8')
-html = (ROOT / 'dashbridge.html').read_text(encoding='utf-8')
+html = (ROOT / 'html/dashbridge.html').read_text(encoding='utf-8')
 
 checks = {
     'custom lazy-load setting is removed':

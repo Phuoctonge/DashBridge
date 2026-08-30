@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
-const html = read('dashbridge.html');
+const html = read('html/dashbridge.html');
 const dashboard = read('js/pages/dashbridge.js');
 const tools = read('js/content/grafana-panel-tools.js');
 const visual = read('js/content/grafana-visual-engine.js');

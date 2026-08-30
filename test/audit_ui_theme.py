@@ -7,7 +7,7 @@
 2. Все HTML файлы подключают css/theme.css
 3. Ни один HTML файл не содержит дублирующий :root { ... } блок
 4. Все используют единые имена переменных (--primary, --bg, --text-main, --border)
-5. Кнопка темы есть в dashbridge.html
+5. Кнопка темы есть в html/dashbridge.html
 6. Логика темы в js/pages/dashbridge.js (applyTheme, initTheme, themeToggle)
 7. Broadcast через chrome.storage.onChanged во всех HTML
 8. Алиасы для обратной совместимости в css/theme.css
@@ -20,7 +20,7 @@ import sys
 # === Пути ===
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 THEME_CSS = os.path.join(ROOT, 'css/theme.css')
-HTML_FILES = ['dashbridge.html', 'popup.html', 'options.html', 'worklog.html', 'batch.html']
+HTML_FILES = ['html/dashbridge.html', 'html/popup.html', 'html/options.html', 'html/worklog.html', 'html/batch.html']
 CSS_FILES = ['css/dashbridge.css', 'css/batch.css']
 JS_FILES = ['js/theme.js']
 
@@ -101,7 +101,7 @@ for html_file in HTML_FILES:
          f"Файл {html_file} не найден")
     if content:
         test(f"{html_file} подключает css/theme.css",
-             'href="css/theme.css"' in content or "href='css/theme.css'" in content,
+             'href="../css/theme.css"' in content or "href='../css/theme.css'" in content,
              f"css/theme.css не подключён в {html_file}")
 
 
@@ -136,24 +136,24 @@ for css_file in CSS_FILES:
 
 
 # ============================================================
-# 5. Кнопка темы в dashbridge.html
+# 5. Кнопка темы в html/dashbridge.html
 # ============================================================
 print("\n=== 5. Кнопка темы ===")
 
-dashbridge_html = read_file(os.path.join(ROOT, 'dashbridge.html'))
+dashbridge_html = read_file(os.path.join(ROOT, 'html/dashbridge.html'))
 if dashbridge_html:
-    test("dashbridge.html не содержит локальную кнопку themeToggle",
+    test("html/dashbridge.html не содержит локальную кнопку themeToggle",
          'id="themeToggle"' not in dashbridge_html,
          "Переключение темы должно оставаться только в popup")
 
-popup_html = read_file(os.path.join(ROOT, 'popup.html'))
+popup_html = read_file(os.path.join(ROOT, 'html/popup.html'))
 if popup_html:
-    test("popup.html содержит кнопку themeToggleBtn",
+    test("html/popup.html содержит кнопку themeToggleBtn",
          'id="themeToggleBtn"' in popup_html,
-         "Кнопка themeToggleBtn отсутствует в popup.html")
-    test("popup.html кнопка темы имеет класс btn-theme",
+         "Кнопка themeToggleBtn отсутствует в html/popup.html")
+    test("html/popup.html кнопка темы имеет класс btn-theme",
          'btn-theme' in popup_html,
-         "Кнопка темы в popup.html не имеет класса btn-theme")
+         "Кнопка темы в html/popup.html не имеет класса btn-theme")
 
 # ============================================================
 # 5.1. Стиль btn-theme в css/theme.css
@@ -194,7 +194,7 @@ if theme_content:
 # ============================================================
 print("\n=== 5.2. Отсутствие дублирования в кнопке темы ===")
 
-# dashbridge.html: кнопка должна быть пустой (без захардкоженного SVG/текста)
+# html/dashbridge.html: кнопка должна быть пустой (без захардкоженного SVG/текста)
 if dashbridge_html and 'id="themeToggle"' in dashbridge_html:
     # Ищем блок кнопки themeToggle
     btn_match = re.search(
@@ -203,14 +203,14 @@ if dashbridge_html and 'id="themeToggle"' in dashbridge_html:
     )
     if btn_match:
         btn_content = btn_match.group(1).strip()
-        test("dashbridge.html кнопка themeToggle пустая (без дублирования)",
+        test("html/dashbridge.html кнопка themeToggle пустая (без дублирования)",
              btn_content == '',
              f"Кнопка содержит: '{btn_content[:80]}' (должна быть пустой)")
     else:
-        test("dashbridge.html кнопка themeToggle найдена", False,
+        test("html/dashbridge.html кнопка themeToggle найдена", False,
              "Не удалось найти кнопку themeToggle")
 
-# popup.html: кнопка должна быть пустой (без захардкоженного SVG)
+# html/popup.html: кнопка должна быть пустой (без захардкоженного SVG)
 if popup_html:
     btn_match = re.search(
         r'<button[^>]*id="themeToggleBtn"[^>]*>(.*?)</button>',
@@ -218,17 +218,17 @@ if popup_html:
     )
     if btn_match:
         btn_content = btn_match.group(1).strip()
-        test("popup.html кнопка themeToggleBtn пустая (без дублирования)",
+        test("html/popup.html кнопка themeToggleBtn пустая (без дублирования)",
              btn_content == '',
              f"Кнопка содержит: '{btn_content[:80]}' (должна быть пустой)")
     else:
-        test("popup.html кнопка themeToggleBtn найдена", False,
+        test("html/popup.html кнопка themeToggleBtn найдена", False,
              "Не удалось найти кнопку themeToggleBtn")
 
-    # popup.html: кнопка должна иметь data-compact
-    test("popup.html кнопка темы имеет data-compact (только иконка)",
+    # html/popup.html: кнопка должна иметь data-compact
+    test("html/popup.html кнопка темы имеет data-compact (только иконка)",
          'data-compact' in popup_html and 'themeToggleBtn' in popup_html,
-         "popup.html кнопка темы не имеет data-compact")
+         "html/popup.html кнопка темы не имеет data-compact")
 
 
 # ============================================================
@@ -289,7 +289,7 @@ for html_file in HTML_FILES:
     if html_content:
         # CSP: inline scripts запрещены, должен быть внешний файл
         test(f"{html_file} подключает js/theme.js через <script src>",
-             'src="js/theme.js"' in html_content,
+             'src="../js/theme.js"' in html_content,
              f"js/theme.js не подключён в {html_file}")
         # Не должно быть inline scripts с chrome.storage.onChanged
         inline_pattern = re.compile(r'<script>(?!.*?src=).*?chrome\.storage\.onChanged.*?</script>', re.DOTALL)
@@ -324,23 +324,23 @@ if batch_css:
 # ============================================================
 # 9. manifest.json содержит css/theme.css в web_accessible_resources
 # ============================================================
-print("\n=== 9. worklog.html: ширина колонки Start Date ===")
+print("\n=== 9. html/worklog.html: ширина колонки Start Date ===")
 worklog = read_file(os.path.join(ROOT, 'css', 'worklog.css'))
-test("worklog.html .col-date width >= 12.5rem",
+test("html/worklog.html .col-date width >= 12.5rem",
      worklog is not None and re.search(r"\.col-date\s*\{[^}]*width:\s*12\.5rem", worklog) is not None,
      "Колонка Start Date должна быть >= 200px для вмещения '01/07/2026 09:00' + иконка")
-test("worklog.html .col-date min-width: 12.5rem",
+test("html/worklog.html .col-date min-width: 12.5rem",
      worklog is not None and 'min-width: 12.5rem' in worklog,
      "min-width нужен чтобы колонка не сжималась")
-test("worklog.html .col-date input text-align: left",
+test("html/worklog.html .col-date input text-align: left",
      worklog is not None and re.search(r"\.col-date\s+input\s*\{[^}]*text-align:\s*left", worklog) is not None,
      "text-align: left чтобы текст не упирался в иконку календаря")
 
 
 # ============================================================
-# 10. css/theme.css: переопределения для options.html inline-стилей
+# 10. css/theme.css: переопределения для html/options.html inline-стилей
 # ============================================================
-print("\n=== 10. css/theme.css: переопределения inline-стилей options.html ===")
+print("\n=== 10. css/theme.css: переопределения inline-стилей html/options.html ===")
 
 # Перечитываем css/theme.css свежим чтением (на случай если content был перезаписан)
 content = read_file(THEME_CSS)
@@ -418,15 +418,15 @@ if manifest:
 
 
 # ============================================================
-# 11. options.html: inline-стили заменены на CSS-классы
+# 11. html/options.html: inline-стили заменены на CSS-классы
 # ============================================================
-print("\n=== 11. options.html: замена inline-стилей на CSS-классы ===")
+print("\n=== 11. html/options.html: замена inline-стилей на CSS-классы ===")
 
-options_content = read_file(os.path.join(ROOT, 'options.html'))
+options_content = read_file(os.path.join(ROOT, 'html/options.html'))
 if options_content:
     # Подсчитываем оставшиеся inline-стили
     inline_styles = re.findall(r'style="[^"]+"', options_content)
-    test("options.html: 0 inline-стилей (все заменены на классы)",
+    test("html/options.html: 0 inline-стилей (все заменены на классы)",
          len(inline_styles) == 0,
          f"Осталось {len(inline_styles)} inline-стилей: {inline_styles[:3]}")
 
@@ -440,9 +440,9 @@ if options_content:
         'btn-save', 'btn-secondary-flex'
     ]
     for cls in required_classes:
-        test(f"options.html использует класс .{cls}",
+        test(f"html/options.html использует класс .{cls}",
              f'class="{cls}' in options_content or f' {cls}"' in options_content or f'"{cls} ' in options_content,
-             f"Класс .{cls} не найден в options.html")
+             f"Класс .{cls} не найден в html/options.html")
 
 
 # ============================================================
@@ -557,16 +557,16 @@ if content:
 
 
 # ============================================================
-# 14. options.html: отсутствие inline-стилей
+# 14. html/options.html: отсутствие inline-стилей
 # ============================================================
-print("\n=== 14. options.html: отсутствие inline-стилей ===")
+print("\n=== 14. html/options.html: отсутствие inline-стилей ===")
 
-options_path = os.path.join(ROOT, 'options.html')
+options_path = os.path.join(ROOT, 'html/options.html')
 options_content = read_file(options_path)
 if options_content:
     # Не должно быть style="..." атрибутов
     inline_styles = re.findall(r'style\s*=\s*["\']', options_content)
-    test("options.html не содержит inline-стилей", len(inline_styles) == 0,
+    test("html/options.html не содержит inline-стилей", len(inline_styles) == 0,
          f"Найдено {len(inline_styles)} inline-стилей: {inline_styles[:3]}")
 
     # Должны использоваться новые классы
@@ -575,8 +575,8 @@ if options_content:
         'arrow-icon', 'ic-muted', 'ic-white', 'section-description'
     ]
     for cls in new_classes_used:
-        test(f"options.html использует класс {cls}", cls in options_content,
-             f"Класс {cls} не используется в options.html")
+        test(f"html/options.html использует класс {cls}", cls in options_content,
+             f"Класс {cls} не используется в html/options.html")
 
 
 # ============================================================

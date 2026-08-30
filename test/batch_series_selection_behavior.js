@@ -53,7 +53,7 @@ assert.deepStrictEqual(JSON.parse(JSON.stringify(context.BatchSeriesSelection.re
     missing: []
 });
 
-const batchHtml = fs.readFileSync(path.join(__dirname, '..', 'batch.html'), 'utf8');
+const batchHtml = fs.readFileSync(path.join(__dirname, '..', 'html/batch.html'), 'utf8');
 const batchSource = fs.readFileSync(path.join(__dirname, '..', 'js/pages/batch.js'), 'utf8');
 assert(batchHtml.includes('id="seriesIncludeFilter"') && batchHtml.includes('id="seriesIgnoreFilter"'),
     'Batch must expose include and ignore Series pattern fields');

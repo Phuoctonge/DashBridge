@@ -5,7 +5,7 @@ from support.smoke import run_checks
 
 ROOT = Path(__file__).resolve().parent.parent
 THEME = (ROOT / "js/theme.js").read_text(encoding="utf-8")
-PAGES = ["popup.html", "options.html", "dashbridge.html", "batch.html", "worklog.html"]
+PAGES = ["html/popup.html", "html/options.html", "html/dashbridge.html", "html/batch.html", "html/worklog.html"]
 
 
 checks = {
@@ -16,7 +16,7 @@ checks = {
     "theme reacts to changes from other pages": "chrome.storage.onChanged.addListener" in THEME,
     "theme button remains keyboard-native": "btn.addEventListener('click', toggleTheme)" in THEME,
     "all extension pages load the shared runtime": all(
-        '<script src="js/theme.js"></script>' in (ROOT / page).read_text(encoding="utf-8") for page in PAGES
+        '<script src="../js/theme.js"></script>' in (ROOT / page).read_text(encoding="utf-8") for page in PAGES
     ),
 }
 

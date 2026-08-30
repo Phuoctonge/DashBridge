@@ -287,17 +287,21 @@ DashBridge предназначен для работы с корпоратив�
 ```text
 DashBridge/
 ├── manifest.json            # Manifest V3
-├── popup.html               # Главное popup-окно
-├── dashbridge.html          # Единый Grafana-дашборд
-├── batch.html               # Массовый сбор снимков
-├── worklog.html             # Jira Worklog Manager
-├── options.html             # Настройки расширения
+├── html/                    # Production HTML-страницы расширения
+│   ├── popup.html           # Главное popup-окно
+│   ├── dashbridge.html      # Единый Grafana-дашборд
+│   ├── batch.html           # Массовый сбор снимков
+│   ├── worklog.html         # Jira Worklog Manager
+│   ├── options.html         # Настройки расширения
+│   ├── recorder.html        # Traffic Recorder
+│   ├── test-runner.html     # Диагностика и E2E-проверки
+│   └── ui/                  # Изолированная debug UI-страница и sprites
 ├── js/
 │   ├── content/             # Интеграция со страницами Grafana/Confluence
 │   ├── pages/               # Логика полноразмерных страниц
 │   ├── popup/               # Модули popup-окна
 │   ├── shared/              # Общие компоненты и хранилища
-│   └── test-runner/         # Диагностика и E2E-проверки
+│   └── test-runner/         # Логика диагностики и E2E-проверок
 ├── css/                     # Стили интерфейса
 ├── icons/                   # Иконки расширения
 └── test/                    # Автоматические проверки

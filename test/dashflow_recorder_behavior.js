@@ -83,7 +83,7 @@ assert(!extensionManifest.optional_permissions?.includes('debugger'), 'Chrome re
 assert(!extensionManifest.content_scripts.some(script => (script.js || []).includes('js/content/scenario-recorder.js')),
     'the generic action recorder must not run outside an explicitly controlled tab');
 
-const html = fs.readFileSync(path.join(root, 'recorder.html'), 'utf8');
+const html = fs.readFileSync(path.join(root, 'html/recorder.html'), 'utf8');
 const recorderCss = fs.readFileSync(path.join(root, 'css', 'recorder.css'), 'utf8');
 assert(html.includes('id="disableCache"') && html.includes('id="disableCookies"'), 'Recorder must expose independent cache and cookie switches');
 assert(html.includes('id="incognitoSetup"') && html.includes('id="openIncognitoSettings"'), 'Recorder must expose conditional incognito setup help');

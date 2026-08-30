@@ -117,14 +117,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const recorderButton = document.getElementById("openTrafficRecorderBtn");
     if (recorderButton) {
-        recorderButton.onclick = () => chrome.tabs.create({ url: chrome.runtime.getURL("recorder.html") });
+        recorderButton.onclick = () => chrome.tabs.create({ url: chrome.runtime.getURL("html/recorder.html") });
     }
 
     function openOptions() {
         if (chrome.runtime.openOptionsPage) {
             chrome.runtime.openOptionsPage();
         } else {
-            window.open(chrome.runtime.getURL('options.html'));
+            window.open(chrome.runtime.getURL('html/options.html'));
         }
     }
 });

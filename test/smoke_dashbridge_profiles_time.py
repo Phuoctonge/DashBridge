@@ -8,7 +8,7 @@ JS = (ROOT / "js/pages/dashbridge.js").read_text(encoding="utf-8")
 PROFILE_STORE = (ROOT / "js/shared/dashbridge-profile-store.js").read_text(encoding="utf-8")
 TIME_STATE = (ROOT / "js/pages/dashbridge-time-state.js").read_text(encoding="utf-8")
 MIGRATION = (ROOT / "js/pages/dashbridge-data-migration.js").read_text(encoding="utf-8")
-HTML = (ROOT / "dashbridge.html").read_text(encoding="utf-8")
+HTML = (ROOT / "html/dashbridge.html").read_text(encoding="utf-8")
 
 
 checks = {
@@ -29,8 +29,8 @@ checks = {
         and "loadActiveProfileTimeState();" in JS,
     "legacy global time uses an isolated one-shot migration": "dashbridge_dataSchemaVersion" in MIGRATION
         and "migrateProfiles" in MIGRATION and "clearLegacyTimeState" in MIGRATION
-        and 'src="js/pages/dashbridge-data-migration.js"' in HTML,
-    "dashboard loads the Grafana time helper": 'src="js/shared/grafana-time.js"' in HTML,
+        and 'src="../js/pages/dashbridge-data-migration.js"' in HTML,
+    "dashboard loads the Grafana time helper": 'src="../js/shared/grafana-time.js"' in HTML,
     "panel URLs retain their time format": "DashBridgeTimeState.applyToUrl" in JS
         and "detectGrafanaTimeFormat(urlValue)" in TIME_STATE,
     "time controls are present": all(token in HTML for token in ['id="absTimeFrom"', 'id="absTimeTo"', 'id="applyAbsoluteTime"']),
@@ -43,10 +43,10 @@ checks = {
     "all panel addition paths use canonical duplicate checks": "function getCurrentProfilePanelIdentities()" in JS
         and "currentProfileHasPanel(url)" in JS
         and JS.count("getCurrentProfilePanelIdentities()") >= 4
-        and 'src="js/shared/grafana-panel-identity.js"' in HTML,
+        and 'src="../js/shared/grafana-panel-identity.js"' in HTML,
     "dashboard panel picker reuses Batch inventory without replacing quick add": all(token in HTML for token in [
         'id="quickAddPanelsBtn"', 'id="discoverDashboardPanelsBtn"', 'id="dashboardPanelPickerOverlay"',
-        'src="js/shared/grafana-dashboard-api.js"'
+        'src="../js/shared/grafana-dashboard-api.js"'
     ]) and "fetchGrafanaDashboardPanels(dashboardUrl)" in JS,
 }
 

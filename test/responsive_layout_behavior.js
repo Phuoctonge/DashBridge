@@ -9,7 +9,7 @@ const themeJs = read('js/theme.js');
 const dashboardCss = read('css/dashbridge.css');
 const dashboardJs = read('js/pages/dashbridge.js');
 const renderer = read('js/pages/dashbridge-renderer.js');
-const optionsHtml = read('options.html');
+const optionsHtml = read('html/options.html');
 const optionsJs = read('js/pages/options.js');
 
 for (const token of ['--page-gutter:', '--control-height-md:', '--readable-max:']) {
@@ -25,10 +25,10 @@ assert(optionsHtml.includes('id="settingUiScale"')
     && optionsJs.includes('uiScale: document.getElementById("settingUiScale").value'),
     'Options must expose and save the shared scale');
 
-for (const page of ['batch.html', 'dashbridge.html', 'options.html', 'popup.html', 'recorder.html', 'test-runner.html', 'worklog.html']) {
+for (const page of ['html/batch.html', 'html/dashbridge.html', 'html/options.html', 'html/popup.html', 'html/recorder.html', 'html/test-runner.html', 'html/worklog.html']) {
     assert(read(page).includes('name="viewport"'), `${page} must declare its viewport`);
 }
-for (const page of ['batch.html', 'dashbridge.html', 'options.html', 'recorder.html', 'test-runner.html', 'worklog.html', 'assets/ui/debug-easter-egg.html']) {
+for (const page of ['html/batch.html', 'html/dashbridge.html', 'html/options.html', 'html/recorder.html', 'html/test-runner.html', 'html/worklog.html', 'html/ui/debug-easter-egg.html']) {
     assert(read(page).includes('data-ui-scale="auto"'), `${page} must scale correctly from its first frame`);
 }
 

@@ -11,7 +11,7 @@ const context = {
 context.window = context;
 vm.createContext(context);
 const controllerSource = fs.readFileSync(path.join(__dirname, '..', 'js/pages/operation-progress-window.js'), 'utf8');
-const testRunnerHtml = fs.readFileSync(path.join(__dirname, '..', 'test-runner.html'), 'utf8');
+const testRunnerHtml = fs.readFileSync(path.join(__dirname, '..', 'html/test-runner.html'), 'utf8');
 const testRunnerUi = fs.readFileSync(path.join(__dirname, '..', 'js/test-runner/test-runner-ui.js'), 'utf8');
 vm.runInContext(controllerSource, context);
 assert(controllerSource.includes('documentPictureInPicture.requestWindow') && controllerSource.includes('bindDocument'),

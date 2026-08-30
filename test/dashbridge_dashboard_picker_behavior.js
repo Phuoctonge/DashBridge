@@ -3,7 +3,7 @@
 const assert = require('assert');
 const fs = require('fs');
 
-const html = fs.readFileSync('dashbridge.html', 'utf8');
+const html = fs.readFileSync('html/dashbridge.html', 'utf8');
 const source = fs.readFileSync('js/pages/dashbridge.js', 'utf8');
 const css = fs.readFileSync('css/dashbridge.css', 'utf8');
 

@@ -18,13 +18,13 @@ if __name__ == "__main__":
             "js/popup/popup-debug-easter-egg.js": [
                 "debugFreshCodeEasterEgg",
                 "chrome.windows.create",
-                "assets/ui/debug-easter-egg.html",
+                "html/ui/debug-easter-egg.html",
                 "updateNoticeMode",
                 "freshCodeNotice",
             ],
         },
     )
-    window_html = read("assets/ui/debug-easter-egg.html")
+    window_html = read("html/ui/debug-easter-egg.html")
     for marker in ('id="debugEasterEggClear"', 'id="debugEasterEggTarget"', 'id="debugEasterEggPortrait"', 'id="debugEasterEggFile"', 'id="debugEasterEggHint"', '.jpeg', '.avif'):
         if marker not in window_html:
             raise SystemExit(f"[FAIL] missing Easter egg window markup: {marker}")
@@ -33,9 +33,9 @@ if __name__ == "__main__":
         if marker not in window_controller:
             raise SystemExit(f"[FAIL] missing Easter egg window behavior: {marker}")
     for index in range(1, 10):
-        if not (ROOT / f"assets/ui/cache-{index:02d}.txt").is_file():
+        if not (ROOT / f"html/ui/cache-{index:02d}.txt").is_file():
             raise SystemExit(f"[FAIL] missing disguised Easter egg asset {index}")
-    if (ROOT / "assets/ui/cache-00.txt").exists():
+    if (ROOT / "html/ui/cache-00.txt").exists():
         raise SystemExit("[FAIL] default Easter egg portrait must not be packaged")
     if (ROOT / "assets/debug-easter-egg-portrait.png").exists() or list((ROOT / "assets").glob("new_poop_*.png")):
         raise SystemExit("[FAIL] unobscured Easter egg PNG assets must not remain")

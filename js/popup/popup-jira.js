@@ -115,7 +115,7 @@ async function dashbridgeTransferJiraWorklogs(expectedOrigin, expectedBasePath =
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('openJiraPage').onclick = () => chrome.tabs.create({ url: chrome.runtime.getURL('worklog.html') });
+    document.getElementById('openJiraPage').onclick = () => chrome.tabs.create({ url: chrome.runtime.getURL('html/worklog.html') });
     const transferBtn = document.getElementById('transferWorklogBtn');
     if (!transferBtn) return;
     transferBtn.onclick = async () => {

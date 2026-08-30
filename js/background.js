@@ -3,7 +3,7 @@
 // и раскомментируй обработчик ниже:
 //
 // chrome.action.onClicked.addListener(() => {
-//     chrome.windows.create({ url: "popup.html", type: "popup", width: 300, height: 400 });
+//     chrome.windows.create({ url: "html/popup.html", type: "popup", width: 300, height: 400 });
 // });
 
 importScripts('../vendor/jszip.min.js', 'shared/grafana-settings.js', 'shared/url-validation.js', 'shared/dnr-rules.js', 'shared/grafana-runtime-manifest.js', 'shared/local-state-schema.js', 'shared/grafana-panel-identity.js');
@@ -35,7 +35,7 @@ function isTrustedExtensionPage(sender, page) {
 chrome.runtime.onConnect?.addListener(port => {
     if (port.name !== 'dashbridge-recorder-lifecycle'
         || port.sender?.id !== chrome.runtime.id
-        || port.sender?.url !== chrome.runtime.getURL('recorder.html')) return;
+        || port.sender?.url !== chrome.runtime.getURL('html/recorder.html')) return;
     let recorderTabId = null;
     port.onMessage.addListener(message => {
         if (message?.type === 'bind' && Number.isInteger(message.tabId) && message.tabId >= 0) recorderTabId = message.tabId;
@@ -54,7 +54,7 @@ function queueStorageCommit(values) {
 }
 
 async function commitDashBridgeProfilePatch(message, sender) {
-    if (!isTrustedExtensionPage(sender, 'dashbridge.html')
+    if (!isTrustedExtensionPage(sender, 'html/dashbridge.html')
         || !Array.isArray(message?.upserts)
         || !Array.isArray(message?.deleteProfileIds)
         || typeof message.activeProfileId !== 'string') {
@@ -308,7 +308,7 @@ async function backfillOpenGrafanaFrames() {
 }
 
 async function getDashBridgeTabIds() {
-    const dashbridgeUrl = chrome.runtime.getURL('dashbridge.html');
+    const dashbridgeUrl = chrome.runtime.getURL('html/dashbridge.html');
     const tabs = await chrome.tabs.query({});
     return tabs.filter(tab => typeof tab.url === 'string' && tab.url.startsWith(dashbridgeUrl))
         .map(tab => tab.id).filter(Number.isInteger);
@@ -443,7 +443,7 @@ const waitForGuiCaptureTab = (tabId) => new Promise(resolve => {
 async function collectGuiScreenshotsInternal() {
     await chrome.storage.local.set({ guiCaptureStatus: { state: 'running', message: 'Сбор скриншотов запущен', updatedAt: Date.now() } });
     if (typeof JSZip !== 'function') throw new Error('Модуль упаковки ZIP не загружен');
-    const popupUrl = chrome.runtime.getURL('popup.html');
+    const popupUrl = chrome.runtime.getURL('html/popup.html');
     const pages = [
         { name: '01_popup_grafana_dashboards.png', popup: ['tab-grafana', 'grafana-links'] },
         { name: '04_popup_grafana_links.png', popup: ['tab-grafana', 'grafana-links'] },
@@ -451,10 +451,10 @@ async function collectGuiScreenshotsInternal() {
         { name: '06_popup_grafana_debug.png', popup: ['tab-grafana', 'grafana-debug'] },
         { name: '07_popup_jira.png', popup: ['tab-jira'] },
         { name: '09_popup_tdm.png', popup: ['tab-tdm'] },
-        { name: '10_options.png', url: chrome.runtime.getURL('options.html') },
-        { name: '11_dashbridge.png', url: chrome.runtime.getURL('dashbridge.html') },
-        { name: '12_batch.png', url: chrome.runtime.getURL('batch.html') },
-        { name: '13_worklog.png', url: chrome.runtime.getURL('worklog.html') }
+        { name: '10_options.png', url: chrome.runtime.getURL('html/options.html') },
+        { name: '11_dashbridge.png', url: chrome.runtime.getURL('html/dashbridge.html') },
+        { name: '12_batch.png', url: chrome.runtime.getURL('html/batch.html') },
+        { name: '13_worklog.png', url: chrome.runtime.getURL('html/worklog.html') }
     ];
     const captureWindow = await chrome.windows.create({ url: popupUrl, type: 'popup', focused: true, width: 366, height: 760 });
     const tabId = captureWindow.tabs && captureWindow.tabs[0] && captureWindow.tabs[0].id;
@@ -581,7 +581,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         return true;
     }
     if (message && message.type === 'dashbridge-ensure-iframe-rules' && _sender.tab) {
-        const expectedUrl = chrome.runtime.getURL('dashbridge.html');
+        const expectedUrl = chrome.runtime.getURL('html/dashbridge.html');
         if (typeof _sender.tab.url !== 'string' || !_sender.tab.url.startsWith(expectedUrl)) {
             sendResponse({ ok: false, error: 'Unexpected sender' });
             return undefined;
@@ -608,7 +608,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         return undefined;
     }
     if (message && message.type === 'dashbridge-capture-gui') {
-        if (!isTrustedExtensionPage(_sender, 'popup.html')) {
+        if (!isTrustedExtensionPage(_sender, 'html/popup.html')) {
             sendResponse({ ok: false, error: 'Unexpected sender' });
             return undefined;
         }

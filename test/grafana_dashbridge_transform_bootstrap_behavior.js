@@ -47,7 +47,7 @@ assert.strictEqual(new URLSearchParams(disabled.hash.slice(1)).has(bootstrap.PAR
 const malformed = 'https://grafana.example.test/d-solo/infra?panelId=1#dashbridgePanelTransforms=%7Bbad';
 assert.strictEqual(bootstrap.readFromUrl(malformed), null, 'malformed profile data fails closed');
 
-const dashboardHtml = fs.readFileSync('dashbridge.html', 'utf8');
+const dashboardHtml = fs.readFileSync('html/dashbridge.html', 'utf8');
 assert(dashboardHtml.indexOf('js/shared/grafana-panel-bootstrap.js') < dashboardHtml.indexOf('js/pages/dashbridge.js'));
 const panelRuntime = fs.readFileSync('js/content/grafana-panel-tools.js', 'utf8');
 assert(panelRuntime.includes('DashBridgeGrafanaPanelBootstrap?.readFromUrl(location.href)'),

@@ -5,7 +5,7 @@ from support.smoke import run_page_contract
 if __name__ == "__main__":
     run_page_contract(
         "extension options",
-        page="options.html",
+        page="html/options.html",
         html=[
             'id="saveBtn"', 'id="exportBtn"', 'id="importBtn"', 'id="importFile"',
             'id="maintenanceStatus"', 'id="settingModuleGrafanaDebug"', 'id="settingModuleRecorder"',

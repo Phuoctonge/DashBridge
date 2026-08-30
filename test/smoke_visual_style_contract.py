@@ -24,7 +24,7 @@ for stylesheet in ("popup.css", "batch.css"):
     assert "var(--tab-active-bg)" in css, f"{stylesheet} misses tab active token"
 
 popup = (ROOT / "css" / "popup.css").read_text(encoding="utf-8")
-popup_html = (ROOT / "popup.html").read_text(encoding="utf-8")
+popup_html = (ROOT / "html/popup.html").read_text(encoding="utf-8")
 assert "#f8fafc" not in popup, "Popup retains a light-only hover surface"
 assert "#f1f6ff" not in popup, "Popup retains a light-only active surface"
 
@@ -45,7 +45,7 @@ assert "cursor: pointer" in tab_button_rule.group("body"), "Popup tabs must use 
 dashbridge = (ROOT / "css" / "dashbridge.css").read_text(encoding="utf-8")
 assert ":root" not in dashbridge, "DashBridge retains a page-local token root"
 
-options = (ROOT / "options.html").read_text(encoding="utf-8")
+options = (ROOT / "html/options.html").read_text(encoding="utf-8")
 assert 'style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;"' not in options, (
     "Options retains visual inline layout"
 )

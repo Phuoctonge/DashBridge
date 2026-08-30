@@ -74,7 +74,9 @@ def verify_contract(
     require_all(page_html, html, page)
     for source, expected in sources.items():
         if source.startswith(script_prefixes):
-            require_all(page_html, [f'<script src="{source}"></script>'], page)
+            page_depth = len(Path(page).parent.parts)
+            script_reference = "../" * page_depth + source
+            require_all(page_html, [f'<script src="{script_reference}"></script>'], page)
         require_all(read(source), expected, source)
 
 
@@ -123,7 +125,7 @@ def run_popup_contract(
 ) -> None:
     run_contract(
         name,
-        page="popup.html",
+        page="html/popup.html",
         html=html,
         sources=sources,
         script_prefixes=("js/popup/",),
@@ -136,7 +138,7 @@ def run_popup_contracts(cases: Iterable[ContractCase]) -> None:
     for case in cases:
         try:
             verify_contract(
-                page="popup.html",
+                page="html/popup.html",
                 html=case["html"],
                 sources=case["sources"],
                 script_prefixes=("js/popup/",),

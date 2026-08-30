@@ -4,7 +4,7 @@ from support.smoke import run_checks
 
 
 ROOT = Path(__file__).resolve().parent.parent
-HTML = (ROOT / "batch.html").read_text(encoding="utf-8")
+HTML = (ROOT / "html/batch.html").read_text(encoding="utf-8")
 CSS = (ROOT / "css/batch.css").read_text(encoding="utf-8")
 JS = (ROOT / "js/pages/batch.js").read_text(encoding="utf-8")
 

@@ -3,7 +3,7 @@
 const assert = require('assert');
 const fs = require('fs');
 
-const html = fs.readFileSync('batch.html', 'utf8');
+const html = fs.readFileSync('html/batch.html', 'utf8');
 const source = fs.readFileSync('js/pages/batch.js', 'utf8');
 const css = fs.readFileSync('css/batch.css', 'utf8');
 

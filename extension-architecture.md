@@ -6,7 +6,7 @@
 > `docs/history/architecture-decisions.md`.
 
 DashBridge — Chrome MV3-расширение с шестью контурами: инструменты обычной
-Grafana, единый дашборд `dashbridge.html`, пакетный экспорт `batch.html`, Jira
+Grafana, единый дашборд `html/dashbridge.html`, пакетный экспорт `html/batch.html`, Jira
 worklog, Traffic Recorder и Popup-инструменты для Grafana/Jira/Confluence/TDM.
 
 Основные принципы:
@@ -23,13 +23,15 @@ worklog, Traffic Recorder и Popup-инструменты для Grafana/Jira/Co
 ```text
 manifest.json
 ├── AGENTS.md                   # Обязательная точка входа для AI-анализа
-├── popup.html                  # Основной Popup
-├── options.html                # Настройки, импорт/экспорт
-├── dashbridge.html             # Единый дашборд Grafana
-├── batch.html                  # Пакетный PNG/ZIP и серии
-├── worklog.html                # Jira worklog
-├── test-runner.html            # Живые E2E-сценарии
-├── recorder.html               # Traffic record/replay и .dashflow
+├── html/                       # Все production HTML-страницы расширения
+│   ├── popup.html              # Основной Popup
+│   ├── options.html            # Настройки, импорт/экспорт
+│   ├── dashbridge.html         # Единый дашборд Grafana
+│   ├── batch.html              # Пакетный PNG/ZIP и серии
+│   ├── worklog.html            # Jira worklog
+│   ├── test-runner.html        # Живые E2E-сценарии
+│   ├── recorder.html           # Traffic record/replay и .dashflow
+│   └── ui/                     # Изолированная debug UI-страница и sprites
 ├── js/background.js            # MV3 service worker
 ├── js/theme.js                 # Общая light/dark тема
 ├── js/shared/                  # Контракты, storage, URL, capture
@@ -267,7 +269,7 @@ legacy memory-панелей. Исходное состояние один ра�
 отложенная загрузка делала невидимые threshold/данные непредсказуемыми. Пауза
 остаётся явным долговременным способом полностью исключить iframe и запросы.
 
-DNR создаётся только для открытых вкладок `dashbridge.html` и разрешённых
+DNR создаётся только для открытых вкладок `html/dashbridge.html` и разрешённых
 Grafana-хостов. Закрытие вкладки удаляет её session rules.
 
 ### Фильтр Load Average по vCPU
@@ -298,7 +300,7 @@ node_load1/5/15{... instance=...}
 - числовой фильтр и vCPU-фильтр взаимоисключающие;
 - переключение вызывает штатный refresh, а не polling.
 
-Один pipeline работает в direct Grafana и `dashbridge.html`.
+Один pipeline работает в direct Grafana и `html/dashbridge.html`.
 
 ### Легенда
 
@@ -387,7 +389,7 @@ Batch использует отдельное окно, ждёт нужную п
 
 ### Traffic Recorder
 
-`recorder.html` владеет жизненным циклом контролируемой вкладки и CDP attach.
+`html/recorder.html` владеет жизненным циклом контролируемой вкладки и CDP attach.
 Lifecycle-port с heartbeat удерживает service worker доступным для аварийного
 detach, если Recorder закрыт или перезагружен.
 Обобщённый `scenario-recorder.js` динамически инжектируется только в эту
@@ -520,7 +522,7 @@ smoke/security/audit-файл. Все 78 production JavaScript-файлов пр
 `node --check`.
 `DASHBRIDGE_PYTHON` задаёт Python, если он не находится автоматически.
 
-Дополнительно: `test-runner.html` запускает живые E2E на Grafana. По user action
+Дополнительно: `html/test-runner.html` запускает живые E2E на Grafana. По user action
 он открывает общий Document Picture-in-Picture progress controller с количеством
 завершённых/запланированных тестов, PASS/FAIL, общим временем и аварийной
 остановкой; при отсутствии Document PiP основной in-page прогресс остаётся
@@ -568,7 +570,7 @@ manifest с файлом на диске и предлагает штатный 
 
 ## Куда добавлять функцию
 
-- Popup UI: `js/popup/` + порядок `popup.html`.
+- Popup UI: `js/popup/` + порядок `html/popup.html`.
 - Новая page: HTML + `js/pages/` + CSS + ранний `theme.js`.
 - Общая чистая логика pages: `js/shared/`.
 - Данные/renderer Grafana: MAIN-модуль `js/content/`, runtime manifest, UI-команда.

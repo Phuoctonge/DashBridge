@@ -3,7 +3,7 @@
 const assert = require('assert');
 const fs = require('fs');
 
-const html = fs.readFileSync('popup.html', 'utf8');
+const html = fs.readFileSync('html/popup.html', 'utf8');
 const css = fs.readFileSync('css/popup.css', 'utf8');
 const source = fs.readFileSync('js/popup/popup-updates.js', 'utf8');
 

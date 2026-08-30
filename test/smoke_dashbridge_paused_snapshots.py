@@ -2,7 +2,7 @@ from pathlib import Path
 from support.smoke import CheckCollector
 
 ROOT = Path(__file__).resolve().parents[1]
-HTML = (ROOT / 'dashbridge.html').read_text(encoding='utf-8')
+HTML = (ROOT / 'html/dashbridge.html').read_text(encoding='utf-8')
 PAGE = (ROOT / 'js/pages/dashbridge.js').read_text(encoding='utf-8')
 RENDERER = (ROOT / 'js/pages/dashbridge-renderer.js').read_text(encoding='utf-8')
 

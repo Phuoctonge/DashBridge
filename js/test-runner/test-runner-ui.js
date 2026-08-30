@@ -1,6 +1,6 @@
 // test-runner-ui.js
 // UI-слой E2E тест-раннера DashBridge.
-// Управляет страницей test-runner.html: ввод URL, запуск/стоп, таблица результатов,
+// Управляет страницей html/test-runner.html: ввод URL, запуск/стоп, таблица результатов,
 // прогресс-бар, копирование отчёта.
 // Зависит от: test-runner-core.js (DashBridgeTestRunner),
 //             test-runner-suite.js (DASHBRIDGE_TEST_SUITE),

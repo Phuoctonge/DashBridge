@@ -7,7 +7,7 @@ CASES = [
     {
         "name": "Grafana Batch section",
         "html": ['id="grafana-batch"', 'id="openBatchCaptureBtn"'],
-        "sources": {"js/popup/popup-grafana-router.js": ["openBatchCaptureBtn", "batch.html"]},
+        "sources": {"js/popup/popup-grafana-router.js": ["openBatchCaptureBtn", "html/batch.html"]},
     },
     {
         "name": "Grafana links section",
@@ -16,7 +16,7 @@ CASES = [
             'id="grafanaTimestampReadBtn"', 'id="grafanaTimestampFrom"', 'id="grafanaTimestampTo"',
         ],
         "sources": {
-            "js/popup/popup-grafana-router.js": ["openDashBridgeBtn", "dashbridge.html"],
+            "js/popup/popup-grafana-router.js": ["openDashBridgeBtn", "html/dashbridge.html"],
             "js/popup/popup-grafana-links.js": [
                 "function renderButtons()", "function openGrafana(baseUrl)", "customButtons",
                 "setupGrafanaTimestampTool", "parseGrafanaUrlTimeRange", "navigator.clipboard.writeText",
@@ -32,7 +32,7 @@ CASES = [
         "sources": {
             "js/popup/popup-core.js": [
                 'module_recorder: true', '"tab-recorder": modules.module_recorder',
-                "openTrafficRecorderBtn", "recorder.html",
+                "openTrafficRecorderBtn", "html/recorder.html",
             ],
             "js/popup/popup-grafana-router.js": ["!openTrafficRecorderBtn"],
         },
@@ -40,7 +40,7 @@ CASES = [
     {
         "name": "Jira section",
         "html": ['data-tab="tab-jira"', 'id="tab-jira"', 'id="openJiraPage"', 'id="transferWorklogBtn"'],
-        "sources": {"js/popup/popup-jira.js": ["openJiraPage", "transferWorklogBtn", "worklog.html"]},
+        "sources": {"js/popup/popup-jira.js": ["openJiraPage", "transferWorklogBtn", "html/worklog.html"]},
     },
     {
         "name": "TDM export section",
