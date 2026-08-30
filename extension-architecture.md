@@ -166,7 +166,7 @@ grafana-panel-tools.js
 | Sync input writes | `sync-input-writer.js` | Частые поля UI. |
 | Bounded diagnostics | `bounded-journal.js` | MAIN и test tooling. |
 | ZIP/лимиты | `archive-download.js`, `archive-budget.js` | Batch, exports. |
-| Анализ CPU/RAM | `grafana-panel-analysis.js` | Кнопки панелей CPU Usage и Memory. |
+| Анализ CPU/RAM | `grafana-panel-analysis.js` | Расчёт, thresholds и clipboard-формат кнопок CPU Usage/Memory. |
 | Grafana time | `grafana-time.js` | DashBridge, iframe. |
 | Clipboard диапазона | `grafana-time-picker-clipboard.js`, `dashbridge-time-state.js` | Direct Grafana, DashBridge. |
 | Theme и UI scale | `theme.js`, `css/theme.css` | Все extension pages. |

@@ -4161,35 +4161,7 @@
             return {};
         }
     };
-    const analysisThreshold = (settings, type, kind) => {
-        const fallback = type === 'cpu' ? (kind === 'critical' ? 80 : 50) : (kind === 'critical' ? 90 : 80);
-        const metric = type === 'cpu' ? 'cpu' : 'mem';
-        const key = `${metric}${kind === 'critical' ? 'Crit' : 'Warn'}Threshold`;
-        const value = Number(settings?.[key]);
-        return Number.isFinite(value) && value >= 0 && value <= 100 ? value : fallback;
-    };
-    const formatPanelAnalysisCopy = (items, type, topOnly, settings) => {
-        const metric = type === 'cpu' ? 'cpu' : 'mem';
-        const copyServer = item => window.DashBridgeGrafanaPanelAnalysis?.serverNameForCopy?.(item.server, settings)
-            ?? item.server;
-        // A TOP-3 sentence has no honest meaning when fewer than three rows are
-        // available. Reuse the full-list template instead of leaking unresolved
-        // placeholders into the clipboard.
-        if (!topOnly || items.length < 3) {
-            const fallback = `{server} до {${metric}}%`;
-            const template = String(settings?.[`${metric}TemplateFull`] || fallback).slice(0, 2000);
-            return items.map(item => template
-                .replaceAll('{server}', copyServer(item))
-                .replaceAll(`{${metric}}`, item.value.toFixed(2).replace('.', ','))).join('\n');
-        }
-        const fallback = `до {${metric}1}% для {server1}, до {${metric}2}% для {server2}, для остальных до {${metric}3}%`;
-        let text = String(settings?.[`${metric}TemplateTop3`] || fallback).slice(0, 2000);
-        items.slice(0, 3).forEach((item, index) => {
-            text = text.replaceAll(`{server${index + 1}}`, copyServer(item))
-                .replaceAll(`{${metric}${index + 1}}`, item.value.toFixed(2).replace('.', ','));
-        });
-        return text;
-    };
+    const { analysisThreshold, formatPanelAnalysisCopy } = window.DashBridgeGrafanaPanelAnalysis;
     const startEmbeddedPanelAnalysis = (panel, type, title, requestId) => {
         const analysis = window.DashBridgeGrafanaPanelAnalysis;
         if (!isDashboardIframe || !analysis || !panel || !['cpu', 'ram'].includes(type) || !requestId) return;

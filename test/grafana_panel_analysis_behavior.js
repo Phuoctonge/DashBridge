@@ -7,6 +7,7 @@ const sourcePath = 'js/shared/grafana-panel-analysis.js';
 assert(fs.existsSync(sourcePath), 'shared panel analysis module must exist');
 const source = fs.readFileSync(sourcePath, 'utf8');
 const context = { globalThis: {} };
+context.window = context.globalThis;
 vm.createContext(context);
 vm.runInContext(source, context);
 const analysis = context.globalThis.DashBridgeGrafanaPanelAnalysis;
@@ -212,26 +213,23 @@ assert(modalStart >= 0 && modalEnd > modalStart
     && modalSource.includes('serverCell.textContent = item.server')
     && !modalSource.includes('innerHTML'),
     'analysis results must render external server names through DOM text only');
-assert(panelTools.includes('DashBridgeGrafanaPanelAnalysis?.serverNameForCopy?.(item.server, settings)')
-    && panelTools.includes('.replaceAll(\'{server}\', copyServer(item))')
-    && panelTools.includes('.replaceAll(`{server${index + 1}}`, copyServer(item))'),
+assert(source.includes('DashBridgeGrafanaPanelAnalysis?.serverNameForCopy?.(item.server, settings)')
+    && source.includes('.replaceAll(\'{server}\', copyServer(item))')
+    && source.includes('.replaceAll(`{server${index + 1}}`, copyServer(item))'),
     'both analysis copy formats must always trim the configured server suffix without changing displayed items');
-const copyFormatterStart = panelTools.indexOf('    const analysisThreshold =');
-const copyFormatterEnd = panelTools.indexOf('    const startEmbeddedPanelAnalysis =', copyFormatterStart);
-const copyFormatterContext = {
-    window: { DashBridgeGrafanaPanelAnalysis: { serverNameForCopy: value => value } }
-};
-vm.createContext(copyFormatterContext);
-vm.runInContext(`${panelTools.slice(copyFormatterStart, copyFormatterEnd)}
-globalThis.formatCopy = formatPanelAnalysisCopy;`, copyFormatterContext);
-assert.strictEqual(copyFormatterContext.formatCopy([
+assert.strictEqual(analysis.formatPanelAnalysisCopy([
     { server: 'server-01', value: 42 }
 ], 'cpu', true, {}), 'server-01 до 42,00%',
 'TOP-3 with fewer than three rows must use the complete-list template without unresolved placeholders');
-assert.strictEqual(copyFormatterContext.formatCopy([
+assert.strictEqual(analysis.formatPanelAnalysisCopy([
     { server: 'server-01', value: 42 }
 ], 'cpu', false, { cpuTemplateFull: '{server}: {cpu}; {server}: {cpu}' }),
 'server-01: 42,00; server-01: 42,00', 'every repeated template placeholder must be replaced');
+assert.strictEqual(analysis.analysisThreshold({}, 'cpu', 'warning'), 50);
+assert.strictEqual(analysis.analysisThreshold({}, 'ram', 'critical'), 90);
+assert.strictEqual(analysis.analysisThreshold({ cpuWarnThreshold: 65 }, 'cpu', 'warning'), 65);
+assert.strictEqual(analysis.analysisThreshold({ memCritThreshold: 101 }, 'ram', 'critical'), 90,
+    'out-of-range thresholds must retain the safe fallback');
 assert(modalSource.includes("document.createElementNS('http://www.w3.org/2000/svg', 'svg')")
     && modalSource.includes("closePath.setAttribute('d', 'M5 5l10 10M15 5L5 15')")
     && panelTools.includes('.dashbridge-panel-analysis-close svg'),
