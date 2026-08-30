@@ -69,7 +69,7 @@
 | Меняется | Обязательно проверить | Часто затрагиваемые места |
 |---|---|---|
 | Grafana MAIN-модуль | порядок runtime, direct Grafana, DashBridge iframe, повторную установку | `grafana-runtime-manifest.js`, `background.js`, `js/content/` |
-| Renderer/легенда/threshold | uPlot и Flot, View/dashboard, refresh/remount, restore после capture | `grafana-panel-definition.js`, `grafana-unit.js`, `grafana-visual-engine.js`, `grafana-panel-tools.js` |
+| Renderer/легенда/threshold | uPlot и Flot, Table, View/dashboard, refresh/remount, restore после capture | `grafana-panel-definition.js`, `grafana-unit.js`, `grafana-table-report.js`, `grafana-visual-engine.js`, `grafana-panel-tools.js` |
 | Network transform | fetch и XHR semantics, panel scope, fail-open, отсутствие helper-серий | `grafana-network.js`, response filters |
 | DashBridge panel/profile | schema, import/export, pause, theme, time, drag/drop, source+origin | `dashbridge.js`, renderer, profile store |
 | Time/refresh | relative/absolute range, Grafana 10/12 clipboard, Off vs saved dashboard refresh, iframe reload | `dashbridge-time-state.js`, `grafana-time-picker-clipboard.js`, `grafana-panel-bootstrap.js`, `grafana-refresh-policy.js` |

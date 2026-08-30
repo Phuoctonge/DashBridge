@@ -8,6 +8,7 @@ const html = read('dashbridge.html');
 const dashboard = read('js/pages/dashbridge.js');
 const tools = read('js/content/grafana-panel-tools.js');
 const visual = read('js/content/grafana-visual-engine.js');
+const tableReport = read('js/content/grafana-table-report.js');
 const schema = read('js/shared/local-state-schema.js');
 const css = read('css/dashbridge.css');
 
@@ -50,9 +51,9 @@ assert(visual.includes('const collectPanelReportSnapshot')
     && visual.includes("hasCritical ? 'critical' : (hasWarning ? 'warning' : 'ok')")
     && visual.includes("level: critical ? 'critical' : (warning ? 'warning' : 'normal')"),
     'visual engine must distinguish an informational panel from an SLA result');
-assert(visual.includes('const collectGrafanaTableRecords')
+assert(tableReport.includes('const collectGrafanaTableRecords')
     && visual.includes("'table-response' : 'table-dom'")
-    && visual.includes('parseGrafanaTableDisplayValue'),
+    && tableReport.includes('parseGrafanaTableDisplayValue'),
     'Grafana Metric/Value tables must feed the same report evaluation pipeline as charts');
 assert(tools.includes('const overlay = existing || document.createElement')
     && tools.includes('if (!existing) document.body.appendChild(overlay);'),

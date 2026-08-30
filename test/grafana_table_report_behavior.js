@@ -6,16 +6,14 @@ const vm = require('vm');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-visual-engine.js'), 'utf8');
 const unitSource = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-unit.js'), 'utf8');
-const tableStart = source.indexOf('    const parseGrafanaTableDisplayValue');
-const tableEnd = source.indexOf('    const collectPanelReportSnapshot', tableStart);
-assert(tableStart >= 0 && tableEnd > tableStart,
-    'table report helpers must remain independently testable');
+const tableSource = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-table-report.js'), 'utf8');
 
 const context = {};
 vm.createContext(context);
 vm.runInContext(unitSource, context);
-vm.runInContext(`const { parseAxisUnitLabel } = globalThis.DashBridgeGrafanaUnit;\n${source.slice(tableStart, tableEnd)}\n`
-    + 'globalThis.collectTable = collectGrafanaTableRecords;', context);
+vm.runInContext(tableSource, context);
+const tableReport = context.DashBridgeGrafanaTableReport;
+assert(tableReport && Object.isFrozen(tableReport), 'table report API must be installed as an immutable runtime dependency');
 
 const cell = value => ({ textContent: value });
 const row = (values, header = false) => ({
@@ -37,11 +35,16 @@ const root = {
     matches: () => false,
     querySelectorAll: selector => selector === 'table, [role="table"], [role="grid"]' ? [table] : []
 };
-const records = context.collectTable(root);
+const records = tableReport.collectGrafanaTableRecords(root);
 assert.strictEqual(records.length, 2, 'non-numeric table rows must not become report series');
 assert.strictEqual(records[0].name, 'DEV_service_/api/v1/data');
 assert.strictEqual(records[0].values[0], 1250, 'Grafana compact K values must be expanded before SLA comparison');
 assert.strictEqual(records[1].values[0], 949);
+assert.strictEqual(tableReport.parseGrafanaTableDisplayValue('−1,5 MiB'), -1.5 * 1024 ** 2);
+assert.strictEqual(tableReport.parseGrafanaTableDisplayValue('1.2e3'), 1200);
+assert.strictEqual(tableReport.parseGrafanaTableDisplayValue('No data'), null);
+vm.runInContext(tableSource, context);
+assert.strictEqual(context.DashBridgeGrafanaTableReport, tableReport, 'reinstallation must preserve the table report API');
 assert(source.includes("engine = responseTableRecords.length ? 'table-response' : 'table-dom'")
     && source.includes('records = tableRecords;'),
     'report snapshots must use table rows when neither Flot nor uPlot exists');
