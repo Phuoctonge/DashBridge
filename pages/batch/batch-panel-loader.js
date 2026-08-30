@@ -1,4 +1,4 @@
-// Isolates navigation and renderer readiness in the temporary Grafana tab.
+// Batch navigation and renderer readiness in the temporary Grafana tab.
 function createBatchPanelLoader({ log }) {
     const waitForPanelInMainWorld = panelId => new Promise(resolve => {
         let previousRect = null;

@@ -6,7 +6,7 @@ const path = require('path');
 const context = { window: {} };
 context.window = context;
 vm.createContext(context);
-vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js/pages/batch-series-selection.js'), 'utf8'), context);
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'pages/batch/batch-series-selection.js'), 'utf8'), context);
 
 const available = ['host-a', 'host-c', 'host-a'];
 const result = context.BatchSeriesSelection.resolveExact(['host-a', 'host-b'], available);
@@ -53,8 +53,8 @@ assert.deepStrictEqual(JSON.parse(JSON.stringify(context.BatchSeriesSelection.re
     missing: []
 });
 
-const batchHtml = fs.readFileSync(path.join(__dirname, '..', 'html/batch.html'), 'utf8');
-const batchSource = fs.readFileSync(path.join(__dirname, '..', 'js/pages/batch.js'), 'utf8');
+const batchHtml = fs.readFileSync(path.join(__dirname, '..', 'pages/batch/batch.html'), 'utf8');
+const batchSource = fs.readFileSync(path.join(__dirname, '..', 'pages/batch/batch.js'), 'utf8');
 assert(batchHtml.includes('id="seriesIncludeFilter"') && batchHtml.includes('id="seriesIgnoreFilter"'),
     'Batch must expose include and ignore Series pattern fields');
 assert(batchSource.includes('BatchSeriesSelection.resolvePatterns(discovery.names, includePattern, ignorePattern)'),

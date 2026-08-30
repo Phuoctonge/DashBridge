@@ -7,8 +7,8 @@ tools = (ROOT / "js/content/grafana-panel-tools.js").read_text(encoding="utf-8")
 state = (ROOT / "js/content/grafana-panel-state.js").read_text(encoding="utf-8")
 dashboard = (ROOT / "js/pages/dashbridge.js").read_text(encoding="utf-8")
 renderer = (ROOT / "js/pages/dashbridge-renderer.js").read_text(encoding="utf-8")
-batch = (ROOT / "js/pages/batch.js").read_text(encoding="utf-8")
-runner = (ROOT / "js/pages/batch-capture-runner.js").read_text(encoding="utf-8")
+batch = (ROOT / "pages/batch/batch.js").read_text(encoding="utf-8")
+runner = (ROOT / "pages/batch/batch-capture-runner.js").read_text(encoding="utf-8")
 layout = (ROOT / "js/content/grafana-compact-layout.js").read_text(encoding="utf-8")
 visual_engine = (ROOT / "js/content/grafana-visual-engine.js").read_text(encoding="utf-8")
 checks = {
@@ -26,7 +26,7 @@ checks = {
         and "rememberUPlotSize" in layout and "layout?.redrawFlot" in tools and "layout?.resizeUPlot" in tools,
     "Batch page has no unreachable capture-window fallback": "captureWindowId" not in batch,
     "Batch page has no local legacy panel loader": "async function loadUrlAndWaitForPanel" not in batch,
-    "Batch state persistence has a dedicated module": (ROOT / "js/pages/batch-state.js").exists() and "BatchPageState.restore" in batch,
+    "Batch state persistence has a dedicated module": (ROOT / "pages/batch/batch-state.js").exists() and "BatchPageState.restore" in batch,
     "Visual toggles always run restoration after a fast legend update": "if (result && !removeFill && !thickenLines && !invertLegend) return result;" not in visual_engine,
     "Legend position restores after the toggle is disabled": "hasSavedLegendLayout" in visual_engine
         and "delete element[legendLayoutSnapshotKey];" in visual_engine,

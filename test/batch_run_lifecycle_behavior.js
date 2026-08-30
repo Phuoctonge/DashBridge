@@ -6,7 +6,7 @@ const vm = require('vm');
 const context = { window: {}, AbortController };
 context.window = context;
 vm.createContext(context);
-vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js/pages/batch-run-lifecycle.js'), 'utf8'), context);
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'pages/batch/batch-run-lifecycle.js'), 'utf8'), context);
 
 const first = context.BatchRunLifecycle.begin();
 assert.strictEqual(context.BatchRunLifecycle.isActive(first), true);

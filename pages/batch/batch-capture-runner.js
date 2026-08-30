@@ -1,4 +1,4 @@
-// Owns the temporary browser window used by Batch capture.
+// Batch owns the temporary browser window used by capture.
 function createBatchCaptureWindowRunner() {
     let windowId = null;
     const neutralizeBeforeUnload = async id => {

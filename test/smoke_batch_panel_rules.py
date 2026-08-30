@@ -4,9 +4,9 @@ from support.smoke import CheckCollector
 
 
 ROOT = Path(__file__).resolve().parents[1]
-HTML = (ROOT / 'html/batch.html').read_text(encoding='utf-8')
-JS = (ROOT / 'js/pages/batch.js').read_text(encoding='utf-8')
-LOADER = (ROOT / 'js/pages/batch-panel-loader.js').read_text(encoding='utf-8')
+HTML = (ROOT / 'pages/batch/batch.html').read_text(encoding='utf-8')
+JS = (ROOT / 'pages/batch/batch.js').read_text(encoding='utf-8')
+LOADER = (ROOT / 'pages/batch/batch-panel-loader.js').read_text(encoding='utf-8')
 
 
 check = CheckCollector()
@@ -20,7 +20,7 @@ check('Batch reloads rules when the dashboard URL changes', 'loadBatchPanelRules
 check('Batch persists rules after editor changes', 'scheduleBatchPanelRulesSave' in JS and 'addEventListener' in JS)
 check('Delayed rule saving keeps the URL that was edited', 'const saveUrl = dashUrl.value.trim();' in JS)
 check('Changing dashboard cancels an old delayed rules save', "dashUrl.addEventListener('change', () => { clearTimeout(batchPanelRulesSaveTimer);" in JS)
-check('Rules reset is hidden when no saved rules exist', '#resetBatchPanelRulesBtn[hidden]' in (ROOT / 'css/batch.css').read_text(encoding='utf-8'))
+check('Rules reset is hidden when no saved rules exist', '#resetBatchPanelRulesBtn[hidden]' in (ROOT / 'pages/batch/batch.css').read_text(encoding='utf-8'))
 check('Batch rule labels match the Grafana panel settings',
       'Убрать заливку графика' in JS
       and 'Утолщить линии графика' in JS

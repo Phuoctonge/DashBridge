@@ -4,7 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnBatchCapture = document.getElementById("openBatchCaptureBtn");
     if (btnBatchCapture) {
         btnBatchCapture.onclick = () => {
-            chrome.tabs.create({ url: chrome.runtime.getURL("html/batch.html") });
+            chrome.tabs.create({ url: chrome.runtime.getURL("pages/batch/batch.html") });
         };
     }
 

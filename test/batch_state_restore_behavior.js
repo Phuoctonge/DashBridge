@@ -32,7 +32,7 @@ context.globalThis = context;
 vm.createContext(context);
 vm.runInContext(fs.readFileSync('js/shared/local-state-schema.js', 'utf8'), context);
 context.DashBridgeLocalStateSchema = context.globalThis.DashBridgeLocalStateSchema;
-vm.runInContext(fs.readFileSync('js/pages/batch-state.js', 'utf8'), context);
+vm.runInContext(fs.readFileSync('pages/batch/batch-state.js', 'utf8'), context);
 
 (async () => {
     const state = vm.runInContext('BatchPageState', context);

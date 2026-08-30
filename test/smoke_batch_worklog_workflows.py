@@ -4,12 +4,12 @@ from support.smoke import run_checks
 
 
 ROOT = Path(__file__).resolve().parent.parent
-BATCH = (ROOT / "js/pages/batch.js").read_text(encoding="utf-8")
-BATCH_STATE = (ROOT / "js/pages/batch-state.js").read_text(encoding="utf-8")
-BATCH_UTILS = (ROOT / "js/pages/batch-capture-utils.js").read_text(encoding="utf-8")
-BATCH_LOADER = (ROOT / "js/pages/batch-panel-loader.js").read_text(encoding="utf-8")
-BATCH_RUNNER = (ROOT / "js/pages/batch-capture-runner.js").read_text(encoding="utf-8")
-HTML = (ROOT / "html/batch.html").read_text(encoding="utf-8")
+BATCH = (ROOT / "pages/batch/batch.js").read_text(encoding="utf-8")
+BATCH_STATE = (ROOT / "pages/batch/batch-state.js").read_text(encoding="utf-8")
+BATCH_UTILS = (ROOT / "pages/batch/batch-capture-utils.js").read_text(encoding="utf-8")
+BATCH_LOADER = (ROOT / "pages/batch/batch-panel-loader.js").read_text(encoding="utf-8")
+BATCH_RUNNER = (ROOT / "pages/batch/batch-capture-runner.js").read_text(encoding="utf-8")
+HTML = (ROOT / "pages/batch/batch.html").read_text(encoding="utf-8")
 WORKLOG = (ROOT / "pages/worklog/worklog.js").read_text(encoding="utf-8")
 DASHBOARD_API = (ROOT / "js/shared/grafana-dashboard-api.js").read_text(encoding="utf-8")
 SERIES_CAPTURE = (ROOT / "js/content/grafana-series-capture.js").read_text(encoding="utf-8")

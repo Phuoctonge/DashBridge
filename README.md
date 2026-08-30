@@ -288,6 +288,7 @@ DashBridge предназначен для работы с корпоратив�
 DashBridge/
 ├── manifest.json            # Manifest V3
 ├── pages/                   # Feature-папки полноразмерных страниц
+│   ├── batch/               # HTML, CSS и lifecycle массового сбора
 │   ├── options/             # HTML, CSS и логика настроек расширения
 │   ├── recorder/            # HTML, CSS и логика Traffic Recorder
 │   ├── test-runner/         # UI, probe, suite и отчёты живых E2E
@@ -296,7 +297,6 @@ DashBridge/
 ├── html/                    # Остальные страницы до их поэтапного переноса
 │   ├── popup.html           # Главное popup-окно
 │   ├── dashbridge.html      # Единый Grafana-дашборд
-│   ├── batch.html           # Массовый сбор снимков
 ├── js/
 │   ├── content/             # Интеграция со страницами Grafana/Confluence
 │   ├── pages/               # Логика полноразмерных страниц

@@ -1,4 +1,4 @@
-// DOM-only UI helpers for Batch. Workflow orchestration remains in batch.js.
+// Batch DOM-only UI helpers; workflow orchestration remains in batch.js.
 const BatchPageUi = {
     createNotifier(container) {
         return (message, type = 'info') => {

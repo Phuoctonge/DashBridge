@@ -1,6 +1,7 @@
 ﻿/* === Batch СЃРїРµС†РёС„РёС‡РЅС‹Рµ СЃС‚РёР»Рё === */
 /* Р‘Р°Р·РѕРІС‹Рµ РїРµСЂРµРјРµРЅРЅС‹Рµ Рё РєРѕРјРїРѕРЅРµРЅС‚С‹ вЂ” РІ theme.css */
 
+/* Batch page-specific styles. */
 body {
     font-family: 'Inter', -apple-system, sans-serif;
     background-color: var(--bg);

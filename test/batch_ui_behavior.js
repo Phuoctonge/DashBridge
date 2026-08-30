@@ -17,7 +17,7 @@ const context = {
     Date,
 };
 vm.createContext(context);
-vm.runInContext(`${fs.readFileSync(path.join(__dirname, '..', 'js/pages/batch-ui.js'), 'utf8')}\n;globalThis.__batchPageUi = BatchPageUi;`, context);
+vm.runInContext(`${fs.readFileSync(path.join(__dirname, '..', 'pages/batch/batch-ui.js'), 'utf8')}\n;globalThis.__batchPageUi = BatchPageUi;`, context);
 
 const toastContainer = makeElement('div');
 context.__batchPageUi.createNotifier(toastContainer)('<unsafe>', 'unknown');

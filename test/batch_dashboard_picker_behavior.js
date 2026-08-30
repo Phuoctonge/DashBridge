@@ -3,9 +3,9 @@
 const assert = require('assert');
 const fs = require('fs');
 
-const html = fs.readFileSync('html/batch.html', 'utf8');
-const source = fs.readFileSync('js/pages/batch.js', 'utf8');
-const css = fs.readFileSync('css/batch.css', 'utf8');
+const html = fs.readFileSync('pages/batch/batch.html', 'utf8');
+const source = fs.readFileSync('pages/batch/batch.js', 'utf8');
+const css = fs.readFileSync('pages/batch/batch.css', 'utf8');
 
 assert(html.includes('id="getPanelsBtn"')
     && html.includes('id="panelsModal"')

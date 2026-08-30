@@ -1,4 +1,4 @@
-// Resolves the series to capture for one exact Grafana time slice.
+// Batch resolves series for one exact Grafana time slice.
 window.BatchSeriesSelection = (() => {
     const entries = available => {
         const occurrences = new Map();

@@ -18,8 +18,8 @@ for token in (
 ):
     assert token in THEME, f"missing shared token {token}"
 
-for stylesheet in ("popup.css", "batch.css"):
-    css = (ROOT / "css" / stylesheet).read_text(encoding="utf-8")
+for stylesheet in ("css/popup.css", "pages/batch/batch.css"):
+    css = (ROOT / stylesheet).read_text(encoding="utf-8")
     assert "var(--tab-hover-bg)" in css, f"{stylesheet} misses tab hover token"
     assert "var(--tab-active-bg)" in css, f"{stylesheet} misses tab active token"
 

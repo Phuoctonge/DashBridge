@@ -7,7 +7,7 @@ CASES = [
     {
         "name": "Grafana Batch section",
         "html": ['id="grafana-batch"', 'id="openBatchCaptureBtn"'],
-        "sources": {"js/popup/popup-grafana-router.js": ["openBatchCaptureBtn", "html/batch.html"]},
+        "sources": {"js/popup/popup-grafana-router.js": ["openBatchCaptureBtn", "pages/batch/batch.html"]},
     },
     {
         "name": "Grafana links section",

@@ -20,8 +20,8 @@ import sys
 # === Пути ===
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 THEME_CSS = os.path.join(ROOT, 'css/theme.css')
-HTML_FILES = ['html/dashbridge.html', 'html/popup.html', 'pages/options/options.html', 'pages/worklog/worklog.html', 'html/batch.html']
-CSS_FILES = ['css/dashbridge.css', 'css/batch.css']
+HTML_FILES = ['html/dashbridge.html', 'html/popup.html', 'pages/options/options.html', 'pages/worklog/worklog.html', 'pages/batch/batch.html']
+CSS_FILES = ['css/dashbridge.css', 'pages/batch/batch.css']
 JS_FILES = ['js/theme.js']
 
 # === Счётчики ===
@@ -323,14 +323,14 @@ if dashbridge_css:
          ':root' not in dashbridge_css or ':root' in dashbridge_css and '/*' in dashbridge_css[dashbridge_css.find(':root'):dashbridge_css.find(':root')+50],
          "css/dashbridge.css всё ещё определяет :root")
 
-batch_css = read_file(os.path.join(ROOT, 'css/batch.css'))
+batch_css = read_file(os.path.join(ROOT, 'pages/batch/batch.css'))
 if batch_css:
-    test("css/batch.css не определяет :root",
+    test("pages/batch/batch.css не определяет :root",
          ':root' not in batch_css,
-         "css/batch.css всё ещё определяет :root")
-    test("css/batch.css не использует зелёный primary #10b981",
+         "pages/batch/batch.css всё ещё определяет :root")
+    test("pages/batch/batch.css не использует зелёный primary #10b981",
          '#10b981' not in batch_css,
-         "css/batch.css всё ещё использует зелёный primary")
+         "pages/batch/batch.css всё ещё использует зелёный primary")
 
 
 # ============================================================

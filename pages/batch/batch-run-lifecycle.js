@@ -1,4 +1,4 @@
-// Keeps cancelled Batch runs from changing the UI or capture window of a newer run.
+// Batch lifecycle keeps cancelled runs from changing a newer run.
 window.BatchRunLifecycle = (() => {
     let nextId = 0;
     let activeId = null;

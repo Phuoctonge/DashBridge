@@ -453,7 +453,7 @@ async function collectGuiScreenshotsInternal() {
         { name: '09_popup_tdm.png', popup: ['tab-tdm'] },
         { name: '10_options.png', url: chrome.runtime.getURL('pages/options/options.html') },
         { name: '11_dashbridge.png', url: chrome.runtime.getURL('html/dashbridge.html') },
-        { name: '12_batch.png', url: chrome.runtime.getURL('html/batch.html') },
+        { name: '12_batch.png', url: chrome.runtime.getURL('pages/batch/batch.html') },
         { name: '13_worklog.png', url: chrome.runtime.getURL('pages/worklog/worklog.html') }
     ];
     const captureWindow = await chrome.windows.create({ url: popupUrl, type: 'popup', focused: true, width: 366, height: 760 });

@@ -1,4 +1,4 @@
-// Pixel and archive helpers used by Batch capture workflows.
+// Batch pixel and archive helpers.
 const BatchCaptureUtils = {
     base64ToUint8Array(base64) {
         const binary = window.atob(base64);

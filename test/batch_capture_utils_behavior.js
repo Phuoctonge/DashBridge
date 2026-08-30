@@ -12,7 +12,7 @@ const context = {
 };
 context.globalThis = context;
 vm.createContext(context);
-vm.runInContext(`${fs.readFileSync(path.join(__dirname, '..', 'js/pages/batch-capture-utils.js'), 'utf8')}
+vm.runInContext(`${fs.readFileSync(path.join(__dirname, '..', 'pages/batch/batch-capture-utils.js'), 'utf8')}
 globalThis.utils = BatchCaptureUtils;`, context);
 
 const utils = context.utils;

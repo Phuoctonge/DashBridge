@@ -1,4 +1,4 @@
-// Persistent UI state for the Batch page. Capture orchestration stays in batch.js.
+// Batch persistent UI state; capture orchestration stays in batch.js.
 const BatchPageState = {
     fields: ['dashUrl', 'panelsMode', 'userPanels', 'timestamps', 'compactCaptureMain', 'seriesDashUrl', 'seriesTimestamps', 'seriesIncludeFilter', 'seriesIgnoreFilter', 'seriesCaptureMode', 'compactCaptureSeries'],
     saveTimer: null,

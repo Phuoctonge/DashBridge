@@ -25,10 +25,10 @@ assert(optionsHtml.includes('id="settingUiScale"')
     && optionsJs.includes('uiScale: document.getElementById("settingUiScale").value'),
     'Options must expose and save the shared scale');
 
-for (const page of ['html/batch.html', 'html/dashbridge.html', 'pages/options/options.html', 'html/popup.html', 'pages/recorder/recorder.html', 'pages/test-runner/test-runner.html', 'pages/worklog/worklog.html']) {
+for (const page of ['pages/batch/batch.html', 'html/dashbridge.html', 'pages/options/options.html', 'html/popup.html', 'pages/recorder/recorder.html', 'pages/test-runner/test-runner.html', 'pages/worklog/worklog.html']) {
     assert(read(page).includes('name="viewport"'), `${page} must declare its viewport`);
 }
-for (const page of ['html/batch.html', 'html/dashbridge.html', 'pages/options/options.html', 'pages/recorder/recorder.html', 'pages/test-runner/test-runner.html', 'pages/worklog/worklog.html', 'pages/debug-easter-egg/debug-easter-egg.html']) {
+for (const page of ['pages/batch/batch.html', 'html/dashbridge.html', 'pages/options/options.html', 'pages/recorder/recorder.html', 'pages/test-runner/test-runner.html', 'pages/worklog/worklog.html', 'pages/debug-easter-egg/debug-easter-egg.html']) {
     assert(read(page).includes('data-ui-scale="auto"'), `${page} must scale correctly from its first frame`);
 }
 
@@ -45,7 +45,7 @@ assert(!renderer.includes('card.style.width = width'), 'panel width must no long
 assert(dashboardJs.includes("card.dataset.panelSize = panel.width === '100%'"),
     'editing a panel must refresh its semantic grid size');
 
-assert(read('css/batch.css').includes('max-width: 80rem'), 'Batch must use the wider responsive workspace');
+assert(read('pages/batch/batch.css').includes('max-width: 80rem'), 'Batch must use the wider responsive workspace');
 const testRunnerCss = read('pages/test-runner/test-runner.css');
 assert(testRunnerCss.includes('.tr-layout') && testRunnerCss.includes('max-width: none')
     && testRunnerCss.includes('.tr-input-panel') && testRunnerCss.includes('width: 100%')

@@ -1,4 +1,4 @@
-// js/pages/batch.js
+// Batch page controller.
 
 document.addEventListener("DOMContentLoaded", () => {
     // --- UI Logic: Tabs ---

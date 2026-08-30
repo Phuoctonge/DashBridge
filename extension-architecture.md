@@ -6,7 +6,7 @@
 > `docs/history/architecture-decisions.md`.
 
 DashBridge — Chrome MV3-расширение с шестью контурами: инструменты обычной
-Grafana, единый дашборд `html/dashbridge.html`, пакетный экспорт `html/batch.html`, Jira
+Grafana, единый дашборд `html/dashbridge.html`, пакетный экспорт `pages/batch/batch.html`, Jira
 worklog, Traffic Recorder и Popup-инструменты для Grafana/Jira/Confluence/TDM.
 
 Основные принципы:
@@ -24,6 +24,7 @@ worklog, Traffic Recorder и Popup-инструменты для Grafana/Jira/Co
 manifest.json
 ├── AGENTS.md                   # Обязательная точка входа для AI-анализа
 ├── pages/                      # Feature-папки полноразмерных extension pages
+│   ├── batch/                  # Пакетный PNG/ZIP: UI и lifecycle-модули
 │   ├── options/                # HTML, CSS и контроллер настроек
 │   ├── recorder/               # Traffic Recorder: HTML, CSS и контроллер
 │   ├── test-runner/            # Живые E2E: UI, probe, suite, report
@@ -32,7 +33,6 @@ manifest.json
 ├── html/                       # Остальные production HTML до их поэтапного переноса
 │   ├── popup.html              # Основной Popup
 │   ├── dashbridge.html         # Единый дашборд Grafana
-│   ├── batch.html              # Пакетный PNG/ZIP и серии
 ├── js/background.js            # MV3 service worker
 ├── js/theme.js                 # Общая light/dark тема
 ├── js/shared/                  # Контракты, storage, URL, capture

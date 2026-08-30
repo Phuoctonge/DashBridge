@@ -4,11 +4,11 @@ from support.smoke import CheckCollector
 
 
 ROOT = Path(__file__).resolve().parents[1]
-HTML = (ROOT / 'html/batch.html').read_text(encoding='utf-8')
-JS = (ROOT / 'js/pages/batch.js').read_text(encoding='utf-8')
-CAPTURE_UTILS = (ROOT / 'js/pages/batch-capture-utils.js').read_text(encoding='utf-8')
-CSS = (ROOT / 'css/batch.css').read_text(encoding='utf-8')
-PANEL_LOADER = (ROOT / 'js/pages/batch-panel-loader.js').read_text(encoding='utf-8')
+HTML = (ROOT / 'pages/batch/batch.html').read_text(encoding='utf-8')
+JS = (ROOT / 'pages/batch/batch.js').read_text(encoding='utf-8')
+CAPTURE_UTILS = (ROOT / 'pages/batch/batch-capture-utils.js').read_text(encoding='utf-8')
+CSS = (ROOT / 'pages/batch/batch.css').read_text(encoding='utf-8')
+PANEL_LOADER = (ROOT / 'pages/batch/batch-panel-loader.js').read_text(encoding='utf-8')
 
 
 check = CheckCollector()
@@ -47,8 +47,8 @@ check('Batch compact capture choices use accessible switches',
 check('Main action uses the shared primary button variant', 'id="startBtn" class="btn btn-primary"' in HTML)
 check('Cancel action uses the shared danger button variant', 'id="cancelBtn" class="btn btn-danger"' in HTML)
 check('Batch action buttons are compact instead of globally full-width', '#mainActionArea .btn' in CSS and 'width: 100%;' not in CSS.split('.btn {', 1)[1].split('}', 1)[0])
-check('Panel navigation is awaited before readiness polling', 'await chrome.tabs.update(tabId, { url: target.toString() })' in (ROOT / 'js/pages/batch-panel-loader.js').read_text(encoding='utf-8'))
-check('Batch state writes are debounced', 'saveTimer' in (ROOT / 'js/pages/batch-state.js').read_text(encoding='utf-8') and 'setTimeout' in (ROOT / 'js/pages/batch-state.js').read_text(encoding='utf-8'))
+check('Panel navigation is awaited before readiness polling', 'await chrome.tabs.update(tabId, { url: target.toString() })' in (ROOT / 'pages/batch/batch-panel-loader.js').read_text(encoding='utf-8'))
+check('Batch state writes are debounced', 'saveTimer' in (ROOT / 'pages/batch/batch-state.js').read_text(encoding='utf-8') and 'setTimeout' in (ROOT / 'pages/batch/batch-state.js').read_text(encoding='utf-8'))
 check('Batch exposes progress counters', 'batchProgress' in HTML and 'updateBatchProgress' in JS)
 check('Rule loading ignores stale URL responses', 'batchPanelRulesLoadVersion' in JS)
 check('Cancel button is explicitly hidden outside an active run', '#cancelBtn[hidden]' in CSS and 'setProcessing(false)' in JS)
@@ -62,7 +62,7 @@ check('Batch filters actual Series names by include and ignore patterns',
       'BatchSeriesSelection.resolvePatterns(discovery.names, includePattern, ignorePattern)' in JS
       and 'id="seriesIncludeFilter"' in HTML and 'id="seriesIgnoreFilter"' in HTML)
 check('Batch writes a result manifest and handles an empty collection', 'manifest.json' in JS and 'if (!successfulJobs)' in JS)
-check('Panel loader receives the active cancellation signal', 'BatchRunLifecycle.signal(runId)' in JS and "signal?.addEventListener('abort'" in (ROOT / 'js/pages/batch-panel-loader.js').read_text(encoding='utf-8'))
+check('Panel loader receives the active cancellation signal', 'BatchRunLifecycle.signal(runId)' in JS and "signal?.addEventListener('abort'" in (ROOT / 'pages/batch/batch-panel-loader.js').read_text(encoding='utf-8'))
 check('Batch exposes an always-on-top cancellable PiP panel',
       'js/pages/operation-progress-window.js' in HTML
       and 'openPictureInPicture' in JS
