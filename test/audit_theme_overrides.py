@@ -10,7 +10,7 @@ import sys
 sys.stdout.reconfigure(encoding='utf-8')
 
 WORKSPACE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-HTML_FILES = ['html/dashbridge.html', 'html/popup.html', 'html/options.html', 'html/worklog.html', 'html/batch.html']
+HTML_FILES = ['html/dashbridge.html', 'html/popup.html', 'pages/options/options.html', 'html/worklog.html', 'html/batch.html']
 THEME_CSS = os.path.join(WORKSPACE, 'css/theme.css')
 
 # Цвета, которые точно нужно переопределять в тёмной теме

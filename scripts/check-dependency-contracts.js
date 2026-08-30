@@ -156,7 +156,7 @@ function serializeMap(map) {
 function analyzeProject(rootDirectory) {
     const root = path.resolve(rootDirectory);
     const allFiles = new Set(walk(root));
-    const jsFiles = [...allFiles].filter(file => file.startsWith('js/') && file.endsWith('.js')).sort();
+    const jsFiles = [...allFiles].filter(file => (file.startsWith('js/') || file.startsWith('pages/')) && file.endsWith('.js')).sort();
     const htmlFiles = [...allFiles].filter(file => file.endsWith('.html') && !file.startsWith('test/fixtures/')).sort();
     const sources = new Map(jsFiles.map(file => [file, fs.readFileSync(path.join(root, ...file.split('/')), 'utf8')]));
     const errors = [];

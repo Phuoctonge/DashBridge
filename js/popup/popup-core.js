@@ -124,7 +124,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (chrome.runtime.openOptionsPage) {
             chrome.runtime.openOptionsPage();
         } else {
-            window.open(chrome.runtime.getURL('html/options.html'));
+            window.open(chrome.runtime.getURL('pages/options/options.html'));
         }
     }
 });

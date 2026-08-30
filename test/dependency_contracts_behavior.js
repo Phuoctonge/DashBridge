@@ -19,10 +19,11 @@ function fixture({ brokenReference = false, brokenOrder = false, missingDom = fa
         background: { service_worker: brokenReference ? 'js/missing.js' : 'js/background.js' },
         action: { default_popup: 'popup.html' },
     }));
-    write(root, 'popup.html', `<main id="ready"></main>\n<script src="js/${brokenOrder ? 'consumer' : 'provider'}.js"></script>\n<script src="js/${brokenOrder ? 'provider' : 'consumer'}.js"></script>`);
+    write(root, 'popup.html', `<main id="ready"></main>\n<script src="js/${brokenOrder ? 'consumer' : 'provider'}.js"></script>\n<script src="js/${brokenOrder ? 'provider' : 'consumer'}.js"></script>\n<script src="pages/feature/feature.js"></script>`);
     write(root, 'js/background.js', `'use strict';`);
     write(root, 'js/provider.js', `globalThis.DashBridgeFixture = Object.freeze({ ok: true });`);
     write(root, 'js/consumer.js', `document.getElementById('${missingDom ? 'missing' : 'ready'}').textContent = '';\nvoid globalThis.DashBridgeFixture;`);
+    write(root, 'pages/feature/feature.js', `'use strict';`);
     return root;
 }
 
@@ -30,6 +31,7 @@ const goodRoot = fixture();
 const good = analyzeProject(goodRoot);
 assert.deepStrictEqual(good.errors, [], good.errors.join('\n'));
 assert(explainFile(good, 'js/provider.js').incoming.some(edge => edge.from === 'popup.html'));
+assert(explainFile(good, 'pages/feature/feature.js').incoming.some(edge => edge.from === 'popup.html'));
 
 const missing = analyzeProject(fixture({ brokenReference: true }));
 assert(missing.errors.some(error => error.includes('js/missing.js')));

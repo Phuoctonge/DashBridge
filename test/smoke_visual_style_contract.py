@@ -45,7 +45,7 @@ assert "cursor: pointer" in tab_button_rule.group("body"), "Popup tabs must use 
 dashbridge = (ROOT / "css" / "dashbridge.css").read_text(encoding="utf-8")
 assert ":root" not in dashbridge, "DashBridge retains a page-local token root"
 
-options = (ROOT / "html/options.html").read_text(encoding="utf-8")
+options = (ROOT / "pages/options/options.html").read_text(encoding="utf-8")
 assert 'style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;"' not in options, (
     "Options retains visual inline layout"
 )

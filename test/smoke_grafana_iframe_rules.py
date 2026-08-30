@@ -5,8 +5,8 @@ from support.smoke import CheckCollector
 
 
 ROOT = Path(__file__).resolve().parent.parent
-OPTIONS_HTML = (ROOT / "html/options.html").read_text(encoding="utf-8")
-OPTIONS_JS = (ROOT / "js/pages/options.js").read_text(encoding="utf-8")
+OPTIONS_HTML = (ROOT / "pages/options/options.html").read_text(encoding="utf-8")
+OPTIONS_JS = (ROOT / "pages/options/options.js").read_text(encoding="utf-8")
 BACKGROUND = (ROOT / "js/background.js").read_text(encoding="utf-8")
 MANIFEST = (ROOT / "manifest.json").read_text(encoding="utf-8")
 CONTENT = (ROOT / "js/content/content.js").read_text(encoding="utf-8")

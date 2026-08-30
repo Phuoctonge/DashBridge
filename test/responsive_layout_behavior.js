@@ -9,8 +9,8 @@ const themeJs = read('js/theme.js');
 const dashboardCss = read('css/dashbridge.css');
 const dashboardJs = read('js/pages/dashbridge.js');
 const renderer = read('js/pages/dashbridge-renderer.js');
-const optionsHtml = read('html/options.html');
-const optionsJs = read('js/pages/options.js');
+const optionsHtml = read('pages/options/options.html');
+const optionsJs = read('pages/options/options.js');
 
 for (const token of ['--page-gutter:', '--control-height-md:', '--readable-max:']) {
     assert(themeCss.includes(token), `shared responsive token ${token} is missing`);
@@ -25,10 +25,10 @@ assert(optionsHtml.includes('id="settingUiScale"')
     && optionsJs.includes('uiScale: document.getElementById("settingUiScale").value'),
     'Options must expose and save the shared scale');
 
-for (const page of ['html/batch.html', 'html/dashbridge.html', 'html/options.html', 'html/popup.html', 'html/recorder.html', 'html/test-runner.html', 'html/worklog.html']) {
+for (const page of ['html/batch.html', 'html/dashbridge.html', 'pages/options/options.html', 'html/popup.html', 'html/recorder.html', 'html/test-runner.html', 'html/worklog.html']) {
     assert(read(page).includes('name="viewport"'), `${page} must declare its viewport`);
 }
-for (const page of ['html/batch.html', 'html/dashbridge.html', 'html/options.html', 'html/recorder.html', 'html/test-runner.html', 'html/worklog.html', 'html/ui/debug-easter-egg.html']) {
+for (const page of ['html/batch.html', 'html/dashbridge.html', 'pages/options/options.html', 'html/recorder.html', 'html/test-runner.html', 'html/worklog.html', 'html/ui/debug-easter-egg.html']) {
     assert(read(page).includes('data-ui-scale="auto"'), `${page} must scale correctly from its first frame`);
 }
 
@@ -59,8 +59,8 @@ assert(read('css/recorder.css').includes('@media (max-width: 820px)')
     && read('css/recorder.css').includes('.table-wrap { flex: 1 1 auto;')
     && read('css/recorder.css').includes('overflow: auto;'),
     'Recorder must collapse its workspace while preserving a local table scroller');
-assert(read('css/options.css').includes('@media (max-width: 560px)')
-    && read('css/options.css').includes('max-width: 40.625rem'),
+assert(read('pages/options/options.css').includes('@media (max-width: 560px)')
+    && read('pages/options/options.css').includes('max-width: 40.625rem'),
     'Options must retain a readable form width and collapse on narrow screens');
 
 const debugCss = read('css/debug-easter-egg.css');

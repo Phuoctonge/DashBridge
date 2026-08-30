@@ -18,6 +18,7 @@ $releasePaths = @(
     (Join-Path $projectRoot 'html'),
     (Join-Path $projectRoot 'icons'),
     (Join-Path $projectRoot 'js'),
+    (Join-Path $projectRoot 'pages'),
     (Join-Path $projectRoot 'vendor')
 )
 

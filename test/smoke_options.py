@@ -5,7 +5,7 @@ from support.smoke import run_page_contract
 if __name__ == "__main__":
     run_page_contract(
         "extension options",
-        page="html/options.html",
+        page="pages/options/options.html",
         html=[
             'id="saveBtn"', 'id="exportBtn"', 'id="importBtn"', 'id="importFile"',
             'id="maintenanceStatus"', 'id="settingModuleGrafanaDebug"', 'id="settingModuleRecorder"',
@@ -28,7 +28,7 @@ if __name__ == "__main__":
             '!id="settingGrafanaMemScreenshotTitle"'
         ],
         sources={
-            "js/pages/options.js": [
+            "pages/options/options.js": [
                 "document.getElementById('saveBtn').addEventListener", "document.getElementById('exportBtn').addEventListener",
                 "importBtn.addEventListener", "function showMaintStatus(text, color)",
                 "module_grafana_debug", "function validateImportedConfig(config)",

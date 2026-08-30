@@ -23,9 +23,10 @@ worklog, Traffic Recorder и Popup-инструменты для Grafana/Jira/Co
 ```text
 manifest.json
 ├── AGENTS.md                   # Обязательная точка входа для AI-анализа
-├── html/                       # Все production HTML-страницы расширения
+├── pages/                      # Feature-папки полноразмерных extension pages
+│   └── options/                # HTML, CSS и контроллер настроек
+├── html/                       # Остальные production HTML до их поэтапного переноса
 │   ├── popup.html              # Основной Popup
-│   ├── options.html            # Настройки, импорт/экспорт
 │   ├── dashbridge.html         # Единый дашборд Grafana
 │   ├── batch.html              # Пакетный PNG/ZIP и серии
 │   ├── worklog.html            # Jira worklog

@@ -451,7 +451,7 @@ async function collectGuiScreenshotsInternal() {
         { name: '06_popup_grafana_debug.png', popup: ['tab-grafana', 'grafana-debug'] },
         { name: '07_popup_jira.png', popup: ['tab-jira'] },
         { name: '09_popup_tdm.png', popup: ['tab-tdm'] },
-        { name: '10_options.png', url: chrome.runtime.getURL('html/options.html') },
+        { name: '10_options.png', url: chrome.runtime.getURL('pages/options/options.html') },
         { name: '11_dashbridge.png', url: chrome.runtime.getURL('html/dashbridge.html') },
         { name: '12_batch.png', url: chrome.runtime.getURL('html/batch.html') },
         { name: '13_worklog.png', url: chrome.runtime.getURL('html/worklog.html') }

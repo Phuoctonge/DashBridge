@@ -41,8 +41,8 @@ assert(!other.includes('name="invertIdle"')
     'every panel-specific control must occupy the same slot before the universal series filter'
 ));
 
-const optionsHtml = fs.readFileSync('html/options.html', 'utf8');
-const optionsSource = fs.readFileSync('js/pages/options.js', 'utf8');
+const optionsHtml = fs.readFileSync('pages/options/options.html', 'utf8');
+const optionsSource = fs.readFileSync('pages/options/options.js', 'utf8');
 const dashboardSource = fs.readFileSync('js/pages/dashbridge.js', 'utf8');
 const iframeSource = fs.readFileSync('js/content/grafana-iframe.js', 'utf8');
 const panelToolsSource = fs.readFileSync('js/content/grafana-panel-tools.js', 'utf8');

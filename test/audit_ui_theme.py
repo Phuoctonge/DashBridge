@@ -20,7 +20,7 @@ import sys
 # === Пути ===
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 THEME_CSS = os.path.join(ROOT, 'css/theme.css')
-HTML_FILES = ['html/dashbridge.html', 'html/popup.html', 'html/options.html', 'html/worklog.html', 'html/batch.html']
+HTML_FILES = ['html/dashbridge.html', 'html/popup.html', 'pages/options/options.html', 'html/worklog.html', 'html/batch.html']
 CSS_FILES = ['css/dashbridge.css', 'css/batch.css']
 JS_FILES = ['js/theme.js']
 
@@ -48,6 +48,18 @@ def read_file(path):
         return None
     with open(path, 'r', encoding='utf-8') as f:
         return f.read()
+
+
+def references_file(html_file, attribute, target):
+    """Checks a local HTML reference independently of directory depth."""
+    content = read_file(os.path.join(ROOT, html_file)) or ''
+    for reference in re.findall(rf'{attribute}\s*=\s*["\']([^"\']+)["\']', content, re.IGNORECASE):
+        if re.match(r'^(?:[a-z]+:|//|#)', reference, re.IGNORECASE):
+            continue
+        resolved = os.path.normpath(os.path.join(os.path.dirname(html_file), reference))
+        if resolved.replace('\\', '/') == target:
+            return True
+    return False
 
 
 # ============================================================
@@ -101,7 +113,7 @@ for html_file in HTML_FILES:
          f"Файл {html_file} не найден")
     if content:
         test(f"{html_file} подключает css/theme.css",
-             'href="../css/theme.css"' in content or "href='../css/theme.css'" in content,
+             references_file(html_file, 'href', 'css/theme.css'),
              f"css/theme.css не подключён в {html_file}")
 
 
@@ -289,7 +301,7 @@ for html_file in HTML_FILES:
     if html_content:
         # CSP: inline scripts запрещены, должен быть внешний файл
         test(f"{html_file} подключает js/theme.js через <script src>",
-             'src="../js/theme.js"' in html_content,
+             references_file(html_file, 'src', 'js/theme.js'),
              f"js/theme.js не подключён в {html_file}")
         # Не должно быть inline scripts с chrome.storage.onChanged
         inline_pattern = re.compile(r'<script>(?!.*?src=).*?chrome\.storage\.onChanged.*?</script>', re.DOTALL)
@@ -338,9 +350,9 @@ test("html/worklog.html .col-date input text-align: left",
 
 
 # ============================================================
-# 10. css/theme.css: переопределения для html/options.html inline-стилей
+# 10. css/theme.css: переопределения для pages/options/options.html inline-стилей
 # ============================================================
-print("\n=== 10. css/theme.css: переопределения inline-стилей html/options.html ===")
+print("\n=== 10. css/theme.css: переопределения inline-стилей pages/options/options.html ===")
 
 # Перечитываем css/theme.css свежим чтением (на случай если content был перезаписан)
 content = read_file(THEME_CSS)
@@ -418,15 +430,15 @@ if manifest:
 
 
 # ============================================================
-# 11. html/options.html: inline-стили заменены на CSS-классы
+# 11. pages/options/options.html: inline-стили заменены на CSS-классы
 # ============================================================
-print("\n=== 11. html/options.html: замена inline-стилей на CSS-классы ===")
+print("\n=== 11. pages/options/options.html: замена inline-стилей на CSS-классы ===")
 
-options_content = read_file(os.path.join(ROOT, 'html/options.html'))
+options_content = read_file(os.path.join(ROOT, 'pages/options/options.html'))
 if options_content:
     # Подсчитываем оставшиеся inline-стили
     inline_styles = re.findall(r'style="[^"]+"', options_content)
-    test("html/options.html: 0 inline-стилей (все заменены на классы)",
+    test("pages/options/options.html: 0 inline-стилей (все заменены на классы)",
          len(inline_styles) == 0,
          f"Осталось {len(inline_styles)} inline-стилей: {inline_styles[:3]}")
 
@@ -440,9 +452,9 @@ if options_content:
         'btn-save', 'btn-secondary-flex'
     ]
     for cls in required_classes:
-        test(f"html/options.html использует класс .{cls}",
+        test(f"pages/options/options.html использует класс .{cls}",
              f'class="{cls}' in options_content or f' {cls}"' in options_content or f'"{cls} ' in options_content,
-             f"Класс .{cls} не найден в html/options.html")
+             f"Класс .{cls} не найден в pages/options/options.html")
 
 
 # ============================================================
@@ -557,16 +569,16 @@ if content:
 
 
 # ============================================================
-# 14. html/options.html: отсутствие inline-стилей
+# 14. pages/options/options.html: отсутствие inline-стилей
 # ============================================================
-print("\n=== 14. html/options.html: отсутствие inline-стилей ===")
+print("\n=== 14. pages/options/options.html: отсутствие inline-стилей ===")
 
-options_path = os.path.join(ROOT, 'html/options.html')
+options_path = os.path.join(ROOT, 'pages/options/options.html')
 options_content = read_file(options_path)
 if options_content:
     # Не должно быть style="..." атрибутов
     inline_styles = re.findall(r'style\s*=\s*["\']', options_content)
-    test("html/options.html не содержит inline-стилей", len(inline_styles) == 0,
+    test("pages/options/options.html не содержит inline-стилей", len(inline_styles) == 0,
          f"Найдено {len(inline_styles)} inline-стилей: {inline_styles[:3]}")
 
     # Должны использоваться новые классы
@@ -575,8 +587,8 @@ if options_content:
         'arrow-icon', 'ic-muted', 'ic-white', 'section-description'
     ]
     for cls in new_classes_used:
-        test(f"html/options.html использует класс {cls}", cls in options_content,
-             f"Класс {cls} не используется в html/options.html")
+        test(f"pages/options/options.html использует класс {cls}", cls in options_content,
+             f"Класс {cls} не используется в pages/options/options.html")
 
 
 # ============================================================

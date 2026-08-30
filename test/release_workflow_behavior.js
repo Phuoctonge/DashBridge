@@ -16,7 +16,7 @@ assert(workflow.includes('permissions:') && workflow.includes('contents: write')
     'release job must declare only the GitHub permission it uses');
 assert(builder.includes('$ExpectedTag -ne "v$version"'),
     'archive builder must reject a tag that differs from manifest.version');
-for (const input of ['manifest.json', 'css', 'html', 'icons', 'js', 'vendor']) {
+for (const input of ['manifest.json', 'css', 'html', 'icons', 'js', 'pages', 'vendor']) {
     assert(builder.includes(input), `release archive must include ${input}`);
 }
 for (const staleInput of ["Join-Path $projectRoot 'assets'", "Filter '*.html'"]) {

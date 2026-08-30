@@ -17,6 +17,7 @@ const manifestReferences = [
 assert.deepStrictEqual(manifestReferences.filter(reference => !exists(reference)), [], 'every manifest resource must exist');
 
 const htmlFiles = [];
+const loadedScriptPaths = new Set((manifest.content_scripts || []).flatMap(entry => entry.js || []));
 const collectHtml = directory => {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
         if (['.git', '.pytest_cache', '__pycache__', 'docs', 'plans'].includes(entry.name)) continue;
@@ -32,6 +33,10 @@ for (const htmlFile of htmlFiles) {
     const duplicateIds = [...new Set(ids.filter((id, index) => ids.indexOf(id) !== index))];
     assert.deepStrictEqual(duplicateIds, [], `${path.relative(root, htmlFile)} must not contain duplicate IDs`);
     const references = [...html.matchAll(/\b(?:src|href)=["']([^"']+)["']/g)].map(match => match[1]);
+    for (const reference of references) {
+        if (!reference.split(/[?#]/, 1)[0].endsWith('.js')) continue;
+        loadedScriptPaths.add(path.relative(root, path.resolve(path.dirname(htmlFile), reference.split(/[?#]/, 1)[0])).replaceAll('\\', '/'));
+    }
     const missing = references.filter(reference => {
         if (/^(?:https?:|data:|#)/i.test(reference)) return false;
         const cleanReference = reference.split(/[?#]/, 1)[0];
@@ -60,12 +65,14 @@ const collectScripts = directory => {
     }
 };
 collectScripts(path.join(root, 'js'));
+collectScripts(path.join(root, 'pages'));
 const orphanScripts = productionScripts
     .map(file => ({
         rootRelative: path.relative(root, file).replaceAll('\\', '/'),
         jsRelative: path.relative(path.join(root, 'js'), file).replaceAll('\\', '/'),
     }))
-    .filter(reference => !runtimeCorpus.includes(reference.rootRelative)
+    .filter(reference => !loadedScriptPaths.has(reference.rootRelative)
+        && !runtimeCorpus.includes(reference.rootRelative)
         && !runtimeCorpus.includes(reference.jsRelative))
     .map(reference => reference.rootRelative);
 assert.deepStrictEqual(orphanScripts, [], 'every production script must have a runtime entry point');
