@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parent.parent
 COMMON = (ROOT / "js/content/grafana-panel-tools.js").read_text(encoding="utf-8")
 PANEL_STATE = (ROOT / "js/content/grafana-panel-state.js").read_text(encoding="utf-8")
 VISUAL_ENGINE = (ROOT / "js/content/grafana-visual-engine.js").read_text(encoding="utf-8")
+PANEL_DEFINITION = (ROOT / "js/content/grafana-panel-definition.js").read_text(encoding="utf-8")
 CPU_CAPACITY_FILTER = (ROOT / "js/content/grafana-cpu-capacity-filter.js").read_text(encoding="utf-8")
 DASHBOARD = (ROOT / "js/pages/dashbridge.js").read_text(encoding="utf-8")
 IFRAME = (ROOT / "js/content/grafana-iframe.js").read_text(encoding="utf-8")
@@ -72,7 +73,7 @@ checks = {
         and "filterSeriesByThreshold(scopedData).metrics;" in COMMON,
     "native query scope survives Grafana template-variable substitution": "expressionMatchesTargetTemplate" in COMMON
         and "queryMatchesConfiguredTarget(configured, query.raw)" in COMMON
-        and "'expr', 'datasource'" in VISUAL_ENGINE,
+        and "'expr', 'datasource'" in PANEL_DEFINITION,
     "Grafana View scopes its first query without delayed retries": "const isTargetPanelView" in COMMON
         and "if (isTargetPanelView())" in COMMON
         and "setTimeout(() => controller.schedule()" not in VISUAL_ENGINE,
@@ -128,7 +129,7 @@ checks = {
         and "legendClickListener" in VISUAL_ENGINE
         and "changedNodes.some(touchesLifecycleRoot)" in VISUAL_ENGINE
         and "relevantMutationBatches" in VISUAL_ENGINE,
-    "native Grafana scopes data filtering to the selected panel queries": "getPanelQuerySignaturesAsync" in VISUAL_ENGINE
+    "native Grafana scopes data filtering to the selected panel queries": "getPanelQuerySignaturesAsync" in PANEL_DEFINITION
         and "getTargetQueryRefIds" in COMMON and "getTargetLegendRefIds" in COMMON,
     "native Grafana legend scope ignores frame-level fallback names": "fieldNames: getFieldLegendNames(field)" in COMMON
         and "field.fieldNames.some(name => targetNames.has(name))" in COMMON,
@@ -340,7 +341,7 @@ checks = {
     "Grafana 12 visual commands retain the normalized panel key": COMMON.count("panelId: getPanelStateKey(targetPanel) || tools.targetPanelId || null") >= 4
         and "panelId: targetPanel?.getAttribute?.('data-panelid') || targetPanel?.dataset?.panelid || null" not in COMMON,
     "Threshold unit lookup accepts the selected panel root": "const getThresholdUnit = (root = document) =>" in VISUAL_ENGINE,
-    "Solo panels do not call the dashboard API that is unavailable to public embeds": "location.pathname.startsWith('/d-solo/')" in VISUAL_ENGINE,
+    "Solo panels do not call the dashboard API that is unavailable to public embeds": "location.pathname.startsWith('/d-solo/')" in PANEL_DEFINITION,
     "Threshold calculation accepts the selected panel root": "const setThreshold = ({ root = document," in VISUAL_ENGINE,
     "Flot threshold uses the drawable plot area": "plot.getPlotOffset?.()" in VISUAL_ENGINE and "plot.height?.()" in VISUAL_ENGINE,
     "Flot threshold follows View layout changes": "const watchThresholdLayoutChanges" in VISUAL_ENGINE and "watchThresholdLayoutChanges(plotHost)" in VISUAL_ENGINE,
