@@ -10,7 +10,7 @@ assert.deepStrictEqual(rootPython.filter(file => !/^(?:audit|security|smoke)_.+\
     'root Python files must be discoverable tests; helpers belong in test/support');
 
 const rootJavaScript = entries.filter(entry => entry.isFile() && entry.name.endsWith('.js')).map(entry => entry.name);
-const expectedJavaScript = /^(?:.+_behavior|run-(?:all-tests|js-tests|python-smoke-tests)|analyze_e2e_.+|devtools-e2e-.+)\.js$/;
+const expectedJavaScript = /^(?:.+_behavior|run-(?:all-tests|extension-browser-smoke|js-tests|python-smoke-tests)|analyze_e2e_.+|devtools-e2e-.+)\.js$/;
 assert.deepStrictEqual(rootJavaScript.filter(file => !expectedJavaScript.test(file)), [],
     'root JavaScript files must be behavior tests, runners, or explicitly named diagnostic tools');
 

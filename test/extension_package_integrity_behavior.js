@@ -18,9 +18,12 @@ assert.deepStrictEqual(manifestReferences.filter(reference => !exists(reference)
 
 const htmlFiles = [];
 const loadedScriptPaths = new Set((manifest.content_scripts || []).flatMap(entry => entry.js || []));
+const ignoredDevelopmentDirectories = new Set([
+    '.git', '.pytest_cache', '__pycache__', 'dist', 'docs', 'node_modules', 'plans', 'test-results'
+]);
 const collectHtml = directory => {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-        if (['.git', '.pytest_cache', '__pycache__', 'docs', 'plans'].includes(entry.name)) continue;
+        if (ignoredDevelopmentDirectories.has(entry.name)) continue;
         const absolute = path.join(directory, entry.name);
         if (entry.isDirectory()) collectHtml(absolute);
         else if (entry.name.endsWith('.html')) htmlFiles.push(absolute);
@@ -48,7 +51,7 @@ for (const htmlFile of htmlFiles) {
 const sourceFiles = [];
 const collectSources = directory => {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-        if (['test', 'docs', 'plans', '.git', '.pytest_cache', '__pycache__'].includes(entry.name)) continue;
+        if (entry.name === 'test' || ignoredDevelopmentDirectories.has(entry.name)) continue;
         const absolute = path.join(directory, entry.name);
         if (entry.isDirectory()) collectSources(absolute);
         else if (/\.(?:js|html|json)$/.test(entry.name)) sourceFiles.push(absolute);

@@ -37,7 +37,8 @@ manifest.json
 ├── js/background.js            # MV3 service worker
 ├── js/shared/                  # Контракты, storage, URL, capture
 ├── js/content/                 # MAIN/isolated runtime сайтов
-├── test/                       # Node behavior, Python smoke, probes
+├── test/                       # Node/Python behavior, browser smoke, probes
+├── package.json                # Только dev-анализ: ESLint и Playwright
 ├── docs/                       # Действующие пояснения и краткая история
 └── docs/roadmap.md             # Только актуальный незавершённый roadmap
 ```
@@ -520,7 +521,7 @@ Fallback нельзя удалять по результату одной Grafan
 
 ## Проверки
 
-`package.json` в репозитории нет. Канонические dependency-free runners:
+Канонические dependency-free runners не требуют npm-пакетов:
 
 ```powershell
 node test/run-js-tests.js
@@ -531,6 +532,17 @@ node test/run-python-smoke-tests.js
 smoke/security/audit-файл. Все 84 production JavaScript-файла проходят
 `node --check`.
 `DASHBRIDGE_PYTHON` задаёт Python, если он не находится автоматически.
+
+Дополнительный dev-контур устанавливается через `npm ci --ignore-scripts` и
+не участвует в runtime расширения. `npm run lint` выполняет строгие
+статические correctness-проверки, а `npm run test:browser` загружает unpacked
+extension в отдельный временный профиль официального Playwright Chromium и
+проверяет все HTML-страницы на ошибки console, page и загрузки ресурсов.
+Профиль удаляется после прогона; JSON-диагностика пишется в игнорируемый
+`test-results/`. `scripts/build-release.ps1` использует whitelist, поэтому
+package-файлы, `node_modules` и результаты тестов не входят в extension ZIP.
+Тестовый Chromium устанавливается отдельно командой
+`npm run browser:install` и не использует пользовательский Chrome-профиль.
 
 Дополнительно: `pages/test-runner/test-runner.html` запускает живые E2E на Grafana. По user action
 он открывает общий Document Picture-in-Picture progress controller с количеством

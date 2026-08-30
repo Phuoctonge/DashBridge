@@ -12,3 +12,7 @@ __pycache__/
 
 # Release archives are reproducible GitHub Actions artifacts.
 dist/
+
+# Development-only analysis and browser smoke dependencies/artifacts.
+node_modules/
+test-results/

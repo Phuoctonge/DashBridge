@@ -48,5 +48,8 @@ assert(builder.includes('Assert-ArchiveEntry')
     && builder.includes("EndsWith('.html'")
     && builder.includes('$htmlReferencePattern'),
     'release builder must verify packaged manifest paths and local HTML dependencies');
+const singleBackslashNormalization = ".Replace('" + '\\' + "', '/')";
+assert(builder.includes(singleBackslashNormalization),
+    'release verification must normalize Windows ZIP entry separators');
 
 console.log('PASS tagged releases test, package and publish a minimal extension archive');

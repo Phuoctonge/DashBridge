@@ -14,10 +14,14 @@
 - 103 JavaScript behavior-файла;
 - 41 Python smoke/security/audit-файл;
 - `node --check` для всех 84 production JavaScript-файлов.
+- ESLint correctness-анализ production, tests и scripts;
+- автономный browser smoke всех восьми extension pages в чистом профиле.
 
 Автотесты хорошо фиксируют структурные и поведенческие контракты, но не
 заменяют живую проверку Chrome/Grafana: renderer, clipboard, capture,
 авторизованные API и lifecycle MV3 service worker зависят от браузера.
+Browser smoke не требует пользователя и ловит ошибки загрузки локальных
+страниц, но не подменяет авторизованную Grafana-сессию.
 
 ## Ключевые инварианты
 
@@ -136,6 +140,30 @@ native Copy/Paste рядом с Apply либо добавляет эти две 
 невалидного payload.
 
 ## Проверка изменения
+
+Однократная установка dev-зависимостей и официального тестового Chromium:
+
+```powershell
+npm ci --ignore-scripts
+npm run browser:install
+```
+
+`--ignore-scripts` запрещает lifecycle-скрипты пакетов при установке.
+Зафиксированные версии и integrity находятся в `package-lock.json`; для
+повторной supply-chain проверки используются `npm audit` и
+`npm audit signatures`.
+
+Полный автономный dev-прогон:
+
+```powershell
+npm run test:all
+```
+
+Он последовательно запускает ESLint, канонические Node/Python-тесты и browser
+smoke. Browser smoke использует отдельный временный профиль, собирает console,
+page и network diagnostics в `test-results/extension-smoke.json`, а снимки
+создаёт только для упавших страниц. Путь к другому тестовому Chromium можно
+явно задать через `DASHBRIDGE_CHROME_PATH`.
 
 Полный dependency-free прогон:
 

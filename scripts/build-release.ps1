@@ -43,7 +43,7 @@ try {
         [System.StringComparer]::Ordinal
     )
     foreach ($entry in $archive.Entries) {
-        [void]$archiveEntries.Add($entry.FullName.Replace('\\', '/').TrimStart('/'))
+        [void]$archiveEntries.Add($entry.FullName.Replace('\', '/').TrimStart('/'))
     }
 
     function Assert-ArchiveEntry {
@@ -52,7 +52,7 @@ try {
             [Parameter(Mandatory = $true)][string]$Source
         )
 
-        $normalizedPath = $Path.Replace('\\', '/').TrimStart('/')
+        $normalizedPath = $Path.Replace('\', '/').TrimStart('/')
         if (-not $archiveEntries.Contains($normalizedPath)) {
             throw "Release archive is missing '$normalizedPath' referenced by $Source."
         }
