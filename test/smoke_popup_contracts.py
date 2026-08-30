@@ -40,7 +40,7 @@ CASES = [
     {
         "name": "Jira section",
         "html": ['data-tab="tab-jira"', 'id="tab-jira"', 'id="openJiraPage"', 'id="transferWorklogBtn"'],
-        "sources": {"js/popup/popup-jira.js": ["openJiraPage", "transferWorklogBtn", "html/worklog.html"]},
+        "sources": {"js/popup/popup-jira.js": ["openJiraPage", "transferWorklogBtn", "pages/worklog/worklog.html"]},
     },
     {
         "name": "TDM export section",

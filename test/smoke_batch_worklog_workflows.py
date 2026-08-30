@@ -10,7 +10,7 @@ BATCH_UTILS = (ROOT / "js/pages/batch-capture-utils.js").read_text(encoding="utf
 BATCH_LOADER = (ROOT / "js/pages/batch-panel-loader.js").read_text(encoding="utf-8")
 BATCH_RUNNER = (ROOT / "js/pages/batch-capture-runner.js").read_text(encoding="utf-8")
 HTML = (ROOT / "html/batch.html").read_text(encoding="utf-8")
-WORKLOG = (ROOT / "js/pages/worklog.js").read_text(encoding="utf-8")
+WORKLOG = (ROOT / "pages/worklog/worklog.js").read_text(encoding="utf-8")
 DASHBOARD_API = (ROOT / "js/shared/grafana-dashboard-api.js").read_text(encoding="utf-8")
 SERIES_CAPTURE = (ROOT / "js/content/grafana-series-capture.js").read_text(encoding="utf-8")
 ARCHIVE = (ROOT / "js/shared/archive-download.js").read_text(encoding="utf-8")

@@ -3,7 +3,7 @@ const assert = require('assert');
 const fs = require('fs');
 const vm = require('vm');
 
-const source = fs.readFileSync('js/pages/worklog.js', 'utf8');
+const source = fs.readFileSync('pages/worklog/worklog.js', 'utf8');
 const context = {
     document: { addEventListener() {} },
     globalThis: null,

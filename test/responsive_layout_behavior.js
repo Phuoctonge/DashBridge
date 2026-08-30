@@ -25,10 +25,10 @@ assert(optionsHtml.includes('id="settingUiScale"')
     && optionsJs.includes('uiScale: document.getElementById("settingUiScale").value'),
     'Options must expose and save the shared scale');
 
-for (const page of ['html/batch.html', 'html/dashbridge.html', 'pages/options/options.html', 'html/popup.html', 'html/recorder.html', 'html/test-runner.html', 'html/worklog.html']) {
+for (const page of ['html/batch.html', 'html/dashbridge.html', 'pages/options/options.html', 'html/popup.html', 'html/recorder.html', 'html/test-runner.html', 'pages/worklog/worklog.html']) {
     assert(read(page).includes('name="viewport"'), `${page} must declare its viewport`);
 }
-for (const page of ['html/batch.html', 'html/dashbridge.html', 'pages/options/options.html', 'html/recorder.html', 'html/test-runner.html', 'html/worklog.html', 'html/ui/debug-easter-egg.html']) {
+for (const page of ['html/batch.html', 'html/dashbridge.html', 'pages/options/options.html', 'html/recorder.html', 'html/test-runner.html', 'pages/worklog/worklog.html', 'html/ui/debug-easter-egg.html']) {
     assert(read(page).includes('data-ui-scale="auto"'), `${page} must scale correctly from its first frame`);
 }
 
@@ -52,8 +52,8 @@ assert(testRunnerCss.includes('.tr-layout') && testRunnerCss.includes('max-width
     && testRunnerCss.includes('#trRunMode') && testRunnerCss.includes('width: auto')
     && testRunnerCss.includes('min-width: 57.5rem') && testRunnerCss.includes('.tr-results-wrap { overflow: auto; }'),
     'Test Runner controls and results must use wide screens while the table keeps a local scroller');
-assert(read('css/worklog.css').includes('min-width: 68rem')
-    && read('css/worklog.css').includes('overflow: auto'),
+assert(read('pages/worklog/worklog.css').includes('min-width: 68rem')
+    && read('pages/worklog/worklog.css').includes('overflow: auto'),
     'Worklog must keep usable columns inside a local horizontal scroller');
 assert(read('css/recorder.css').includes('@media (max-width: 820px)')
     && read('css/recorder.css').includes('.table-wrap { flex: 1 1 auto;')

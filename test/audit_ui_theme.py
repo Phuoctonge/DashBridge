@@ -20,7 +20,7 @@ import sys
 # === Пути ===
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 THEME_CSS = os.path.join(ROOT, 'css/theme.css')
-HTML_FILES = ['html/dashbridge.html', 'html/popup.html', 'pages/options/options.html', 'html/worklog.html', 'html/batch.html']
+HTML_FILES = ['html/dashbridge.html', 'html/popup.html', 'pages/options/options.html', 'pages/worklog/worklog.html', 'html/batch.html']
 CSS_FILES = ['css/dashbridge.css', 'css/batch.css']
 JS_FILES = ['js/theme.js']
 
@@ -336,15 +336,15 @@ if batch_css:
 # ============================================================
 # 9. manifest.json содержит css/theme.css в web_accessible_resources
 # ============================================================
-print("\n=== 9. html/worklog.html: ширина колонки Start Date ===")
-worklog = read_file(os.path.join(ROOT, 'css', 'worklog.css'))
-test("html/worklog.html .col-date width >= 12.5rem",
+print("\n=== 9. pages/worklog/worklog.html: ширина колонки Start Date ===")
+worklog = read_file(os.path.join(ROOT, 'pages', 'worklog', 'worklog.css'))
+test("pages/worklog/worklog.html .col-date width >= 12.5rem",
      worklog is not None and re.search(r"\.col-date\s*\{[^}]*width:\s*12\.5rem", worklog) is not None,
      "Колонка Start Date должна быть >= 200px для вмещения '01/07/2026 09:00' + иконка")
-test("html/worklog.html .col-date min-width: 12.5rem",
+test("pages/worklog/worklog.html .col-date min-width: 12.5rem",
      worklog is not None and 'min-width: 12.5rem' in worklog,
      "min-width нужен чтобы колонка не сжималась")
-test("html/worklog.html .col-date input text-align: left",
+test("pages/worklog/worklog.html .col-date input text-align: left",
      worklog is not None and re.search(r"\.col-date\s+input\s*\{[^}]*text-align:\s*left", worklog) is not None,
      "text-align: left чтобы текст не упирался в иконку календаря")
 

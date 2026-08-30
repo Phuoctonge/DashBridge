@@ -288,12 +288,12 @@ DashBridge предназначен для работы с корпоратив�
 DashBridge/
 ├── manifest.json            # Manifest V3
 ├── pages/                   # Feature-папки полноразмерных страниц
-│   └── options/             # HTML, CSS и логика настроек расширения
+│   ├── options/             # HTML, CSS и логика настроек расширения
+│   └── worklog/             # HTML, CSS и логика Jira Worklog
 ├── html/                    # Остальные страницы до их поэтапного переноса
 │   ├── popup.html           # Главное popup-окно
 │   ├── dashbridge.html      # Единый Grafana-дашборд
 │   ├── batch.html           # Массовый сбор снимков
-│   ├── worklog.html         # Jira Worklog Manager
 │   ├── recorder.html        # Traffic Recorder
 │   ├── test-runner.html     # Диагностика и E2E-проверки
 │   └── ui/                  # Изолированная debug UI-страница и sprites

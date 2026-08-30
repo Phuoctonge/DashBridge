@@ -24,12 +24,12 @@ worklog, Traffic Recorder и Popup-инструменты для Grafana/Jira/Co
 manifest.json
 ├── AGENTS.md                   # Обязательная точка входа для AI-анализа
 ├── pages/                      # Feature-папки полноразмерных extension pages
-│   └── options/                # HTML, CSS и контроллер настроек
+│   ├── options/                # HTML, CSS и контроллер настроек
+│   └── worklog/                # Jira Worklog: HTML, CSS и контроллер
 ├── html/                       # Остальные production HTML до их поэтапного переноса
 │   ├── popup.html              # Основной Popup
 │   ├── dashbridge.html         # Единый дашборд Grafana
 │   ├── batch.html              # Пакетный PNG/ZIP и серии
-│   ├── worklog.html            # Jira worklog
 │   ├── test-runner.html        # Живые E2E-сценарии
 │   ├── recorder.html           # Traffic record/replay и .dashflow
 │   └── ui/                     # Изолированная debug UI-страница и sprites
