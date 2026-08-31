@@ -116,7 +116,7 @@ assert(recorderCss.includes('.comparison-controls > :not(.sr-only) { flex: 1 1 1
     'comparison controls must fill narrow layouts without overflow');
 assert(recorderCss.includes('.network-switches { display: grid; grid-template-columns: minmax(0,1fr);'),
     'cache and cookie switches must be arranged vertically');
-for (const asset of ['vendor/jszip.min.js', 'js/shared/dashflow-schema.js', 'js/shared/dashflow-compare.js', 'js/shared/dashflow-xlsx.js', '../shared/operation-progress-window.js', 'recorder-dashflow-export.js', 'recorder-dashflow-io.js', 'recorder-view.js', 'recorder.js']) {
+for (const asset of ['vendor/jszip.min.js', 'js/shared/dashflow-schema.js', 'js/shared/dashflow-compare.js', 'js/shared/dashflow-xlsx.js', '../shared/operation-progress-window.js', 'recorder-dashflow-export.js', 'recorder-dashflow-io.js', 'recorder-view.js', 'recorder-replay.js', 'recorder.js']) {
     assert(html.includes(asset), `recorder page must load ${asset}`);
 }
 assert(html.indexOf('vendor/jszip.min.js') < html.indexOf('recorder.js'), 'JSZip must load before the recorder controller');
@@ -129,6 +129,7 @@ assert(html.indexOf('recorder-view.js') < html.indexOf('recorder.js'),
 
 const recorder = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recorder.js'), 'utf8');
 const recorderView = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recorder-view.js'), 'utf8');
+const recorderReplay = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recorder-replay.js'), 'utf8');
 const dashflowIo = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recorder-dashflow-io.js'), 'utf8');
 const dashflowExport = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recorder-dashflow-export.js'), 'utf8');
 assert(recorder.includes('Network.getResponseBody'), 'network recorder must capture response bodies through CDP');
@@ -165,14 +166,14 @@ assert(recorder.includes('cookies: требуется разрешение incog
 assert(recorder.includes('dashbridgeRecorderDraft'), 'Recorder must preserve its draft while Chrome reloads the extension for an incognito permission change');
 assert(recorder.includes('dashbridgeRecorderSettings') && recorder.includes('restoreRecorderSettings') && recorder.includes('scheduleRecorderSettingsSave'),
     'Recorder must persist the site, Disable Cache and Disable Cookies choices between page openings');
-assert(recorder.includes('performDomActionWithWait'), 'replay must wait for asynchronously rendered elements');
-assert(recorder.includes('waitForExpectedNavigation'), 'replay must wait for navigation caused by a recorded click');
-assert(recorder.includes('normalizeReplaySteps'), 'replay must remove delayed duplicate input events from legacy recordings');
-assert(!recorder.includes('document.elementFromPoint') && !recorder.includes('clickPoint') && !recorder.includes('viewportWidth'),
+assert(recorderReplay.includes('performDomActionWithWait'), 'replay must wait for asynchronously rendered elements');
+assert(recorderReplay.includes('waitForExpectedNavigation'), 'replay must wait for navigation caused by a recorded click');
+assert(recorderReplay.includes('normalizeReplaySteps'), 'replay must remove delayed duplicate input events from legacy recordings');
+assert(!recorderReplay.includes('document.elementFromPoint') && !recorderReplay.includes('clickPoint') && !recorderReplay.includes('viewportWidth'),
     'record and replay must never locate elements by viewport coordinates');
-assert(recorder.includes('document.getElementById(locator.id)') && recorder.includes('matchesFingerprint'),
+assert(recorderReplay.includes('document.getElementById(locator.id)') && recorderReplay.includes('matchesFingerprint'),
     'replay must prefer stable locator attributes and validate structural CSS fallbacks');
-assert(recorder.includes('Неоднозначный локатор') && recorder.includes('Надёжный элемент не найден'),
+assert(recorderReplay.includes('Неоднозначный локатор') && recorderReplay.includes('Надёжный элемент не найден'),
     'replay must stop instead of guessing when a locator is ambiguous or stale');
 assert(recorder.includes('activeStepId: null'), 'traffic requests must be attributed to the active scenario step');
 assert(recorderView.includes("heading.className = 'traffic-step-group'"), 'traffic table must render a heading for every scenario step');
@@ -181,13 +182,13 @@ assert(recorder.includes('selectedStepId: null'), 'steps sidebar must support fi
 assert(recorderView.includes('sensitiveNamePattern'), 'request details must mask credential-like fields by default');
 assert(recorderView.includes('200 - (performance.now() - lastRenderAt)'), 'live traffic rendering must be throttled');
 assert(recorder.includes('DashBridgeOperationProgress?.create'), 'record and replay must expose the shared cancellable progress window');
-assert(recorder.includes("title: 'Traffic Recorder · Replay'") && recorder.includes("unit: 'запросов'"),
+assert(recorderReplay.includes("title: 'Traffic Recorder · Replay'") && recorder.includes("unit: 'запросов'"),
     'progress window must distinguish recording traffic from replay steps');
 assert(recorder.includes('openPictureInPicture') && recorder.includes('function buildRecorderWindowLayout()') && recorder.includes('...(layout?.controlled || {})'),
     'Recorder must use an always-on-top PiP controller without reserving space for a side popup');
 assert(!recorder.includes('operationProgressController?.open({') && !recorder.includes('layout.progress'),
     'Recorder must not open the removed popup side panel');
-assert(recorder.includes("if (state.stopRequested) throw new Error('Операция остановлена пользователем')"),
+assert(recorderReplay.includes("if (state.stopRequested) throw new Error('Операция остановлена пользователем')"),
     'forced replay cancellation must interrupt asynchronous waits');
 assert(recorderView.includes('→ navigate ${step._dashbridge.navigationUrl}'), 'traffic group heading must expose navigation caused by an action');
 assert(recorderView.match(/→ navigate \$\{step\._dashbridge\.navigationUrl\}/g)?.length >= 2, 'steps sidebar and traffic groups must both expose action navigation');
