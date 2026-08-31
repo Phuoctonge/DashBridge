@@ -6,6 +6,8 @@ const path = require('path');
 const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
 const html = read('pages/dashbridge/dashbridge.html');
 const dashboard = read('pages/dashbridge/dashbridge.js');
+const profileController = read('pages/dashbridge/dashbridge-profile-controller.js');
+const frameController = read('pages/dashbridge/dashbridge-frame-controller.js');
 const reportUi = read('pages/dashbridge/dashbridge-report-ui.js');
 const reportAudit = read('pages/dashbridge/dashbridge-report-audit.js');
 const reportTestRunner = read('pages/dashbridge/dashbridge-report-test-runner.js');
@@ -187,13 +189,13 @@ assert(reportUi.includes('Автоматически по порогу граф�
     && reportUi.includes('Без SLA — информационная фраза')
     && reportUi.includes('Только при нарушении SLA'),
     'common panel setup must use outcome-oriented choices and automatic Grafana thresholds');
-assert(dashboard.includes('dashboardLayoutSignature')
-    && dashboard.includes('if (!dashboardLayoutChanged) return;'),
+assert(profileController.includes('dashboardLayoutSignature')
+    && profileController.includes("previousDashboardLayoutSignature === dashboardLayoutSignature(getActiveProfile())"),
     'report-only saves must not reconcile or move live Grafana iframe cards');
-assert(dashboard.includes('!iframe?.isConnected')
-    && dashboard.includes('iframe.dataset.dashbridgeOrigin !== targetOrigin')
+assert(frameController.includes('!iframe?.isConnected')
+    && frameController.includes('iframe.dataset.dashbridgeOrigin !== targetOrigin')
     && dashboard.includes('sourceIframe.dataset.dashbridgeOrigin = e.origin;')
-    && dashboard.includes("iframe.dataset.dashbridgeLoaded = 'false';"),
+    && frameController.includes("iframe.dataset.dashbridgeLoaded = 'false';"),
     'postMessage must reject detached or unverified iframe windows before using a Grafana target origin');
 assert(!reportUi.includes('Единица измерения\n')
     && visual.includes('const resolvedUnit = String(sla.unit || unit ||'),

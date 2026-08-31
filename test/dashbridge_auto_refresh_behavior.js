@@ -4,6 +4,8 @@ const assert = require('assert');
 const fs = require('fs');
 
 const source = fs.readFileSync('pages/dashbridge/dashbridge.js', 'utf8');
+const profileSource = fs.readFileSync('pages/dashbridge/dashbridge-profile-controller.js', 'utf8');
+const frameSource = fs.readFileSync('pages/dashbridge/dashbridge-frame-controller.js', 'utf8');
 const iframeSource = fs.readFileSync('js/content/grafana-iframe.js', 'utf8');
 const html = fs.readFileSync('pages/dashbridge/dashbridge.html', 'utf8');
 const css = fs.readFileSync('pages/dashbridge/dashbridge.css', 'utf8');
@@ -26,9 +28,9 @@ assert(applyToolsStart >= 0 && applyToolsEnd > applyToolsStart
     && !applyToolsSource.includes('chrome.storage.sync.get'),
     'every ready iframe must reuse the settings cache instead of repeating sync-storage IPC');
 
-assert(source.includes('iframe.dataset.dashbridgeOrigin !== targetOrigin')
-    && source.includes("delete iframe.dataset.dashbridgeOrigin;")
-    && !source.includes('iframe.contentWindow.location.origin'),
+assert(frameSource.includes('iframe.dataset.dashbridgeOrigin !== targetOrigin')
+    && frameSource.includes("delete iframe.dataset.dashbridgeOrigin;")
+    && !frameSource.includes('iframe.contentWindow.location.origin'),
     'the hot postMessage path must use a verified origin cache without normal cross-origin exceptions');
 
 const forceStart = source.indexOf("document.getElementById('forceRefreshBtn').addEventListener");
@@ -62,13 +64,13 @@ assert(readyStart >= 0 && readyEnd > readyStart
     && renderedSource.includes('requestDashboardPanelAnalysis(activeDashboardPanelAnalysis)'),
     'an analysis dialog must resume observing after its Grafana iframe reloads');
 
-const storageSyncStart = source.indexOf('async function syncProfilesFromStorage()');
-const storageSyncEnd = source.indexOf("chrome.storage.onChanged.addListener((changes, areaName) => {", storageSyncStart);
-const storageSyncSource = source.slice(storageSyncStart, storageSyncEnd);
+const storageSyncStart = profileSource.indexOf('const syncProfilesFromStorage = async () => {');
+const storageSyncEnd = profileSource.indexOf("chrome.storage.onChanged.addListener((changes, areaName) => {", storageSyncStart);
+const storageSyncSource = profileSource.slice(storageSyncStart, storageSyncEnd);
 assert(storageSyncStart >= 0 && storageSyncEnd > storageSyncStart
-    && storageSyncSource.includes('await DashBridgeProfileStore.flush();')
-    && storageSyncSource.indexOf('await DashBridgeProfileStore.flush();')
-        < storageSyncSource.indexOf('await DashBridgeProfileStore.load();'),
+    && storageSyncSource.includes('await profileStore.flush();')
+    && storageSyncSource.indexOf('await profileStore.flush();')
+        < storageSyncSource.indexOf('await profileStore.load();'),
     'profile storage events must wait for the newest local snapshot before deciding to rebuild iframes');
 
 const pauseStart = source.indexOf('async function togglePanelPause(id)');
@@ -94,17 +96,17 @@ assert(iframeSettingsStart >= 0 && iframeSettingsEnd > iframeSettingsStart
     && iframeSettingsSource.includes('reloadFrame: previousSrc !== panel.src || previousGrafanaTheme !== panel.grafanaTheme'),
     'layout-only iframe settings must not navigate the selected Grafana frame');
 
-assert(source.includes('else reconcileDashboardPanelCards(previousPanelStates);')
+assert(profileSource.includes('else reconcileDashboardPanelCards(previousPanelStates);')
     && source.includes('updatePanelCard(panel.id, { reloadFrame: false });')
     && source.includes('appendDashboardPanelCards([addedPanel]);')
     && source.includes('appendDashboardPanelCards(newPanels);')
-    && source.includes('adoptPanelState(previous, panel)'),
+    && profileSource.includes('adoptPanelState(previous, panel)'),
     'panel-only storage sync and additions must preserve unchanged iframe elements');
 
-const switchStart = source.indexOf('async function switchProfile(id)');
-const switchEnd = source.indexOf('async function createProfile(name)', switchStart);
-const switchSource = source.slice(switchStart, switchEnd);
-assert(switchSource.includes('currentProfile.panels = panels;')
+const switchStart = profileSource.indexOf('const switchProfile = async id => {');
+const switchEnd = profileSource.indexOf('const createProfile = async name => {', switchStart);
+const switchSource = profileSource.slice(switchStart, switchEnd);
+assert(switchSource.includes('currentProfile.panels = getPanels();')
     && switchSource.includes('await saveProfiles();')
     && !switchSource.includes('await savePanels();'),
     'a profile switch must persist one snapshot instead of emitting two storage changes');

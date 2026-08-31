@@ -1,9 +1,6 @@
 let profiles = [];
 let activeProfileId = null;
 let panels = []; // Всегда синхронизирован с активным профилем
-let profilesLoaded = false;
-let profileStorageSyncVersion = 0;
-const DASHBRIDGE_TAB_ACTIVE_PROFILE_KEY = 'dashbridge_tab_activeProfileId';
 const { showAlert, showConfirm, showPrompt } = window.DashBridgeModal;
 const {
     isSupportedPanelUrl,
@@ -18,6 +15,31 @@ const {
     buildPanelExportFileName,
     parsePanelImportText,
 } = window.DashBridgePanelTransfer;
+const dashBridgeProfileController = DashBridgeProfileController.create({
+    profileStore: DashBridgeProfileStore,
+    timeState: DashBridgeTimeState,
+    renderer: DashBridgeRenderer,
+    getProfilePanelIdentity,
+    showAlert,
+    showConfirm,
+    getProfiles: () => profiles,
+    setProfiles: value => { profiles = value; },
+    getActiveProfileId: () => activeProfileId,
+    setActiveProfileId: value => { activeProfileId = value; },
+    getPanels: () => panels,
+    setPanels: value => { panels = value; },
+    loadActiveProfileTimeState,
+    syncTimeControlsFromState,
+    renderDashboard,
+    panelFrameSignature,
+    adoptPanelState,
+    reconcileDashboardPanelCards,
+});
+const {
+    getActiveProfile, loadProfiles, saveProfiles, savePanels, switchProfile, createProfile,
+    renameActiveProfile, deleteProfile, renderProfileSwitcher, getCurrentProfilePanelIdentities,
+    currentProfileHasPanel, setTabActiveProfileId,
+} = dashBridgeProfileController;
 const {
     openPanelEditor: openPanelReportEditor,
     openReportSettings,
@@ -29,59 +51,15 @@ const {
     escapeHtml,
 });
 
-function getTabActiveProfileId() {
-    try { return sessionStorage.getItem(DASHBRIDGE_TAB_ACTIVE_PROFILE_KEY) || null; }
-    catch { return null; }
-}
-
-function setTabActiveProfileId(id) {
-    activeProfileId = id || null;
-    try {
-        if (activeProfileId) sessionStorage.setItem(DASHBRIDGE_TAB_ACTIVE_PROFILE_KEY, activeProfileId);
-        else sessionStorage.removeItem(DASHBRIDGE_TAB_ACTIVE_PROFILE_KEY);
-    } catch { /* The in-memory selection remains valid when sessionStorage is unavailable. */ }
-    return activeProfileId;
-}
-
 function normalizePanelMetadataText(value, maxLength = 96) {
     return String(value ?? '').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, maxLength);
 }
 
-function getFrameOrigin(iframe) {
-    try {
-        const src = iframe.dataset.src || iframe.src;
-        if (src && src !== 'about:blank') return new URL(src).origin;
-    } catch (e) { }
-    return null;
-}
-
-function postToDashboardFrame(iframe, message) {
-    // Async work (for example chrome.storage reads) can finish after a panel
-    // card has already been replaced. A detached iframe keeps its old data
-    // attributes, while its WindowProxy falls back to the extension document.
-    if (!iframe?.isConnected || !iframe.contentWindow || iframe.dataset.dashbridgeLoaded !== 'true') return false;
-    const targetOrigin = getFrameOrigin(iframe);
-    if (!targetOrigin || iframe.dataset.dashbridgeOrigin !== targetOrigin) return false;
-    try {
-        // dashbridgeOrigin is set only after a message from this exact iframe
-        // has passed the source-window and origin checks below. Avoid probing
-        // cross-origin location on every cursor/report message: that throws in
-        // the normal case and used to make the hottest postMessage path costly.
-        iframe.contentWindow.postMessage(message, targetOrigin);
-        return true;
-    } catch (e) {
-        // An iframe can begin navigating between the ready check and postMessage.
-        return false;
-    }
-}
-
-function navigateDashboardFrame(iframe, url) {
-    if (!iframe || !url) return;
-    iframe.dataset.dashbridgeLoaded = 'false';
-    iframe.dataset.dashbridgeRendered = 'false';
-    delete iframe.dataset.dashbridgeOrigin;
-    iframe.src = url;
-}
+const {
+    getFrameOrigin,
+    post: postToDashboardFrame,
+    navigate: navigateDashboardFrame,
+} = DashBridgeFrameController;
 
 let crosshairMode = 'line';
 let crosshairThickness = 1;
@@ -903,245 +881,8 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     }
 });
 
-// ════════════════════════════════════════════════════════
-//  Профили
-// ════════════════════════════════════════════════════════
-
-function getActiveProfile() {
-    return profiles.find(p => p.id === activeProfileId) || profiles[0] || null;
-}
-
-async function loadProfiles() {
-    const stored = await DashBridgeProfileStore.load();
-    profiles = stored.profiles;
-    const tabActiveProfileId = getTabActiveProfileId();
-    setTabActiveProfileId(profiles.some(profile => profile.id === tabActiveProfileId)
-        ? tabActiveProfileId : stored.activeProfileId);
-    profiles.forEach(profile => {
-        profile.timeState = DashBridgeTimeState.normalize(profile.timeState);
-    });
-    loadActiveProfileTimeState();
-    panels = [...(getActiveProfile()?.panels || [])];
-    profilesLoaded = true;
-    const skipped = (stored.skippedProfiles || 0) + (stored.skippedPanels || 0);
-    if (skipped) {
-        await showAlert(`Пропущено повреждённых записей DashBridge: ${skipped}. Остальные профили загружены безопасно.`);
-    }
-}
-
-function saveProfiles() {
-    return DashBridgeProfileStore.save(profiles, activeProfileId).then(result => {
-        document.documentElement.dataset.dashbridgeStorageDirty = 'false';
-        return result;
-    }).catch(error => {
-        document.documentElement.dataset.dashbridgeStorageDirty = 'true';
-        console.error('Не удалось сохранить профили DashBridge:', error);
-        return { current: false, error: error.message || String(error) };
-    });
-}
-
-// savePanels всегда сохраняет в активный профиль
-function savePanels() {
-    const profile = getActiveProfile();
-    if (profile) {
-        profile.panels = panels;
-        return saveProfiles();
-    }
-}
-
-function profileStorageSignature(profileList, selectedProfileId) {
-    try { return JSON.stringify({ profiles: profileList, activeProfileId: selectedProfileId }); }
-    catch { return ''; }
-}
-
-function dashboardLayoutSignature(profile) {
-    try {
-        return JSON.stringify({
-            id: profile?.id || '',
-            timeState: DashBridgeTimeState.normalize(profile?.timeState),
-            panels: (profile?.panels || []).map(panel => ({
-                id: panel.id,
-                title: panel.title,
-                width: panel.width,
-                height: panel.height,
-                frame: panelFrameSignature(panel)
-            }))
-        });
-    } catch {
-        return '';
-    }
-}
-
-async function syncProfilesFromStorage() {
-    if (!profilesLoaded) return;
-    const syncVersion = ++profileStorageSyncVersion;
-    // A burst of panel metadata/settings saves is persisted as a sequence of
-    // immutable snapshots. chrome.storage.onChanged is emitted for every
-    // committed snapshot, including our own intermediate ones. Reading one of
-    // those snapshots immediately can roll the in-memory profile back and
-    // rebuild every iframe. Wait until our writer is idle so a self-generated
-    // event is compared with the newest snapshot; genuine external changes
-    // still pass through immediately when there is no local write in flight.
-    await DashBridgeProfileStore.flush();
-    if (syncVersion !== profileStorageSyncVersion) return;
-    const stored = await DashBridgeProfileStore.load();
-    if (syncVersion !== profileStorageSyncVersion) return;
-    const nextProfiles = stored.profiles;
-    nextProfiles.forEach(profile => {
-        profile.timeState = DashBridgeTimeState.normalize(profile.timeState);
-    });
-    // Profile data is shared, but the selected profile belongs to this tab.
-    // A save from another DashBridge tab must not navigate the current one.
-    const nextActiveProfileId = nextProfiles.some(profile => profile.id === activeProfileId)
-        ? activeProfileId
-        : nextProfiles.some(profile => profile.id === stored.activeProfileId)
-            ? stored.activeProfileId : nextProfiles[0]?.id || null;
-    if (profileStorageSignature(profiles, activeProfileId)
-        === profileStorageSignature(nextProfiles, nextActiveProfileId)) return;
-
-    const previousActiveProfileId = activeProfileId;
-    const previousPanels = panels;
-    const previousPanelStates = previousPanels.map(panel => ({
-        id: panel.id,
-        title: panel.title,
-        paused: !!panel.paused,
-        frameSignature: panelFrameSignature(panel)
-    }));
-    const previousTimeState = DashBridgeTimeState.normalize(getActiveProfile()?.timeState);
-    const previousActiveProfileSignature = profileStorageSignature([getActiveProfile()], activeProfileId);
-    const previousDashboardLayoutSignature = dashboardLayoutSignature(getActiveProfile());
-    profiles = nextProfiles;
-    setTabActiveProfileId(nextActiveProfileId);
-    panels = [...(getActiveProfile()?.panels || [])];
-    const previousById = new Map(previousPanels.map(panel => [panel.id, panel]));
-    const previousStateById = new Map(previousPanelStates.map(state => [state.id, state]));
-    panels = panels.map(panel => {
-        const previous = previousById.get(panel.id);
-        const previousState = previousStateById.get(panel.id);
-        const canKeepCardBindings = previous && previousState
-            && previousState.frameSignature === panelFrameSignature(panel)
-            && !(previousState.paused && previousState.title !== panel.title);
-        return canKeepCardBindings ? adoptPanelState(previous, panel) : panel;
-    });
-    const activeProfile = getActiveProfile();
-    if (activeProfile) activeProfile.panels = panels;
-    renderProfileSwitcher();
-    const activeProfileChanged = previousActiveProfileId !== activeProfileId
-        || previousActiveProfileSignature !== profileStorageSignature([getActiveProfile()], activeProfileId);
-    if (!activeProfileChanged) return;
-    const dashboardLayoutChanged = previousDashboardLayoutSignature !== dashboardLayoutSignature(getActiveProfile());
-    if (!dashboardLayoutChanged) return;
-    loadActiveProfileTimeState();
-    syncTimeControlsFromState();
-    const activeProfileSwitched = previousActiveProfileId !== activeProfileId;
-    const timeStateChanged = JSON.stringify(previousTimeState)
-        !== JSON.stringify(DashBridgeTimeState.normalize(getActiveProfile()?.timeState));
-    if (activeProfileSwitched || timeStateChanged) await renderDashboard();
-    else reconcileDashboardPanelCards(previousPanelStates);
-}
-
-chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName !== 'local'
-        || (!changes.dashbridge_profiles && !changes.dashbridge_activeProfileId)) return;
-    void syncProfilesFromStorage().catch(error => {
-        console.error('Не удалось синхронизировать профили DashBridge между вкладками:', error);
-    });
-});
-
-async function switchProfile(id) {
-    if (id === activeProfileId) return;
-    const currentProfile = getActiveProfile();
-    if (currentProfile) currentProfile.panels = panels;
-    setTabActiveProfileId(id);
-    const profile = getActiveProfile();
-    panels = profile ? [...(profile.panels || [])] : [];
-    loadActiveProfileTimeState();
-    await saveProfiles();
-    renderProfileSwitcher();
-    syncTimeControlsFromState();
-    renderDashboard();
-}
-
-async function createProfile(name) {
-    const currentProfile = getActiveProfile();
-    if (currentProfile) currentProfile.panels = panels;
-    const newProfile = {
-        id: crypto.randomUUID(),
-        name: name.trim().slice(0, 120),
-        panels: [],
-        timeState: DashBridgeTimeState.defaults()
-    };
-    profiles.push(newProfile);
-    setTabActiveProfileId(newProfile.id);
-    panels = [];
-    loadActiveProfileTimeState();
-    await saveProfiles();
-    renderProfileSwitcher();
-    syncTimeControlsFromState();
-    renderDashboard();
-}
-
-document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') void DashBridgeProfileStore.flush().catch(() => undefined);
-});
-window.addEventListener('pagehide', () => { void DashBridgeProfileStore.checkpoint().catch(() => undefined); });
-
-function renameActiveProfile(newName) {
-    const profile = getActiveProfile();
-    if (!profile || !newName.trim()) return;
-    profile.name = newName.trim().slice(0, 120);
-    saveProfiles();
-    renderProfileSwitcher();
-}
-
-async function deleteProfile(id) {
-    if (profiles.length <= 1) {
-        await showAlert('Нельзя удалить единственный профиль.');
-        return;
-    }
-    const profile = profiles.find(p => p.id === id);
-    if (!profile) return;
-    if (!await showConfirm(`Удалить профиль «${profile.name}»?\nВсе панели этого профиля будут потеряны.`)) return;
-
-    const idx = profiles.findIndex(p => p.id === id);
-    profiles.splice(idx, 1);
-
-    if (activeProfileId === id) {
-        // Переходим на соседний профиль
-        const newActive = profiles[Math.max(0, idx - 1)];
-        setTabActiveProfileId(newActive.id);
-        panels = [...(newActive.panels || [])];
-        loadActiveProfileTimeState();
-        syncTimeControlsFromState();
-        renderDashboard();
-    }
-
-    saveProfiles();
-    renderProfileSwitcher();
-}
-
-function renderProfileSwitcher() {
-    DashBridgeRenderer.renderProfileList({
-        profiles,
-        activeProfileId,
-        onSelect(id) {
-            document.getElementById('profileDropdown').style.display = 'none';
-            switchProfile(id);
-        }
-    });
-}
-
 function escapeHtml(str) {
     return DashBridgeRenderer.escapeHtml(str);
-}
-
-function getCurrentProfilePanelIdentities() {
-    return new Set(panels.map(panel => getProfilePanelIdentity(panel.src)).filter(Boolean));
-}
-
-function currentProfileHasPanel(value) {
-    const identity = getProfilePanelIdentity(value);
-    return !!identity && getCurrentProfilePanelIdentities().has(identity);
 }
 
 // ════════════════════════════════════════════════════════

@@ -37,7 +37,7 @@ def test(name, condition, detail=""):
 
 
 def read_file():
-    return DASHBRIDGE_JS.read_text(encoding="utf-8")
+    return DASHBRIDGE_JS.read_text(encoding="utf-8") + (ROOT / "pages/dashbridge/dashbridge-profile-controller.js").read_text(encoding="utf-8")
 
 
 print("=" * 70)
@@ -248,7 +248,7 @@ test(
 
 # deleteProfile должен быть async
 delete_profile_async = re.search(
-    r"async\s+function\s+deleteProfile\s*\(",
+    r"(?:async\s+function\s+deleteProfile\s*\(|const\s+deleteProfile\s*=\s*async)",
     content
 )
 test(
