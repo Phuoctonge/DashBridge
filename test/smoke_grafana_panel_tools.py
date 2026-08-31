@@ -10,6 +10,7 @@ VISUAL_ENGINE = (ROOT / "js/content/grafana-visual-engine.js").read_text(encodin
 PANEL_DEFINITION = (ROOT / "js/content/grafana-panel-definition.js").read_text(encoding="utf-8")
 CPU_CAPACITY_FILTER = (ROOT / "js/content/grafana-cpu-capacity-filter.js").read_text(encoding="utf-8")
 DASHBOARD = (ROOT / "pages/dashbridge/dashbridge.js").read_text(encoding="utf-8")
+TIME_CONTROLLER = (ROOT / "pages/dashbridge/dashbridge-time-controller.js").read_text(encoding="utf-8")
 IFRAME = (ROOT / "js/content/grafana-iframe.js").read_text(encoding="utf-8")
 POPUP = (ROOT / "pages/popup/popup.html").read_text(encoding="utf-8")
 OPTIONS = (ROOT / "pages/options/options.js").read_text(encoding="utf-8")
@@ -42,10 +43,10 @@ checks = {
         and "state?.legendMode === 'fast_complete_hide'" in LEGEND_SELECTION,
     "complete-hide interceptor runs for a legend-only filter": "const hasDataTransform" in COMMON
         and "hasDataTransform()" in COMMON,
-    "DashBridge serializes the complete-hide filter before iframe navigation": "applyPanelLegendFilterToUrl" in DASHBOARD
-        and "dashbridgeLegendFilter" in DASHBOARD,
-    "DashBridge keeps the complete-hide filter out of request URLs": "url.hash = hashParams.toString();" in DASHBOARD
-        and "url.searchParams.set(DASHBRIDGE_LEGEND_FILTER_PARAM" not in DASHBOARD
+    "DashBridge serializes the complete-hide filter before iframe navigation": "applyPanelLegendFilterToUrl" in TIME_CONTROLLER
+        and "dashbridgeLegendFilter" in TIME_CONTROLLER,
+    "DashBridge keeps the complete-hide filter out of request URLs": "url.hash = hashParams.toString();" in TIME_CONTROLLER
+        and "url.searchParams.set(LEGEND_FILTER_PARAM" not in TIME_CONTROLLER
         and "new URLSearchParams(url.hash.slice(1)).get('dashbridgeLegendFilter')" in COMMON,
     "Dashboard refresh regenerates the iframe URL with the filter": "new URL(applyPanelParamsToUrl(panel, iframe.src))" in DASHBOARD,
     "Grafana reads the serialized filter at document start": "readBootstrapLegendFilter" in COMMON
@@ -185,9 +186,9 @@ checks = {
     "series threshold filter displays the detected unit": "panel-series-filter-unit" in PANEL_SETTINGS,
     "RAM percent conversion overrides the series filter unit": "const getSeriesFilterUnitText" in PANEL_SETTINGS
         and "'Единица: %'" in PANEL_SETTINGS,
-    "Dashboard serializes the response-level series filter before iframe navigation": "dashbridgeSeriesQueryFilter" in DASHBOARD
+    "Dashboard serializes the response-level series filter before iframe navigation": "dashbridgeSeriesQueryFilter" in TIME_CONTROLLER
         and "const bootstrapSeriesQueryFilter = readBootstrapSeriesFilter();" in COMMON
-        and "dashbridgeSeriesFilter'" not in DASHBOARD,
+        and "dashbridgeSeriesFilter'" not in TIME_CONTROLLER,
     "Threshold settings expose an enabled-by-default notifications switch": "name=\"thresholdNotifyEnabled\"" in PANEL_SETTINGS
         and "Порог на графике" in PANEL_SETTINGS
         and "Уведомлять о превышении" in PANEL_SETTINGS

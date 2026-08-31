@@ -10,6 +10,7 @@ PANEL_URL = (ROOT / "pages/dashbridge/dashbridge-panel-url.js").read_text(encodi
 PANEL_TRANSFER = (ROOT / "pages/dashbridge/dashbridge-panel-transfer.js").read_text(encoding="utf-8")
 PROFILE_STORE = (ROOT / "js/shared/dashbridge-profile-store.js").read_text(encoding="utf-8")
 TIME_STATE = (ROOT / "pages/dashbridge/dashbridge-time-state.js").read_text(encoding="utf-8")
+TIME_CONTROLLER = (ROOT / "pages/dashbridge/dashbridge-time-controller.js").read_text(encoding="utf-8")
 MIGRATION = (ROOT / "pages/dashbridge/dashbridge-data-migration.js").read_text(encoding="utf-8")
 HTML = (ROOT / "pages/dashbridge/dashbridge.html").read_text(encoding="utf-8")
 
@@ -27,14 +28,14 @@ checks = {
     "profile CRUD entry points exist": all(token in PROFILE for token in ["const createProfile", "const renameActiveProfile", "const deleteProfile = async"]),
     "panel export uses a JSON blob": "new Blob([JSON.stringify(data, null, 2)]" in JS,
     "panel import validates JSON before use": "JSON.parse(text)" in PANEL_TRANSFER and "Array.isArray(data?.panels)" in PANEL_TRANSFER,
-    "time range updates unloaded and loaded frames": "iframe.dataset.src" in JS and "postToDashboardFrame(iframe" in JS,
-    "time state belongs to each profile": "profile.timeState = { from: globalTimeFrom, to: globalTimeTo, refresh: globalRefresh }" in JS
+    "time range updates unloaded and loaded frames": "iframe.dataset.src" in TIME_CONTROLLER and "postToDashboardFrame(iframe" in TIME_CONTROLLER,
+    "time state belongs to each profile": "profile.timeState = getState()" in TIME_CONTROLLER
         and "loadActiveProfileTimeState();" in JS,
     "legacy global time uses an isolated one-shot migration": "dashbridge_dataSchemaVersion" in MIGRATION
         and "migrateProfiles" in MIGRATION and "clearLegacyTimeState" in MIGRATION
         and 'src="dashbridge-data-migration.js"' in HTML,
     "dashboard loads the Grafana time helper": 'src="../../js/shared/grafana-time.js"' in HTML,
-    "panel URLs retain their time format": "DashBridgeTimeState.applyToUrl" in JS
+    "panel URLs retain their time format": "timeState.applyToUrl" in TIME_CONTROLLER
         and "detectGrafanaTimeFormat(urlValue)" in TIME_STATE,
     "time controls are present": all(token in HTML for token in ['id="absTimeFrom"', 'id="absTimeTo"', 'id="applyAbsoluteTime"']),
     "crosshair mode is stored": "dashbridge_crosshairMode" in JS,

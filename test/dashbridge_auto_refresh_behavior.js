@@ -4,6 +4,7 @@ const assert = require('assert');
 const fs = require('fs');
 
 const source = fs.readFileSync('pages/dashbridge/dashbridge.js', 'utf8');
+const timeSource = fs.readFileSync('pages/dashbridge/dashbridge-time-controller.js', 'utf8');
 const profileSource = fs.readFileSync('pages/dashbridge/dashbridge-profile-controller.js', 'utf8');
 const frameSource = fs.readFileSync('pages/dashbridge/dashbridge-frame-controller.js', 'utf8');
 const analysisSource = fs.readFileSync('pages/dashbridge/dashbridge-panel-analysis-controller.js', 'utf8');
@@ -34,22 +35,22 @@ assert(frameSource.includes('iframe.dataset.dashbridgeOrigin !== targetOrigin')
     && !frameSource.includes('iframe.contentWindow.location.origin'),
     'the hot postMessage path must use a verified origin cache without normal cross-origin exceptions');
 
-const forceStart = source.indexOf("document.getElementById('forceRefreshBtn').addEventListener");
-const forceEnd = source.indexOf('    updateTimeLabels();', forceStart);
-const forceSource = source.slice(forceStart, forceEnd);
+const forceStart = timeSource.indexOf("documentRef.getElementById('forceRefreshBtn').addEventListener");
+const forceEnd = timeSource.indexOf('            updateLabels();', forceStart);
+const forceSource = timeSource.slice(forceStart, forceEnd);
 assert(forceStart >= 0 && forceEnd > forceStart
     && forceSource.includes('await refreshAllPanels();')
     && !forceSource.includes('navigateDashboardFrame('),
     'Refresh now must traverse and navigate active panels exactly once');
 
-const absoluteStart = source.indexOf("document.getElementById('applyAbsoluteTime').addEventListener");
-const absoluteEnd = source.indexOf("document.querySelectorAll('#refreshPopover", absoluteStart);
-const absoluteSource = source.slice(absoluteStart, absoluteEnd);
+const absoluteStart = timeSource.indexOf("documentRef.getElementById('applyAbsoluteTime').addEventListener");
+const absoluteEnd = timeSource.indexOf("documentRef.querySelectorAll('#refreshPopover", absoluteStart);
+const absoluteSource = timeSource.slice(absoluteStart, absoluteEnd);
 assert(absoluteStart >= 0 && absoluteEnd > absoluteStart
     && absoluteSource.includes('if (requiresNavigation)')
     && absoluteSource.includes('navigateDashboardFrame(iframe, applyPanelParamsToUrl(panel, currentUrl))')
-    && absoluteSource.includes('} else broadcastTimeUpdate();')
-    && absoluteSource.indexOf('broadcastTimeUpdate()') > absoluteSource.indexOf('if (requiresNavigation)'),
+    && absoluteSource.includes('broadcast();')
+    && absoluteSource.indexOf('broadcast()') > absoluteSource.indexOf('if (requiresNavigation)'),
     'absolute ranges must navigate once while relative ranges keep the seamless update path');
 
 const readyStart = source.indexOf("if (e.data.action === 'dashbridgeIframeReady')");
@@ -111,11 +112,11 @@ assert(switchSource.includes('currentProfile.panels = getPanels();')
     && !switchSource.includes('await savePanels();'),
     'a profile switch must persist one snapshot instead of emitting two storage changes');
 
-const timeLabelStart = source.indexOf('function updateTimeLabels()');
-const timeLabelEnd = source.indexOf('function applyGlobalParamsToUrl', timeLabelStart);
-const timeLabelSource = source.slice(timeLabelStart, timeLabelEnd);
+const timeLabelStart = timeSource.indexOf('const updateLabels = () => {');
+const timeLabelEnd = timeSource.indexOf('const syncControls', timeLabelStart);
+const timeLabelSource = timeSource.slice(timeLabelStart, timeLabelEnd);
 assert(timeLabelSource.includes('timeLabel.replaceChildren(')
-    && timeLabelSource.includes('timezone.textContent = tzName;')
+    && timeLabelSource.includes('timezone.textContent = timezoneName;')
     && !timeLabelSource.includes('innerHTML'),
     'absolute time labels must render as text without parsing user-controlled markup');
 
@@ -123,14 +124,14 @@ assert(iframeSource.includes('applyRefreshPolicyToUrl?.(url.toString(), event.da
     && !iframeSource.includes("url.searchParams.set('refresh', '1y')")
     && !iframeSource.includes("url.searchParams.set('refresh', 'off')"),
     'Off must use the shared bootstrap policy instead of unsupported or clamped Grafana intervals');
-const refreshChoiceStart = source.indexOf("document.querySelectorAll('#refreshPopover .dropdown-item')");
-const refreshChoiceEnd = source.indexOf("document.getElementById('forceRefreshBtn')", refreshChoiceStart);
-const refreshChoiceSource = source.slice(refreshChoiceStart, refreshChoiceEnd);
+const refreshChoiceStart = timeSource.indexOf("documentRef.querySelectorAll('#refreshPopover .dropdown-item')");
+const refreshChoiceEnd = timeSource.indexOf("documentRef.getElementById('forceRefreshBtn')", refreshChoiceStart);
+const refreshChoiceSource = timeSource.slice(refreshChoiceStart, refreshChoiceEnd);
 assert(refreshChoiceStart >= 0 && refreshChoiceEnd > refreshChoiceStart
-    && refreshChoiceSource.includes('const previousRefresh = globalRefresh;')
-    && refreshChoiceSource.includes('if (!globalRefresh && previousRefresh)')
+    && refreshChoiceSource.includes('const previousRefresh = state.refresh;')
+    && refreshChoiceSource.includes('if (!state.refresh && previousRefresh)')
     && refreshChoiceSource.includes('void refreshAllPanels();')
-    && refreshChoiceSource.includes('else {\n                broadcastTimeUpdate();'),
+    && refreshChoiceSource.includes('else {\n                        broadcast();'),
     'switching a live profile to Off must navigate once to destroy the existing Grafana scheduler');
 assert(iframeSource.includes("window.history.replaceState(null, '', url.toString())")
     && !iframeSource.includes("window.history.pushState(null, '', url.toString())"),

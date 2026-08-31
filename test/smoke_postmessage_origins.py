@@ -6,7 +6,8 @@ from support.smoke import run_checks
 ROOT = Path(__file__).resolve().parent.parent
 FILES = {
     "dashbridge": (ROOT / "pages/dashbridge/dashbridge.js").read_text(encoding="utf-8")
-        + (ROOT / "pages/dashbridge/dashbridge-frame-controller.js").read_text(encoding="utf-8"),
+        + (ROOT / "pages/dashbridge/dashbridge-frame-controller.js").read_text(encoding="utf-8")
+        + (ROOT / "pages/dashbridge/dashbridge-time-controller.js").read_text(encoding="utf-8"),
     "iframe": (ROOT / "js/content/grafana-iframe.js").read_text(encoding="utf-8"),
     "content": (ROOT / "js/content/content.js").read_text(encoding="utf-8"),
     "inject": (ROOT / "js/content/inject.js").read_text(encoding="utf-8"),

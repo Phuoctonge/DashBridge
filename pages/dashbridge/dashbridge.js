@@ -1,6 +1,15 @@
 let profiles = [];
 let activeProfileId = null;
 let panels = []; // Всегда синхронизирован с активным профилем
+let dashBridgeTimeController = null;
+
+function loadActiveProfileTimeState() {
+    return dashBridgeTimeController.loadProfileState();
+}
+
+function syncTimeControlsFromState() {
+    return dashBridgeTimeController.syncControls();
+}
 const { showAlert, showConfirm, showPrompt } = window.DashBridgeModal;
 const {
     isSupportedPanelUrl,
@@ -80,6 +89,24 @@ try {
 } catch (e) {
     console.warn("localStorage init failed:", e);
 }
+
+dashBridgeTimeController = DashBridgeTimeController.create({
+    timeState: DashBridgeTimeState,
+    getActiveProfile,
+    saveProfiles,
+    getPanels: () => panels,
+    getPanelTools,
+    legendSelection: window.DashBridgeGrafanaLegendSelection,
+    panelBootstrap: window.DashBridgeGrafanaPanelBootstrap,
+    getTransformSettings: () => grafanaTransformSettings,
+    postToDashboardFrame,
+    navigateDashboardFrame,
+    refreshAllPanels,
+});
+const applyPanelParamsToUrl = dashBridgeTimeController.applyPanelParamsToUrl;
+const getPanelForIframe = dashBridgeTimeController.getPanelForIframe;
+const broadcastTimeUpdate = dashBridgeTimeController.broadcast;
+const setupTimeControls = dashBridgeTimeController.setupControls;
 
 // --- Drag & Drop state ---
 let draggedId = null;
@@ -403,7 +430,7 @@ const dashBridgeReportController = DashBridgeReportController.create({
     postToDashboardFrame,
     getPanels: () => panels,
     getActiveProfile,
-    getTimeContext: () => ({ from: globalTimeFrom, to: globalTimeTo }),
+    getTimeContext: dashBridgeTimeController.getState,
 });
 const dashBridgeReportTransport = dashBridgeReportController.transport;
 const dashBridgeReportTestRunner = dashBridgeReportController.testRunner;
@@ -1558,318 +1585,6 @@ async function renderDashboard() {
 }
 
 // ════════════════════════════════════════════════════════
-//  Время и автообновление активного профиля
-// ════════════════════════════════════════════════════════
-
-const initialTimeState = DashBridgeTimeState.defaults();
-let globalTimeFrom = initialTimeState.from;
-let globalTimeTo = initialTimeState.to;
-let globalRefresh = initialTimeState.refresh;
-
-function loadActiveProfileTimeState() {
-    const state = DashBridgeTimeState.normalize(getActiveProfile()?.timeState);
-    globalTimeFrom = state.from;
-    globalTimeTo = state.to;
-    globalRefresh = state.refresh;
-}
-
-function saveActiveProfileTimeState() {
-    const profile = getActiveProfile();
-    if (!profile) return;
-    profile.timeState = { from: globalTimeFrom, to: globalTimeTo, refresh: globalRefresh };
-    void saveProfiles();
-}
-
-function syncTimeControlsFromState() {
-    const fromInput = document.getElementById('absTimeFrom');
-    const toInput = document.getElementById('absTimeTo');
-    if (fromInput) fromInput.value = DashBridgeTimeState.formatForInput(globalTimeFrom);
-    if (toInput) toInput.value = DashBridgeTimeState.formatForInput(globalTimeTo);
-    if (document.getElementById('timePickerLabel')) updateTimeLabels();
-}
-
-function updateTimeLabels() {
-    const timeLabel = document.getElementById('timePickerLabel');
-    if (globalTimeFrom.toString().startsWith('now-')) {
-        timeLabel.textContent = 'Last ' + globalTimeFrom.replace('now-', '');
-    } else {
-        let tzName = '';
-        try {
-            const parts = new Intl.DateTimeFormat('en', { timeZoneName: 'short' }).formatToParts(new Date());
-            const tzPart = parts.find(p => p.type === 'timeZoneName');
-            if (tzPart) tzName = tzPart.value;
-        } catch (e) { }
-        const timezone = document.createElement('span');
-        timezone.className = 'time-picker-timezone';
-        timezone.textContent = tzName;
-        timeLabel.replaceChildren(document.createTextNode(
-            `${DashBridgeTimeState.formatForInput(globalTimeFrom)} to ${DashBridgeTimeState.formatForInput(globalTimeTo)} `
-        ), timezone);
-    }
-    document.getElementById('refreshPickerLabel').textContent = globalRefresh || 'Off';
-}
-
-function applyGlobalParamsToUrl(urlStr) {
-    return DashBridgeTimeState.applyToUrl(urlStr, { from: globalTimeFrom, to: globalTimeTo, refresh: globalRefresh });
-}
-
-// The MAIN-world script reads this before Grafana's first datasource query.
-const DASHBRIDGE_LEGEND_FILTER_PARAM = 'dashbridgeLegendFilter';
-const DASHBRIDGE_LEGEND_SELECTION_PARAM = 'dashbridgeLegendSelection';
-const DASHBRIDGE_SERIES_QUERY_FILTER_PARAM = 'dashbridgeSeriesQueryFilter';
-const DASHBRIDGE_CPU_CAPACITY_FILTER_PARAM = 'dashbridgeCpuCapacityFilter';
-
-function applyPanelLegendFilterToUrl(panel, urlValue) {
-    try {
-        const url = new URL(urlValue);
-        const tools = getPanelTools(panel);
-        const selection = window.DashBridgeGrafanaLegendSelection;
-        const hasAllowlist = tools.legendMode === 'fast_complete_hide' && selection?.isAllowlistState(tools);
-        const visible = hasAllowlist ? selection.normalizeNames(tools.legendVisibleSeries) : [];
-        const hidden = tools.legendMode === 'fast_complete_hide' && !hasAllowlist
-            ? [...new Set((tools.legendFilter || [])
-                .filter(name => typeof name === 'string')
-                .map(name => name.trim())
-                .filter(Boolean))]
-            : [];
-        // A complete-hide selection can contain hundreds of series. Keep it
-        // in the URL fragment: it is available to the iframe at startup but
-        // is never sent to Grafana or copied into the same-origin Referer of
-        // the datasource query.
-        const hashParams = new URLSearchParams(url.hash.slice(1));
-        if (hasAllowlist) {
-            hashParams.set(DASHBRIDGE_LEGEND_SELECTION_PARAM, JSON.stringify({ version: 2, visibleSeries: visible }));
-            hashParams.delete(DASHBRIDGE_LEGEND_FILTER_PARAM);
-        } else {
-            hashParams.delete(DASHBRIDGE_LEGEND_SELECTION_PARAM);
-            if (hidden.length) hashParams.set(DASHBRIDGE_LEGEND_FILTER_PARAM, JSON.stringify(hidden));
-            else hashParams.delete(DASHBRIDGE_LEGEND_FILTER_PARAM);
-        }
-        url.hash = hashParams.toString();
-        url.searchParams.delete(DASHBRIDGE_LEGEND_FILTER_PARAM);
-        url.searchParams.delete(DASHBRIDGE_LEGEND_SELECTION_PARAM);
-        if (tools.seriesQueryFilterEnabled) {
-            url.searchParams.set(DASHBRIDGE_SERIES_QUERY_FILTER_PARAM, JSON.stringify({
-                enabled: true,
-                value: tools.seriesQueryFilterValue,
-                rawValue: tools.seriesQueryFilterRawValue,
-                mode: tools.seriesQueryFilterMode === 'last' ? 'last' : 'max',
-                highlightEnabled: tools.seriesQueryFilterHighlightEnabled !== false
-            }));
-        } else {
-            url.searchParams.delete(DASHBRIDGE_SERIES_QUERY_FILTER_PARAM);
-        }
-        if (tools.cpuCapacityFilterEnabled) {
-            url.searchParams.set(DASHBRIDGE_CPU_CAPACITY_FILTER_PARAM, JSON.stringify({
-                enabled: true,
-                coefficient: tools.cpuCapacityFilterCoefficient,
-                mode: tools.cpuCapacityFilterMode === 'last' ? 'last' : 'max',
-                highlightEnabled: tools.cpuCapacityFilterHighlightEnabled !== false,
-                load1: tools.cpuCapacityFilterLoad1 !== false,
-                load5: tools.cpuCapacityFilterLoad5 === true,
-                load15: tools.cpuCapacityFilterLoad15 === true
-            }));
-        } else {
-            url.searchParams.delete(DASHBRIDGE_CPU_CAPACITY_FILTER_PARAM);
-        }
-        return url.toString();
-    } catch (e) {
-        return urlValue;
-    }
-}
-
-function resolveGrafanaTheme(panel) {
-    const configuredTheme = panel?.grafanaTheme || 'follow';
-    if (configuredTheme === 'light' || configuredTheme === 'dark') return configuredTheme;
-    return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
-}
-
-function applyPanelParamsToUrl(panel, urlStr = panel?.src) {
-    const urlWithGlobalParams = window.DashBridgeGrafanaPanelBootstrap.applyToUrl(
-        applyPanelLegendFilterToUrl(panel, applyGlobalParamsToUrl(urlStr)),
-        getPanelTools(panel),
-        grafanaTransformSettings
-    );
-    try {
-        const url = new URL(urlWithGlobalParams);
-        url.searchParams.set('theme', resolveGrafanaTheme(panel));
-        return url.toString();
-    } catch (e) { return urlWithGlobalParams; }
-}
-
-window.addEventListener('dashbridge-theme-change', () => {
-    document.querySelectorAll('iframe[name="dashbridge-iframe"]').forEach(iframe => {
-        const panel = getPanelForIframe(iframe);
-        if ((panel?.grafanaTheme || 'follow') !== 'follow' || !iframe.src || iframe.src === 'about:blank') return;
-        navigateDashboardFrame(iframe, applyPanelParamsToUrl(panel, iframe.src));
-    });
-});
-
-function getPanelForIframe(iframe) {
-    const id = iframe?.closest('.panel-card')?.dataset.panelId;
-    return panels.find(panel => panel.id === id) || null;
-}
-
-// Обновляет время во всех iframe: загруженным шлёт postMessage, незагруженным — обновляет data-src
-function broadcastTimeUpdate() {
-    document.querySelectorAll('iframe[name="dashbridge-iframe"]').forEach(iframe => {
-        const panel = getPanelForIframe(iframe);
-        if (!panel) return;
-        const timeUrl = iframe.dataset.src || iframe.src;
-        const message = {
-            type: 'DASHBRIDGE_TIME_UPDATE',
-            from: DashBridgeTimeState.formatForUrl(timeUrl, globalTimeFrom),
-            to: DashBridgeTimeState.formatForUrl(timeUrl, globalTimeTo),
-            refresh: globalRefresh
-        };
-        if (iframe.contentWindow && iframe.src && iframe.src !== 'about:blank') {
-            postToDashboardFrame(iframe, message);
-        } else if (iframe.dataset.src) {
-            // Навигация ещё не началась — обновляем отложенный URL.
-            iframe.dataset.src = applyPanelParamsToUrl(panel, iframe.dataset.src);
-        }
-    });
-}
-
-function setupTimeControls() {
-    const timeBtn = document.getElementById('timePickerBtn');
-    const refreshBtn = document.getElementById('refreshPickerBtn');
-    const timePopover = document.getElementById('timePopover');
-    const refreshPopover = document.getElementById('refreshPopover');
-    if (!timeBtn) return;
-
-    timeBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const showing = timePopover.style.display === 'flex';
-        timePopover.style.display = showing ? 'none' : 'flex';
-        refreshPopover.style.display = 'none';
-        document.getElementById('profileDropdown').style.display = 'none';
-    });
-    refreshBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const showing = refreshPopover.style.display === 'block';
-        refreshPopover.style.display = showing ? 'none' : 'block';
-        timePopover.style.display = 'none';
-        document.getElementById('profileDropdown').style.display = 'none';
-    });
-    timePopover.addEventListener('click', (e) => e.stopPropagation());
-    refreshPopover.addEventListener('click', (e) => e.stopPropagation());
-
-    document.getElementById('absTimeFrom').value = DashBridgeTimeState.formatForInput(globalTimeFrom);
-    document.getElementById('absTimeTo').value = DashBridgeTimeState.formatForInput(globalTimeTo);
-
-    document.querySelectorAll('.quick-range-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            document.getElementById('absTimeFrom').value = e.target.dataset.time;
-            document.getElementById('absTimeTo').value = 'now';
-            document.getElementById('applyAbsoluteTime').click();
-        });
-    });
-
-    document.querySelectorAll('.calendar-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            document.getElementById(e.target.closest('.calendar-btn').dataset.picker).showPicker();
-        });
-    });
-
-    document.getElementById('quickRangeSearch').addEventListener('input', (e) => {
-        const q = e.target.value.toLowerCase();
-        document.querySelectorAll('.quick-range-btn').forEach(btn => {
-            btn.style.display = btn.textContent.toLowerCase().includes(q) ? 'block' : 'none';
-        });
-    });
-
-    document.querySelectorAll('.hidden-date-picker').forEach(picker => {
-        picker.addEventListener('change', (e) => {
-            if (e.target.value) {
-                const suffix = e.target.dataset.target === 'absTimeTo' ? ' 23:59:59' : ' 00:00:00';
-                document.getElementById(e.target.dataset.target).value = e.target.value + suffix;
-            }
-        });
-    });
-
-    document.getElementById('copyTimeBtn').addEventListener('click', async () => {
-        const from = document.getElementById('absTimeFrom').value.trim();
-        const to = document.getElementById('absTimeTo').value.trim();
-        try {
-            await navigator.clipboard.writeText(JSON.stringify({ from, to }));
-            const btn = document.getElementById('copyTimeBtn');
-            const orig = btn.innerHTML;
-            btn.innerHTML = '✅';
-            setTimeout(() => btn.innerHTML = orig, 1000);
-        } catch (e) { console.error('Failed to copy', e); }
-    });
-
-    document.getElementById('pasteTimeBtn').addEventListener('click', async () => {
-        try {
-            const data = JSON.parse(await navigator.clipboard.readText());
-            if (data.from) document.getElementById('absTimeFrom').value = data.from;
-            if (data.to) document.getElementById('absTimeTo').value = data.to;
-            const btn = document.getElementById('pasteTimeBtn');
-            const orig = btn.innerHTML;
-            btn.innerHTML = '✅';
-            setTimeout(() => btn.innerHTML = orig, 1000);
-        } catch (e) { console.error('Failed to paste', e); }
-    });
-
-    document.getElementById('applyAbsoluteTime').addEventListener('click', () => {
-        const fromVal = document.getElementById('absTimeFrom').value.trim();
-        const toVal = document.getElementById('absTimeTo').value.trim();
-        if (!fromVal || !toVal) return;
-
-        const tryParse = v => v.startsWith('now') ? v : (isNaN(Date.parse(v)) ? v : Date.parse(v).toString());
-        globalTimeFrom = tryParse(fromVal);
-        globalTimeTo = tryParse(toVal);
-        saveActiveProfileTimeState();
-        updateTimeLabels();
-        timePopover.style.display = 'none';
-
-        const requiresNavigation = !globalTimeFrom.toString().startsWith('now')
-            || !globalTimeTo.toString().startsWith('now');
-        if (requiresNavigation) {
-            document.querySelectorAll('iframe[name="dashbridge-iframe"]').forEach(iframe => {
-                const panel = getPanelForIframe(iframe);
-                if (!panel) return;
-                const currentUrl = iframe.dataset.src || iframe.src || panel.src;
-                navigateDashboardFrame(iframe, applyPanelParamsToUrl(panel, currentUrl));
-            });
-        } else broadcastTimeUpdate();
-    });
-
-    document.querySelectorAll('#refreshPopover .dropdown-item').forEach(btn => {
-        if (!btn.hasAttribute('data-refresh')) return;
-        btn.addEventListener('click', (e) => {
-            const previousRefresh = globalRefresh;
-            globalRefresh = e.target.dataset.refresh;
-            saveActiveProfileTimeState();
-            updateTimeLabels();
-            if (!globalRefresh && previousRefresh) {
-                // Removing refresh from a live Grafana URL does not stop an
-                // already-created scheduler. A one-time navigation lets the
-                // document_start Off policy clear the saved dashboard value
-                // before Grafana creates the replacement scheduler.
-                void refreshAllPanels();
-            } else {
-                broadcastTimeUpdate();
-            }
-            refreshPopover.style.display = 'none';
-        });
-    });
-
-    // Принудительное обновление всех iframe: загруженным — cache-busting, незагруженным — обновляем data-src
-    document.getElementById('forceRefreshBtn').addEventListener('click', async () => {
-        const icon = document.getElementById('forceRefreshBtn').querySelector('svg');
-        icon.style.transition = 'transform 0.5s ease';
-        icon.style.transform = 'rotate(360deg)';
-        setTimeout(() => { icon.style.transition = 'none'; icon.style.transform = 'none'; }, 500);
-        await refreshAllPanels();
-    });
-
-    updateTimeLabels();
-}
-
-// ════════════════════════════════════════════════════════
 //  Кроссхейр-синхронизация между iframe
 // ════════════════════════════════════════════════════════
 
@@ -1951,12 +1666,7 @@ window.addEventListener('message', (e) => {
         sourceIframe.dataset.dashbridgeLoaded = 'true';
         postToDashboardFrame(sourceIframe, { action: 'setCrosshairMode', mode: crosshairMode, thickness: crosshairThickness });
         const panel = getPanelForIframe(sourceIframe);
-        postToDashboardFrame(sourceIframe, {
-            type: 'DASHBRIDGE_TIME_UPDATE',
-            from: DashBridgeTimeState.formatForUrl(sourceIframe.src, globalTimeFrom),
-            to: DashBridgeTimeState.formatForUrl(sourceIframe.src, globalTimeTo),
-            refresh: globalRefresh
-        });
+        dashBridgeTimeController.sendTimeUpdate(sourceIframe);
         if (panel) applyPanelTools(panel, sourceIframe);
         dashBridgePanelAnalysisController.retryForFrame(sourceIframe);
         return;
