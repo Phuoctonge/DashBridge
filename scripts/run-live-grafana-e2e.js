@@ -142,7 +142,6 @@ async function readRunnerSnapshot(page) {
 async function readFailureDiagnostics(page) {
     return page.evaluate(async () => {
         const snapshot = DashBridgeTestRunner.getSnapshot();
-        if (!diagnosticSpool) return [];
         const compactRuntime = runtime => runtime ? {
             at: runtime.at || null,
             environment: runtime.environment || null,
@@ -181,14 +180,22 @@ async function readFailureDiagnostics(page) {
             for (let testIndex = 0; testIndex < result.tests.length; testIndex += 1) {
                 const test = result.tests[testIndex];
                 if (test.pass || test.skip || test.aborted || !test.diagnosticRef) continue;
-                const full = await diagnosticSpool.readTest(test.diagnosticRef);
-                const diagnostic = full?.diagnostic || null;
+                // The public row was already analysed before its raw diagnostic
+                // was spooled. Do not parse that potentially multi-gigabyte
+                // file here: details/reasonCode/analysisUnit are the compact
+                // automatic failure digest, while the interactive viewer keeps
+                // explicit on-demand access to full OPFS evidence.
+                const diagnostic = null;
                 failures.push({
                     urlIndex,
                     testIndex,
                     id: test.id,
                     name: test.name,
                     details: test.details || '',
+                    reasonCode: test.reasonCode || null,
+                    shortReason: test.shortReason || null,
+                    analysisUnit: test.analysisUnit || null,
+                    visualAudit: test.visualAudit || null,
                     diagnostic: diagnostic ? {
                         kind: diagnostic.kind || null,
                         schema: diagnostic.schema || null,

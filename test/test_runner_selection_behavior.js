@@ -63,6 +63,11 @@ assert.strictEqual(convertMemOff({}, {
 assert.strictEqual(convertMemOff({}, flotRamOn, ramEnvironment).pass, false,
     'RAM reset must reject a calculated legend that remains visible');
 
+const repeatedLifecycle = suite.find(test => test.id === 'H1_3');
+assert.strictEqual(repeatedLifecycle.expectedRefreshCount, 8,
+    'repeated identical ON/OFF states must retain one persistence proof per unique active set');
+assert.strictEqual(repeatedLifecycle.timeoutBudgetModel, 'max(30s, expectedRefreshCount * 10s + 30s)');
+
 assert(coreSource.includes('selectedTestIds = null')
     && coreSource.includes('const selectionMatch = !selectedIds || selectedIds.has(t.id);')
     && coreSource.includes("selection: selectedIds ? { scope: 'selected', ids: [...selectedIds] }"),

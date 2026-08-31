@@ -738,46 +738,69 @@ async function runTestsForUrls(urls, {
                 runnerState.started += 1;
                 urlResult.started += 1;
                 const testResult = await runSingleTest(test, tabId, env);
-                urlResult.tests.push(testResult);
-                const testIndex = urlResult.tests.length - 1;
+                const testIndex = urlResult.tests.length;
+                let retainedTestResult = testResult;
 
-                runnerState.done += 1;
-                runnerState.completed += 1;
-                urlResult.completed += 1;
-                if (testResult.skip) {
-                    runnerState.skipped += 1;
-                } else if (testResult.pass) {
-                    runnerState.passed += 1;
-                } else {
-                    runnerState.failed += 1;
-                }
-
-                if (testResult.environmentUnsafe) {
-                    environmentUnsafe = true;
-                    environmentUnsafeReason = 'Не доказан откат настроек выбранной панели';
-                    urlResult.environmentUnsafe = true;
-                }
-                if (testResult.timedOut) {
-                    environmentUnsafe = true;
-                    environmentUnsafeReason = 'сценарий превысил таймаут; состояние панели неизвестно';
-                    urlResult.environmentUnsafe = true;
-                }
+                // Never publish the raw diagnostic through getSnapshot(). A
+                // long matrix result can exceed Chromium/Playwright's 512 MiB
+                // protocol string limit while persistTest serializes it. Make
+                // the OPFS write atomic from the public snapshot's point of
+                // view: observers see either no row yet or the compact row
+                // containing only its diagnosticRef.
                 if (typeof onTestFinalized === 'function') {
                     try {
                         const retained = await onTestFinalized(testResult, {
                             url, urlIndex: runnerState.results.length - 1,
                             testIndex, urlResult,
                         });
-                        if (retained) urlResult.tests[testIndex] = retained;
+                        if (retained) retainedTestResult = retained;
                     } catch (error) {
                         // Do not start another heavy test when its predecessor
-                        // could not be made disk-backed. The raw result remains
-                        // available to onUrlFinalized for one recovery attempt.
+                        // could not be made disk-backed. Publish only scalar
+                        // failure metadata: retaining/publishing the raw value
+                        // here would recreate the protocol/OOM failure that the
+                        // spool boundary is designed to prevent.
                         environmentUnsafe = true;
                         environmentUnsafeReason = `Не удалось сохранить диагностику теста на диск: ${error?.message || String(error)}`;
                         urlResult.environmentUnsafe = true;
                         urlResult.spoolError = environmentUnsafeReason;
+                        retainedTestResult = {
+                            id: testResult.id,
+                            category: testResult.category,
+                            name: testResult.name,
+                            feature: testResult.feature || null,
+                            pass: false,
+                            skip: false,
+                            environmentUnsafe: true,
+                            timedOut: !!testResult.timedOut,
+                            details: `${testResult.details || ''}${testResult.details ? ' | ' : ''}${environmentUnsafeReason}`,
+                            durationMs: Number(testResult.durationMs) || 0,
+                            spoolError: environmentUnsafeReason,
+                        };
                     }
+                }
+                urlResult.tests.push(retainedTestResult);
+
+                runnerState.done += 1;
+                runnerState.completed += 1;
+                urlResult.completed += 1;
+                if (retainedTestResult.skip) {
+                    runnerState.skipped += 1;
+                } else if (retainedTestResult.pass) {
+                    runnerState.passed += 1;
+                } else {
+                    runnerState.failed += 1;
+                }
+
+                if (retainedTestResult.environmentUnsafe) {
+                    environmentUnsafe = true;
+                    environmentUnsafeReason ||= 'Не доказан откат настроек выбранной панели';
+                    urlResult.environmentUnsafe = true;
+                }
+                if (retainedTestResult.timedOut) {
+                    environmentUnsafe = true;
+                    environmentUnsafeReason = 'сценарий превысил таймаут; состояние панели неизвестно';
+                    urlResult.environmentUnsafe = true;
                 }
                 emitProgress();
             }

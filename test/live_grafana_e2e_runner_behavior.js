@@ -16,6 +16,10 @@ assert(runnerSource.includes('const RUNNER_READY_TIMEOUT_MS = 10 * 60_000;')
     'Playwright must allow bounded stale OPFS cleanup before declaring the runner unavailable');
 assert(runnerSource.includes('dataStatus: runtime.dataStatus || null'),
     'failed live diagnostics must retain the compact intentional-empty status');
+assert(!runnerSource.includes('diagnosticSpool.readCompactedTest(test.diagnosticRef)')
+    && !runnerSource.includes('diagnosticSpool.readTest(test.diagnosticRef)')
+    && runnerSource.includes('analysisUnit: test.analysisUnit || null'),
+    'automatic failure reporting must use the published digest without parsing multi-gigabyte OPFS tests');
 
 assert.deepStrictEqual(parseArguments([
     '--mode=fast',

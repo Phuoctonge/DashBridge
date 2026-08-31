@@ -393,9 +393,18 @@ checks = {
     "Flot refresh work is microtask-coalesced": "queueMicrotask" in VISUAL_ENGINE,
     "Flot redraw is requested only when visibility changes": "controller.needsApply" in VISUAL_ENGINE,
     "Visual engine can restore a previous Flot controller": "resetSeriesVisibility" in VISUAL_ENGINE,
-    "Visibility OFF actively restores Grafana-native legend selection": "const legendVisibilityRequested = Object.prototype.hasOwnProperty.call(commandTools, 'legendVisibility');" in COMMON
+    "Visibility OFF actively restores Grafana-native legend selection": "const legendVisibilityPayloadProvided = Object.prototype.hasOwnProperty.call(commandTools, 'legendVisibility');" in COMMON
+        and "visibilityHasHiddenEntries(commandTools.legendVisibility)" in COMMON
+        and "visibilityHasHiddenEntries(tools.legendVisibility)" in COMMON
+        and "commandTools.legendVisibility === null" in COMMON
         and "const visibility = tools.legendVisibility && typeof tools.legendVisibility === 'object'" in COMMON
         and "await applyLegendVisibilityByKey(visibility);" in COMMON,
+    "Legend visibility follows reversible CPU calculated labels": "const resolveLegendVisibilityDesired = (visibility, key) =>" in COMMON
+        and "const loadPattern = /load\\s*\\(calc\\)/gi;" in COMMON
+        and "desired: resolveLegendVisibilityDesired(visibility, key), nativeDisabled" in COMMON,
+    "Legend visibility follows calculated RAM labels by server": "const memoryIdentity = candidate =>" in COMMON
+        and "const calculatedPattern = /used\\s*%\\s*\\(calc\\)/gi;" in COMMON
+        and "memoryIdentity(candidate) === currentMemoryIdentity" in COMMON,
     "Visibility reset remains independent from other visual work": "if (!tools.legendVisibility) {\n            window.DashBridgeGrafanaVisualEngine?.resetSeriesVisibility?.({ root });\n        }\n        if (hasVisualWork())" in COMMON,
     "Dashboard clears a fast filter when the legend filter is empty": "resetSeriesVisibility?.({ root })" in COMMON,
 

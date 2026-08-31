@@ -105,6 +105,9 @@ const reportCode = fs.readFileSync(
     'lastPanelDiagnosticCaptureAt',
     "error: 'captureVisibleTab-empty-result'",
     'async function waitForPanelStability',
+    'sampleCap = 64',
+    "samplePolicy: 'first-and-newest-bounded/v1'",
+    'samples.splice(1, removeCount);',
     "schema: 'dashbridge-e2e-panel-settlement/v1'",
     "dataStatusKind === 'filtered_empty'",
     'const renderStateReady = canvas.length > 0 || facts.dataStatus.intentionalEmpty;',
@@ -118,9 +121,12 @@ const reportCode = fs.readFileSync(
     'const commandCursor = (await readQueryLifecycle(tabId)).nextEventId;',
     "e.data.commandStatus === 'error'",
     'e.data.legendVisibilityDeferred !== true',
-    'verifyPersistence: activeIds.length > 0',
+    'const verifyPersistence = activeIds.length > 0 && !persistenceProvenFor.has(persistenceKey);',
+    'applySettingsAndWait(tabId, panelId, resolvedSettings, { verifyPersistence })',
     "status: verifyPersistence ? 'not-run' : 'not-required'",
     'persistence.beforeRefresh = await captureRuntimeDiagnostic',
+    "const intentionalEmpty = after?.dataStatus?.intentionalEmpty === true;",
+    'deferredByIntentionalEmpty: intentionalEmpty,',
     "schema: 'dashbridge-e2e-action-event/v1'",
     "schema: 'dashbridge-e2e-runtime-diff/v1'",
     'buildRuntimeDiagnosticDiff(before, after)',
@@ -128,9 +134,30 @@ const reportCode = fs.readFileSync(
     'viewportImage:',
     'outerHTMLHash:',
     'readNetworkDiagnosticArchive',
+    'const includeCanvasImages = mode === DIAGNOSTIC_CAPTURE_MODES.CANVAS;',
+    'const retainFullDom = mode === DIAGNOSTIC_CAPTURE_MODES.FORENSIC;',
+    'const retainFullResources = mode === DIAGNOSTIC_CAPTURE_MODES.FORENSIC;',
+    "allResourceEntries.slice(-25)",
+    "const sampleWidth = Math.max(1, Math.min(160, sourceWidth));",
+    "const sampleHeight = Math.max(1, Math.min(90,",
+    'const h = hashBytes(sampledPixels || dimensionBytes);',
+    ".find('.graph-panel__chart, .flot-base, canvas')",
+    ".addBack('.graph-panel__chart, .flot-base, canvas')",
+    "hosts.find(element => !!$(element).data('plot'))",
+    'function findEquivalentVisibilityEntry(entries, target, current)',
+    "const calculatedKey = target.key.replace(new RegExp(escapedIdle, 'gi'), 'load (calc)');",
+    'if (runtimeTools.convertMemToUsed !== true) return null;',
+    ".replace(/used\\s*%\\s*\\(calc\\)/gi, '')",
 ].forEach(fragment => {
     assert(suiteCode.includes(fragment), `Отсутствует последовательный matrix-контракт: ${fragment}`);
 });
+
+assert(!suiteCode.includes("const includeCanvasImages = mode !== DIAGNOSTIC_CAPTURE_MODES.SEMANTIC;"),
+    'panel/forensic evidence must not duplicate its screenshots as canvas base64 payloads');
+assert(!suiteCode.includes("context.getImageData(0, 0, element.width, element.height).data"),
+    'matrix checkpoints must not allocate a full-panel RGBA buffer for every capture');
+assert(!suiteCode.includes('window.jQuery?.plot?.getPlot?.(host)'),
+    'Flot diagnostics must use Grafana\'s actual jQuery data(plot) owner');
 
 const panelToolsCode = fs.readFileSync(
     path.join(__dirname, '..', 'js', 'content', 'grafana-panel-tools.js'),

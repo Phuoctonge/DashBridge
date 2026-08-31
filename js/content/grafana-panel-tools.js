@@ -1088,16 +1088,15 @@
         }, 300);
         visualReapplyDiagnostic.nextEventId = visualReapplyDiagnostic.events.at(-1)?.id || visualReapplyDiagnostic.nextEventId || 0;
     };
-    const canDeferLegendVisibilityApply = targetRoot => visualMetadata.responseDataStatus?.kind === 'filtered_empty'
+    const canDeferLegendVisibilityApply = () => visualMetadata.responseDataStatus?.kind === 'filtered_empty'
         && getLegendItems().length === 0
         && (legendVisibilityRestoreAfterNextQuery
-            // While the filter remains active, defer only for a genuinely
-            // absent target renderer. During reset, legacy Flot may retain an
-            // empty canvas with no plot/legend; the pending restore itself is
-            // consumed only after the next complete response proves the legend.
-            || ((targetRoot === document || !targetRoot?.querySelector?.('canvas'))
-                && (tools.seriesQueryFilterEnabled === true
-                    || tools.cpuCapacityFilterEnabled === true)));
+            // Legacy Flot retains a blank canvas after a response is reduced
+            // to zero series. The authoritative filtered_empty status plus an
+            // empty legend prove that native visibility cannot be applied yet;
+            // canvas presence does not mean that the missing legend is ready.
+            || tools.seriesQueryFilterEnabled === true
+            || tools.cpuCapacityFilterEnabled === true);
     const applyPersistentVisualState = async () => {
         const targetPanel = getTargetPanel();
         const targetRoot = window.DashBridgeGrafanaDom?.outerPanel(targetPanel) || targetPanel || document;
@@ -1115,7 +1114,7 @@
         let legendVisibilityApplied = null;
         if (hasExplicitLegendVisibilityWork() || legendVisibilityRestoreAfterNextQuery) {
             legendVisibilityApplied = await applyLegendVisibilityByKey(tools.legendVisibility || {});
-            const filteredEmptyLegendCanReturnAfterQuery = canDeferLegendVisibilityApply(targetRoot);
+            const filteredEmptyLegendCanReturnAfterQuery = canDeferLegendVisibilityApply();
             if (!legendVisibilityApplied && !filteredEmptyLegendCanReturnAfterQuery) {
                 throw new Error('legend-visibility-reapply-failed');
             }
@@ -1132,7 +1131,7 @@
             styleState,
             legendVisibilityApplied,
             legendVisibilityDeferred: legendVisibilityApplied === false
-                && canDeferLegendVisibilityApply(targetRoot),
+                && canDeferLegendVisibilityApply(),
         };
     };
     const observePersistentVisualState = () => {
@@ -1454,6 +1453,56 @@
     // Batch identifies duplicate legend labels by occurrence key. The Popup
     // painter intentionally uses names, so keep this narrow key-aware path
     // only for Batch requests.
+    const resolveLegendVisibilityDesired = (visibility, key) => {
+        const hasOwn = candidate => Object.prototype.hasOwnProperty.call(visibility, candidate);
+        if (hasOwn(key)) return visibility[key] !== false;
+
+        // Response transforms may rename the same logical field while a saved
+        // key-aware legend selection remains active. Keep the occurrence suffix
+        // stable and recognise only the reversible CPU label owned by
+        // transformCpuData; unrelated series still require an exact key.
+        const separatorIndex = key.lastIndexOf('\u0000');
+        const label = separatorIndex >= 0 ? key.slice(0, separatorIndex) : key;
+        const occurrenceSuffix = separatorIndex >= 0 ? key.slice(separatorIndex) : '';
+        const idleKeyword = String(tools.idleKeyword || 'idle');
+        const idlePattern = new RegExp(escapeKeywordRegExp(idleKeyword), 'gi');
+        const loadPattern = /load\s*\(calc\)/gi;
+        const aliases = [];
+        const originalIdleLabel = label.replace(loadPattern, idleKeyword);
+        if (originalIdleLabel !== label) aliases.push(`${originalIdleLabel}${occurrenceSuffix}`);
+        const calculatedLoadLabel = label.replace(idlePattern, 'load (calc)');
+        if (calculatedLoadLabel !== label) aliases.push(`${calculatedLoadLabel}${occurrenceSuffix}`);
+        const memoryIdentity = candidate => {
+            const candidateSeparator = candidate.lastIndexOf('\u0000');
+            const candidateLabel = candidateSeparator >= 0 ? candidate.slice(0, candidateSeparator) : candidate;
+            const candidateOccurrence = candidateSeparator >= 0 ? candidate.slice(candidateSeparator) : '';
+            const totalPattern = new RegExp(escapeKeywordRegExp(String(tools.totalKeyword || 'total')), 'gi');
+            const availablePattern = new RegExp(escapeKeywordRegExp(String(tools.availKeyword || 'available')), 'gi');
+            const calculatedPattern = /used\s*%\s*\(calc\)/gi;
+            let server = candidateLabel;
+            let recognised = false;
+            for (const pattern of [calculatedPattern, totalPattern, availablePattern]) {
+                const next = server.replace(pattern, '');
+                if (next !== server) recognised = true;
+                server = next;
+            }
+            if (!recognised) return null;
+            if (tools.trimDomainEnabled !== false) {
+                const domainPattern = new RegExp(escapeKeywordRegExp(String(tools.trimDomain || '.passport.local:9182')), 'gi');
+                server = server.replace(domainPattern, '').replace(/:\d+$/, '');
+            }
+            return `${server.replace(/\s+/g, ' ').trim().toLowerCase()}${candidateOccurrence}`;
+        };
+        const currentMemoryIdentity = memoryIdentity(key);
+        if (currentMemoryIdentity) {
+            const memoryAlias = Object.keys(visibility)
+                .find(candidate => memoryIdentity(candidate) === currentMemoryIdentity);
+            if (memoryAlias) aliases.push(memoryAlias);
+        }
+        const alias = aliases.find(hasOwn);
+        return alias ? visibility[alias] !== false : true;
+    };
+
     const applyLegendVisibilityByKey = async (visibility = tools.legendVisibility) => {
         const diagnostic = {
             at: Date.now(),
@@ -1534,7 +1583,7 @@
                 const current = !nativeDisabled && paintedVisible;
                 return {
                     key, item, target, control, current, paintedVisible,
-                    desired: visibility[key] !== false, nativeDisabled,
+                    desired: resolveLegendVisibilityDesired(visibility, key), nativeDisabled,
                     opacity, hiddenClass: classes.includes('hidden'), disabledClass: classes.includes('disabled'),
                     fastHidden: item.classList.contains('dashbridge-uplot-fast-hidden'),
                     fastDimmed: item.classList.contains('dashbridge-uplot-fast-dimmed'),
@@ -3161,6 +3210,7 @@
         }
         if (event.data?.action !== 'applyPanelTools') return;
         const commandTools = event.data.tools || {};
+        const invertIdleWasEnabled = !!tools.invertIdle;
         const convertMemWasEnabled = !!tools.convertMemToUsed;
         const visualWorkWasEnabled = hasVisualWork(tools);
         const thresholdWasEnabled = !!tools.thresholdEnabled;
@@ -3168,13 +3218,23 @@
         const seriesQueryFilterWasEnabled = !!tools.seriesQueryFilterEnabled;
         const cpuCapacityFilterWasEnabled = !!tools.cpuCapacityFilterEnabled;
         const previousResponseFilterConfigKey = getResponseSeriesFilterConfigKey(tools);
-        const legendVisibilityRequested = Object.prototype.hasOwnProperty.call(commandTools, 'legendVisibility');
+        const legendVisibilityPayloadProvided = Object.prototype.hasOwnProperty.call(commandTools, 'legendVisibility');
+        const visibilityHasHiddenEntries = value => !!value && typeof value === 'object'
+            && Object.values(value).some(visible => visible === false);
+        // Generated commands always carry an explicit empty map so OFF/reset
+        // remains deterministic. Treat it as real native legend work only when
+        // it restores a previously hidden series. A map containing false and
+        // explicit null (show all) remain unconditional user commands.
+        const legendVisibilityRequested = legendVisibilityPayloadProvided
+            && (commandTools.legendVisibility === null
+                || visibilityHasHiddenEntries(commandTools.legendVisibility)
+                || visibilityHasHiddenEntries(tools.legendVisibility));
         const commandDiagnostic = {
             at: Date.now(), requestId: event.data.requestId || null,
             runtimeGeneration: window.__dashbridgePanelToolsRuntimeGeneration,
             queue: event.data.__dashbridgeCommandQueue || null,
             legendVisibilityRequested,
-            payloadHasLegendVisibility: Object.prototype.hasOwnProperty.call(commandTools, 'legendVisibility'),
+            payloadHasLegendVisibility: legendVisibilityPayloadProvided,
             receivedLegendVisibility: commandTools.legendVisibility,
             receivedLegendVisibilityType: commandTools.legendVisibility === null ? 'null' : typeof commandTools.legendVisibility,
             stateBefore: tools.legendVisibility,
@@ -3213,6 +3273,15 @@
             // after the first full-data response, when that series exists again.
             legendVisibilityRestoreAfterNextQuery = true;
         }
+        const responseLabelTransformWasDisabled = invertIdleWasEnabled && !tools.invertIdle
+            || convertMemWasEnabled && !tools.convertMemToUsed;
+        if (responseLabelTransformWasDisabled && legendVisibilityRequested) {
+            // The current calculated legend can be restored before Refresh,
+            // then legacy Flot can transfer its previous hidden presentation
+            // to the native labels created by the untransformed response.
+            // Reapply the empty/show-all map once those labels exist.
+            legendVisibilityRestoreAfterNextQuery = true;
+        }
         commandDiagnostic.stateAfter = tools.legendVisibility;
         commandDiagnostic.stateAfterType = tools.legendVisibility === null ? 'null' : typeof tools.legendVisibility;
         commandDiagnostic.stateAfterHasOwnProperty = Object.prototype.hasOwnProperty.call(tools, 'legendVisibility');
@@ -3248,7 +3317,7 @@
             const legendVisibilityApplied = await applyLegendVisibilityByKey(visibility);
             commandDiagnostic.legendVisibilityApplied = legendVisibilityApplied;
             commandDiagnostic.legendVisibilityDeferred = !legendVisibilityApplied
-                && canDeferLegendVisibilityApply(root);
+                && canDeferLegendVisibilityApply();
             commandDiagnostic.legendDiagnostic = window.__dashbridgeLegendVisibilityDiagnostic || null;
             window.__dashbridgePanelToolsCommandDiagnostic = commandDiagnostic;
             if (!legendVisibilityApplied) {

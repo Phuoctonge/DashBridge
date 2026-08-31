@@ -587,6 +587,61 @@ Full не удаляет причинные проверки ради скоро
 проверяет native legend и all-OFF invariant. При любом расхождении он
 автоматически возвращается к обычному `resetAllSettings + Refresh`.
 
+Диагностические уровни ограничивают пиковую память, но не семантические
+инварианты. Semantic сохраняет DOM/canvas hashes, bounded pixel statistics и
+последние resource timings; canvas сохраняет собственный PNG. Panel и forensic
+не дублируют этот PNG, потому что уже содержат crop всей панели, а forensic —
+также viewport, полный DOM и полный список resource timings. Pixel hash во всех
+режимах вычисляется по одинаковой уменьшенной поверхности не более 160×90,
+поэтому сравнение остаётся стабильным без многократных полноразмерных RGBA и
+base64-аллокаций внутри длинного матричного сценария.
+Raw результат сценария не добавляется в публичный `runnerState`, пока awaited
+OPFS hook не вернул компактную строку с `diagnosticRef`. Поэтому UI и внешний
+Playwright-оркестратор не могут случайно сериализовать многосотмегабайтный
+промежуточный объект через `getSnapshot()`; после публикации полная evidence
+доступна лениво только через OPFS.
+Flot diagnostic разрешает renderer тем же контрактом, что production visual
+engine: ищет chart host и читает `$(host).data('plot')`. Он не использует
+несуществующий в Grafana 10 `$.plot.getPlot()`, поэтому заливка и толщина линий
+проверяются по живым series вместо ложного renderer-unsupported SKIP.
+
+Внутри одного matrix-сценария второй Refresh без повторной команды доказывает
+persistence один раз для каждого уникального непустого active set. Если тот же
+active set появляется повторно ради идемпотентности или порядка отключения,
+runner всё равно отправляет команду, делает причинный Refresh и проверяет все
+инварианты, но не дублирует уже полученное persistence-доказательство. Для
+нового active set второй Refresh обязателен; isolation и финальный reset не
+сокращаются.
+
+Автоматический Playwright failure-report не перечитывает test value из OPFS:
+один проваленный high-risk сценарий может содержать гигабайты повторяющихся
+структур ещё до разворачивания assets. Он использует опубликованные вместе со
+строкой результата `details`, `reasonCode`, `shortReason`, `analysisUnit` и
+`visualAudit`. Полная гидратация сохранена в `readTest()` и выполняется только
+по явному открытию одного теста в интерактивном viewer.
+Компактная `diagnosticRef` также содержит фактический размер test JSON в OPFS,
+чтобы memory/disk regressions обнаруживались по отчёту без гидратации файла.
+Settlement использует каждый animation frame для live verdict, но в JSON
+сохраняет максимум 64 записи: первый frame и новейшее bounded-окно. Общие
+`observedFrames`, `droppedSamples` и mutation counters не ограничиваются. Это
+не меняет quiet/stable/timeout решение и устраняет сотни повторов длинной Flot
+легенды в каждом Refresh.
+
+Наличие `legendVisibility` в generated command не само по себе означает native
+legend work. Пустая карта является no-op, если предыдущая карта не скрывала ни
+одной серии; карта с `false`, явный `null` и пустая карта после скрытого
+состояния остаются реальными командами. В `filtered_empty` visibility intent
+доказывается сохранённым tools/transport-state без требования repaint
+несуществующей легенды; первый полный ответ после снятия фильтра по-прежнему
+обязан доказать native restore.
+
+Combined visual-команды (`seriesConfig` и/или `invertLegend`) сначала выполняют
+legacy layout/visibility painter, затем заново применяют только локальные
+fill/width-настройки к текущему Flot/uPlot и оставляют узкий replacement guard.
+Это необходимо, потому что перестройка легенды может заменить Flot plot после
+того, как legacy painter изменил старый instance; guard не вмешивается в цвета,
+layout или visibility.
+
 Дополнительно: `pages/test-runner/test-runner.html` запускает живые E2E на Grafana. По user action
 он открывает общий Document Picture-in-Picture progress controller с количеством
 завершённых/запланированных тестов, PASS/FAIL, общим временем и аварийной

@@ -212,10 +212,12 @@ class DiagnosticSpool {
         this.mergeVisualStates(artifact.visualStates);
         const file = `url-${String(urlIndex).padStart(4, '0')}-test-${String(testIndex).padStart(4, '0')}.json`;
         await this.writeJson(file, artifact.value);
+        const persistedBytes = await this.directory.getFileHandle(file)
+            .then(handle => handle.getFile()).then(value => value.size);
         const entry = this.entries[urlIndex] || (this.entries[urlIndex] = { metadataFile: null, testFiles: [] });
         entry.testFiles[testIndex] = file;
         return DiagnosticSpool.testSummary({ ...artifact.value, analysisUnit: artifact.analysisUnit },
-            { urlIndex, testIndex, file });
+            { urlIndex, testIndex, file, bytes: persistedBytes });
     }
 
     async persistUrl(urlResult, urlIndex) {
@@ -249,10 +251,15 @@ class DiagnosticSpool {
         };
     }
 
-    async readTest(ref) {
+    async readCompactedTest(ref) {
         if (!ref?.file || !this.directory) return null;
         const handle = await this.directory.getFileHandle(ref.file);
-        const test = JSON.parse(await (await handle.getFile()).text());
+        return JSON.parse(await (await handle.getFile()).text());
+    }
+
+    async readTest(ref) {
+        const test = await this.readCompactedTest(ref);
+        if (!test) return null;
         return this.hydrateValue(test, new Map());
     }
 

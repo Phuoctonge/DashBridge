@@ -9,6 +9,7 @@ const vm = require('vm');
 
 const reportSource = fs.readFileSync(path.join(__dirname, '..', 'pages', 'test-runner', 'test-runner-report.js'), 'utf8');
 const uiSource = fs.readFileSync(path.join(__dirname, '..', 'pages', 'test-runner', 'test-runner-ui.js'), 'utf8');
+const coreSource = fs.readFileSync(path.join(__dirname, '..', 'pages', 'test-runner', 'test-runner-core.js'), 'utf8');
 const classStart = uiSource.indexOf('class DiagnosticSpool');
 const classEnd = uiSource.indexOf('// --- Утилиты ---', classStart);
 const serializerStart = uiSource.indexOf('async function serializeJsonInChunks(');
@@ -16,6 +17,12 @@ const serializerEnd = uiSource.indexOf('async function createChunkedJsonBlob(', 
 const spoolSerializerStart = uiSource.indexOf('async function serializeSpoolArtifact(');
 const spoolSerializerEnd = uiSource.indexOf('function localExportTimestamp(', spoolSerializerStart);
 assert(classStart >= 0 && classEnd > classStart && serializerStart >= 0 && serializerEnd > serializerStart);
+const persistHookPosition = coreSource.indexOf('const retained = await onTestFinalized(testResult, {');
+const publishResultPosition = coreSource.indexOf('urlResult.tests.push(retainedTestResult);');
+assert(persistHookPosition >= 0 && publishResultPosition > persistHookPosition,
+    'raw diagnostics must be persisted and compacted before becoming visible through getSnapshot');
+assert(!coreSource.includes('urlResult.tests.push(testResult);'),
+    'the public runner state must never expose an unspooled matrix diagnostic');
 
 class MemoryFileHandle {
     constructor() { this.blob = new Blob([]); }
@@ -59,11 +66,18 @@ vm.runInContext(`${uiSource.slice(serializerStart, serializerEnd)}\n${uiSource.s
     const first = await spool.persistTest(makeTest('A'), 0, 0);
     const second = await spool.persistTest(makeTest('B'), 0, 1);
     assert(first.diagnosticRef && second.diagnosticRef, 'UI summaries must retain only disk references');
+    assert(first.diagnosticRef.bytes > 0 && second.diagnosticRef.bytes > 0,
+        'each compact reference must expose its persisted OPFS byte size');
     assert.strictEqual(first.diagnostic, undefined);
     assert.strictEqual(spool.assetsByCategory.images.size, 1,
         'identical images from multiple tests must have one physical asset');
     assert.strictEqual(spool.entries[0].testFiles.length, 2);
 
+    const compacted = await spool.readCompactedTest(first.diagnosticRef);
+    assert.strictEqual(compacted.diagnostic.before.panelImage.dataUrl, undefined,
+        'automatic readers must keep image assets as compact references');
+    assert(compacted.diagnostic.before.panelImage.imageRef,
+        'the compact test must retain a resolvable image reference');
     const hydrated = await spool.readTest(first.diagnosticRef);
     assert.strictEqual(hydrated.diagnostic.before.panelImage.dataUrl, dataUrl,
         'diagnostic viewer must hydrate a selected test on demand');

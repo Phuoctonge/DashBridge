@@ -49,7 +49,9 @@ assert(!source.includes("polyline.setAttribute('stroke-width', '4')"), 'highligh
 assert(source.includes('const completeStyleApply = result =>'), 'every visual command must complete through a shared highlight refresh');
 assert(source.includes('scheduleThresholdHighlightRender(root);'), 'style completion must schedule a threshold repaint');
 assert(source.includes('return completeStyleApply(result);'), 'the local uPlot/Flot style path must refresh active highlights');
-assert(source.match(/return completeStyleApply\(await applyPopupLegendAndVisuals/g)?.length >= 2,
-    'legacy and legend style paths must refresh active highlights');
+assert(source.includes('const completeLegacyStyleApply = legacyResult =>')
+    && source.includes('return completeStyleApply(legacyResult || localStyleResult);')
+    && source.match(/return completeLegacyStyleApply\(legacyResult\);/g)?.length === 2,
+    'legacy and legend style paths must refresh active highlights after reasserting local styles');
 
 console.log('PASS threshold highlights remain thicker than the rendered series');

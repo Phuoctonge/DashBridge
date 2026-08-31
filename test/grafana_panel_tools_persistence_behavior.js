@@ -61,10 +61,29 @@ assert(source.includes('let legendVisibilityRestoreAfterNextQuery = false;')
     && source.includes('hasExplicitLegendVisibilityWork() || legendVisibilityRestoreAfterNextQuery')
     && source.includes("recordVisualReapply('legend-visibility-restore-consumed'"),
     'source-filter OFF must restore visibility again after the complete native legend returns');
+assert(source.includes('const invertIdleWasEnabled = !!tools.invertIdle;')
+    && source.includes('const responseLabelTransformWasDisabled = invertIdleWasEnabled && !tools.invertIdle')
+    && source.includes('convertMemWasEnabled && !tools.convertMemToUsed')
+    && source.includes('if (responseLabelTransformWasDisabled && legendVisibilityRequested)')
+    && source.includes('legendVisibilityRestoreAfterNextQuery = true;'),
+    'turning off a label-changing response transform must restore visibility after native labels return');
+assert(source.includes('const legendVisibilityPayloadProvided = Object.prototype.hasOwnProperty.call(commandTools, \'legendVisibility\');')
+    && source.includes('visibilityHasHiddenEntries(commandTools.legendVisibility)')
+    && source.includes('visibilityHasHiddenEntries(tools.legendVisibility)')
+    && source.includes('commandTools.legendVisibility === null'),
+    'an empty generated visibility map must be a no-op unless it restores a previously hidden series');
+assert(source.includes('const resolveLegendVisibilityDesired = (visibility, key) =>')
+    && source.includes("const separatorIndex = key.lastIndexOf('\\u0000');")
+    && source.includes("const loadPattern = /load\\s*\\(calc\\)/gi;")
+    && source.includes('desired: resolveLegendVisibilityDesired(visibility, key), nativeDisabled'),
+    'key-aware visibility must follow the reversible idle to load (calc) response transform');
+assert(source.includes('const memoryIdentity = candidate =>')
+    && source.includes('const calculatedPattern = /used\\s*%\\s*\\(calc\\)/gi;')
+    && source.includes('memoryIdentity(candidate) === currentMemoryIdentity'),
+    'key-aware visibility must follow Total/Available fields into the calculated RAM series for the same server');
 assert(source.includes("visualMetadata.responseDataStatus?.kind === 'filtered_empty'")
     && source.includes("getLegendItems().length === 0")
     && source.includes('&& (legendVisibilityRestoreAfterNextQuery')
-    && source.includes("targetRoot === document || !targetRoot?.querySelector?.('canvas')")
     && source.includes("tools.seriesQueryFilterEnabled === true")
     && source.includes("tools.cpuCapacityFilterEnabled === true")
     && source.includes('!legendVisibilityApplied && !filteredEmptyLegendCanReturnAfterQuery')
@@ -88,6 +107,11 @@ assert(visualEngineSource.includes('const configureLocalSeriesStyleGuard =')
     && visualEngineSource.includes("attributeFilter: ['width', 'height', 'class']")
     && visualEngineSource.includes('applyLocalSeriesStyles({ root, ...guard.settings })'),
     'style-only state must be restored in the renderer replacement mutation before paint');
+assert(visualEngineSource.includes('const completeLegacyStyleApply = legacyResult =>')
+    && visualEngineSource.includes('return completeLegacyStyleApply(legacyResult);')
+    && visualEngineSource.match(/return completeLegacyStyleApply\(legacyResult\);/g)?.length === 2
+    && visualEngineSource.includes('root, removeFill, thickenLines, thickenLinesValue,'),
+    'legend layout and visibility routes must reassert fill/width on the current Flot renderer');
 assert(visualEngineSource.includes('layoutAlreadyApplied')
     && visualEngineSource.includes('layoutChanged: false')
     && visualEngineSource.includes('if (legendLayout?.layoutChanged || uplotResizedAfterLegendLayout)'),

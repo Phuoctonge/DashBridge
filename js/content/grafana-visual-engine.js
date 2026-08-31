@@ -2720,6 +2720,20 @@
                 scheduleThresholdHighlightRender(root);
                 return result;
             };
+            const completeLegacyStyleApply = legacyResult => {
+                // Legend relocation/visibility can replace the Flot plot after
+                // the legacy painter touched the previous instance. Reassert
+                // only the independent fill/width state on the live renderer
+                // and keep its narrow replacement guard active. This does not
+                // repaint palette, legend layout or visibility.
+                const localStyleResult = applyLocalSeriesStyles({
+                    root, removeFill, thickenLines, thickenLinesValue,
+                });
+                configureLocalSeriesStyleGuard({
+                    root, removeFill, thickenLines, thickenLinesValue,
+                });
+                return completeStyleApply(legacyResult || localStyleResult);
+            };
             if (seriesConfig) {
                 const result = await this.applySeriesVisibility({ root, seriesConfig, mode });
                 // На Grafana 6-7 (Flot) installFlotVisibilityController возвращает null,
@@ -2731,7 +2745,7 @@
                 // В обоих случаях вызов applyPopupLegendAndVisuals безопасен: он идемпотентен
                 // (повторный вызов applySeriesVisibility просто обновляет seriesConfig
                 // в уже существующем контроллере).
-                return completeStyleApply(await applyPopupLegendAndVisuals(
+                const legacyResult = await applyPopupLegendAndVisuals(
                     panelId,
                     seriesConfig,
                     mode,
@@ -2739,7 +2753,8 @@
                     thickenLines,
                     thickenLinesValue,
                     invertLegend
-                ));
+                );
+                return completeLegacyStyleApply(legacyResult);
             }
             resetSeriesVisibility({ root });
             const hasSavedLegendLayout = Array.from(root.querySelectorAll?.('*') || [])
@@ -2757,8 +2772,7 @@
                 configureLocalSeriesStyleGuard({ root, removeFill, thickenLines, thickenLinesValue });
                 return completeStyleApply(result);
             }
-            configureLocalSeriesStyleGuard({ root, removeFill: false, thickenLines: false, thickenLinesValue });
-            return completeStyleApply(await applyPopupLegendAndVisuals(
+            const legacyResult = await applyPopupLegendAndVisuals(
                 panelId,
                 seriesConfig,
                 mode,
@@ -2766,7 +2780,8 @@
                 thickenLines,
                 thickenLinesValue,
                 invertLegend
-            ));
+            );
+            return completeLegacyStyleApply(legacyResult);
         },
         findUPlot(root = document) {
             return findUPlotForThreshold(root);

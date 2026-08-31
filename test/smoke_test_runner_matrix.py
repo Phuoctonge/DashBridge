@@ -80,6 +80,8 @@ checks = {
     ),
     "runner waits for observable panel stability after the target response": (
         "async function waitForPanelStability(tabId, panelId" in SUITE
+        and "sampleCap = 64" in SUITE
+        and "samplePolicy: 'first-and-newest-bounded/v1'" in SUITE
         and "schema: 'dashbridge-e2e-panel-settlement/v1'" in SUITE
         and "requiredQuietMs: options.quietMs" in SUITE
         and "consecutiveStableFrames >= options.stableFrames" in SUITE
@@ -97,7 +99,8 @@ checks = {
             > SUITE.index("const result = await applyPanelTools(tabId, command);")
     ),
     "active matrix states survive a second refresh without another command": (
-        "verifyPersistence: activeIds.length > 0" in SUITE
+        "const verifyPersistence = activeIds.length > 0 && !persistenceProvenFor.has(persistenceKey);" in SUITE
+        and "applySettingsAndWait(tabId, panelId, resolvedSettings, { verifyPersistence })" in SUITE
         and "persistence.beforeRefresh = await captureRuntimeDiagnostic(tabId, panelId, {" in SUITE
         and "persistence.refresh = await triggerRefresh(tabId);" in SUITE
         and "persistence.lifecycle = await waitForTargetQueryLifecycle(tabId, persistence.cursor);" in SUITE
@@ -261,7 +264,11 @@ checks = {
         and "seriesVisibilityOff: (baseline, current, env) =>" in SUITE
         and "const visibilityEntries = legendEntries.map(entry => {" in SUITE
         and "key: `${label}\\u0000${occurrence}`" in SUITE
-        and "const targetEntry = (markers.visibilityEntries || []).find(entry => entry.key === target?.key);" in SUITE
+        and "const targetEntry = findEquivalentVisibilityEntry(markers.visibilityEntries || [], target, current);" in SUITE
+        and "function findEquivalentVisibilityEntry(entries, target, current)" in SUITE
+        and "const calculatedKey = target.key.replace(new RegExp(escapedIdle, 'gi'), 'load (calc)');" in SUITE
+        and "if (runtimeTools.convertMemToUsed !== true) return null;" in SUITE
+        and ".replace(/used\\s*%\\s*\\(calc\\)/gi, '')" in SUITE
         and "targetEntry.hidden || targetEntry.dimmed || targetEntry.nativeHidden || targetEntry.visuallyHidden" in SUITE
         and "entry?.nativeDisabled === !desired && entry.current === desired" in PANEL_TOOLS
         and "resetSeriesVisibility?.({ root });" in PANEL_TOOLS
@@ -357,6 +364,13 @@ checks = {
         and "mode: snapshot.mode || 'fast'," in REPORT
         and 'id="trRunMode"' in HTML
     ),
+    "label-transform reset restores visibility after native series return": (
+        "const invertIdleWasEnabled = !!tools.invertIdle;" in PANEL_TOOLS
+        and "const responseLabelTransformWasDisabled = invertIdleWasEnabled && !tools.invertIdle" in PANEL_TOOLS
+        and "convertMemWasEnabled && !tools.convertMemToUsed" in PANEL_TOOLS
+        and "if (responseLabelTransformWasDisabled && legendVisibilityRequested)" in PANEL_TOOLS
+        and "legendVisibilityRestoreAfterNextQuery = true;" in PANEL_TOOLS
+    ),
     "selected scenarios are explicit, persisted and auditable": (
         "selectedTestIds = null" in CORE
         and "const selectionMatch = !selectedIds || selectedIds.has(t.id);" in CORE
@@ -385,7 +399,7 @@ checks = {
         "const timeoutPromise = coreSleeep(testTimeoutMs)" in CORE
         and "Math.max(CORE_TEST_TIMEOUT_MS, Number(test.timeoutMs))" in CORE
         and "const refreshCount = states.reduce(" in SUITE
-        and "timeoutMs: Math.max(30_000, refreshCount * 5_000 + 15_000)" in SUITE
+        and "timeoutMs: Math.max(30_000, refreshCount * 10_000 + 30_000)" in SUITE
         and "expectedRefreshCount: refreshCount" in SUITE
         and "timeoutProgress" in CORE
         and "await Promise.race([resultPromise, timeoutPromise])" in CORE

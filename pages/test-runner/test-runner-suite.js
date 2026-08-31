@@ -440,7 +440,14 @@ async function captureRuntimeDiagnostic(tabId, panelId, {
     captureReason = 'explicit-full-diagnostic',
 } = {}) {
     const mode = normalizeDiagnosticCaptureMode(captureMode);
-    const includeCanvasImages = mode !== DIAGNOSTIC_CAPTURE_MODES.SEMANTIC;
+    // Panel/forensic captures already retain a cropped panel PNG (and the
+    // forensic mode also retains the viewport). Keeping a second base64 PNG
+    // for every canvas made long matrix scenarios retain equivalent images
+    // until the whole test could be spooled to OPFS. Only canvas mode needs
+    // the raw canvas PNG; every mode keeps a sampled pixel hash/statistics.
+    const includeCanvasImages = mode === DIAGNOSTIC_CAPTURE_MODES.CANVAS;
+    const retainFullDom = mode === DIAGNOSTIC_CAPTURE_MODES.FORENSIC;
+    const retainFullResources = mode === DIAGNOSTIC_CAPTURE_MODES.FORENSIC;
     const diagnostic = await execMain(tabId, (pid, visualOptions) => {
         const dom = window.DashBridgeGrafanaDom;
         const visual = window.DashBridgeGrafanaVisualEngine;
@@ -453,6 +460,11 @@ async function captureRuntimeDiagnostic(tabId, panelId, {
         const hash = text => {
             let value = 2166136261;
             for (let i = 0; i < text.length; i += 1) value = Math.imul(value ^ text.charCodeAt(i), 16777619);
+            return `fnv1a-${(value >>> 0).toString(16)}`;
+        };
+        const hashBytes = bytes => {
+            let value = 2166136261;
+            for (let i = 0; i < bytes.length; i += 1) value = Math.imul(value ^ bytes[i], 16777619);
             return `fnv1a-${(value >>> 0).toString(16)}`;
         };
         const display = value => typeof value === 'function' ? `[function ${value.name || 'anonymous'}]`
@@ -472,6 +484,9 @@ async function captureRuntimeDiagnostic(tabId, panelId, {
                 bottom: rect.bottom, left: rect.left, width: rect.width, height: rect.height,
             } : null;
         })();
+        const allResourceEntries = performance.getEntriesByType?.('resource') || [];
+        const retainedResourceEntries = visualOptions?.retainFullResources
+            ? allResourceEntries : allResourceEntries.slice(-25);
         const environment = {
             url: location.href,
             title: document.title,
@@ -513,7 +528,13 @@ async function captureRuntimeDiagnostic(tabId, panelId, {
                 transferSize: entry.transferSize,
                 decodedBodySize: entry.decodedBodySize,
             })) || [],
-            resources: performance.getEntriesByType?.('resource')?.map(entry => ({
+            resourceSummary: {
+                observed: allResourceEntries.length,
+                retained: retainedResourceEntries.length,
+                transferSize: allResourceEntries.reduce((sum, entry) => sum + (Number(entry.transferSize) || 0), 0),
+                decodedBodySize: allResourceEntries.reduce((sum, entry) => sum + (Number(entry.decodedBodySize) || 0), 0),
+            },
+            resources: retainedResourceEntries.map(entry => ({
                 name: entry.name,
                 entryType: entry.entryType,
                 initiatorType: entry.initiatorType,
@@ -534,7 +555,7 @@ async function captureRuntimeDiagnostic(tabId, panelId, {
                 nextHopProtocol: entry.nextHopProtocol,
                 renderBlockingStatus: entry.renderBlockingStatus,
                 responseStatus: entry.responseStatus,
-            })) || [],
+            })),
             memory: performance.memory ? {
                 jsHeapSizeLimit: performance.memory.jsHeapSizeLimit,
                 totalJSHeapSize: performance.memory.totalJSHeapSize,
@@ -553,7 +574,7 @@ async function captureRuntimeDiagnostic(tabId, panelId, {
                 canvasCount: root.querySelectorAll('canvas').length,
                 buttonCount: root.querySelectorAll('button').length,
                 text: root.innerText || '',
-                outerHTML: rootOuterHTML,
+                ...(visualOptions?.retainFullDom ? { outerHTML: rootOuterHTML } : {}),
                 outerHTMLBytes: rootOuterHTML.length,
                 outerHTMLHash: hash(rootOuterHTML),
                 outerHTMLStructuralHash: hash(rootStructuralHTML),
@@ -567,20 +588,35 @@ async function captureRuntimeDiagnostic(tabId, panelId, {
         };
         const canvas = root ? [...root.querySelectorAll('canvas')].map(element => {
             let data = '';
-            try { data = element.toDataURL('image/png'); } catch (_) { }
-            const h = hash(data);
+            if (visualOptions?.includeCanvasImages) {
+                try { data = element.toDataURL('image/png'); } catch (_) { }
+            }
+            let sampledPixels = null;
             let pixelStats = null;
             try {
-                const context = element.getContext('2d', { willReadFrequently: true });
-                const pixels = context.getImageData(0, 0, element.width, element.height).data;
-                const stride = Math.max(1, Math.floor((element.width * element.height) / 16384));
+                // A bounded downscaled surface avoids allocating a full RGBA
+                // buffer (several MiB on a large Grafana panel) at every
+                // semantic checkpoint while preserving stable visual evidence.
+                const sourceWidth = Math.max(1, element.width || 1);
+                const sourceHeight = Math.max(1, element.height || 1);
+                const sampleWidth = Math.max(1, Math.min(160, sourceWidth));
+                const sampleHeight = Math.max(1, Math.min(90,
+                    Math.round(sourceHeight * sampleWidth / sourceWidth)));
+                const sampleCanvas = document.createElement('canvas');
+                sampleCanvas.width = sampleWidth;
+                sampleCanvas.height = sampleHeight;
+                const context = sampleCanvas.getContext('2d', { willReadFrequently: true });
+                context.drawImage(element, 0, 0, sampleWidth, sampleHeight);
+                sampledPixels = context.getImageData(0, 0, sampleWidth, sampleHeight).data;
+                const stride = Math.max(1, Math.floor((sampleWidth * sampleHeight) / 16384));
                 const bins = Array(16).fill(0);
                 let count = 0, sum = 0, sumSq = 0, transparent = 0, min = 255, max = 0;
-                for (let pixel = 0; pixel < element.width * element.height; pixel += stride) {
+                for (let pixel = 0; pixel < sampleWidth * sampleHeight; pixel += stride) {
                     const offset = pixel * 4;
-                    const luminance = Math.round(0.2126 * pixels[offset] + 0.7152 * pixels[offset + 1] + 0.0722 * pixels[offset + 2]);
+                    const luminance = Math.round(0.2126 * sampledPixels[offset]
+                        + 0.7152 * sampledPixels[offset + 1] + 0.0722 * sampledPixels[offset + 2]);
                     count += 1; sum += luminance; sumSq += luminance * luminance;
-                    if (pixels[offset + 3] < 5) transparent += 1;
+                    if (sampledPixels[offset + 3] < 5) transparent += 1;
                     min = Math.min(min, luminance); max = Math.max(max, luminance);
                     bins[Math.min(15, Math.floor(luminance / 16))] += 1;
                 }
@@ -590,10 +626,16 @@ async function captureRuntimeDiagnostic(tabId, panelId, {
                     luminanceStdDev: Number(Math.sqrt(Math.max(0, sumSq / Math.max(1, count) - mean * mean)).toFixed(3)),
                     luminanceMin: min, luminanceMax: max,
                     transparentRatio: Number((transparent / Math.max(1, count)).toFixed(4)), histogram16: bins,
+                    sampleWidth, sampleHeight,
                 };
             } catch (error) {
                 pixelStats = { error: error?.message || String(error) };
             }
+            const dimensionBytes = new Uint8Array([
+                element.width & 255, (element.width >>> 8) & 255,
+                element.height & 255, (element.height >>> 8) & 255,
+            ]);
+            const h = hashBytes(sampledPixels || dimensionBytes);
 
             // The hash supports compact matrix comparisons; the image is retained
             // as visual evidence for the diagnostic viewer and exported artifact.
@@ -668,8 +710,20 @@ async function captureRuntimeDiagnostic(tabId, panelId, {
             }));
         } else {
             const flot = (() => {
-                const host = root?.querySelector('.flot-base, .flot-overlay, .flot-placeholder') || root;
-                try { return window.jQuery?.plot?.getPlot?.(host) || window.$?.plot?.getPlot?.(host) || null; } catch (_) { return null; }
+                const $ = window.jQuery || window.$;
+                if (!$ || !root) return null;
+                try {
+                    // Match the production getFlotPlot() resolver. Grafana 10
+                    // stores the live plot on the chart host via jQuery data;
+                    // $.plot.getPlot() is not part of this runtime and made
+                    // working fill/width changes look unsupported to E2E.
+                    const hosts = $(root)
+                        .find('.graph-panel__chart, .flot-base, canvas')
+                        .addBack('.graph-panel__chart, .flot-base, canvas')
+                        .toArray();
+                    const host = hosts.find(element => !!$(element).data('plot'));
+                    return host ? $(host).data('plot') : null;
+                } catch (_) { return null; }
             })();
             if (flot?.getData) {
                 renderer = 'flot';
@@ -918,7 +972,7 @@ async function captureRuntimeDiagnostic(tabId, panelId, {
             tools: state ? JSON.parse(JSON.stringify(state)) : null,
             series,
         };
-    }, [panelId, { includeCanvasImages }]);
+    }, [panelId, { includeCanvasImages, retainFullDom, retainFullResources }]);
     const visualStateRef = `visual-state-${runtimeVisualReuseHash(diagnostic)}`;
     if (canReuseRuntimeVisual(diagnostic, reuseVisualFrom, mode)) {
         if (mode === DIAGNOSTIC_CAPTURE_MODES.PANEL || mode === DIAGNOSTIC_CAPTURE_MODES.FORENSIC) {
@@ -1286,12 +1340,15 @@ async function waitForPanelStability(tabId, panelId, {
     timeoutMs = 8000,
     quietMs = 300,
     stableFrames = 4,
+    sampleCap = 64,
 } = {}) {
     return execMain(tabId, (pid, options) => new Promise(resolve => {
         const dom = window.DashBridgeGrafanaDom;
         const startedAt = performance.now();
         const startedWallAt = Date.now();
         const samples = [];
+        let observedFrames = 0;
+        let droppedSamples = 0;
         let lastFingerprint = null;
         let stableSince = null;
         let consecutiveStableFrames = 0;
@@ -1374,7 +1431,10 @@ async function waitForPanelStability(tabId, panelId, {
                 elapsedMs: Math.round(performance.now() - startedAt),
                 requiredQuietMs: options.quietMs,
                 requiredStableFrames: options.stableFrames,
-                observedFrames: samples.length,
+                observedFrames,
+                retainedSamples: samples.length,
+                droppedSamples,
+                samplePolicy: 'first-and-newest-bounded/v1',
                 observedMutations: mutationVersion,
                 observedRootGenerations: rootGeneration,
                 mutationSummary: {
@@ -1505,8 +1565,9 @@ async function waitForPanelStability(tabId, panelId, {
                 consecutiveStableFrames = 1;
                 stableSince = now;
             }
+            observedFrames += 1;
             samples.push({
-                frame: samples.length + 1,
+                frame: observedFrames,
                 at: Date.now(),
                 elapsedMs: Math.round(now - startedAt),
                 sameAsPrevious: same,
@@ -1514,6 +1575,14 @@ async function waitForPanelStability(tabId, panelId, {
                 stableForMs: Math.round(now - stableSince),
                 ...facts,
             });
+            if (samples.length > options.sampleCap) {
+                const removeCount = samples.length - options.sampleCap;
+                // Preserve the first baseline frame and the newest bounded
+                // window. Every frame still participates in the live verdict;
+                // only repetitive report evidence is discarded.
+                samples.splice(1, removeCount);
+                droppedSamples += removeCount;
+            }
             lastSampleMutationVersion = mutationVersion;
 
             const quietLongEnough = now - stableSince >= options.quietMs;
@@ -1544,7 +1613,7 @@ async function waitForPanelStability(tabId, panelId, {
             requestAnimationFrame(sample);
         };
         sample();
-    }), [panelId, { timeoutMs, quietMs, stableFrames }]);
+    }), [panelId, { timeoutMs, quietMs, stableFrames, sampleCap }]);
 }
 
 /**
@@ -1922,7 +1991,10 @@ async function runTransitionTest(tabId, env, transitions) {
     let previousActiveIds = [];
     try {
         for (let i = 0; i < resolvedTransitions.length; i++) {
-            const { label, settings: resolvedSettings, invariant, activeIds = [] } = resolvedTransitions[i];
+            const {
+                label, settings: resolvedSettings, invariant, activeIds = [],
+                verifyPersistence = activeIds.length > 0,
+            } = resolvedTransitions[i];
             const changedIds = [...new Set([...previousActiveIds, ...activeIds])]
                 .filter(id => previousActiveIds.includes(id) !== activeIds.includes(id));
             const actionStartedAt = Date.now();
@@ -1940,7 +2012,7 @@ async function runTransitionTest(tabId, env, transitions) {
                 captureReason: 'transition-before-semantic-proof',
             });
             const command = isolationResetPassed
-                ? await applySettingsAndWait(tabId, panelId, resolvedSettings, { verifyPersistence: activeIds.length > 0 })
+                ? await applySettingsAndWait(tabId, panelId, resolvedSettings, { verifyPersistence })
                 : {
                     status: 'isolation-reset-failed',
                     lifecycle: isolationReset.lifecycle || null,
@@ -1960,13 +2032,20 @@ async function runTransitionTest(tabId, env, transitions) {
             afterState.diagnostic = after;
             const lifecycle = command.lifecycle;
             const visualPersistenceFeatures = ['removeFill', 'thickenLines', 'invertLegend', 'seriesVisibility'];
-            const requiresVisualReapply = activeIds.some(id => visualPersistenceFeatures.includes(id));
+            const intentionalEmpty = after?.dataStatus?.intentionalEmpty === true;
+            // A source filter may intentionally remove every series. The
+            // visibility intent is then proven by tools+transport invariants;
+            // requiring a renderer repaint would demand a legend that must not
+            // exist until the filter is disabled and full data returns.
+            const requiresVisualReapply = !intentionalEmpty
+                && activeIds.some(id => visualPersistenceFeatures.includes(id));
             const reapplyBefore = Number(command.persistence?.beforeRefresh?.visualReapplyDiagnostic?.completed) || 0;
             const reapplyAfter = Number(after?.visualReapplyDiagnostic?.completed) || 0;
             const reapplyErrorsBefore = Number(command.persistence?.beforeRefresh?.visualReapplyDiagnostic?.errors) || 0;
             const reapplyErrorsAfter = Number(after?.visualReapplyDiagnostic?.errors) || 0;
             const visualReapplyProof = {
                 required: requiresVisualReapply,
+                deferredByIntentionalEmpty: intentionalEmpty,
                 completedBeforeSecondRefresh: reapplyBefore,
                 completedAfterSecondRefresh: reapplyAfter,
                 completedDelta: reapplyAfter - reapplyBefore,
@@ -2678,7 +2757,7 @@ const matrixInvariants = {
         if (!env.hasVisibilitySeries) return { pass: true, skip: true, reason: 'SKIP: нет двух управляемых серий легенды' };
         const markers = current.diagnostic?.markers || {};
         const target = env.visibilityTarget;
-        const targetEntry = (markers.visibilityEntries || []).find(entry => entry.key === target?.key);
+        const targetEntry = findEquivalentVisibilityEntry(markers.visibilityEntries || [], target, current);
         const targetHidden = !!targetEntry && (targetEntry.hidden || targetEntry.dimmed || targetEntry.nativeHidden || targetEntry.visuallyHidden);
         const deferredForIntentionalEmpty = current.diagnostic?.dataStatus?.intentionalEmpty === true
             && current.diagnostic?.tools?.legendVisibility?.[target?.key] === false
@@ -2697,7 +2776,7 @@ const matrixInvariants = {
         if (!env.hasVisibilitySeries) return { pass: true, skip: true, reason: 'SKIP: нет двух управляемых серий легенды' };
         const markers = current.diagnostic?.markers || {};
         const target = env.visibilityTarget;
-        const targetEntry = (markers.visibilityEntries || []).find(entry => entry.key === target?.key);
+        const targetEntry = findEquivalentVisibilityEntry(markers.visibilityEntries || [], target, current);
         const targetStillHidden = !!targetEntry && (targetEntry.hidden || targetEntry.dimmed || targetEntry.nativeHidden || targetEntry.visuallyHidden);
         const clearedDuringIntentionalEmpty = current.diagnostic?.dataStatus?.intentionalEmpty === true
             && current.diagnostic?.tools?.legendVisibility?.[target?.key] !== false
@@ -2765,6 +2844,34 @@ const visibilitySettings = env => {
     const target = env.visibilityTarget;
     return target ? { legendVisibility: { [target.key]: false } } : { legendVisibility: {} };
 };
+
+function findEquivalentVisibilityEntry(entries, target, current) {
+    const exact = entries.find(entry => entry.key === target?.key);
+    if (exact || !target?.key) return exact;
+    const runtimeTools = current.diagnostic?.tools || {};
+    if (runtimeTools.invertIdle === true) {
+        const idleKeyword = String(runtimeTools.idleKeyword || 'idle');
+        const escapedIdle = idleKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const calculatedKey = target.key.replace(new RegExp(escapedIdle, 'gi'), 'load (calc)');
+        const calculatedEntry = entries.find(entry => entry.key === calculatedKey);
+        if (calculatedEntry) return calculatedEntry;
+    }
+    if (runtimeTools.convertMemToUsed !== true) return null;
+    const sourceLabel = String(target.label || target.key.split('\u0000')[0]);
+    const totalKeyword = String(runtimeTools.totalKeyword || 'total');
+    const availableKeyword = String(runtimeTools.availKeyword || 'available');
+    const escape = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const sourceServer = sourceLabel
+        .replace(new RegExp(escape(totalKeyword), 'gi'), '')
+        .replace(new RegExp(escape(availableKeyword), 'gi'), '')
+        .replace(/\s+/g, ' ').trim().toLowerCase();
+    return entries.find(entry => {
+        const calculatedServer = String(entry.label || '')
+            .replace(/used\s*%\s*\(calc\)/gi, '')
+            .replace(/\s+/g, ' ').trim().toLowerCase();
+        return calculatedServer === sourceServer && entry.occurrence === target.occurrence;
+    });
+}
 
 const E2E_FEATURE_REGISTRY = [
     {
@@ -2842,12 +2949,17 @@ function activeSetInvariant(activeIds, changedId = null) {
 
 function makeMatrixTransitions(states) {
     let previous = [];
+    const persistenceProvenFor = new Set();
     return states.map(activeIds => {
         const changedId = [...previous, ...activeIds].find(id => previous.includes(id) !== activeIds.includes(id)) || null;
+        const persistenceKey = [...activeIds].sort().join('|');
+        const verifyPersistence = activeIds.length > 0 && !persistenceProvenFor.has(persistenceKey);
+        if (verifyPersistence) persistenceProvenFor.add(persistenceKey);
         previous = activeIds;
         return {
             label: activeIds.length ? `активны: ${activeIds.join(', ')}` : 'все функции выключены',
             activeIds: [...activeIds],
+            verifyPersistence,
             settings: env => featureSettings(activeIds, env),
             invariant: activeSetInvariant(activeIds, changedId),
         };
@@ -2889,24 +3001,30 @@ function describeMatrixScenario(id, featureIds, states) {
 }
 
 function matrixTest(id, technicalName, states, runModes = ['full'], featureIds = []) {
-    // Each transition performs one graph Refresh. An active state performs a
-    // second Refresh to prove persistence without resending the command;
-    // isolation and final cleanup contribute one refresh each.
-    const refreshCount = states.reduce(
-        (count, activeIds) => count + (activeIds.length > 0 ? 2 : 1),
-        2
-    );
+    // Each transition performs one graph Refresh. The first occurrence of
+    // every distinct active set performs a second Refresh to prove persistence
+    // without resending the command. Repeated identical active sets still run
+    // their command/Refresh/invariant, but reuse that exact persistence proof.
+    // Isolation and final cleanup contribute one refresh each.
+    const persistenceSets = new Set();
+    const refreshCount = states.reduce((count, activeIds) => {
+        const persistenceKey = [...activeIds].sort().join('|');
+        const needsPersistence = activeIds.length > 0 && !persistenceSets.has(persistenceKey);
+        if (needsPersistence) persistenceSets.add(persistenceKey);
+        return count + 1 + (needsPersistence ? 1 : 0);
+    }, 2);
     const metadata = describeMatrixScenario(id, featureIds, states);
     return {
         id, category: 'H', name: metadata.name, technicalName, description: metadata.description,
         featureIds: [...new Set(featureIds)], tags: [/^HR/.test(id) ? 'risk' : (/^HP/.test(id) ? 'pair' : 'lifecycle')], runModes,
         steps: states.map((activeIds, index) => `${index + 1}. ${activeIds.length ? `Активны: ${humanFeatureList(activeIds)}` : 'Все функции выключены'}`),
         expectedRefreshCount: refreshCount,
-        timeoutBudgetModel: 'max(30s, expectedRefreshCount * 5s + 15s)',
-        // Each active transition proves two real graph refreshes and now waits
-        // for the complete renderer-reapply generation. Long pair/high-risk
-        // vectors therefore need a budget proportional to their state count.
-        timeoutMs: Math.max(30_000, refreshCount * 5_000 + 15_000),
+        timeoutBudgetModel: 'max(30s, expectedRefreshCount * 10s + 30s)',
+        // This is only the outer emergency ceiling; successful scenarios end
+        // immediately. Live Flot evidence shows threshold/layout refreshes can
+        // legitimately take 9–23 seconds per transition while every inner
+        // command, target-query and settlement watchdog remains healthy.
+        timeoutMs: Math.max(30_000, refreshCount * 10_000 + 30_000),
         async run(tabId, env) {
             return runTransitionTest(tabId, env, makeMatrixTransitions(states));
         }
