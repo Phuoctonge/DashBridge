@@ -1806,23 +1806,54 @@ async function runTransitionTest(tabId, env, transitions) {
     diagnostic.opened = openedSnapshot;
 
     // Isolate once, then preserve state across the complete user sequence.
-    // Resetting before every step would test independent snapshots rather than
-    // ON→ON, partial-OFF and multi-feature interactions.
+    // A preceding matrix scenario already ends with a causal reset + Refresh.
+    // Reuse that proof only after confirming the current semantic snapshot is
+    // still clean; this removes a duplicate network cycle without weakening
+    // the boundary between scenarios.
     const isolationStartedAt = Date.now();
     liveProgress.phase = 'isolation-reset';
+    const verifiedBoundary = env.__dashbridgeVerifiedCleanBoundary || null;
+    env.__dashbridgeVerifiedCleanBoundary = null;
     const isolationRuntimeCursor = (await readRuntimeDiagnosticEvents(tabId)).nextEventId;
-    const isolationReset = await resetAllSettings(tabId, panelId);
-    const isolationSnapshot = await captureRuntimeDiagnostic(tabId, panelId, {
-        captureMode: DIAGNOSTIC_CAPTURE_MODES.PANEL,
-        captureReason: 'canonical-isolated-baseline',
-    });
-    const isolationRuntimeEvents = await readRuntimeDiagnosticEvents(tabId, isolationRuntimeCursor);
-    const isolationNativeReset = nativeLegendResetVerified(isolationSnapshot);
-    const isolationResetPassed = isolationReset.status === 'applied'
-        && isolationReset.lifecycle?.status === 'target-complete'
-        && isolationReset.settlement?.status === 'stable'
-        && isolationNativeReset.pass;
-    baseline = await captureState(tabId, panelId);
+    let isolationReset;
+    let isolationSnapshot;
+    let isolationRuntimeEvents;
+    let isolationNativeReset;
+    let isolationResetPassed;
+    if (verifiedBoundary?.pass && verifiedBoundary.panelId === panelId) {
+        baseline = await captureState(tabId, panelId);
+        baseline.diagnostic = openedSnapshot;
+        isolationNativeReset = nativeLegendResetVerified(openedSnapshot);
+        const cleanInvariant = isolationNativeReset.pass
+            ? activeSetInvariant([], null)(verifiedBoundary.state || baseline, baseline, env)
+            : { pass: false, reason: 'Нативная видимость легенды изменилась после доказанного reset' };
+        isolationResetPassed = isolationNativeReset.pass && cleanInvariant.pass;
+        isolationSnapshot = openedSnapshot;
+        isolationRuntimeEvents = await readRuntimeDiagnosticEvents(tabId, isolationRuntimeCursor);
+        isolationReset = {
+            status: isolationResetPassed ? 'reused-verified-reset' : 'reused-reset-drifted',
+            acknowledgement: verifiedBoundary.reset?.command?.acknowledgement || null,
+            lifecycle: verifiedBoundary.reset?.lifecycle || null,
+            settlement: verifiedBoundary.reset?.settlement || null,
+            afterCommandBeforeRefresh: null,
+            reusedFromTestId: verifiedBoundary.testId || null,
+            cleanInvariant,
+        };
+    }
+    if (!verifiedBoundary?.pass || verifiedBoundary.panelId !== panelId || !isolationResetPassed) {
+        isolationReset = await resetAllSettings(tabId, panelId);
+        isolationSnapshot = await captureRuntimeDiagnostic(tabId, panelId, {
+            captureMode: DIAGNOSTIC_CAPTURE_MODES.PANEL,
+            captureReason: 'canonical-isolated-baseline',
+        });
+        isolationRuntimeEvents = await readRuntimeDiagnosticEvents(tabId, isolationRuntimeCursor);
+        isolationNativeReset = nativeLegendResetVerified(isolationSnapshot);
+        isolationResetPassed = isolationReset.status === 'applied'
+            && isolationReset.lifecycle?.status === 'target-complete'
+            && isolationReset.settlement?.status === 'stable'
+            && isolationNativeReset.pass;
+        baseline = await captureState(tabId, panelId);
+    }
     diagnostic.baseline = isolationSnapshot;
     baseline.diagnostic = diagnostic.baseline;
     diagnostic.isolation = {
@@ -1835,6 +1866,9 @@ async function runTransitionTest(tabId, env, transitions) {
         commandCursor: isolationReset.commandCursor ?? null,
         refreshCursor: isolationReset.cursor ?? null,
         nativeLegend: isolationNativeReset,
+        reusedVerifiedReset: isolationReset.status === 'reused-verified-reset',
+        reusedFromTestId: isolationReset.reusedFromTestId || null,
+        cleanInvariant: isolationReset.cleanInvariant || null,
         afterCommandBeforeRefresh: isolationReset.afterCommandBeforeRefresh || null,
         passed: isolationResetPassed,
     };
@@ -1843,7 +1877,9 @@ async function runTransitionTest(tabId, env, transitions) {
     liveProgress.isolationDurationMs = isolationFinishedAt - isolationStartedAt;
     appendAction({
         action: 'isolate-scenario-baseline',
-        description: 'Зафиксировано входное состояние страницы, затем все функции явно сброшены и график обновлён',
+        description: isolationReset.status === 'reused-verified-reset'
+            ? 'Текущее состояние сверено с доказанным финальным reset предыдущего сценария без дублирующего Refresh'
+            : 'Зафиксировано входное состояние страницы, затем все функции явно сброшены и график обновлён',
         startedAt: openedAt,
         finishedAt: isolationFinishedAt,
         durationMs: isolationFinishedAt - openedAt,
@@ -2180,6 +2216,14 @@ async function runTransitionTest(tabId, env, transitions) {
                 reason: resetPassed ? 'Сброс семантически подтвердил исходное состояние всех функций' : resetInvariant.reason,
             },
         };
+        env.__dashbridgeVerifiedCleanBoundary = resetPassed ? {
+            pass: true,
+            panelId,
+            testId: env.__dashbridgeCurrentTestId || null,
+            state: afterState,
+            snapshot: after,
+            reset: diagnostic.reset,
+        } : null;
         const resetFinishedAt = Date.now();
         appendAction({
             action: 'restore-after-scenario',
@@ -2590,11 +2634,26 @@ const matrixInvariants = {
     },
     thresholdOff: (baseline, current) => {
         const threshold = current.diagnostic?.thresholdDiagnostic || {};
-        const removed = !current.dom.thresholdApplied && threshold.enabled === false && threshold.status?.enabled === false;
+        const baselineWasInactive = baseline.dom.thresholdApplied === false
+            && baseline.diagnostic?.tools?.thresholdEnabled === false;
+        const currentIsInactive = !current.dom.thresholdApplied
+            && current.diagnostic?.tools?.thresholdEnabled === false;
+        const explicitRemoval = threshold.enabled === false && threshold.status?.enabled === false;
+        const removed = currentIsInactive && (explicitRemoval || baselineWasInactive);
         return {
             pass: removed,
-            reason: removed ? 'порог семантически отключён и маркер снят' : 'не доказано отключение порога',
-            debug: removed ? '' : JSON.stringify({ thresholdApplied: current.dom.thresholdApplied, threshold }),
+            reason: removed
+                ? (explicitRemoval
+                    ? 'порог семантически отключён и маркер снят'
+                    : 'порог остался выключен относительно чистого baseline')
+                : 'не доказано отключение порога',
+            debug: removed ? '' : JSON.stringify({
+                baselineThresholdApplied: baseline.dom.thresholdApplied,
+                baselineThresholdEnabled: baseline.diagnostic?.tools?.thresholdEnabled,
+                thresholdApplied: current.dom.thresholdApplied,
+                thresholdEnabled: current.diagnostic?.tools?.thresholdEnabled,
+                threshold,
+            }),
         };
     },
 
@@ -2692,14 +2751,53 @@ const visibilitySettings = env => {
 };
 
 const E2E_FEATURE_REGISTRY = [
-    { id: 'removeFill', name: 'removeFill', on: { visualSettings: { removeFill: true } }, off: { visualSettings: { removeFill: false } }, invariant: matrixInvariants.removeFillOn, inactive: matrixInvariants.removeFillOff },
-    { id: 'thickenLines', name: 'thickenLines', on: { visualSettings: { thickenLines: true, thickenLinesValue: 3 } }, off: { visualSettings: { thickenLines: false, thickenLinesValue: 3 } }, invariant: matrixInvariants.thickenLinesOn, inactive: matrixInvariants.thickenLinesOff },
-    { id: 'invertLegend', name: 'invertLegend', on: { visualSettings: { invertLegend: true } }, off: { visualSettings: { invertLegend: false } }, invariant: matrixInvariants.invertLegendOn, inactive: matrixInvariants.invertLegendOff },
-    { id: 'seriesVisibility', name: 'seriesVisibility', on: visibilitySettings, off: { legendVisibility: {} }, invariant: matrixInvariants.seriesVisibilityOn, inactive: matrixInvariants.seriesVisibilityOff },
-    { id: 'invertIdle', name: 'invertIdle', on: { transformSettings: { invertIdle: true } }, off: { transformSettings: { invertIdle: false } }, invariant: matrixInvariants.invertIdleOn, inactive: matrixInvariants.invertIdleOff },
-    { id: 'convertMemToUsed', name: 'convertMemToUsed', on: { transformSettings: { convertMemToUsed: true } }, off: { transformSettings: { convertMemToUsed: false } }, invariant: matrixInvariants.convertMemOn, inactive: matrixInvariants.convertMemOff },
-    { id: 'seriesQueryFilter', name: 'seriesQueryFilter', on: { transformSettings: { seriesQueryFilterEnabled: true, seriesQueryFilterValue: Number.MAX_SAFE_INTEGER, seriesQueryFilterRawValue: Number.MAX_SAFE_INTEGER, seriesQueryFilterMode: 'max' } }, off: { transformSettings: { seriesQueryFilterEnabled: false } }, invariant: matrixInvariants.seriesFilterOn, inactive: matrixInvariants.seriesFilterOff },
-    { id: 'thresholdEnabled', name: 'thresholdEnabled', on: { transformSettings: { thresholdEnabled: true } }, off: { transformSettings: { thresholdEnabled: false } }, invariant: matrixInvariants.thresholdOn, inactive: matrixInvariants.thresholdOff },
+    {
+        id: 'removeFill', name: 'Заливка графика', description: 'Убирает цветную заливку под линиями и проверяет её точное восстановление.',
+        sourceFile: 'js/content/grafana-visual-engine.js', sourceSymbol: 'applyLocalSeriesStyles',
+        on: { visualSettings: { removeFill: true } }, off: { visualSettings: { removeFill: false } },
+        invariant: matrixInvariants.removeFillOn, inactive: matrixInvariants.removeFillOff,
+    },
+    {
+        id: 'thickenLines', name: 'Толщина линий', description: 'Утолщает все линии графика и проверяет возврат исходной толщины.',
+        sourceFile: 'js/content/grafana-visual-engine.js', sourceSymbol: 'applyLocalSeriesStyles',
+        on: { visualSettings: { thickenLines: true, thickenLinesValue: 3 } }, off: { visualSettings: { thickenLines: false, thickenLinesValue: 3 } },
+        invariant: matrixInvariants.thickenLinesOn, inactive: matrixInvariants.thickenLinesOff,
+    },
+    {
+        id: 'invertLegend', name: 'Положение легенды', description: 'Перемещает легенду справа вниз или снизу вправо и проверяет восстановление.',
+        sourceFile: 'js/content/grafana-visual-engine.js', sourceSymbol: 'applyPopupLegendAndVisuals',
+        on: { visualSettings: { invertLegend: true } }, off: { visualSettings: { invertLegend: false } },
+        invariant: matrixInvariants.invertLegendOn, inactive: matrixInvariants.invertLegendOff,
+    },
+    {
+        id: 'seriesVisibility', name: 'Видимость отдельных серий', description: 'Скрывает выбранную строку легенды, сохраняет остальные серии и затем восстанавливает её.',
+        sourceFile: 'js/content/grafana-visual-engine.js', sourceSymbol: 'applySeriesVisibility',
+        on: visibilitySettings, off: { legendVisibility: {} }, invariant: matrixInvariants.seriesVisibilityOn, inactive: matrixInvariants.seriesVisibilityOff,
+    },
+    {
+        id: 'invertIdle', name: 'CPU Idle → Load', description: 'Преобразует CPU Idle в вычисленную загрузку и проверяет исходные данные после выключения.',
+        sourceFile: 'js/content/grafana-panel-tools.js', sourceSymbol: 'transformCpuData',
+        on: { transformSettings: { invertIdle: true } }, off: { transformSettings: { invertIdle: false } },
+        invariant: matrixInvariants.invertIdleOn, inactive: matrixInvariants.invertIdleOff,
+    },
+    {
+        id: 'convertMemToUsed', name: 'RAM → % Used', description: 'Пересчитывает память в процент использования и проверяет возврат исходных серий.',
+        sourceFile: 'js/content/grafana-panel-tools.js', sourceSymbol: 'transformMemData',
+        on: { transformSettings: { convertMemToUsed: true } }, off: { transformSettings: { convertMemToUsed: false } },
+        invariant: matrixInvariants.convertMemOn, inactive: matrixInvariants.convertMemOff,
+    },
+    {
+        id: 'seriesQueryFilter', name: 'Фильтр отображаемых серий', description: 'Фильтрует данные до renderer, включая допустимый пустой результат, и проверяет возврат полного ответа.',
+        sourceFile: 'js/content/grafana-panel-tools.js', sourceSymbol: 'filterSeriesByThreshold',
+        on: { transformSettings: { seriesQueryFilterEnabled: true, seriesQueryFilterValue: Number.MAX_SAFE_INTEGER, seriesQueryFilterRawValue: Number.MAX_SAFE_INTEGER, seriesQueryFilterMode: 'max' } },
+        off: { transformSettings: { seriesQueryFilterEnabled: false } }, invariant: matrixInvariants.seriesFilterOn, inactive: matrixInvariants.seriesFilterOff,
+    },
+    {
+        id: 'thresholdEnabled', name: 'Порог на графике', description: 'Добавляет пороговую линию, проверяет расчёт для выбранной панели и безопасное снятие.',
+        sourceFile: 'js/content/grafana-visual-engine.js', sourceSymbol: 'setThreshold',
+        on: { transformSettings: { thresholdEnabled: true } }, off: { transformSettings: { thresholdEnabled: false } },
+        invariant: matrixInvariants.thresholdOn, inactive: matrixInvariants.thresholdOff,
+    },
 ];
 const E2E_FEATURES_BY_ID = Object.fromEntries(E2E_FEATURE_REGISTRY.map(feature => [feature.id, feature]));
 
@@ -2740,7 +2838,41 @@ function makeMatrixTransitions(states) {
     });
 }
 
-function matrixTest(id, name, states, runModes = ['full']) {
+const humanFeatureList = featureIds => featureIds
+    .map(featureId => E2E_FEATURES_BY_ID[featureId]?.name || featureId)
+    .join(' + ');
+
+function describeMatrixScenario(id, featureIds, states) {
+    const uniqueFeatureIds = [...new Set(featureIds)];
+    const featureNames = humanFeatureList(uniqueFeatureIds);
+    if (/^HP/.test(id)) {
+        return {
+            name: `${featureNames}: совместная работа`,
+            description: `Проверяет обе функции вместе и по очереди выключает каждую, не нарушая оставшуюся активную функцию. Затем повторно включает комбинацию и выполняет полный сброс.`,
+        };
+    }
+    if (/^HR/.test(id)) {
+        return {
+            name: `${featureNames}: рискованная последовательность`,
+            description: `Последовательно наращивает комбинацию «${featureNames}», по одному удаляет активные компоненты, собирает комбинацию заново и доказывает чистый финальный reset.`,
+        };
+    }
+    const suffix = id.split('_')[1];
+    if (suffix === '1') return {
+        name: `${featureNames}: включение`,
+        description: `Включает функцию «${featureNames}», обновляет выбранный график и повторным Refresh доказывает, что настройка сохранилась без повторной команды.`,
+    };
+    if (suffix === '2') return {
+        name: `${featureNames}: включение и выключение`,
+        description: `Включает функцию «${featureNames}», затем выключает её и проверяет возврат исходного состояния Grafana.`,
+    };
+    return {
+        name: `${featureNames}: повторные ON/OFF`,
+        description: `Повторяет включение и выключение функции «${featureNames}», чтобы обнаружить накопление обработчиков, потерю состояния и неидемпотентный reset.`,
+    };
+}
+
+function matrixTest(id, technicalName, states, runModes = ['full'], featureIds = []) {
     // Each transition performs one graph Refresh. An active state performs a
     // second Refresh to prove persistence without resending the command;
     // isolation and final cleanup contribute one refresh each.
@@ -2748,8 +2880,11 @@ function matrixTest(id, name, states, runModes = ['full']) {
         (count, activeIds) => count + (activeIds.length > 0 ? 2 : 1),
         2
     );
+    const metadata = describeMatrixScenario(id, featureIds, states);
     return {
-        id, category: 'H', name, runModes,
+        id, category: 'H', name: metadata.name, technicalName, description: metadata.description,
+        featureIds: [...new Set(featureIds)], tags: [/^HR/.test(id) ? 'risk' : (/^HP/.test(id) ? 'pair' : 'lifecycle')], runModes,
+        steps: states.map((activeIds, index) => `${index + 1}. ${activeIds.length ? `Активны: ${humanFeatureList(activeIds)}` : 'Все функции выключены'}`),
         expectedRefreshCount: refreshCount,
         timeoutBudgetModel: 'max(30s, expectedRefreshCount * 5s + 15s)',
         // Each active transition proves two real graph refreshes and now waits
@@ -2769,13 +2904,14 @@ function generateLifecycleMatrixTests() {
     return E2E_FEATURE_REGISTRY.flatMap((feature, index) => {
         const id = `H${index + 1}`;
         return [
-            matrixTest(`${id}_1`, `${feature.name} OFF→ON`, [[feature.id]], ['fast', 'full']),
-            matrixTest(`${id}_2`, `${feature.name} ON→OFF`, [[feature.id], []], ['full']),
+            matrixTest(`${id}_1`, `${feature.id} OFF→ON`, [[feature.id]], ['fast', 'full'], [feature.id]),
+            matrixTest(`${id}_2`, `${feature.id} ON→OFF`, [[feature.id], []], ['full'], [feature.id]),
             matrixTest(
                 `${id}_3`,
-                `${feature.name} OFF→ON→ON→OFF→OFF→ON (идемпотентность)`,
+                `${feature.id} OFF→ON→ON→OFF→OFF→ON (идемпотентность)`,
                 [[feature.id], [feature.id], [], [], [feature.id]],
-                ['full']
+                ['full'],
+                [feature.id]
             ),
         ];
     });
@@ -2805,13 +2941,15 @@ function generatePairwiseMatrixTests() {
             `HP${index + 1}_1`,
             `${first} + ${second}: снять ${first}, сохранив ${second}`,
             pairwiseStates(first, second),
-            ['full']
+            ['full'],
+            [first, second]
         ),
         matrixTest(
             `HP${index + 1}_2`,
             `${first} + ${second}: снять ${second}, сохранив ${first}`,
             pairwiseStates(first, second, true),
-            ['full']
+            ['full'],
+            [first, second]
         ),
     ]);
 }
@@ -2845,7 +2983,8 @@ function generateHighRiskMatrixTests() {
         `HR${index + 1}`,
         `рискованная цепочка: ${features.join(' → ')}`,
         highRiskStates(features),
-        index === 0 ? ['fast', 'full'] : ['full']
+        index === 0 ? ['fast', 'full'] : ['full'],
+        features
     ));
 }
 
@@ -2997,90 +3136,46 @@ const suiteF = [
     },
 ];
 
-// ─── Человекочитаемые ссылки тестов ──────────────────────────────────
-// Stable IDs remain useful to automation; this registry translates them into
-// a feature and a source-level owner for people reading the E2E report.
-const TEST_FEATURE_REFERENCES = {
-    A6: {
-        label: 'Контроллер настроек панели',
-        description: 'Принимает настройки визуализации и преобразования данных для выбранной панели.',
-        sourceFile: 'js/content/grafana-panel-tools.js',
-        sourceSymbol: 'window.__dashbridgePanelToolsState',
-    },
-    A7: {
-        label: 'Движок визуального оформления графика',
-        description: 'Применяет заливку, толщину линий, легенду, видимость серий и пороги.',
-        sourceFile: 'js/content/grafana-visual-engine.js',
-        sourceSymbol: 'window.DashBridgeGrafanaVisualEngine',
-    },
-    A8: {
-        label: 'Состояние панели Grafana',
-        description: 'Хранит и восстанавливает настройки конкретной панели.',
-        sourceFile: 'js/content/grafana-panel-state.js',
-        sourceSymbol: 'window.DashBridgeGrafanaPanelState',
-    },
-    A9: {
-        label: 'Поиск и адресация панелей Grafana',
-        description: 'Находит целевую панель и её DOM-элементы.',
-        sourceFile: 'js/content/grafana-dom.js',
-        sourceSymbol: 'window.DashBridgeGrafanaDom',
-    },
-    H1: {
-        label: 'Заливка графика: переходы ON/OFF',
-        description: 'Матрица включает и выключает removeFill, затем проверяет возврат состояния.',
-        sourceFile: 'js/content/grafana-visual-engine.js',
-        sourceSymbol: 'applyLocalSeriesStyles',
-    },
-    H4: {
-        label: 'Толщина линий: переходы ON/OFF',
-        description: 'Матрица проверяет включение, выключение и сброс thickenLines.',
-        sourceFile: 'js/content/grafana-visual-engine.js',
-        sourceSymbol: 'applyLocalSeriesStyles',
-    },
-    H7: {
-        label: 'Инверсия легенды: переходы ON/OFF',
-        description: 'Матрица переносит все строки легенды вниз и проверяет их восстановление.',
-        sourceFile: 'js/content/grafana-visual-engine.js',
-        sourceSymbol: 'applyPopupLegendAndVisuals',
-    },
-    H10: {
-        label: 'Видимость серии: переходы ON/OFF',
-        description: 'Матрица скрывает выбранную серию по duplicate-safe ключу легенды и восстанавливает её.',
-        sourceFile: 'js/content/grafana-visual-engine.js',
-        sourceSymbol: 'applySeriesVisibility',
-    },
-    H13: {
-        label: 'Преобразование CPU: Idle → Load',
-        description: 'После обновления данных ожидает вычисленную серию load (calc).',
-        sourceFile: 'js/content/grafana-panel-tools.js',
-        sourceSymbol: 'transformCpuData',
-    },
-    H16: {
-        label: 'Преобразование RAM: → % Used',
-        description: 'После обновления данных ожидает вычисленную серию Used % (calc).',
-        sourceFile: 'js/content/grafana-panel-tools.js',
-        sourceSymbol: 'transformMemData',
-    },
-    H19: {
-        label: 'Фильтрация серий по запросу',
-        description: 'Матрица включает и выключает фильтрацию данных выбранных серий.',
-        sourceFile: 'js/content/grafana-panel-tools.js',
-        sourceSymbol: 'filterSeriesByThreshold',
-    },
-    H22: {
-        label: 'Порог на графике',
-        description: 'Матрица проверяет отображение и сброс пороговой линии.',
-        sourceFile: 'js/content/grafana-visual-engine.js',
-        sourceSymbol: 'setThreshold',
-    },
+// ─── Человекочитаемый каталог тестов ──────────────────────────────────
+const STATIC_TEST_METADATA = {
+    F1: ['Локальное хранилище: запись и чтение', 'Записывает уникальное тестовое значение в chrome.storage.local, читает его и удаляет без изменения пользовательских данных.'],
+    F2: ['Синхронизируемое хранилище: доступность', 'Проверяет, что chrome.storage.sync доступно расширению для чтения настроек.'],
+    A1: ['Версия Grafana', 'Определяет фактическую версию Grafana из runtime страницы.'],
+    A2: ['Тип страницы Grafana', 'Проверяет распознавание обычного дашборда, View или одиночной панели.'],
+    A3: ['Движок графика: uPlot или Flot', 'Находит фактически работающий renderer, от которого зависят дальнейшие проверки.'],
+    A4: ['Панели дашборда', 'Проверяет, что панели Grafana найдены в DOM и хотя бы одна доступна для тестирования.'],
+    A5: ['Загрузка DashBridge в Grafana', 'Проверяет маркер isolated content script на открытой странице Grafana.'],
+    A6: ['Контроллер настроек панели', 'Проверяет загрузку MAIN-world владельца команд, фильтров и lifecycle панели.'],
+    A7: ['Движок оформления графика', 'Проверяет загрузку MAIN-world движка заливки, линий, легенды, видимости и порога.'],
+    A8: ['Состояние выбранной панели', 'Проверяет загрузку владельца сохранения и восстановления состояния панели.'],
+    A9: ['Поиск панели в DOM Grafana', 'Проверяет загрузку общего адаптера поиска панели и её renderer-узлов.'],
 };
 
-function getTestFeatureReference(testId) {
-    const id = String(testId || '');
-    const baseId = id.replace(/_\d+$/, '');
-    return TEST_FEATURE_REFERENCES[id] || TEST_FEATURE_REFERENCES[baseId] || null;
+const STATIC_TEST_SOURCES = {
+    A6: ['js/content/grafana-panel-tools.js', 'window.__dashbridgePanelToolsState'],
+    A7: ['js/content/grafana-visual-engine.js', 'window.DashBridgeGrafanaVisualEngine'],
+    A8: ['js/content/grafana-panel-state.js', 'window.DashBridgeGrafanaPanelState'],
+    A9: ['js/content/grafana-dom.js', 'window.DashBridgeGrafanaDom'],
+};
+
+const DASHBRIDGE_TEST_SUITE = [...suiteF, ...suiteA, ...suiteH].map(test => {
+    const metadata = STATIC_TEST_METADATA[test.id];
+    return metadata ? { ...test, name: metadata[0], technicalName: test.name, description: metadata[1], tags: ['environment'] } : test;
+});
+
+function getTestFeatureReference(testOrId) {
+    const test = typeof testOrId === 'object'
+        ? testOrId
+        : DASHBRIDGE_TEST_SUITE.find(item => item.id === String(testOrId || ''));
+    if (!test) return null;
+    const features = (test.featureIds || []).map(id => E2E_FEATURES_BY_ID[id]).filter(Boolean);
+    const staticSource = STATIC_TEST_SOURCES[test.id] || [];
+    return {
+        label: test.name,
+        description: test.description || 'Выполняет причинную проверку DashBridge в живой Grafana.',
+        steps: Array.isArray(test.steps) ? test.steps : [],
+        sourceFile: features[0]?.sourceFile || staticSource[0] || '',
+        sourceSymbol: features[0]?.sourceSymbol || staticSource[1] || '',
+        technicalName: test.technicalName || '',
+    };
 }
-
-// --- Экспорт ---
-
-const DASHBRIDGE_TEST_SUITE = [...suiteF, ...suiteA, ...suiteH];

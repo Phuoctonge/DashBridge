@@ -188,6 +188,7 @@ async function runSingleTest(test, tabId, env) {
         const testTimeoutMs = Number.isFinite(Number(test.timeoutMs))
             ? Math.max(CORE_TEST_TIMEOUT_MS, Number(test.timeoutMs))
             : CORE_TEST_TIMEOUT_MS;
+        env.__dashbridgeCurrentTestId = test.id;
         const resultPromise = test.run(tabId, env);
         const timeoutPromise = coreSleeep(testTimeoutMs).then(() => {
             const progress = env.__dashbridgeTransitionProgress;
@@ -387,6 +388,7 @@ let runnerState = {
     runId: null,
     startedAt: null,
     finishedAt: null,
+    selection: { scope: 'all', ids: [] },
     // `total`/`done` remain compatibility aliases for planned/completed.
     total: 0,
     done: 0,
@@ -423,6 +425,7 @@ function getRunnerSnapshot() {
         startedAt: runnerState.startedAt || null,
         finishedAt: runnerState.finishedAt || null,
         mode: runnerState.mode || 'fast',
+        selection: runnerState.selection || { scope: 'all', ids: [] },
         total: runnerState.total,
         done: runnerState.done,
         planned: runnerState.planned,
@@ -499,6 +502,8 @@ function recordNotRunTests(urlResult, tests, reason, options) {
  * @param {Function} [options.onTestFinalized] — awaited disk-spool hook after
  *     every executed test; may return a compact replacement for runnerState.
  * @param {boolean}  [options.keepTab]     — не закрывать вкладку после теста (debug)
+ * @param {string[]|null} [options.selectedTestIds] — null запускает весь профиль;
+ *     массив ограничивает его явно выбранными стабильными ID.
  * @param {Function} [options.onUrlFinalized] — awaited hook after one URL is
  *     completely finished.  It may return a compact replacement retained in
  *     the runner snapshot; the original result is then eligible for GC.
@@ -512,11 +517,16 @@ async function runTestsForUrls(urls, {
     // Compatibility defaults: keepTab = false, mode = 'fast'
     keepTab = false,
     mode = 'fast',
+    selectedTestIds = null,
 } = {}) {
     if (runnerState.running) throw new Error('Тест-раннер уже запущен');
 
     const fullSuite = (typeof DASHBRIDGE_TEST_SUITE !== 'undefined') ? DASHBRIDGE_TEST_SUITE : [];
     if (!fullSuite.length) throw new Error('DASHBRIDGE_TEST_SUITE не загружен');
+    const selectedIds = Array.isArray(selectedTestIds)
+        ? new Set(selectedTestIds.map(id => String(id || '')).filter(Boolean))
+        : null;
+    if (selectedIds && selectedIds.size === 0) throw new Error('Не выбран ни один E2E-тест');
 
     // Нормализуем список URL
     const urlList = urls
@@ -533,15 +543,18 @@ async function runTestsForUrls(urls, {
             const hostMatch = !t.urlHost || hostname === t.urlHost;
             const filterMatch = !t.urlFilter || u.includes(t.urlFilter);
             const modeMatch = !Array.isArray(t.runModes) || t.runModes.includes(mode);
-            return hostMatch && filterMatch && modeMatch;
+            const selectionMatch = !selectedIds || selectedIds.has(t.id);
+            return hostMatch && filterMatch && modeMatch && selectionMatch;
         });
     };
     const totalCount = urlList.reduce((acc, url) => acc + suiteForUrl(url).length, 0);
+    if (!totalCount) throw new Error('В выбранном профиле нет отмеченных E2E-тестов');
 
     // Инициализация состояния
     runnerState = {
         running: true,
         mode,
+        selection: selectedIds ? { scope: 'selected', ids: [...selectedIds] } : { scope: 'all', ids: [] },
         aborted: false,
         runId: `run_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
         startedAt: Date.now(),

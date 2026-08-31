@@ -115,6 +115,75 @@ async function inspectPage(context, extensionId, relativePath) {
     return result;
 }
 
+async function inspectTestSelectionWorkflow(context, extensionId) {
+    const result = {
+        name: 'test-runner scenario selection',
+        status: 'passed',
+        checks: []
+    };
+    const runner = await context.newPage();
+    let selector = null;
+    try {
+        await runner.goto(`chrome-extension://${extensionId}/pages/test-runner/test-runner.html`, {
+            waitUntil: 'load',
+            timeout: 20_000
+        });
+        await runner.locator('#trSelectTestsBtn').waitFor({ state: 'visible' });
+        const popupPromise = context.waitForEvent('page', { timeout: 10_000 });
+        await runner.locator('#trSelectTestsBtn').click();
+        selector = await popupPromise;
+        await selector.waitForLoadState('load');
+        await selector.locator('.selector-test').first().waitFor({ state: 'visible' });
+
+        const total = await selector.locator('.selector-test').count();
+        if (total < 1) throw new Error('Selector did not render any scenarios');
+        result.checks.push({ check: 'catalog-rendered', total });
+
+        await selector.locator('#selectorSearch').fill('Заливка графика');
+        const searchMatches = await selector.locator('.selector-test').count();
+        if (searchMatches < 1 || searchMatches >= total) {
+            throw new Error(`Search did not narrow the catalog: ${searchMatches}/${total}`);
+        }
+        result.checks.push({ check: 'human-search', matches: searchMatches });
+
+        await selector.locator('#selectorSearch').fill('');
+        await selector.locator('[data-preset="failed"]').click();
+        if (await selector.locator('#selectorApply').isEnabled()) {
+            throw new Error('Empty last-failure preset must not be runnable');
+        }
+        result.checks.push({ check: 'empty-failure-preset-guard' });
+
+        await selector.locator('[data-preset="all"]').click();
+        const firstCheckbox = selector.locator('.selector-test input[type="checkbox"]').first();
+        await firstCheckbox.uncheck();
+        const expectedSelected = total - 1;
+        const selectorClosePromise = selector.waitForEvent('close');
+        await selector.locator('#selectorApply').click();
+        await selectorClosePromise;
+        selector = null;
+        await runner.locator('#trSelectionSummary').waitFor({
+            state: 'visible',
+            timeout: 5_000
+        });
+        const summary = await runner.locator('#trSelectionSummary').textContent();
+        if (!summary?.includes(`Выбрано: ${expectedSelected} из ${total}`)) {
+            throw new Error(`Runner did not receive saved selection: ${summary}`);
+        }
+        result.checks.push({ check: 'selection-saved-and-received', selected: expectedSelected, total });
+    } catch (error) {
+        result.status = 'failed';
+        result.error = serializeError(error);
+        if (!runner.isClosed()) {
+            result.screenshot = 'test-results/test_runner_selection_workflow.png';
+            await runner.screenshot({ path: path.join(projectRoot, result.screenshot), fullPage: true });
+        }
+    } finally {
+        if (selector && !selector.isClosed()) await selector.close();
+        if (!runner.isClosed()) await runner.close();
+    }
+    return result;
+}
+
 async function main() {
     if (!fs.existsSync(chromeExecutable)) {
         throw new Error(`Chrome executable not found: ${chromeExecutable}`);
@@ -149,6 +218,7 @@ async function main() {
         for (const htmlPath of findHtmlFiles(path.join(projectRoot, 'pages'))) {
             pages.push(await inspectPage(context, extensionId, htmlPath));
         }
+        const workflows = [await inspectTestSelectionWorkflow(context, extensionId)];
 
         report = {
             startedAt,
@@ -157,10 +227,11 @@ async function main() {
             chromeVersion: await context.browser()?.version(),
             extensionId,
             pages,
+            workflows,
             summary: {
-                total: pages.length,
-                passed: pages.filter(page => page.status === 'passed').length,
-                failed: pages.filter(page => page.status === 'failed').length,
+                total: pages.length + workflows.length,
+                passed: pages.filter(page => page.status === 'passed').length + workflows.filter(workflow => workflow.status === 'passed').length,
+                failed: pages.filter(page => page.status === 'failed').length + workflows.filter(workflow => workflow.status === 'failed').length,
                 consoleWarnings: pages.reduce((sum, page) => sum + page.console.filter(item => item.type === 'warning').length, 0),
                 externalRequestFailures: pages.reduce((sum, page) => sum + page.failedRequests.filter(item => !item.url.startsWith(`chrome-extension://${extensionId}/`)).length, 0)
             }

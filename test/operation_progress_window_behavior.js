@@ -28,8 +28,12 @@ assert(testRunnerUi.includes('onCancel: handleAbort')
     && testRunnerUi.includes('Общее время: ${formatElapsedDuration')
     && testRunnerUi.includes('closeDelayMs: 6000'),
     'the E2E runner PiP must expose emergency stop, test accounting, and total elapsed time');
-assert(testRunnerUi.indexOf('const progressWindowPromise = openOperationProgressWindow(mode);')
-    < testRunnerUi.indexOf('await chrome.storage.local.set'),
+const handleRunSource = testRunnerUi.slice(
+    testRunnerUi.indexOf('async function handleRun()'),
+    testRunnerUi.indexOf('function handleAbort()')
+);
+assert(handleRunSource.indexOf('const progressWindowPromise = openOperationProgressWindow(mode);')
+    < handleRunSource.indexOf('await chrome.storage.local.set'),
     'the E2E runner must request Picture-in-Picture before its first await consumes user activation');
 
 (async () => {

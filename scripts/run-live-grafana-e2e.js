@@ -27,6 +27,7 @@ function pushBoundedEvidence(target, entry) {
 
 function parseArguments(values) {
     let mode = 'fast';
+    let tests = null;
     const urls = [];
     for (let index = 0; index < values.length; index += 1) {
         const value = values[index];
@@ -35,6 +36,11 @@ function parseArguments(values) {
             index += 1;
         } else if (value.startsWith('--mode=')) {
             mode = value.slice('--mode='.length);
+        } else if (value === '--tests') {
+            tests = values[index + 1] || '';
+            index += 1;
+        } else if (value.startsWith('--tests=')) {
+            tests = value.slice('--tests='.length);
         } else if (value.startsWith('--')) {
             throw new Error(`Unknown option: ${value}`);
         } else {
@@ -42,7 +48,11 @@ function parseArguments(values) {
         }
     }
     if (!['fast', 'full'].includes(mode)) throw new Error(`Unsupported E2E mode: ${mode}`);
-    return { mode, urls: validateGrafanaUrls(urls) };
+    const testIds = tests === null ? null : [...new Set(tests.split(',').map(value => value.trim()).filter(Boolean))];
+    if (testIds && (!testIds.length || testIds.some(id => !/^[A-Za-z0-9_-]+$/.test(id)))) {
+        throw new Error('Invalid --tests list: use comma-separated stable test IDs');
+    }
+    return { mode, testIds, urls: validateGrafanaUrls(urls) };
 }
 
 function compactSnapshot(snapshot) {
@@ -53,6 +63,7 @@ function compactSnapshot(snapshot) {
         startedAt: snapshot?.startedAt || null,
         finishedAt: snapshot?.finishedAt || null,
         mode: snapshot?.mode || 'fast',
+        selection: snapshot?.selection || { scope: 'all', ids: [] },
         total: Number(snapshot?.total) || 0,
         planned: Number(snapshot?.planned) || 0,
         scheduled: Number(snapshot?.scheduled) || 0,
@@ -227,7 +238,7 @@ async function readFailureDiagnostics(page) {
 }
 
 async function main() {
-    const { mode, urls } = parseArguments(process.argv.slice(2));
+    const { mode, testIds, urls } = parseArguments(process.argv.slice(2));
     const profileRoot = resolveProfileRoot();
     const chromeExecutable = process.env.DASHBRIDGE_CHROME_PATH || chromium.executablePath();
     if (!fs.existsSync(profileRoot)) throw new Error(`Grafana E2E profile does not exist: ${profileRoot}`);
@@ -277,6 +288,13 @@ async function main() {
         await runnerPage.waitForFunction(() => (
             globalThis.document.documentElement.dataset.dashbridgeTestRunnerReady === 'true'
         ), null, { timeout: RUNNER_READY_TIMEOUT_MS });
+        await runnerPage.evaluate(async ids => {
+            await globalThis.chrome.storage.local.set({
+                trTestSelection: ids === null
+                    ? { scope: 'all', ids: [] }
+                    : { scope: 'selected', ids }
+            });
+        }, testIds);
         await runnerPage.locator('#trUrlInput').fill(urls.join('\n'));
         await runnerPage.locator('#trRunMode').selectOption(mode);
         await runnerPage.locator('#trRunBtn').click();

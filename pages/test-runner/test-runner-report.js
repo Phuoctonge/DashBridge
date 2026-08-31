@@ -1034,6 +1034,7 @@ const DashBridgeTestReport = (() => {
                 durationMs: snapshot.startedAt && snapshot.finishedAt
                     ? Math.max(0, snapshot.finishedAt - snapshot.startedAt) : null,
                 mode: snapshot.mode || 'fast',
+                selection: snapshot.selection || { scope: 'all', ids: [] },
                 total: snapshot.total ?? planned,
                 planned,
                 scheduled: snapshot.scheduled ?? 0,

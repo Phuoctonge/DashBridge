@@ -22,6 +22,7 @@ assert.deepStrictEqual(parseArguments([
     'https://grafana-one.example/d/one'
 ]), {
     mode: 'fast',
+    testIds: null,
     urls: ['https://grafana-one.example/d/one']
 });
 assert.deepStrictEqual(parseArguments([
@@ -30,10 +31,22 @@ assert.deepStrictEqual(parseArguments([
     'https://grafana-two.example/d/two'
 ]), {
     mode: 'full',
+    testIds: null,
     urls: ['https://grafana-one.example/d/one', 'https://grafana-two.example/d/two']
 });
+assert.deepStrictEqual(parseArguments([
+    '--mode=full', '--tests=H1_1,HP9_1,H1_1',
+    'https://grafana-one.example/d/one'
+]), {
+    mode: 'full',
+    testIds: ['H1_1', 'HP9_1'],
+    urls: ['https://grafana-one.example/d/one']
+});
 assert.throws(() => parseArguments(['--mode=unknown', 'https://grafana.example/d/one']), /Unsupported E2E mode/);
+assert.throws(() => parseArguments(['--tests=', 'https://grafana.example/d/one']), /Invalid --tests list/);
 assert.throws(() => parseArguments(['--unsafe', 'https://grafana.example/d/one']), /Unknown option/);
+assert(runnerSource.includes("trTestSelection: ids === null") && runnerSource.includes("{ scope: 'selected', ids }"),
+    'the external runner must deterministically override a saved interactive selection');
 
 const compact = compactSnapshot({
     running: false,

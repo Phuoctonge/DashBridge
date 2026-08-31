@@ -244,7 +244,7 @@ checks = {
         and "settings: typeof step.settings === 'function'" in SUITE
         and "const skippedReason = resolvedTransitions.map(step => transitionSkipReason(step.settings, env)).find(Boolean);" in SUITE
         and "for (let i = 0; i < resolvedTransitions.length; i++)" in SUITE
-        and "const isolationReset = await resetAllSettings(tabId, panelId);" in SUITE
+        and "isolationReset = await resetAllSettings(tabId, panelId);" in SUITE
         and "status: i === 0 ? isolationReset.status : 'not-repeated'" in SUITE
         and "inactive.filter(result => !result?.skip)" in SUITE
     ),
@@ -310,7 +310,7 @@ checks = {
         and "debugLog('legend layout decision'" in VISUAL_ENGINE
     ),
     "active suite excludes deprecated timing-based categories": (
-        "const DASHBRIDGE_TEST_SUITE = [...suiteF, ...suiteA, ...suiteH];" in SUITE
+        "const DASHBRIDGE_TEST_SUITE = [...suiteF, ...suiteA, ...suiteH].map(test =>" in SUITE
         and "...suiteB" not in SUITE.split("const DASHBRIDGE_TEST_SUITE =", 1)[1]
         and "...suiteC" not in SUITE.split("const DASHBRIDGE_TEST_SUITE =", 1)[1]
         and "...suiteD" not in SUITE.split("const DASHBRIDGE_TEST_SUITE =", 1)[1]
@@ -353,9 +353,24 @@ checks = {
         and "['fast', 'full']" in SUITE
         and "const mode = elRunMode?.value === 'full' ? 'full' : 'fast';" in UI
         and "trRunMode" in UI
-        and "chrome.storage.local.set({ trLastUrls: cleanedUrls, trRunMode: mode })" in UI
+        and "trLastUrls: cleanedUrls, trRunMode: mode, trTestSelection: testSelection" in UI
         and "mode: snapshot.mode || 'fast'," in REPORT
         and 'id="trRunMode"' in HTML
+    ),
+    "selected scenarios are explicit, persisted and auditable": (
+        "selectedTestIds = null" in CORE
+        and "const selectionMatch = !selectedIds || selectedIds.has(t.id);" in CORE
+        and "selection: runnerState.selection || { scope: 'all', ids: [] }," in CORE
+        and "selectedTestIds," in UI
+        and "trTestSelection" in UI
+        and 'id="trSelectTestsBtn"' in HTML
+    ),
+    "verified scenario boundaries remove only duplicate reset refreshes": (
+        "const verifiedBoundary = env.__dashbridgeVerifiedCleanBoundary || null;" in SUITE
+        and "activeSetInvariant([], null)(verifiedBoundary.state || baseline, baseline, env)" in SUITE
+        and "status: isolationResetPassed ? 'reused-verified-reset' : 'reused-reset-drifted'" in SUITE
+        and "if (!verifiedBoundary?.pass || verifiedBoundary.panelId !== panelId || !isolationResetPassed)" in SUITE
+        and "env.__dashbridgeVerifiedCleanBoundary = resetPassed ?" in SUITE
     ),
     "diagnostic export has lifecycle accounting schema": (
         "dashbridge-e2e-diagnostics/v4" in REPORT

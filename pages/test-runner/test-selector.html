@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Выбор E2E-сценариев</title>
+    <script src="../shared/theme.js"></script>
+    <link rel="stylesheet" href="../shared/theme.css">
+    <link rel="stylesheet" href="test-selector.css">
+</head>
+<body>
+    <header class="selector-header">
+        <div>
+            <h1>Выбор E2E-сценариев</h1>
+            <p id="selectorProfile">Настройка запуска</p>
+        </div>
+        <button id="selectorClose" class="selector-icon-btn" aria-label="Закрыть">×</button>
+    </header>
+    <main>
+        <section class="selector-controls" aria-label="Фильтры сценариев">
+            <input id="selectorSearch" type="search" placeholder="Название, ID или проверяемая функция">
+            <div class="selector-presets">
+                <button data-preset="all">Все профиля</button>
+                <button data-preset="fast">Быстрые</button>
+                <button data-preset="failed">Последние ошибки</button>
+                <button data-preset="not-run">Последние NOT RUN</button>
+                <button data-preset="none">Снять выбор</button>
+            </div>
+            <div class="selector-summary" id="selectorSummary"></div>
+        </section>
+        <section id="selectorList" class="selector-list" aria-live="polite"></section>
+    </main>
+    <footer>
+        <span id="selectorStatus"></span>
+        <button id="selectorCancel" class="secondary">Отмена</button>
+        <button id="selectorApply" class="primary">Сохранить выбор</button>
+    </footer>
+    <script src="test-runner-suite.js"></script>
+    <script src="test-selector.js"></script>
+</body>
+</html>
