@@ -506,8 +506,9 @@ async function collectProfileReport(signal = null, onProgress = () => {}, { requ
     return { profile, reportPanels, snapshots, context, panelResults, problems, output };
 }
 
-const dashBridgeReportAudit = DashBridgeReportAudit.create({
+const dashBridgeReportTestRunner = DashBridgeReportTestRunner.create({
     reportEngine: DashBridgeReport,
+    auditEngine: DashBridgeReportAudit,
     collect: (signal, onProgress) => collectProfileReport(signal, onProgress, { requirePanels: false })
 });
 
@@ -1283,8 +1284,8 @@ function setupEventListeners() {
     document.getElementById('generateReportBtn').addEventListener('click', () => {
         closeHeaderMenus(); openReportPreview();
     });
-    document.getElementById('auditReportBtn').addEventListener('click', () => {
-        closeHeaderMenus(); dashBridgeReportAudit.open();
+    document.getElementById('testReportBtn').addEventListener('click', () => {
+        closeHeaderMenus(); dashBridgeReportTestRunner.open();
     });
 
     document.getElementById('newProfileBtn').addEventListener('click', async () => {

@@ -165,7 +165,8 @@ grafana-panel-tools.js
 | JSON transfer панелей DashBridge | `dashbridge-panel-transfer.js` | Полный export payload, строгая нормализация import, новые ID и удаление канонических дублей; FileReader/download lifecycle остаётся в `dashbridge.js`. |
 | UI сводного отчёта и SLA | `dashbridge-report-ui.js` | Настройка профиля, редактор фраз панели, валидация warning/critical и modal cleanup; состояние передаётся через явные callbacks `dashbridge.js`. |
 | Transport сводного отчёта | `dashbridge-report-transport.js` | Ожидание iframe, request ID, timeout/abort и точная корреляция ответа. |
-| Аудит сводного отчёта | `dashbridge-report-audit.js` | Статическая проверка переменных и `panel:key`, синтетическая проверка контракта движка, живые значения и итоговый текст; использует общий collector `dashbridge.js` и не изменяет настройки. |
+| Аудит сводного отчёта | `dashbridge-report-audit.js` | Чистый анализ переменных, `panel:key`, живых значений и итогового текста без UI и записей. |
+| Message Test Runner | `dashbridge-report-test-runner.js` | Детерминированные сценарии всех ветвей рендера и один живой интеграционный прогон активного профиля через общий collector `dashbridge.js`. |
 | Снимки DashBridge | `dashbridge-capture.js` | Одиночный save/copy, последовательный ZIP, throttling и восстановление карточки. |
 | Версия данных DashBridge | `dashbridge-data-migration.js` | Startup `dashbridge.js`. |
 | Import/recovery | `local-state-schema.js` | Options, Worklog, profiles. |
@@ -226,6 +227,7 @@ dashbridge-profile-store.js
      ├── dashbridge-renderer.js
      ├── dashbridge-report-transport.js
      ├── dashbridge-report-audit.js
+     ├── dashbridge-report-test-runner.js
      ├── dashbridge-capture.js
      ├── dashbridge-time-state.js
      └── dashbridge-crosshair.js
@@ -260,14 +262,14 @@ uPlot/Flot, а для table-panel — уже отрисованные строк
 а не успешным прохождением SLA. Шаблоны обрабатываются как простой текст без
 `eval` и HTML-рендеринга.
 
-Команда «Проверить сообщение» выполняет тот же сбор снимков, `renderPanel` и
-`compose`, что и обычное формирование сообщения. Поверх результата отдельный
-аудитор показывает используемые и неиспользуемые поддерживаемые переменные,
-пустые живые значения, неизвестные или неразрешённые placeholders, дубли и
-потерянные ссылки `panel:key`, состояния панелей, сформированные фразы и
-итоговый текст. Синтетическая самопроверка отдельно подтверждает, что движок
-умеет разрешить весь объявленный каталог переменных; аудит ничего не записывает
-в storage и закрытие окна отменяет только принадлежащие ему запросы.
+Message Test Runner сначала прогоняет детерминированные fixtures для полного
+каталога переменных, normal/warning/critical/no-threshold, недоступности,
+режимов включения, именованных ссылок и 2500 серий. Затем он ровно один раз
+получает реальные снимки активного профиля и отдельно проверяет конфигурацию,
+каждый snapshot, фразу панели, живые значения и итоговый `compose`. UI явно
+маркирует источник каждого сценария как тестовые или реальные данные и
+показывает PASS/FAIL/WARN/SKIP, длительность и evidence. Runner ничего не
+записывает в storage, а закрытие окна отменяет только принадлежащие ему запросы.
 
 Профильный JSON экспортирует полные объекты панелей, включая `tools`, тему и
 паузу. Импорт назначает новые ID, валидирует известные поля и сохраняет
