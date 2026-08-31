@@ -471,12 +471,12 @@ function setDashboardPanelDataStatus(panel, snapshot) {
     wrapper.appendChild(status);
 }
 
-async function generateProfileReport(output, status, warnings, signal = null) {
+async function collectProfileReport(signal = null, onProgress = () => {}, { requirePanels = true } = {}) {
     throwIfReportAborted(signal);
     const profile = getActiveProfile();
     const reportPanels = panels.filter(panel => DashBridgeReport.normalizePanel(panel.report, panel).enabled);
-    if (!reportPanels.length) throw new Error('В настройках сообщения не выбрана ни одна панель.');
-    status.textContent = `Получаем данные панелей: ${reportPanels.length}…`;
+    if (requirePanels && !reportPanels.length) throw new Error('В настройках сообщения не выбрана ни одна панель.');
+    onProgress(`Получаем данные панелей: ${reportPanels.length}…`);
     reportPanels.forEach(panel => setDashboardPanelDataStatus(panel, null));
     let completedPanels = 0;
     const snapshots = await Promise.all(reportPanels.map(async panel => {
@@ -484,9 +484,7 @@ async function generateProfileReport(output, status, warnings, signal = null) {
         const snapshot = await requestPanelReportSnapshot(panel, signal);
         completedPanels += 1;
         setDashboardPanelDataStatus(panel, snapshot);
-        if (status.isConnected) {
-            status.textContent = `Получаем данные панелей: ${completedPanels} из ${reportPanels.length}…`;
-        }
+        onProgress(`Получаем данные панелей: ${completedPanels} из ${reportPanels.length}…`);
         return snapshot;
     }));
     throwIfReportAborted(signal);
@@ -504,9 +502,23 @@ async function generateProfileReport(output, status, warnings, signal = null) {
         return { ...rendered, key: DashBridgeReport.normalizePanel(panel.report, panel).key, panel, snapshot: snapshots[index] };
     });
     const problems = panelResults.filter(item => ['unavailable', 'timeout', 'no_data', 'error', 'configuration_error'].includes(item.snapshot?.state));
+    const output = DashBridgeReport.compose(profile, panelResults, context);
+    return { profile, reportPanels, snapshots, context, panelResults, problems, output };
+}
+
+const dashBridgeReportAudit = DashBridgeReportAudit.create({
+    reportEngine: DashBridgeReport,
+    collect: (signal, onProgress) => collectProfileReport(signal, onProgress, { requirePanels: false })
+});
+
+async function generateProfileReport(output, status, warnings, signal = null) {
+    const collected = await collectProfileReport(signal, message => {
+        if (status.isConnected) status.textContent = message;
+    });
+    const { reportPanels, problems } = collected;
     warnings.textContent = problems.map(item => `${item.panel.title || 'Панель'}: ${item.snapshot.error || 'данные недоступны'}`).join('\n');
     warnings.hidden = !problems.length;
-    output.value = DashBridgeReport.compose(profile, panelResults, context);
+    output.value = collected.output;
     status.textContent = `Готово. Обработано панелей: ${reportPanels.length}; предупреждений: ${problems.length}.`;
 }
 
@@ -1270,6 +1282,9 @@ function setupEventListeners() {
     });
     document.getElementById('generateReportBtn').addEventListener('click', () => {
         closeHeaderMenus(); openReportPreview();
+    });
+    document.getElementById('auditReportBtn').addEventListener('click', () => {
+        closeHeaderMenus(); dashBridgeReportAudit.open();
     });
 
     document.getElementById('newProfileBtn').addEventListener('click', async () => {

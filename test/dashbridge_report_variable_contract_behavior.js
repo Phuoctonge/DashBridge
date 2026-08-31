@@ -11,14 +11,8 @@ vm.runInContext(fs.readFileSync('js/shared/dashbridge-report.js', 'utf8'), conte
     { filename: 'dashbridge-report.js' });
 const report = context.DashBridgeReport;
 
-const panelVariables = [
-    'panelTitle', 'warningThreshold', 'criticalThreshold', 'threshold', 'unit',
-    'criticalServers', 'warningServers', 'criticalCount', 'warningCount',
-    'criticalList', 'warningList', 'breachesList', 'allSeriesList', 'top3List',
-    'stateList', 'stateQuote', 'aggregateValue', 'cpuCapacityCoefficient',
-    'dataStatus', 'maxValue', 'minValue', 'lastValue', 'averageValue', 'sumValue',
-];
-const listVariables = ['name', 'rawName', 'vCpu', 'cpuCapacity', 'seriesThreshold', 'value', 'unit', 'level'];
+const panelVariables = Array.from(report.PANEL_VARIABLES);
+const listVariables = Array.from(report.LIST_VARIABLES);
 const completeTemplate = panelVariables.map(name => `${name}={{${name}}}`).join('\n');
 const listTemplate = listVariables.map(name => `${name}={{${name}}}`).join('|');
 const panel = {
@@ -65,10 +59,7 @@ for (const name of listVariables) {
     assert(!rendered.text.includes(`{{${name}}}`), `list output must resolve {{${name}}}`);
 }
 
-const profileVariables = [
-    'profileName', 'testName', 'environment', 'testDuration', 'stableLoadDuration',
-    'period', 'generatedAt', 'panels',
-];
+const profileVariables = Array.from(report.PROFILE_VARIABLES);
 const profileTemplate = [
     ...profileVariables.map(name => `${name}={{${name}}}`),
     'selected={{panel:cpu}}',
@@ -79,6 +70,8 @@ const output = report.compose({
 }, [{ included: true, key: 'cpu', text: rendered.text }], {
     testName: 'Load test 42',
     environment: 'production',
+    testStartedAt: '2026-08-31T10:00',
+    stableLoadStartedAt: '2026-08-31T11:00',
     testDuration: '2 часа',
     stableLoadDuration: '1 час',
     period: '15 минут',

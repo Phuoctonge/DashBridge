@@ -13,6 +13,22 @@
     const INCLUDE_MODES = new Set(['always', 'issue_only', 'critical_only']);
     const EVALUATIONS = new Set(['period_max', 'latest', 'period_min', 'period_avg', 'period_sum']);
     const OPERATORS = new Set(['gt', 'gte', 'lt', 'lte']);
+    const PROFILE_VARIABLES = Object.freeze([
+        'profileName', 'testName', 'environment', 'testStartedAt', 'stableLoadStartedAt',
+        'testDuration', 'stableLoadDuration', 'period', 'generatedAt', 'panels'
+    ]);
+    const PANEL_VARIABLES = Object.freeze([
+        'panelTitle', 'threshold', 'criticalThreshold', 'warningThreshold', 'unit',
+        'servers', 'serverCount', 'criticalServers', 'criticalCount', 'warningServers',
+        'warningCount', 'criticalList', 'warningList', 'breachesList', 'allSeriesList',
+        'top3List', 'stateList', 'stateQuote', 'maxValue', 'minValue', 'lastValue',
+        'averageValue', 'sumValue', 'aggregateValue', 'cpuCapacityCoefficient',
+        'dataStatus', 'period', 'generatedAt'
+    ]);
+    const LIST_VARIABLES = Object.freeze([
+        'name', 'rawName', 'vCpu', 'cpuCapacity', 'seriesThreshold', 'value', 'unit',
+        'level', 'panelTitle'
+    ]);
 
     const text = (value, maxLength, fallback = '') => typeof value === 'string'
         ? value.slice(0, maxLength) : fallback;
@@ -77,6 +93,14 @@
         return String(template || '').replace(/\{\{\s*([a-zA-Zа-яА-ЯёЁ0-9_.:-]+)\s*\}\}/gu,
             (match, key) => Object.prototype.hasOwnProperty.call(variables, key)
                 ? String(variables[key] ?? '') : match);
+    }
+
+    function extractTemplateVariables(template) {
+        const names = [];
+        const pattern = /\{\{\s*([a-zA-Zа-яА-ЯёЁ0-9_.:-]+)\s*\}\}/gu;
+        let match;
+        while ((match = pattern.exec(String(template || '')))) names.push(match[1]);
+        return names;
     }
 
     function panelVariables(panel, snapshot, context = {}) {
@@ -209,6 +233,8 @@
     root.DashBridgeReport = Object.freeze({
         DEFAULT_PROFILE_TEMPLATE, DEFAULT_NORMAL_TEMPLATE, DEFAULT_WARNING_TEMPLATE, DEFAULT_BREACH_TEMPLATE,
         DEFAULT_NEUTRAL_TEMPLATE, DEFAULT_UNAVAILABLE_TEMPLATE, DEFAULT_LIST_ITEM_TEMPLATE, DEFAULT_DETAILS_TEMPLATE,
-        normalizeProfile, normalizePanel, renderTemplate, renderPanel, compose, formatNumber, formatDuration, slug
+        PROFILE_VARIABLES, PANEL_VARIABLES, LIST_VARIABLES,
+        normalizeProfile, normalizePanel, renderTemplate, extractTemplateVariables, panelVariables,
+        renderPanel, compose, formatNumber, formatDuration, slug
     });
 })(globalThis);

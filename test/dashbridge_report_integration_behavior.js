@@ -7,6 +7,7 @@ const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
 const html = read('pages/dashbridge/dashbridge.html');
 const dashboard = read('pages/dashbridge/dashbridge.js');
 const reportUi = read('pages/dashbridge/dashbridge-report-ui.js');
+const reportAudit = read('pages/dashbridge/dashbridge-report-audit.js');
 const reportTransport = read('pages/dashbridge/dashbridge-report-transport.js');
 const tools = read('js/content/grafana-panel-tools.js');
 const visual = read('js/content/grafana-visual-engine.js');
@@ -14,12 +15,19 @@ const tableReport = read('js/content/grafana-table-report.js');
 const schema = read('js/shared/local-state-schema.js');
 const css = read('pages/dashbridge/dashbridge.css');
 
-assert(html.includes('id="generateReportBtn"') && html.includes('id="configureReportBtn"'));
+assert(html.includes('id="generateReportBtn"') && html.includes('id="auditReportBtn"')
+    && html.includes('id="configureReportBtn"'));
 assert(html.indexOf('js/shared/dashbridge-report.js') < html.indexOf('dashbridge-report-ui.js')
     && html.indexOf('dashbridge-report-ui.js') < html.indexOf('dashbridge.js'),
     'report engine and UI must load in dependency order before the dashboard controller');
 assert(html.indexOf('dashbridge-report-transport.js') < html.indexOf('dashbridge.js'),
     'report transport must load before the dashboard controller');
+assert(html.indexOf('dashbridge-report-audit.js') < html.indexOf('dashbridge.js')
+    && dashboard.includes('DashBridgeReportAudit.create({')
+    && dashboard.includes('collect: (signal, onProgress) => collectProfileReport(signal, onProgress, { requirePanels: false })')
+    && dashboard.includes("document.getElementById('auditReportBtn').addEventListener('click'")
+    && reportAudit.includes('runEngineSelfCheck'),
+    'live report audit must load before the controller and reuse its report collector');
 assert(html.indexOf('dashbridge-report-ui.js') < html.indexOf('dashbridge.js')
     && dashboard.includes('window.DashBridgeReportUi.create({'),
     'report UI must load before the dashboard controller and receive explicit dependencies');
