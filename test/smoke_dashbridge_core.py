@@ -17,6 +17,7 @@ from pathlib import Path
 ROOT = Path(__file__).parent.parent
 DASHBRIDGE_JS = ROOT / "pages/dashbridge/dashbridge.js"
 DASHBRIDGE_MODAL_JS = ROOT / "pages/dashbridge/dashbridge-modal.js"
+DASHBRIDGE_PANEL_URL_JS = ROOT / "pages/dashbridge/dashbridge-panel-url.js"
 DASHBRIDGE_HTML = ROOT / "pages/dashbridge/dashbridge.html"
 
 passed = 0
@@ -45,6 +46,7 @@ print("=" * 70)
 content = read_file()
 renderer = (ROOT / "pages/dashbridge/dashbridge-renderer.js").read_text(encoding="utf-8")
 modal_content = DASHBRIDGE_MODAL_JS.read_text(encoding="utf-8")
+panel_url_content = DASHBRIDGE_PANEL_URL_JS.read_text(encoding="utf-8")
 dashbridge_html = DASHBRIDGE_HTML.read_text(encoding="utf-8")
 
 # ════════════════════════════════════════════════════════
@@ -340,13 +342,13 @@ print("\n--- Нормализация URL Grafana ---")
 # Общий нормализатор должен существовать
 test(
     "Есть функция normalizeGrafanaPanelUrl",
-    "function normalizeGrafanaPanelUrl(" in content
+    "function normalizeGrafanaPanelUrl(" in panel_url_content
 )
 
 # Нормализатор должен приводить ссылку к режиму одиночной панели без хрома Grafana
 normalize_body = re.search(
     r"function normalizeGrafanaPanelUrl\(value\)\s*\{(.*?)\n\}",
-    content,
+    panel_url_content,
     re.S
 )
 test(

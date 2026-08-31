@@ -5,6 +5,13 @@ let profilesLoaded = false;
 let profileStorageSyncVersion = 0;
 const DASHBRIDGE_TAB_ACTIVE_PROFILE_KEY = 'dashbridge_tab_activeProfileId';
 const { showAlert, showConfirm, showPrompt } = window.DashBridgeModal;
+const {
+    isSupportedPanelUrl,
+    normalizeGrafanaPanelUrl,
+    buildDashBridgeSoloPanelUrl,
+    getProfilePanelIdentity,
+    parseQuickPanelIds,
+} = window.DashBridgePanelUrl;
 
 function getTabActiveProfileId() {
     try { return sessionStorage.getItem(DASHBRIDGE_TAB_ACTIVE_PROFILE_KEY) || null; }
@@ -1452,75 +1459,6 @@ function escapeHtml(str) {
     return DashBridgeRenderer.escapeHtml(str);
 }
 
-function isSupportedPanelUrl(value) {
-    try {
-        const url = new URL(value);
-        return url.protocol === 'https:' || url.protocol === 'http:';
-    } catch (e) {
-        return false;
-    }
-}
-
-// Единая нормализация ссылки Grafana для карточки дашборда.
-// Используется и при добавлении панели, и при правке URL в «Настройки iframe»,
-// иначе отредактированная ссылка остаётся в режиме полного дашборда и панель
-// приезжает вместе с верхней панелью настроек Grafana.
-function normalizeGrafanaPanelUrl(value) {
-    const url = new URL(value);
-    if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-        throw new Error('Поддерживаются только URL с протоколом http или https.');
-    }
-
-    const hasPanelId = url.searchParams.has('viewPanel') || url.searchParams.has('panelId');
-    if (hasPanelId) {
-        if (url.pathname.includes('/d/')) url.pathname = url.pathname.replace('/d/', '/d-solo/');
-        if (url.searchParams.has('viewPanel')) {
-            const panelId = url.searchParams.get('viewPanel');
-            url.searchParams.delete('viewPanel');
-            url.searchParams.set('panelId', panelId);
-        }
-    } else if (url.pathname.includes('/d-solo/')) {
-        // Без panelId режим d-solo отдаёт пустую панель.
-        url.pathname = url.pathname.replace('/d-solo/', '/d/');
-    }
-
-    url.searchParams.set('kiosk', 'tv');
-    url.searchParams.set('dashbridge', '1');
-    return url.toString();
-}
-
-function buildGrafanaSoloPanelUrl(dashboardUrl, panelId) {
-    const url = new URL(dashboardUrl);
-    if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-        throw new Error('Поддерживаются только URL с протоколом http или https.');
-    }
-
-    if (url.pathname.includes('/d/')) {
-        url.pathname = url.pathname.replace('/d/', '/d-solo/');
-    } else if (!url.pathname.includes('/d-solo/')) {
-        throw new Error('Укажите ссылку Grafana вида /d/... или /d-solo/....');
-    }
-
-    url.searchParams.delete('viewPanel');
-    url.searchParams.delete('editPanel');
-    url.searchParams.set('panelId', panelId);
-    url.searchParams.set('kiosk', 'tv');
-    url.searchParams.set('dashbridge', '1');
-    return url.toString();
-}
-
-function getProfilePanelIdentity(value) {
-    const grafanaIdentity = window.DashBridgeGrafanaPanelIdentity?.fromUrl(value) || '';
-    if (grafanaIdentity) return grafanaIdentity;
-    try {
-        const url = new URL(value);
-        ['from', 'to', 'refresh', 'theme', 'kiosk', 'dashbridge'].forEach(key => url.searchParams.delete(key));
-        url.hash = '';
-        url.searchParams.sort();
-        return url.toString();
-    } catch { return String(value || ''); }
-}
-
 function getCurrentProfilePanelIdentities() {
     return new Set(panels.map(panel => getProfilePanelIdentity(panel.src)).filter(Boolean));
 }
@@ -1528,13 +1466,6 @@ function getCurrentProfilePanelIdentities() {
 function currentProfileHasPanel(value) {
     const identity = getProfilePanelIdentity(value);
     return !!identity && getCurrentProfilePanelIdentities().has(identity);
-}
-
-function parseQuickPanelIds(value) {
-    const tokens = String(value || '').split(',').map(t => t.trim()).filter(Boolean);
-    const invalid = tokens.filter(token => !/^\d+$/.test(token) || Number(token) < 1);
-    if (invalid.length) throw new Error(`Некорректные ID панелей: ${invalid.join(', ')}`);
-    return [...new Set(tokens)];
 }
 
 // ════════════════════════════════════════════════════════
@@ -1778,7 +1709,7 @@ function setupEventListeners() {
 
         let panelUrls;
         try {
-            panelUrls = panelIds.map(panelId => buildGrafanaSoloPanelUrl(dashboardUrl, panelId));
+            panelUrls = panelIds.map(panelId => buildDashBridgeSoloPanelUrl(dashboardUrl, panelId));
         } catch (error) {
             await showAlert(error.message || 'Не удалось подготовить URL панелей.');
             return;
@@ -1854,7 +1785,7 @@ function setupEventListeners() {
                 id: String(panel.id),
                 title: normalizePanelMetadataText(panel.title || `Panel_${panel.id}`, 240),
                 type: normalizePanelMetadataText(panel.type || '', 80),
-                url: buildGrafanaSoloPanelUrl(dashboardUrl, String(panel.id))
+                url: buildDashBridgeSoloPanelUrl(dashboardUrl, String(panel.id))
             }));
         dashboardPickerList.replaceChildren();
         safePanels.forEach((panel, index) => {

@@ -5,6 +5,7 @@ from support.smoke import run_checks
 
 ROOT = Path(__file__).resolve().parent.parent
 JS = (ROOT / "pages/dashbridge/dashbridge.js").read_text(encoding="utf-8")
+PANEL_URL = (ROOT / "pages/dashbridge/dashbridge-panel-url.js").read_text(encoding="utf-8")
 PROFILE_STORE = (ROOT / "js/shared/dashbridge-profile-store.js").read_text(encoding="utf-8")
 TIME_STATE = (ROOT / "pages/dashbridge/dashbridge-time-state.js").read_text(encoding="utf-8")
 MIGRATION = (ROOT / "pages/dashbridge/dashbridge-data-migration.js").read_text(encoding="utf-8")
@@ -38,8 +39,8 @@ checks = {
     "active panels load eagerly and paused panels remain excluded": "navigateDashboardFrame(iframeEl, iframeEl.dataset.src)" in JS
         and "if (!panel.paused)" in JS and "dashbridgeLazyLoadEnabled" not in JS,
     "quick panel addition UI is present": all(token in HTML for token in ['id="quickAddPanelsBtn"', 'id="quickAddDashboardUrl"', 'id="quickAddPanelIds"']),
-    "quick panel addition builds d-solo URLs": "function buildGrafanaSoloPanelUrl" in JS and "url.searchParams.set('panelId', panelId)" in JS,
-    "quick panel addition validates and deduplicates IDs": "function parseQuickPanelIds" in JS and "new Set(tokens)" in JS,
+    "quick panel addition builds d-solo URLs": "function buildDashBridgeSoloPanelUrl" in PANEL_URL and "url.searchParams.set('panelId', panelId)" in PANEL_URL,
+    "quick panel addition validates and deduplicates IDs": "function parseQuickPanelIds" in PANEL_URL and "new Set(tokens)" in PANEL_URL,
     "all panel addition paths use canonical duplicate checks": "function getCurrentProfilePanelIdentities()" in JS
         and "currentProfileHasPanel(url)" in JS
         and JS.count("getCurrentProfilePanelIdentities()") >= 4
