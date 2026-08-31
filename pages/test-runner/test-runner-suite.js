@@ -2496,22 +2496,38 @@ const matrixInvariants = {
     // ── convertMemToUsed (RAM) ───────────────────────────────────────
     convertMemOn: (baseline, current, env) => {
         if (!env.hasRAM) return { pass: true, skip: true, reason: 'SKIP: нет RAM-панели' };
-        const labels = (current.diagnostic?.series || []).map(item => String(item.label || ''));
-        const transformed = labels.some(label => /used\s*%\s*\(calc\)/i.test(label));
+        const labels = [
+            ...(current.diagnostic?.series || []).map(item => String(item.label || '')),
+            ...(current.diagnostic?.markers?.visibilityEntries || []).map(item => String(item.label || '')),
+        ];
+        const transform = [...(current.diagnostic?.interceptor?.events || [])].reverse()
+            .find(event => event.stage === 'transform'
+                && ['iframe', 'query-signature', 'legend-fallback'].includes(event.scope)
+                && event.convertMemToUsed === true
+                && event.memoryTransform?.applied === true);
+        const transformed = !!transform && labels.some(label => /used\s*%\s*\(calc\)/i.test(label));
         return {
             pass: transformed,
             reason: transformed ? 'RAM → % Used подтверждён серией Used % (calc)' : 'RAM Used % (calc) не получен после refresh',
-            debug: transformed ? '' : `После refresh не найдена серия Used % (calc); серии: ${labels.join(', ') || 'нет данных'}`,
+            debug: transformed ? '' : JSON.stringify({ transform: transform || null, labels }),
         };
     },
     convertMemOff: (baseline, current, env) => {
         if (!env.hasRAM) return { pass: true, skip: true, reason: 'SKIP: нет RAM-панели' };
-        const labels = (current.diagnostic?.series || []).map(item => String(item.label || ''));
-        const restored = !labels.some(label => /used\s*%\s*\(calc\)/i.test(label));
+        const labels = [
+            ...(current.diagnostic?.series || []).map(item => String(item.label || '')),
+            ...(current.diagnostic?.markers?.visibilityEntries || []).map(item => String(item.label || '')),
+        ];
+        const targetEvent = [...(current.diagnostic?.interceptor?.events || [])].reverse()
+            .find(event => ['transform', 'transform-skipped'].includes(event.stage)
+                && ['iframe', 'query-signature', 'legend-fallback'].includes(event.scope));
+        const nativeResponse = targetEvent?.stage === 'transform-skipped'
+            || (targetEvent?.stage === 'transform' && targetEvent.convertMemToUsed === false);
+        const restored = nativeResponse && !labels.some(label => /used\s*%\s*\(calc\)/i.test(label));
         return {
             pass: restored,
             reason: restored ? 'RAM восстановлен после refresh без преобразования' : 'RAM всё ещё содержит Used % (calc)',
-            debug: restored ? '' : `После отключения найдена вычисленная RAM-серия: ${labels.join(', ')}`,
+            debug: restored ? '' : JSON.stringify({ targetEvent: targetEvent || null, labels }),
         };
     },
 

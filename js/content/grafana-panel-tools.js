@@ -1090,10 +1090,14 @@
     };
     const canDeferLegendVisibilityApply = targetRoot => visualMetadata.responseDataStatus?.kind === 'filtered_empty'
         && getLegendItems().length === 0
-        && !targetRoot?.querySelector?.('canvas')
         && (legendVisibilityRestoreAfterNextQuery
-            || tools.seriesQueryFilterEnabled === true
-            || tools.cpuCapacityFilterEnabled === true);
+            // While the filter remains active, defer only for a genuinely
+            // absent target renderer. During reset, legacy Flot may retain an
+            // empty canvas with no plot/legend; the pending restore itself is
+            // consumed only after the next complete response proves the legend.
+            || ((targetRoot === document || !targetRoot?.querySelector?.('canvas'))
+                && (tools.seriesQueryFilterEnabled === true
+                    || tools.cpuCapacityFilterEnabled === true)));
     const applyPersistentVisualState = async () => {
         const targetPanel = getTargetPanel();
         const targetRoot = window.DashBridgeGrafanaDom?.outerPanel(targetPanel) || targetPanel || document;

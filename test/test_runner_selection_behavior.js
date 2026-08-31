@@ -11,9 +11,11 @@ const selectorSource = fs.readFileSync(path.join(root, 'pages/test-runner/test-s
 const selectorHtml = fs.readFileSync(path.join(root, 'pages/test-runner/test-selector.html'), 'utf8');
 
 const context = vm.createContext({ console, URL, URLSearchParams, setTimeout, clearTimeout });
-vm.runInContext(`${suiteSource}\nthis.__suite = DASHBRIDGE_TEST_SUITE; this.__thresholdOff = matrixInvariants.thresholdOff;`, context);
+vm.runInContext(`${suiteSource}\nthis.__suite = DASHBRIDGE_TEST_SUITE; this.__thresholdOff = matrixInvariants.thresholdOff; this.__convertMemOn = matrixInvariants.convertMemOn; this.__convertMemOff = matrixInvariants.convertMemOff;`, context);
 const suite = context.__suite;
 const thresholdOff = context.__thresholdOff;
+const convertMemOn = context.__convertMemOn;
+const convertMemOff = context.__convertMemOff;
 
 assert(suite.length >= 60, 'the human catalog must cover the complete generated suite as it grows');
 assert(suite.every(test => typeof test.name === 'string' && test.name.length > 3), 'every test needs a human name');
@@ -34,6 +36,32 @@ assert.strictEqual(thresholdOff(previouslyActiveThreshold, cleanThresholdCurrent
 const explicitThresholdRemoval = { dom: { thresholdApplied: false }, diagnostic: { tools: { thresholdEnabled: false }, thresholdDiagnostic: { enabled: false, status: { enabled: false } } } };
 assert.strictEqual(thresholdOff(previouslyActiveThreshold, explicitThresholdRemoval).pass, true,
     'explicit threshold removal evidence must satisfy the reset invariant');
+
+const ramEnvironment = { hasRAM: true };
+const ramTransformEvent = {
+    stage: 'transform', scope: 'query-signature', convertMemToUsed: true,
+    memoryTransform: { applied: true, reason: 'converted' },
+};
+const flotRamOn = {
+    diagnostic: {
+        series: [],
+        markers: { visibilityEntries: [{ label: 'server-01 Used % (calc)' }] },
+        interceptor: { events: [ramTransformEvent] },
+    },
+};
+assert.strictEqual(convertMemOn({}, flotRamOn, ramEnvironment).pass, true,
+    'Flot RAM conversion must accept causal transport evidence plus its visible calculated legend');
+assert.strictEqual(convertMemOn({}, {
+    diagnostic: { series: [], markers: { visibilityEntries: [{ label: 'server-01 Used % (calc)' }] }, interceptor: { events: [] } },
+}, ramEnvironment).pass, false, 'a calculated-looking legend without transport evidence must not pass');
+assert.strictEqual(convertMemOff({}, {
+    diagnostic: {
+        series: [], markers: { visibilityEntries: [{ label: 'server-01 Total' }] },
+        interceptor: { events: [{ stage: 'transform-skipped', scope: 'query-signature' }] },
+    },
+}, ramEnvironment).pass, true, 'RAM reset must prove a native response and absence of calculated legend rows');
+assert.strictEqual(convertMemOff({}, flotRamOn, ramEnvironment).pass, false,
+    'RAM reset must reject a calculated legend that remains visible');
 
 assert(coreSource.includes('selectedTestIds = null')
     && coreSource.includes('const selectionMatch = !selectedIds || selectedIds.has(t.id);')
