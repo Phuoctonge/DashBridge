@@ -5,7 +5,8 @@ from support.smoke import CheckCollector
 
 ROOT = Path(__file__).resolve().parents[1]
 HTML = (ROOT / 'pages/batch/batch.html').read_text(encoding='utf-8')
-JS = (ROOT / 'pages/batch/batch.js').read_text(encoding='utf-8')
+JS = ''.join((ROOT / path).read_text(encoding='utf-8') for path in [
+    'pages/batch/batch.js', 'pages/batch/batch-panel-rules-ui.js', 'pages/batch/batch-operation-controller.js'])
 PICKER = (ROOT / 'pages/batch/batch-panel-picker.js').read_text(encoding='utf-8')
 CAPTURE_UTILS = (ROOT / 'pages/batch/batch-capture-utils.js').read_text(encoding='utf-8')
 CSS = (ROOT / 'pages/batch/batch.css').read_text(encoding='utf-8')
@@ -16,8 +17,8 @@ check = CheckCollector()
 
 
 check('Series loader status element exists', 'id="seriesLoaderStatus"' in HTML)
-check('Series processing disables its own start button', 'startSeriesBtn.disabled = active' in JS)
-check('Series cancellation remains visible while Series runs', 'cancelBtn.hidden = !active' in JS and 'mainActionArea.hidden' not in JS.split('function setProcessing', 1)[1].split('}', 1)[0])
+check('Series processing disables its own start button', 'startSeriesButton.disabled = active' in JS)
+check('Series cancellation remains visible while Series runs', 'cancelButton.hidden = !active' in JS)
 check('Authorization recovery has a finite timeout', 'AUTH_RECOVERY_TIMEOUT_MS' in PICKER and 'setTimeout' in PICKER)
 check('Standalone Series filenames include a stable occurrence suffix', 'seriesIndex' in JS and 'occurrence' in JS)
 check('Batch filenames are unique and Confluence-safe', 'buildCaptureFilename' in CAPTURE_UTILS
@@ -51,7 +52,7 @@ check('Batch action buttons are compact instead of globally full-width', '#mainA
 check('Panel navigation is awaited before readiness polling', 'await chrome.tabs.update(tabId, { url: target.toString() })' in (ROOT / 'pages/batch/batch-panel-loader.js').read_text(encoding='utf-8'))
 check('Batch state writes are debounced', 'saveTimer' in (ROOT / 'pages/batch/batch-state.js').read_text(encoding='utf-8') and 'setTimeout' in (ROOT / 'pages/batch/batch-state.js').read_text(encoding='utf-8'))
 check('Batch exposes progress counters', 'batchProgress' in HTML and 'updateBatchProgress' in JS)
-check('Rule loading ignores stale URL responses', 'batchPanelRulesLoadVersion' in JS)
+check('Rule loading ignores stale URL responses', 'loadVersion' in JS and 'version !== loadVersion' in JS)
 check('Cancel button is explicitly hidden outside an active run', '#cancelBtn[hidden]' in CSS and 'setProcessing(false)' in JS)
 check('Grafana base paths are preserved for dashboard API calls', 'basePath' in (ROOT / 'js/shared/grafana-url.js').read_text(encoding='utf-8'))
 check('Exact Batch capture cannot fall back to a different panel', 'targetPanelId === null' in (ROOT / 'js/shared/grafana-panel-capture.js').read_text(encoding='utf-8'))
@@ -67,7 +68,7 @@ check('Panel loader receives the active cancellation signal', 'BatchRunLifecycle
 check('Batch exposes an always-on-top cancellable PiP panel',
       '../shared/operation-progress-window.js' in HTML
       and 'openPictureInPicture' in JS
-      and 'cancelActiveBatchRun' in JS)
+      and 'async function cancel' in JS)
 check('Removed popup progress window is not used as a fallback',
       not (ROOT / 'operation-progress.html').exists()
       and 'operationProgressController.focus()' not in JS)

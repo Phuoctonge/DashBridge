@@ -12,8 +12,7 @@ if __name__ == "__main__":
               'id="getSeriesPanelsBtn"', 'id="copyMainSettingsToSeriesBtn"', 'id="seriesPanelSelectionStatus"', 'id="loadSelectedSeriesBtn"', 'id="seriesIncludeFilter"', 'id="seriesIgnoreFilter"', 'id="captureThemeSeries"', 'id="startSeriesBtn"'],
         sources={
             "pages/batch/batch.js": [
-                "function parseGrafanaUrl(url)", "async function getOrCreateCaptureWindow()",
-                "createBatchPanelLoader", "BatchCaptureUtils.base64ToUint8Array",
+                "function parseGrafanaUrl(url)",
                 "const loadSelectedSeriesPanels = async () =>",
                 "discoverSeriesForSlice",
                 "BatchSeriesSelection.resolvePatterns",
@@ -21,6 +20,7 @@ if __name__ == "__main__":
                 "ignorePattern",
                 "copyMainSettingsToSeriesBtn",
             ],
+            "pages/batch/batch-operation-controller.js": ["captureWindowRunner.acquire", "captureWindowRunner.release", "BatchCaptureUtils.base64ToUint8Array"],
             "pages/batch/batch-panel-picker.js": [
                 "Открываю Grafana для авторизации. После входа список панелей загрузится автоматически.",
                 "const recoverGrafanaDashboardSession = async",

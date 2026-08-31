@@ -36,7 +36,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const batchProgressText = document.getElementById('batchProgressText');
     const batchProgressStats = document.getElementById('batchProgressStats');
     const batchProgressBar = document.getElementById('batchProgressBar');
-    let operationProgressController = null;
     const updateBatchProgress = ({ done, total, success, failed, phase }) => {
         batchProgress.hidden = false;
         const safeTotal = Math.max(1, Number(total) || 1);
@@ -87,151 +86,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // --- Per-panel transformation rules ---
     const dashUrl = document.getElementById('dashUrl');
-    const batchPanelRules = document.getElementById('batchPanelRules');
-    const batchPanelRulesStatus = document.getElementById('batchPanelRulesStatus');
-    let batchPanelRulesLoadVersion = 0;
-    const ruleOptionLabels = [
-        ['removeFill', 'Убрать заливку графика'],
-        ['thickenLines', 'Утолщить линии графика'],
-        ['invertLegend', 'Переместить легенду: справа ↔ снизу'],
-        ['invertIdle', 'Инвертировать CPU-график: Idle → Load'],
-        ['convertMemToUsed', 'Конвертировать RAM-график в % Used']
-    ];
-
-    const setBatchPanelRulesStatus = message => { batchPanelRulesStatus.textContent = message; };
-    const createBatchPanelRuleOption = (key, label, checked) => {
-        const option = document.createElement('label');
-        const input = document.createElement('input');
-        input.type = 'checkbox';
-        input.dataset.ruleField = key;
-        input.checked = checked === true;
-        option.append(input, document.createTextNode(label));
-        return option;
-    };
-    const addBatchPanelRuleRow = (panelId = '', rule = {}) => {
-        const row = document.createElement('article');
-        row.className = 'batch-panel-rule';
-        const idBox = document.createElement('div');
-        idBox.className = 'batch-panel-rule-id';
-        const idLabel = document.createElement('label');
-        idLabel.textContent = 'ID панели';
-        const idInput = document.createElement('input');
-        idInput.type = 'number';
-        idInput.min = '1';
-        idInput.step = '1';
-        idInput.inputMode = 'numeric';
-        idInput.className = 'batch-panel-rule-id-input';
-        idInput.value = panelId;
-        idInput.placeholder = '12';
-        idLabel.append(idInput);
-        idBox.append(idLabel);
-
-        const options = document.createElement('div');
-        options.className = 'batch-panel-rule-options';
-        ruleOptionLabels.forEach(([key, label]) => options.append(createBatchPanelRuleOption(key, label, rule[key])));
-        const width = document.createElement('label');
-        width.className = 'batch-panel-rule-width';
-        width.append(document.createTextNode('Толщина '));
-        const widthInput = document.createElement('input');
-        widthInput.type = 'number';
-        widthInput.min = '1';
-        widthInput.max = '10';
-        widthInput.step = '0.5';
-        widthInput.dataset.ruleField = 'thickenLinesValue';
-        widthInput.value = Number(rule.thickenLinesValue) || 1.5;
-        width.append(widthInput);
-        options.append(width);
-
-        const thickenLinesInput = options.querySelector('[data-rule-field="thickenLines"]');
-        const syncThicknessControl = () => {
-            const enabled = thickenLinesInput?.checked === true;
-            width.hidden = !enabled;
-            widthInput.disabled = !enabled;
-            widthInput.setAttribute('aria-hidden', String(!enabled));
-        };
-        thickenLinesInput?.addEventListener('change', syncThicknessControl);
-        syncThicknessControl();
-
-        const remove = document.createElement('button');
-        remove.type = 'button';
-        remove.className = 'btn batch-panel-rule-remove';
-        remove.textContent = 'Удалить';
-        remove.addEventListener('click', () => { row.remove(); scheduleBatchPanelRulesSave(); });
-        row.append(idBox, options, remove);
-        row.querySelectorAll('input').forEach(input => {
-            input.addEventListener('input', scheduleBatchPanelRulesSave);
-            input.addEventListener('change', scheduleBatchPanelRulesSave);
-        });
-        batchPanelRules.append(row);
-    };
-    const renderBatchPanelRules = (rules = {}) => {
-        batchPanelRules.replaceChildren();
-        Object.entries(rules).sort(([a], [b]) => Number(a) - Number(b)).forEach(([panelId, rule]) => addBatchPanelRuleRow(panelId, rule));
-    };
-    const collectBatchPanelRules = () => {
-        const rules = {};
-        batchPanelRules.querySelectorAll('.batch-panel-rule').forEach(row => {
-            const panelId = row.querySelector('.batch-panel-rule-id-input')?.value.trim();
-            if (!panelId) return;
-            if (!/^\d+$/.test(panelId) || Number(panelId) < 1) throw new Error(`Некорректный ID панели: ${panelId}`);
-            const rule = {};
-            row.querySelectorAll('[data-rule-field]').forEach(input => {
-                if (input.type === 'checkbox' && input.checked) rule[input.dataset.ruleField] = true;
-            });
-            if (rule.thickenLines) rule.thickenLinesValue = Number(row.querySelector('[data-rule-field="thickenLinesValue"]')?.value);
-            rules[panelId] = rule;
-        });
-        return rules;
-    };
-    const loadBatchPanelRules = async () => {
-        const url = dashUrl.value.trim();
-        const loadVersion = ++batchPanelRulesLoadVersion;
-        if (!parseGrafanaUrl(url)) {
-            renderBatchPanelRules();
-            setBatchPanelRulesStatus('Введите URL Grafana, чтобы загрузить правила этого дашборда.');
-            return;
-        }
-        try {
-            const rules = await BatchPanelRules.load(url);
-            if (loadVersion !== batchPanelRulesLoadVersion || url !== dashUrl.value.trim()) return;
-            renderBatchPanelRules(rules);
-            document.getElementById('resetBatchPanelRulesBtn').hidden = !Object.keys(rules).length;
-            setBatchPanelRulesStatus(Object.keys(rules).length ? `Загружено правил: ${Object.keys(rules).length}.` : 'Для этого дашборда правил пока нет.');
-        } catch (error) {
-            setBatchPanelRulesStatus(`Не удалось загрузить правила: ${error.message}`);
-        }
-    };
-
-    let batchPanelRulesSaveTimer = null;
-    const hasIncompleteBatchPanelRule = () => Array.from(batchPanelRules.querySelectorAll('.batch-panel-rule')).some(row => {
-        const panelId = row.querySelector('.batch-panel-rule-id-input')?.value.trim();
-        const hasSelectedTool = Array.from(row.querySelectorAll('input[type="checkbox"]')).some(input => input.checked);
-        return !panelId || !/^\d+$/.test(panelId) || Number(panelId) < 1 || !hasSelectedTool;
+    const batchPanelRulesUi = BatchPanelRulesUi.create({
+        dashboardUrl: dashUrl,
+        container: document.getElementById('batchPanelRules'),
+        status: document.getElementById('batchPanelRulesStatus'),
+        store: BatchPanelRules,
+        parseUrl: parseGrafanaUrl,
     });
-    const scheduleBatchPanelRulesSave = () => {
-        clearTimeout(batchPanelRulesSaveTimer);
-        const saveUrl = dashUrl.value.trim();
-        setBatchPanelRulesStatus('Сохранение…');
-        batchPanelRulesSaveTimer = setTimeout(async () => {
-            if (saveUrl !== dashUrl.value.trim()) return;
-            if (!parseGrafanaUrl(saveUrl)) return setBatchPanelRulesStatus('Введите URL Grafana, чтобы сохранить правила.');
-            if (hasIncompleteBatchPanelRule()) return setBatchPanelRulesStatus('Укажите корректный ID панели и выберите хотя бы одну настройку.');
-            try {
-                const rules = await BatchPanelRules.save(saveUrl, collectBatchPanelRules());
-                if (saveUrl !== dashUrl.value.trim()) return;
-                document.getElementById('resetBatchPanelRulesBtn').hidden = !Object.keys(rules).length;
-                setBatchPanelRulesStatus(Object.keys(rules).length ? `Сохранено правил: ${Object.keys(rules).length}.` : 'Нет сохранённых правил для этого дашборда.');
-            } catch (error) {
-                setBatchPanelRulesStatus(`Не удалось сохранить правила: ${error.message}`);
-            }
-        }, 350);
-    };
-    document.getElementById('addBatchPanelRuleBtn').addEventListener('click', () => { addBatchPanelRuleRow(); scheduleBatchPanelRulesSave(); });
-    document.getElementById('resetBatchPanelRulesBtn').addEventListener('click', () => {
-        renderBatchPanelRules();
-        scheduleBatchPanelRulesSave();
-    });
-    dashUrl.addEventListener('change', () => { clearTimeout(batchPanelRulesSaveTimer); void loadBatchPanelRules(); });
+    const loadBatchPanelRules = batchPanelRulesUi.load;
 
     BatchPageState.bind();
     BatchPageState.restore().then(loadBatchPanelRules);
@@ -283,124 +145,33 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // --- Engine State ---
-    let isProcessing = false;
-    const captureWindowRunner = createBatchCaptureWindowRunner();
-    const loadBatchPanel = createBatchPanelLoader({ log: logMessage });
-    async function getOrCreateCaptureWindow() {
-        return captureWindowRunner.acquire();
-    }
-
-    async function closeCaptureWindow() {
-        return captureWindowRunner.release();
-    }
-
-
-    // --- Helper APIs ---
-    // Убиваем тултипы и курсор чтобы не мешали скриншоту
-    // Запоминаем CSS классы и стили всех элементов легенды до клика
-    // Ждем изменения классов/стилей (реакции React)
-
-    async function capturePanelToZip(win, tabId, panelId, filename, archive, captureOptions = {}) {
-        const captured = await captureGrafanaPanelImage({
-            tabId,
-            windowId: win.id,
-            panelId,
-            settleMs: 300,
-            ...captureOptions
-        });
-        if (!captured) {
-            logMessage(`Unable to capture panel: ${filename}`, true);
-            return false;
-        }
-        const bytes = BatchCaptureUtils.base64ToUint8Array(captured.dataUrl.split(',')[1]);
-        await archive.add(filename, bytes, bytes.byteLength);
-        logMessage(`Saved: ${filename} (${bytes.length} bytes)`);
-        return true;
-    }
-
-    async function getBatchCaptureOptions(toggleId) {
-        const prepared = document.getElementById(toggleId)?.checked === true;
-        if (!prepared) return { prepared: false };
-        const stored = await chrome.storage.sync.get([
-            'grafanaCompactExportWidth', 'grafanaCompactExportHeight'
-        ]);
-        const settings = normalizeGrafanaSettings(stored);
-        return {
-            prepared: true,
-            outputWidth: settings.grafanaCompactExportWidth,
-            outputHeight: settings.grafanaCompactExportHeight
-        };
-    }
-
-    async function addBatchArchiveReport(archive, report) {
-        const manifest = `${JSON.stringify({
-            generatedAt: new Date().toISOString(),
-            ...report
-        }, null, 2)}\n`;
-        const manifestBytes = new TextEncoder().encode(manifest);
-        await archive.add('manifest.json', manifestBytes, manifestBytes.byteLength);
-        if (report.errors?.length) {
-            const errorText = `${report.errors.map(item => `${item.file}: ${item.reason}`).join('\n')}\n`;
-            const errorBytes = new TextEncoder().encode(errorText);
-            await archive.add('errors.txt', errorBytes, errorBytes.byteLength);
-        }
-    }
-
-    // --- Управление флагом обработки и кнопкой отмены ---
-    const cancelBtn = document.getElementById('cancelBtn');
-    const startBtn = document.getElementById('startBtn');
-    const startSeriesBtn = document.getElementById('startSeriesBtn');
-
-    const updateActionVisibility = () => {
-        const isMainTab = document.querySelector('.tab-btn.active')?.dataset.tab === 'tab-main';
-        mainActionArea.hidden = !isMainTab && !isProcessing;
-        startBtn.hidden = !isMainTab && isProcessing;
-    };
-
-    function setProcessing(active) {
-        isProcessing = active;
-        startBtn.disabled = active;
-        startSeriesBtn.disabled = active;
-        cancelBtn.hidden = !active;
-        // inline-flex восстанавливаем вручную, т.к. hidden убирает display
-        if (!active) cancelBtn.style.display = '';
-        updateActionVisibility();
-    }
-
-    setProcessing(false);
-    const cancelActiveBatchRun = async () => {
-        if (!isProcessing) return false;
-        BatchRunLifecycle.cancel();
-        isProcessing = false;
-        operationProgressController?.cancel();
-        logMessage('⛔ Сбор отменён пользователем.');
-        showToast('Сбор отменён', 'info');
-        await closeCaptureWindow();
-        setProcessing(false);
-        return true;
-    };
-    operationProgressController = DashBridgeOperationProgress.create({ onCancel: cancelActiveBatchRun });
-    const beginBatchRun = async ({ title, phase }) => {
-        const runId = BatchRunLifecycle.begin();
-        setProcessing(true);
-        await operationProgressController.openPictureInPicture({ title, phase, width: 390, height: 300 });
-        return runId;
-    };
-    const isBatchRunActive = runId => isProcessing && BatchRunLifecycle.isActive(runId);
-    const finishBatchRun = async runId => {
-        if (!BatchRunLifecycle.finish(runId)) return false;
-        operationProgressController.finish();
-        await closeCaptureWindow();
-        setProcessing(false);
-        return true;
-    };
-
-    cancelBtn.addEventListener('click', cancelActiveBatchRun);
-    window.addEventListener('pagehide', () => { void operationProgressController?.release(); });
+    const batchOperation = BatchOperationController.create({
+        mainActionArea,
+        startButton: document.getElementById('startBtn'),
+        startSeriesButton: document.getElementById('startSeriesBtn'),
+        cancelButton: document.getElementById('cancelBtn'),
+        showToast,
+        logMessage,
+        lifecycle: BatchRunLifecycle,
+        progressFactory: DashBridgeOperationProgress,
+        captureWindowRunner: createBatchCaptureWindowRunner(),
+        loadPanel: createBatchPanelLoader({ log: logMessage }),
+    });
+    const operationProgressController = batchOperation.progress;
+    const loadBatchPanel = batchOperation.loadPanel;
+    const updateActionVisibility = batchOperation.updateActionVisibility;
+    const getOrCreateCaptureWindow = batchOperation.acquireWindow;
+    const closeCaptureWindow = batchOperation.releaseWindow;
+    const capturePanelToZip = batchOperation.capturePanelToZip;
+    const getBatchCaptureOptions = batchOperation.getCaptureOptions;
+    const addBatchArchiveReport = batchOperation.addArchiveReport;
+    const beginBatchRun = batchOperation.begin;
+    const isBatchRunActive = batchOperation.isActive;
+    const finishBatchRun = batchOperation.finish;
 
     // --- Main Capture Action ---
     startBtn.addEventListener('click', async () => {
-        if (isProcessing) return showToast('Процесс уже запущен!', 'error');
+        if (batchOperation.processing) return showToast('Процесс уже запущен!', 'error');
 
         const urlStr = document.getElementById('dashUrl').value.trim();
         const timestampsText = document.getElementById('timestamps').value.trim();
@@ -740,7 +511,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById('loadSelectedSeriesBtn').addEventListener('click', loadSelectedSeriesPanels);
 
     document.getElementById('startSeriesBtn').addEventListener('click', async () => {
-        if (isProcessing) return showToast('Процесс уже запущен!', 'error');
+        if (batchOperation.processing) return showToast('Процесс уже запущен!', 'error');
 
         const normalizedRanges = normalizeTimeRangesField({ fieldId: 'seriesTimestamps', notify: false });
         if (normalizedRanges.errors.length) {

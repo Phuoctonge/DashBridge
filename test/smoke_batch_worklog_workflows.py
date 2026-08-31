@@ -4,7 +4,7 @@ from support.smoke import run_checks
 
 
 ROOT = Path(__file__).resolve().parent.parent
-BATCH = (ROOT / "pages/batch/batch.js").read_text(encoding="utf-8")
+BATCH = (ROOT / "pages/batch/batch.js").read_text(encoding="utf-8") + (ROOT / "pages/batch/batch-operation-controller.js").read_text(encoding="utf-8")
 BATCH_PICKER = (ROOT / "pages/batch/batch-panel-picker.js").read_text(encoding="utf-8")
 BATCH_STATE = (ROOT / "pages/batch/batch-state.js").read_text(encoding="utf-8")
 BATCH_UTILS = (ROOT / "pages/batch/batch-capture-utils.js").read_text(encoding="utf-8")
@@ -27,7 +27,7 @@ checks = {
     "batch API can find nested dashboard panels": "function findGrafanaDashboardPanel(dashboard, panelId)" in DASHBOARD_API,
     "batch identifies native queries for the requested panel": "function getGrafanaPanelQuerySignatures(panel)" in DASHBOARD_API
         and "function getGrafanaQuerySignature(query)" in DASHBOARD_API,
-    "batch isolates capture in a dedicated window": "function getOrCreateCaptureWindow()" in BATCH and "function closeCaptureWindow()" in BATCH,
+    "batch isolates capture in a dedicated window": "captureWindowRunner.acquire" in BATCH and "captureWindowRunner.release" in BATCH,
     "batch waits for the requested panel": "createBatchPanelLoader" in BATCH_LOADER and "loadBatchPanel" in BATCH,
     "batch uses the shared panel lookup": "files: ['js/content/grafana-dom.js']" in BATCH_LOADER
         and "window.DashBridgeGrafanaDom?.findPanelById(panelId)" in BATCH_LOADER,
@@ -54,7 +54,7 @@ checks = {
         and "url.searchParams.set('panelId', panelId)" in URLS
         and "seriesPanelIdFormatCache" in BATCH
         and "seriesPanelIdCandidates" in BATCH,
-    "full-dashboard action is hidden outside collection settings": "mainActionArea.hidden = !isMainTab && !isProcessing" in BATCH,
+    "full-dashboard action is hidden outside collection settings": "mainActionArea.hidden = !mainTab && !processing" in BATCH,
     "batch captures dynamically rendered series cards": "#seriesPanelsContainer .batch-series-card" in BATCH,
     "grouped Batch installs complete-hide before the first panel render":
         "applyGrafanaCompleteHideSelection(" in BATCH
