@@ -6,6 +6,7 @@ ROOT = Path(__file__).resolve().parent.parent
 tools = (ROOT / "js/content/grafana-panel-tools.js").read_text(encoding="utf-8")
 state = (ROOT / "js/content/grafana-panel-state.js").read_text(encoding="utf-8")
 dashboard = (ROOT / "pages/dashbridge/dashbridge.js").read_text(encoding="utf-8")
+dashboard_capture = (ROOT / "pages/dashbridge/dashbridge-capture.js").read_text(encoding="utf-8")
 renderer = (ROOT / "pages/dashbridge/dashbridge-renderer.js").read_text(encoding="utf-8")
 batch = (ROOT / "pages/batch/batch.js").read_text(encoding="utf-8")
 runner = (ROOT / "pages/batch/batch-capture-runner.js").read_text(encoding="utf-8")
@@ -14,8 +15,8 @@ visual_engine = (ROOT / "js/content/grafana-visual-engine.js").read_text(encodin
 checks = {
     "Panel state is keyed independently of DOM node": "const states" in state and "keyFor" in state,
     "Remounted canvas reapplies saved visual state": "restorePanelVisualState" in tools and "__dashbridgeVisualCanvas" in tools,
-    "Dashboard archive capture has a single sequential owner": "let dashbridgeArchiveCaptureInProgress" in dashboard
-        and "for (let index = 0; index < activePanels.length; index += 1)" in dashboard,
+    "Dashboard archive capture has a single sequential owner": "let archiveCaptureInProgress" in dashboard_capture
+        and "for (let index = 0; index < activePanels.length; index += 1)" in dashboard_capture,
     "Iframe resize jiggle is disabled for the layout experiment": "jiggleDashboardFrameWidth" not in dashboard
         and "dashbridgeJiggle" not in dashboard,
     "Batch capture window has an owner": "createBatchCaptureWindowRunner" in runner and "captureWindowRunner.acquire" in batch and "captureWindowRunner.release" in batch,

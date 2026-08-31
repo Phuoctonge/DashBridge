@@ -24,6 +24,7 @@ if __name__ == "__main__":
     popup = read("pages/popup/popup.html")
     tools = read("js/content/grafana-panel-tools.js")
     dashboard = read("pages/dashbridge/dashbridge.js")
+    dashboard_capture = read("pages/dashbridge/dashbridge-capture.js")
     content = read("js/content/content.js")
     background = read("js/background.js")
     output = read("js/shared/grafana-capture-output.js")
@@ -51,9 +52,9 @@ if __name__ == "__main__":
             and 'Подготовить снимок 1000×520' not in read("js/shared/grafana-panel-settings-modal.js"),
         "native Grafana uses a bounded temporary layout": "const prepareNativePanelCapture" in tools
             and "fitPreparedSize" in tools and "session?.restore?.()" in tools,
-        "DashBridge expands and restores its exact card": "async function captureDashbridgePanel" in dashboard
-            and "captureSnapshot?.forEach" in dashboard and "dashbridgePanelCaptureResult" in dashboard,
-        "iframe is explicitly reflowed around capture": "dashbridgeCaptureLayoutChanged" in dashboard
+        "DashBridge expands and restores its exact card": "const capturePanel = async" in dashboard_capture
+            and "captureSnapshot?.forEach" in dashboard_capture and "dashbridgePanelCaptureResult" in dashboard_capture,
+        "iframe is explicitly reflowed around capture": "dashbridgeCaptureLayoutChanged" in dashboard_capture
             and "dashbridgeCaptureLayoutChanged" in read("js/content/grafana-iframe.js"),
         "capture output crops at device pixel ratio": "const crop = async" in output
             and "rect?.dpr" in output and "drawImage" in output,

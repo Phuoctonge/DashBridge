@@ -30,6 +30,7 @@ assert(narrow.left >= 12 && narrow.top >= 12, 'prepared panel must stay inside t
 
 const tools = fs.readFileSync('js/content/grafana-panel-tools.js', 'utf8');
 const dashboard = fs.readFileSync('pages/dashbridge/dashbridge.js', 'utf8');
+const dashboardCapture = fs.readFileSync('pages/dashbridge/dashbridge-capture.js', 'utf8');
 const dashboardCss = fs.readFileSync('pages/dashbridge/dashbridge.css', 'utf8');
 const dashboardHtml = fs.readFileSync('pages/dashbridge/dashbridge.html', 'utf8');
 assert(tools.includes("await session?.restore?.()"), 'native capture must restore its temporary layout');
@@ -98,7 +99,7 @@ assert(tools.includes("'aria-hidden': 'true'") && tools.includes("focusable: 'fa
 assert(tools.includes("setAttribute('aria-pressed', String(enabled))"), 'prepared capture toggle must expose its current state');
 assert(tools.includes('.dashbridge-panel-capture-toggle-active { color:#5794f2 !important; background:transparent !important; box-shadow:none !important; }'),
     'native Grafana compact capture must use a blue icon without a persistent button background');
-assert(dashboard.includes('captureSnapshot?.forEach'), 'DashBridge capture must restore the card layout');
+assert(dashboardCapture.includes('captureSnapshot?.forEach'), 'DashBridge capture must restore the card layout');
 assert(dashboard.includes('dashbridgeCapturePreparedChanged'), 'DashBridge must persist the toolbar toggle in the panel profile');
 assert(!dashboard.includes("card.querySelector('.btn-capture-toggle')")
     && dashboardHtml.includes('id="capturePreparedToggleBtn"')
@@ -107,12 +108,12 @@ assert(!dashboard.includes("card.querySelector('.btn-capture-toggle')")
     'DashBridge cards must keep save/copy actions while compact mode has one header control');
 assert(dashboard.includes('runDashboardToolbarCapture(panel, iframeEl'), 'DashBridge toolbar must reuse the existing panel capture pipeline');
 assert(dashboard.includes('setDashboardCapturePrepared(!defaultCapturePrepared)'), 'DashBridge toolbar toggle must update the shared prepared-capture setting');
-assert(dashboard.includes("'box-sizing', 'border'"), 'DashBridge capture must snapshot its temporary border override');
-assert(dashboard.includes("setProperty('border', 'none', 'important')"), 'the card border must not distort the prepared iframe aspect ratio');
+assert(dashboardCapture.includes("'box-sizing', 'border'"), 'DashBridge capture must snapshot its temporary border override');
+assert(dashboardCapture.includes("setProperty('border', 'none', 'important')"), 'the card border must not distort the prepared iframe aspect ratio');
 assert(dashboardCss.includes('.panel-card.dashbridge-panel-capture-active .panel-actions')
     && dashboardCss.includes('visibility: hidden !important;')
     && dashboardCss.includes('transition: none !important;'),
     'DashBridge capture must hide its toolbar immediately instead of capturing an opacity transition');
-assert(tools.includes('panelCaptureInProgress') && dashboard.includes('dashbridgePanelCaptureInProgress'), 'both hosts must reject overlapping captures');
+assert(tools.includes('panelCaptureInProgress') && dashboardCapture.includes('panelCaptureInProgress'), 'both hosts must reject overlapping captures');
 
 console.log('PASS Grafana panel capture preserves aspect ratio and restores both hosts');

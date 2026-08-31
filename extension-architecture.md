@@ -165,6 +165,7 @@ grafana-panel-tools.js
 | JSON transfer панелей DashBridge | `dashbridge-panel-transfer.js` | Полный export payload, строгая нормализация import, новые ID и удаление канонических дублей; FileReader/download lifecycle остаётся в `dashbridge.js`. |
 | UI сводного отчёта и SLA | `dashbridge-report-ui.js` | Настройка профиля, редактор фраз панели, валидация warning/critical и modal cleanup; состояние передаётся через явные callbacks `dashbridge.js`. |
 | Transport сводного отчёта | `dashbridge-report-transport.js` | Ожидание iframe, request ID, timeout/abort и точная корреляция ответа. |
+| Снимки DashBridge | `dashbridge-capture.js` | Одиночный save/copy, последовательный ZIP, throttling и восстановление карточки. |
 | Версия данных DashBridge | `dashbridge-data-migration.js` | Startup `dashbridge.js`. |
 | Import/recovery | `local-state-schema.js` | Options, Worklog, profiles. |
 | Local writes | `storage-writer.js` | Profiles, Worklog, Batch. |
@@ -223,6 +224,7 @@ dashbridge-profile-store.js
   → dashbridge.js
      ├── dashbridge-renderer.js
      ├── dashbridge-report-transport.js
+     ├── dashbridge-capture.js
      ├── dashbridge-time-state.js
      └── dashbridge-crosshair.js
   ↔ postMessage конкретного iframe

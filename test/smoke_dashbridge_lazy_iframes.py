@@ -6,6 +6,7 @@ from support.smoke import run_checks
 
 ROOT = Path(__file__).parent.parent
 src = (ROOT / 'pages/dashbridge/dashbridge.js').read_text(encoding='utf-8')
+capture = (ROOT / 'pages/dashbridge/dashbridge-capture.js').read_text(encoding='utf-8')
 renderer = (ROOT / 'pages/dashbridge/dashbridge-renderer.js').read_text(encoding='utf-8')
 html = (ROOT / 'pages/dashbridge/dashbridge.html').read_text(encoding='utf-8')
 
@@ -21,26 +22,29 @@ checks = {
     'active iframe starts during dashboard render':
         re.search(r"if \(!panel\.paused\)\s*\{\s*navigateDashboardFrame\(iframeEl, iframeEl\.dataset\.src\)", src) is not None,
     'header contains current-profile ZIP button':
-        'id="captureAllPanelsBtn"' in html and 'captureAllDashboardPanels' in src,
+        'id="captureAllPanelsBtn"' in html and 'captureAllDashboardPanels' in src
+        and 'captureAll' in capture,
     'header compact toggle shares global panel state':
         'id="capturePreparedToggleBtn"' in html and 'btn-capture-toggle' in html
         and "setDashboardCapturePrepared(!defaultCapturePrepared)" in src,
     'DashBridge page loads ZIP dependencies before controller':
-        html.index('vendor/jszip.min.js') < html.index('js/shared/archive-download.js') < html.index('dashbridge.js'),
+        html.index('vendor/jszip.min.js') < html.index('js/shared/archive-download.js')
+        < html.index('dashbridge-capture.js') < html.index('dashbridge.js'),
     'archive capture is sequential':
-        re.search(r"for \(let index = 0; index < activePanels\.length; index \+= 1\)[\s\S]+?await captureDashbridgePanel", src) is not None,
+        re.search(r"for \(let index = 0; index < activePanels\.length; index \+= 1\)[\s\S]+?await capturePanel", capture) is not None,
     'paused panels are excluded from archive':
-        'panels.filter(panel => !panel.paused)' in src,
+        'panels.filter(panel => !panel.paused)' in capture,
     'archive waits for a rendered Grafana panel':
-        'waitForDashboardPanelRendered(iframe)' in src and "dataset.dashbridgeRendered = 'true'" in src,
+        'waitForPanelRendered(iframe)' in capture and "dataset.dashbridgeRendered = 'true'" in src,
     'archive uses the same prepared capture dimensions':
-        "outputAction: 'archive'" in src
-        and 'outputWidth: getCompactCaptureDimensions().width' in src
-        and 'outputHeight: getCompactCaptureDimensions().height' in src,
+        "outputAction: 'archive'" in capture
+        and 'const dimensions = getCompactCaptureDimensions()' in capture
+        and 'outputWidth: dimensions.width' in capture
+        and 'outputHeight: dimensions.height' in capture,
     'archive is memory bounded':
-        'DashBridgeArchiveBudget.create(64 * 1024 * 1024)' in src,
+        'DashBridgeArchiveBudget.create(64 * 1024 * 1024)' in capture,
     'capture always restores its card':
-        "card.classList.remove('dashbridge-panel-capture-active')" in src and 'window.scrollTo(scroll.x, scroll.y)' in src,
+        "card.classList.remove('dashbridge-panel-capture-active')" in capture and 'window.scrollTo(scroll.x, scroll.y)' in capture,
     'dashboard still batches card DOM insertion':
         'document.createDocumentFragment()' in src and 'container.appendChild(fragment)' in src,
 }
