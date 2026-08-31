@@ -4,6 +4,7 @@ let panels = []; // Всегда синхронизирован с активн�
 let profilesLoaded = false;
 let profileStorageSyncVersion = 0;
 const DASHBRIDGE_TAB_ACTIVE_PROFILE_KEY = 'dashbridge_tab_activeProfileId';
+const { showAlert, showConfirm, showPrompt } = window.DashBridgeModal;
 
 function getTabActiveProfileId() {
     try { return sessionStorage.getItem(DASHBRIDGE_TAB_ACTIVE_PROFILE_KEY) || null; }
@@ -1534,68 +1535,6 @@ function parseQuickPanelIds(value) {
     const invalid = tokens.filter(token => !/^\d+$/.test(token) || Number(token) < 1);
     if (invalid.length) throw new Error(`Некорректные ID панелей: ${invalid.join(', ')}`);
     return [...new Set(tokens)];
-}
-
-// ════════════════════════════════════════════════════════
-//  Кастомные модалки (не блокируют выполнение, в отличие от alert/confirm/prompt)
-// ════════════════════════════════════════════════════════
-
-function showAlert(message) {
-    return new Promise((resolve) => {
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay';
-        overlay.innerHTML = '<div class="modal-content" style="max-width: 400px;"><div class="form-group" style="margin-bottom: 16px;"><p style="margin: 0; color: var(--text-main);">' + escapeHtml(message) + '</p></div><div class="modal-actions"><button class="btn btn-primary modal-ok">OK</button></div></div>';
-        document.body.appendChild(overlay);
-        overlay.style.display = 'flex';
-        const okBtn = overlay.querySelector('.modal-ok');
-        okBtn.focus();
-        const close = () => { overlay.remove(); resolve(true); };
-        okBtn.addEventListener('click', close);
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
-    });
-}
-
-function showConfirm(message) {
-    return new Promise((resolve) => {
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay';
-        overlay.innerHTML = '<div class="modal-content" style="max-width: 400px;"><div class="form-group" style="margin-bottom: 16px;"><p style="margin: 0; color: var(--text-main); white-space: pre-line;">' + escapeHtml(message) + '</p></div><div class="modal-actions"><button class="btn btn-outline modal-cancel">Отмена</button><button class="btn btn-primary modal-ok">OK</button></div></div>';
-        document.body.appendChild(overlay);
-        overlay.style.display = 'flex';
-        const okBtn = overlay.querySelector('.modal-ok');
-        const cancelBtn = overlay.querySelector('.modal-cancel');
-        okBtn.focus();
-        const onOk = () => { overlay.remove(); resolve(true); };
-        const onCancel = () => { overlay.remove(); resolve(false); };
-        okBtn.addEventListener('click', onOk);
-        cancelBtn.addEventListener('click', onCancel);
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) onCancel(); });
-    });
-}
-
-function showPrompt(message, defaultValue) {
-    if (defaultValue === undefined) defaultValue = '';
-    return new Promise((resolve) => {
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay';
-        overlay.innerHTML = '<div class="modal-content" style="max-width: 400px;"><div class="form-group" style="margin-bottom: 16px;"><label style="display: block; margin-bottom: 8px; color: var(--text-main);">' + escapeHtml(message) + '</label><input type="text" class="form-input modal-input" value="' + escapeHtml(defaultValue) + '" style="width: 100%;"></div><div class="modal-actions"><button class="btn btn-outline modal-cancel">Отмена</button><button class="btn btn-primary modal-ok">OK</button></div></div>';
-        document.body.appendChild(overlay);
-        overlay.style.display = 'flex';
-        const input = overlay.querySelector('.modal-input');
-        const okBtn = overlay.querySelector('.modal-ok');
-        const cancelBtn = overlay.querySelector('.modal-cancel');
-        input.focus();
-        input.select();
-        const onOk = () => { const v = input.value; overlay.remove(); resolve(v); };
-        const onCancel = () => { overlay.remove(); resolve(null); };
-        okBtn.addEventListener('click', onOk);
-        cancelBtn.addEventListener('click', onCancel);
-        input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') onOk();
-            else if (e.key === 'Escape') onCancel();
-        });
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) onCancel(); });
-    });
 }
 
 // ════════════════════════════════════════════════════════

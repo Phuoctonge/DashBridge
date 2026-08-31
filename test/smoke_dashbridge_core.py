@@ -6,7 +6,7 @@
 2. card.draggable сбрасывается после mouseup, не отменяя drag при mouseleave
 3. window.open использует noopener,noreferrer
 4. panel.src экранируется через escapeHtml
-5. showAlert/showConfirm/showPrompt существуют и возвращают Promise
+5. showAlert/showConfirm/showPrompt принадлежат отдельному модулю и возвращают Promise
 6. Все нативные alert/confirm/prompt заменены на кастомные
 """
 
@@ -16,6 +16,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
 DASHBRIDGE_JS = ROOT / "pages/dashbridge/dashbridge.js"
+DASHBRIDGE_MODAL_JS = ROOT / "pages/dashbridge/dashbridge-modal.js"
+DASHBRIDGE_HTML = ROOT / "pages/dashbridge/dashbridge.html"
 
 passed = 0
 failed = 0
@@ -42,6 +44,8 @@ print("=" * 70)
 
 content = read_file()
 renderer = (ROOT / "pages/dashbridge/dashbridge-renderer.js").read_text(encoding="utf-8")
+modal_content = DASHBRIDGE_MODAL_JS.read_text(encoding="utf-8")
+dashbridge_html = DASHBRIDGE_HTML.read_text(encoding="utf-8")
 
 # ════════════════════════════════════════════════════════
 # 1.1. setupTimeControls вызывается только один раз
@@ -164,7 +168,7 @@ print("\n--- 1.5. Кастомные модалки ---")
 # showAlert должен существовать
 show_alert_def = re.search(
     r"function\s+showAlert\s*\([^)]*\)\s*\{[^}]*return\s+new\s+Promise",
-    content,
+    modal_content,
     re.DOTALL
 )
 test(
@@ -175,7 +179,7 @@ test(
 # showConfirm должен существовать
 show_confirm_def = re.search(
     r"function\s+showConfirm\s*\([^)]*\)\s*\{[^}]*return\s+new\s+Promise",
-    content,
+    modal_content,
     re.DOTALL
 )
 test(
@@ -183,17 +187,16 @@ test(
     show_confirm_def is not None
 )
 
-# Созданные модальные окна по умолчанию скрыты в CSS, поэтому каждая из трёх
-# функций должна явно показать свой экземпляр после добавления в DOM.
+# Общий конструктор обязан явно показывать новый экземпляр после добавления в DOM.
 test(
     "Кастомные модальные окна становятся видимыми",
-    content.count("overlay.style.display = 'flex';") >= 3
+    "overlay.style.display = 'flex';" in modal_content
 )
 
 # showPrompt должен существовать
 show_prompt_def = re.search(
     r"function\s+showPrompt\s*\([^)]*\)\s*\{[^}]*return\s+new\s+Promise",
-    content,
+    modal_content,
     re.DOTALL
 )
 test(
@@ -202,7 +205,7 @@ test(
 )
 
 # Не должно быть нативных alert(
-native_alert = re.findall(r"(?<![\w.])alert\(", content)
+native_alert = re.findall(r"(?<![\w.])alert\(", content + modal_content)
 test(
     "Нет нативных alert()",
     len(native_alert) == 0,
@@ -210,7 +213,7 @@ test(
 )
 
 # Не должно быть нативных confirm(
-native_confirm = re.findall(r"(?<![\w.])confirm\(", content)
+native_confirm = re.findall(r"(?<![\w.])confirm\(", content + modal_content)
 test(
     "Нет нативных confirm()",
     len(native_confirm) == 0,
@@ -218,11 +221,25 @@ test(
 )
 
 # Не должно быть нативных prompt(
-native_prompt = re.findall(r"(?<![\w.])prompt\(", content)
+native_prompt = re.findall(r"(?<![\w.])prompt\(", content + modal_content)
 test(
     "Нет нативных prompt()",
     len(native_prompt) == 0,
     f"найдено {len(native_prompt)}"
+)
+
+test(
+    "Модальный модуль загружается до основного контроллера",
+    dashbridge_html.find('src="dashbridge-modal.js"')
+    < dashbridge_html.find('src="dashbridge.js"')
+)
+
+test(
+    "Основной контроллер использует единый модальный API",
+    "const { showAlert, showConfirm, showPrompt } = window.DashBridgeModal;" in content
+    and "function showAlert(" not in content
+    and "function showConfirm(" not in content
+    and "function showPrompt(" not in content
 )
 
 # deleteProfile должен быть async

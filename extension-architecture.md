@@ -160,6 +160,7 @@ grafana-panel-tools.js
 | URL/dashboard API | `grafana-url.js`, `grafana-dashboard-api.js` | Batch. |
 | Batch presets | `grafana-batch-panel-rules.js` | Batch. |
 | Profiles | `dashbridge-profile-store.js` | `dashbridge.js`. |
+| Неблокирующие модальные диалоги DashBridge | `dashbridge-modal.js` | Профили, импорт/экспорт, настройки и capture в `dashbridge.js`. |
 | Transport сводного отчёта | `dashbridge-report-transport.js` | Ожидание iframe, request ID, timeout/abort и точная корреляция ответа. |
 | Версия данных DashBridge | `dashbridge-data-migration.js` | Startup `dashbridge.js`. |
 | Import/recovery | `local-state-schema.js` | Options, Worklog, profiles. |
