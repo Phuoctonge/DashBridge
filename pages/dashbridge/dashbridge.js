@@ -205,9 +205,6 @@ const panelLegendWaiters = new Map();
 const panelThresholdWaiters = new Map();
 const panelThresholdStates = new Map();
 const panelTitleWaiters = new Map();
-let activeReportPreview = null;
-const DASHBRIDGE_REPORT_FRAME_TIMEOUT_MS = 90_000;
-const DASHBRIDGE_REPORT_TOTAL_TIMEOUT_MS = 125_000;
 
 function requestPanelTitle(panel, iframe) {
     if (!panel || !iframe) return Promise.resolve('');
@@ -390,174 +387,22 @@ async function openPanelTools(panel, iframe) {
     });
 }
 
-function getEffectivePanelSla(panel) {
-    const config = DashBridgeReport.normalizePanel(panel.report, panel);
-    if (config.sla.source === 'graph') {
-        if (!panel.tools?.thresholdEnabled) return { error: 'Порог на графике выключен.' };
-        return { source: 'graph', operator: 'gt', evaluation: config.sla.evaluation,
-            value: panel.tools.thresholdValue, rawValue: panel.tools.thresholdRawValue,
-            warningValue: config.sla.warningValue, unit: panel.tools.thresholdUnit || '' };
-    }
-    if (config.sla.source === 'cpu_capacity') {
-        if (!panel.tools?.cpuCapacityFilterEnabled) return { error: 'Фильтр Load Average по vCPU выключен.' };
-        const coefficient = Number(panel.tools.cpuCapacityFilterCoefficient ?? 0.8);
-        if (!Number.isFinite(coefficient) || coefficient <= 0) return { error: 'Некорректный коэффициент фильтра Load Average по vCPU.' };
-        return { source: 'cpu_capacity', operator: 'gt', coefficient,
-            evaluation: panel.tools.cpuCapacityFilterMode === 'last' ? 'latest' : 'period_max', unit: '' };
-    }
-    return { ...config.sla };
-}
-
-const dashBridgeReportTransport = DashBridgeReportTransport.create({
-    forceLoadPanel,
-    getEffectivePanelSla,
-    postToDashboardFrame,
-    frameTimeoutMs: DASHBRIDGE_REPORT_FRAME_TIMEOUT_MS,
-    totalTimeoutMs: DASHBRIDGE_REPORT_TOTAL_TIMEOUT_MS
-});
-
-function reportAbortError() {
-    return dashBridgeReportTransport.abortError();
-}
-
-function throwIfReportAborted(signal) {
-    dashBridgeReportTransport.throwIfAborted(signal);
-}
-
-function waitForDashboardIframeReady(iframe, timeoutMs = DASHBRIDGE_REPORT_FRAME_TIMEOUT_MS, signal = null) {
-    return dashBridgeReportTransport.waitForIframeReady(iframe, timeoutMs, signal);
-}
-
-async function requestPanelReportSnapshot(panel, signal = null) {
-    return dashBridgeReportTransport.requestPanelSnapshot(panel, signal);
-}
-
-function setDashboardPanelDataStatus(panel, snapshot) {
-    const card = document.querySelector(`.panel-card[data-panel-id="${CSS.escape(panel.id)}"]`);
-    const wrapper = card?.querySelector('.iframe-wrapper');
-    if (!wrapper) return;
-    wrapper.querySelector('.dashbridge-panel-data-status')?.remove();
-    const parentKinds = new Set(['timeout', 'iframe_unavailable', 'request_error', 'configuration_error']);
-    const kind = String(snapshot?.dataStatus || '');
-    const message = String(snapshot?.dataStatusText || snapshot?.error || '').trim();
-    if (!parentKinds.has(kind) || !message) return;
-    const status = document.createElement('div');
-    status.className = 'dashbridge-panel-data-status';
-    status.dataset.kind = kind;
-    status.setAttribute('role', 'alert');
-    status.textContent = message;
-    wrapper.appendChild(status);
-}
-
-async function collectProfileReport(signal = null, onProgress = () => {}, { requirePanels = true } = {}) {
-    throwIfReportAborted(signal);
-    const profile = getActiveProfile();
-    const reportPanels = panels.filter(panel => DashBridgeReport.normalizePanel(panel.report, panel).enabled);
-    if (requirePanels && !reportPanels.length) throw new Error('В настройках сообщения не выбрана ни одна панель.');
-    onProgress(`Получаем данные панелей: ${reportPanels.length}…`);
-    reportPanels.forEach(panel => setDashboardPanelDataStatus(panel, null));
-    let completedPanels = 0;
-    const snapshots = await Promise.all(reportPanels.map(async panel => {
-        throwIfReportAborted(signal);
-        const snapshot = await requestPanelReportSnapshot(panel, signal);
-        completedPanels += 1;
-        setDashboardPanelDataStatus(panel, snapshot);
-        onProgress(`Получаем данные панелей: ${completedPanels} из ${reportPanels.length}…`);
-        return snapshot;
-    }));
-    throwIfReportAborted(signal);
-    const context = {
-        period: document.getElementById('timePickerLabel')?.textContent?.trim() || `${globalTimeFrom} — ${globalTimeTo}`,
-        generatedAt: new Date().toLocaleString('ru-RU')
-    };
-    const profileContext = DashBridgeReport.normalizeProfile(profile.report).context;
-    Object.assign(context, profileContext, {
-        testDuration: DashBridgeReport.formatDuration(profileContext.testStartedAt),
-        stableLoadDuration: DashBridgeReport.formatDuration(profileContext.stableLoadStartedAt)
-    });
-    const panelResults = reportPanels.map((panel, index) => {
-        const rendered = DashBridgeReport.renderPanel(panel, snapshots[index], context);
-        return { ...rendered, key: DashBridgeReport.normalizePanel(panel.report, panel).key, panel, snapshot: snapshots[index] };
-    });
-    const problems = panelResults.filter(item => ['unavailable', 'timeout', 'no_data', 'error', 'configuration_error'].includes(item.snapshot?.state));
-    const output = DashBridgeReport.compose(profile, panelResults, context);
-    return { profile, reportPanels, snapshots, context, panelResults, problems, output };
-}
-
-const dashBridgeReportTestRunner = DashBridgeReportTestRunner.create({
+const dashBridgeReportController = DashBridgeReportController.create({
     reportEngine: DashBridgeReport,
+    transportFactory: DashBridgeReportTransport,
+    testRunnerFactory: DashBridgeReportTestRunner,
     auditEngine: DashBridgeReportAudit,
-    collect: (signal, onProgress) => collectProfileReport(signal, onProgress, { requirePanels: false })
+    forceLoadPanel,
+    postToDashboardFrame,
+    getPanels: () => panels,
+    getActiveProfile,
+    getTimeContext: () => ({ from: globalTimeFrom, to: globalTimeTo }),
 });
-
-async function generateProfileReport(output, status, warnings, signal = null) {
-    const collected = await collectProfileReport(signal, message => {
-        if (status.isConnected) status.textContent = message;
-    });
-    const { reportPanels, problems } = collected;
-    warnings.textContent = problems.map(item => `${item.panel.title || 'Панель'}: ${item.snapshot.error || 'данные недоступны'}`).join('\n');
-    warnings.hidden = !problems.length;
-    output.value = collected.output;
-    status.textContent = `Готово. Обработано панелей: ${reportPanels.length}; предупреждений: ${problems.length}.`;
-}
-
-function openReportPreview() {
-    if (activeReportPreview?.isConnected) {
-        activeReportPreview.querySelector('.report-close')?.focus();
-        return;
-    }
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay report-preview-overlay';
-    overlay.innerHTML = `<section class="modal-content report-preview-modal" role="dialog" aria-modal="true">
-        <div class="report-preview-header"><h3>Сводное сообщение</h3><button type="button" class="btn btn-outline report-close">Закрыть</button></div>
-        <div class="report-preview-status" role="status">Подготовка…</div>
-        <div class="report-preview-warnings" hidden></div>
-        <textarea class="report-preview-output" aria-label="Сформированное сообщение"></textarea>
-        <div class="modal-actions"><button type="button" class="btn btn-outline report-regenerate">Обновить данные</button><button type="button" class="btn btn-primary report-copy">Скопировать</button></div>
-    </section>`;
-    document.body.appendChild(overlay); overlay.style.display = 'flex';
-    activeReportPreview = overlay;
-    const output = overlay.querySelector('.report-preview-output');
-    const status = overlay.querySelector('.report-preview-status');
-    const warnings = overlay.querySelector('.report-preview-warnings');
-    const regenerate = overlay.querySelector('.report-regenerate');
-    let running = false;
-    let runController = null;
-    const run = async () => {
-        if (running) return;
-        running = true;
-        runController = new AbortController();
-        const controller = runController;
-        regenerate.disabled = true;
-        warnings.hidden = true;
-        warnings.textContent = '';
-        try { await generateProfileReport(output, status, warnings, controller.signal); }
-        catch (error) {
-            if (error?.name !== 'AbortError' && status.isConnected) status.textContent = error.message || String(error);
-        }
-        finally {
-            if (runController === controller) {
-                runController = null;
-                running = false;
-                if (regenerate.isConnected) regenerate.disabled = false;
-            }
-        }
-    };
-    const close = () => {
-        runController?.abort();
-        if (activeReportPreview === overlay) activeReportPreview = null;
-        overlay.remove();
-    };
-    overlay.querySelector('.report-close').addEventListener('click', close);
-    overlay.addEventListener('click', event => { if (event.target === overlay) close(); });
-    regenerate.addEventListener('click', run);
-    overlay.querySelector('.report-copy').addEventListener('click', async event => {
-        try { await navigator.clipboard.writeText(output.value); event.currentTarget.textContent = 'Скопировано'; }
-        catch { event.currentTarget.textContent = 'Ошибка копирования'; }
-        setTimeout(() => { if (event.currentTarget.isConnected) event.currentTarget.textContent = 'Скопировать'; }, 1800);
-    });
-    void run();
-}
+const dashBridgeReportTransport = dashBridgeReportController.transport;
+const dashBridgeReportTestRunner = dashBridgeReportController.testRunner;
+const collectProfileReport = dashBridgeReportController.collect;
+const openReportPreview = dashBridgeReportController.openPreview;
+const setDashboardPanelDataStatus = dashBridgeReportController.setPanelDataStatus;
 
 let activeDashboardPanelAnalysis = null;
 

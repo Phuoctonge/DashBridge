@@ -5,7 +5,9 @@ const path = require('path');
 
 const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
 const html = read('pages/dashbridge/dashbridge.html');
-const dashboard = read('pages/dashbridge/dashbridge.js');
+const dashboardPage = read('pages/dashbridge/dashbridge.js');
+const reportController = read('pages/dashbridge/dashbridge-report-controller.js');
+const dashboard = `${dashboardPage}\n${reportController}`;
 const profileController = read('pages/dashbridge/dashbridge-profile-controller.js');
 const frameController = read('pages/dashbridge/dashbridge-frame-controller.js');
 const reportUi = read('pages/dashbridge/dashbridge-report-ui.js');
@@ -29,10 +31,11 @@ assert(html.indexOf('js/shared/dashbridge-report.js') < html.indexOf('dashbridge
 assert(html.indexOf('dashbridge-report-transport.js') < html.indexOf('dashbridge.js'),
     'report transport must load before the dashboard controller');
 assert(html.indexOf('dashbridge-report-audit.js') < html.indexOf('dashbridge-report-test-runner.js')
-    && html.indexOf('dashbridge-report-test-runner.js') < html.indexOf('dashbridge.js')
-    && dashboard.includes('DashBridgeReportTestRunner.create({')
+    && html.indexOf('dashbridge-report-test-runner.js') < html.indexOf('dashbridge-report-controller.js')
+    && html.indexOf('dashbridge-report-controller.js') < html.indexOf('dashbridge.js')
+    && reportController.includes('testRunnerFactory.create({')
     && dashboard.includes('auditEngine: DashBridgeReportAudit')
-    && dashboard.includes('collect: (signal, onProgress) => collectProfileReport(signal, onProgress, { requirePanels: false })')
+    && reportController.includes('collect: (signal, onProgress) => collect(signal, onProgress, { requirePanels: false })')
     && dashboard.includes("document.getElementById('testReportBtn').addEventListener('click'")
     && reportAudit.includes('runEngineSelfCheck')
     && reportTestRunner.includes("result(id, name, 'fixture'")
@@ -101,20 +104,20 @@ assert(reportRequestSource.includes("iframe.dataset.dashbridgeLoaded === 'true'"
     && !reportRequestSource.includes('removalPoll = setInterval(inspect, 500);')
     && reportTransport.includes("iframe.closest?.('.panel-card')?.parentElement")
     && !reportRequestSource.includes('documentObserver')
-    && dashboard.includes('frameTimeoutMs: DASHBRIDGE_REPORT_FRAME_TIMEOUT_MS')
-    && dashboard.includes('totalTimeoutMs: DASHBRIDGE_REPORT_TOTAL_TIMEOUT_MS')
+    && reportController.includes('frameTimeoutMs: FRAME_TIMEOUT_MS')
+    && reportController.includes('totalTimeoutMs: TOTAL_TIMEOUT_MS')
     && reportRequestSource.includes('timeoutMs: responseTimeoutMs'),
     'report collection must allow slow Grafana iframes while retaining bounded failure results');
 assert(reportRequestSource.includes("action: 'cancelPanelReportSnapshot'")
     && reportRequestSource.includes("signal?.addEventListener('abort', abort, { once: true })")
-    && dashboard.includes('Promise.all(reportPanels.map(async panel =>')
+    && reportController.includes('Promise.all(reportPanels.map(async panel =>')
     && !dashboard.includes('Math.min(2, reportPanels.length)')
-    && dashboard.includes('runController?.abort()')
+    && reportController.includes('runController?.abort()')
     && tools.includes("event.data?.action === 'cancelPanelReportSnapshot'")
     && tools.includes('panelReportSnapshotCancellers.delete(requestId)'),
     'closing a report must release all waiters while panels share one parallel timeout window');
-assert(dashboard.includes('function setDashboardPanelDataStatus(panel, snapshot)')
-    && dashboard.includes("new Set(['timeout', 'iframe_unavailable', 'request_error', 'configuration_error'])")
+assert(reportController.includes('const setPanelDataStatus = (panel, snapshot) =>')
+    && reportController.includes("new Set(['timeout', 'iframe_unavailable', 'request_error', 'configuration_error'])")
     && css.includes('.dashbridge-panel-data-status'),
     'dashboard cards must show failures that happen outside the Grafana iframe');
 assert(reportUi.includes('report-test-header') && reportUi.includes('{{stableLoadDuration}}')
