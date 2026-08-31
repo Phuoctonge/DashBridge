@@ -18,6 +18,7 @@ ROOT = Path(__file__).parent.parent
 DASHBRIDGE_JS = ROOT / "pages/dashbridge/dashbridge.js"
 DASHBRIDGE_MODAL_JS = ROOT / "pages/dashbridge/dashbridge-modal.js"
 DASHBRIDGE_PANEL_URL_JS = ROOT / "pages/dashbridge/dashbridge-panel-url.js"
+DASHBRIDGE_PANEL_TRANSFER_JS = ROOT / "pages/dashbridge/dashbridge-panel-transfer.js"
 DASHBRIDGE_HTML = ROOT / "pages/dashbridge/dashbridge.html"
 
 passed = 0
@@ -47,6 +48,7 @@ content = read_file()
 renderer = (ROOT / "pages/dashbridge/dashbridge-renderer.js").read_text(encoding="utf-8")
 modal_content = DASHBRIDGE_MODAL_JS.read_text(encoding="utf-8")
 panel_url_content = DASHBRIDGE_PANEL_URL_JS.read_text(encoding="utf-8")
+panel_transfer_content = DASHBRIDGE_PANEL_TRANSFER_JS.read_text(encoding="utf-8")
 dashbridge_html = DASHBRIDGE_HTML.read_text(encoding="utf-8")
 
 # ════════════════════════════════════════════════════════
@@ -287,15 +289,15 @@ test(
 test(
     "Экспорт профиля сохраняет полный объект панели",
     "panels: panels.map(p => ({ src: p.src, width: p.width, height: p.height }))" not in content
-    and "version: 2" in content
-    and "panels\n" in content
+    and "version: 3" in panel_transfer_content
+    and "panels," in panel_transfer_content
 )
 
 test(
     "Импорт профиля сохраняет настройки и нормализует полный объект",
-    "const candidate = {" in content
-    and "...source," in content
-    and "DashBridgeLocalStateSchema.normalizeProfiles" in content
+    "const candidate = {" in panel_transfer_content
+    and "...source," in panel_transfer_content
+    and "DashBridgeLocalStateSchema.normalizeProfiles" in panel_transfer_content
 )
 
 test(

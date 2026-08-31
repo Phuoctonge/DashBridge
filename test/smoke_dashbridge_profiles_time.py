@@ -6,6 +6,7 @@ from support.smoke import run_checks
 ROOT = Path(__file__).resolve().parent.parent
 JS = (ROOT / "pages/dashbridge/dashbridge.js").read_text(encoding="utf-8")
 PANEL_URL = (ROOT / "pages/dashbridge/dashbridge-panel-url.js").read_text(encoding="utf-8")
+PANEL_TRANSFER = (ROOT / "pages/dashbridge/dashbridge-panel-transfer.js").read_text(encoding="utf-8")
 PROFILE_STORE = (ROOT / "js/shared/dashbridge-profile-store.js").read_text(encoding="utf-8")
 TIME_STATE = (ROOT / "pages/dashbridge/dashbridge-time-state.js").read_text(encoding="utf-8")
 MIGRATION = (ROOT / "pages/dashbridge/dashbridge-data-migration.js").read_text(encoding="utf-8")
@@ -24,7 +25,7 @@ checks = {
     "profile switch saves current panels": "function switchProfile(id)" in JS and "savePanels();" in JS,
     "profile CRUD entry points exist": all(token in JS for token in ["function createProfile", "function renameActiveProfile", "async function deleteProfile"]),
     "panel export uses a JSON blob": "new Blob([JSON.stringify(data, null, 2)]" in JS,
-    "panel import validates JSON before use": "JSON.parse(e.target.result)" in JS and "Array.isArray(data.panels)" in JS,
+    "panel import validates JSON before use": "JSON.parse(text)" in PANEL_TRANSFER and "Array.isArray(data?.panels)" in PANEL_TRANSFER,
     "time range updates unloaded and loaded frames": "iframe.dataset.src" in JS and "postToDashboardFrame(iframe" in JS,
     "time state belongs to each profile": "profile.timeState = { from: globalTimeFrom, to: globalTimeTo, refresh: globalRefresh }" in JS
         and "loadActiveProfileTimeState();" in JS,

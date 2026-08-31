@@ -12,6 +12,12 @@ const {
     getProfilePanelIdentity,
     parseQuickPanelIds,
 } = window.DashBridgePanelUrl;
+const {
+    INVALID_PANELS_CODE,
+    createPanelExportPayload,
+    buildPanelExportFileName,
+    parsePanelImportText,
+} = window.DashBridgePanelTransfer;
 
 function getTabActiveProfileId() {
     try { return sessionStorage.getItem(DASHBRIDGE_TAB_ACTIVE_PROFILE_KEY) || null; }
@@ -2014,22 +2020,13 @@ function toggleFullscreen(id) {
 async function exportPanels() {
     if (panels.length === 0) { await showAlert('Нет панелей для экспорта.'); return; }
     const profile = getActiveProfile();
-    const data = {
-        version: 3,
-        profileName: profile ? profile.name : 'Default',
-        timeState: DashBridgeTimeState.normalize(profile?.timeState),
-        report: DashBridgeReport.normalizeProfile(profile?.report),
-        exportedAt: new Date().toISOString(),
-        // JSON serialization creates the export snapshot. Keep the complete
-        // panel contract: tools, theme, pause state and forward-compatible data.
-        panels
-    };
+    const exportedAt = new Date().toISOString();
+    const data = createPanelExportPayload({ profile, panels, exportedAt });
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    const safeName = (profile?.name || 'panels').replace(/[^a-zа-яё0-9]/gi, '_').toLowerCase();
-    a.download = `dashbridge_${safeName}_${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = buildPanelExportFileName(profile?.name, exportedAt);
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -2040,33 +2037,19 @@ async function importPanels(file) {
     const reader = new FileReader();
     reader.onload = async (e) => {
         try {
-            const data = JSON.parse(e.target.result);
-            if (!data.panels || !Array.isArray(data.panels)) {
-                await showAlert('Неверный формат файла: ожидается поле panels[]');
-                return;
-            }
-            const profileName = String(data.profileName || file.name.replace('.json', '')).trim().slice(0, 120) || 'Imported';
-            const importedTimeState = DashBridgeTimeState.normalize(data.timeState);
-            const importedReport = DashBridgeReport.normalizeProfile(data.report);
-            const importedPanels = [];
-            for (const source of data.panels) {
-                if (!source || typeof source !== 'object' || typeof source.src !== 'string' || !isSupportedPanelUrl(source.src)) continue;
-                const height = Number.parseInt(source.height, 10);
-                const candidate = {
-                    ...source,
-                    id: crypto.randomUUID(),
-                    width: ['33%', '50%', '100%'].includes(source.width) ? source.width : '50%',
-                    height: Number.isFinite(height) ? `${Math.min(3000, Math.max(180, height))}px` : '350px'
-                };
-                try {
-                    const normalized = DashBridgeLocalStateSchema.normalizeProfiles([{
-                        id: crypto.randomUUID(), name: profileName, panels: [candidate]
-                    }]).items[0]?.panels[0];
-                    if (normalized) importedPanels.push(normalized);
-                } catch (error) {
-                    console.warn('Пропущена некорректная импортируемая панель:', error);
-                }
-            }
+            const imported = parsePanelImportText(e.target.result, {
+                fallbackProfileName: file.name,
+                randomUUID: () => crypto.randomUUID(),
+            });
+            imported.warnings.forEach(error => {
+                console.warn('Пропущена некорректная импортируемая панель:', error);
+            });
+            const {
+                profileName,
+                timeState: importedTimeState,
+                report: importedReport,
+                panels: importedPanels,
+            } = imported;
             if (importedPanels.length === 0) { await showAlert('В файле нет панелей с корректными настройками и URL.'); return; }
 
             const choice = await showConfirm(
@@ -2079,12 +2062,12 @@ async function importPanels(file) {
                 // Заменяем панели активного профиля
                 panels = importedPanels;
                 const activeProfile = getActiveProfile();
-                if (activeProfile && data.timeState && typeof data.timeState === 'object') {
+                if (activeProfile && imported.hasTimeState) {
                     activeProfile.timeState = importedTimeState;
                     loadActiveProfileTimeState();
                     syncTimeControlsFromState();
                 }
-                if (activeProfile && data.report && typeof data.report === 'object') activeProfile.report = importedReport;
+                if (activeProfile && imported.hasReport) activeProfile.report = importedReport;
                 savePanels();
                 renderDashboard();
             } else {
@@ -2105,6 +2088,10 @@ async function importPanels(file) {
                 renderDashboard();
             }
         } catch (err) {
+            if (err?.code === INVALID_PANELS_CODE) {
+                await showAlert(err.message);
+                return;
+            }
             await showAlert('Ошибка чтения файла: ' + err.message);
         }
     };
