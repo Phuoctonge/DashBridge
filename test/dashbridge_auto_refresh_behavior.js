@@ -8,6 +8,7 @@ const timeSource = fs.readFileSync('pages/dashbridge/dashbridge-time-controller.
 const profileSource = fs.readFileSync('pages/dashbridge/dashbridge-profile-controller.js', 'utf8');
 const frameSource = fs.readFileSync('pages/dashbridge/dashbridge-frame-controller.js', 'utf8');
 const analysisSource = fs.readFileSync('pages/dashbridge/dashbridge-panel-analysis-controller.js', 'utf8');
+const panelToolsSource = fs.readFileSync('pages/dashbridge/dashbridge-panel-tools-controller.js', 'utf8');
 const iframeSource = fs.readFileSync('js/content/grafana-iframe.js', 'utf8');
 const html = fs.readFileSync('pages/dashbridge/dashbridge.html', 'utf8');
 const css = fs.readFileSync('pages/dashbridge/dashbridge.css', 'utf8');
@@ -22,12 +23,12 @@ assert(initStart >= 0 && initEnd > initStart
     && initSource.includes("'grafanaCompactScreenshot'"),
     'profile, settings and iframe-rule IPC must run in parallel before the first dashboard render');
 
-const applyToolsStart = source.indexOf('function applyPanelTools(panel, iframe)');
-const applyToolsEnd = source.indexOf('const panelLegendWaiters', applyToolsStart);
-const applyToolsSource = source.slice(applyToolsStart, applyToolsEnd);
+const applyToolsStart = panelToolsSource.indexOf('const apply = (panel, iframe)');
+const applyToolsEnd = panelToolsSource.indexOf('const requestTitle', applyToolsStart);
+const applyToolsSource = panelToolsSource.slice(applyToolsStart, applyToolsEnd);
 assert(applyToolsStart >= 0 && applyToolsEnd > applyToolsStart
-    && applyToolsSource.includes('transformSettings: grafanaTransformSettings')
-    && !applyToolsSource.includes('chrome.storage.sync.get'),
+    && applyToolsSource.includes('transformSettings: getTransformSettings()')
+    && !applyToolsSource.includes('settingsStorage.get'),
     'every ready iframe must reuse the settings cache instead of repeating sync-storage IPC');
 
 assert(frameSource.includes('iframe.dataset.dashbridgeOrigin !== targetOrigin')

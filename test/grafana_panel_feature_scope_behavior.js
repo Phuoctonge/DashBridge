@@ -43,7 +43,8 @@ assert(!other.includes('name="invertIdle"')
 
 const optionsHtml = fs.readFileSync('pages/options/options.html', 'utf8');
 const optionsSource = fs.readFileSync('pages/options/options.js', 'utf8');
-const dashboardSource = fs.readFileSync('pages/dashbridge/dashbridge.js', 'utf8');
+const dashboardSource = fs.readFileSync('pages/dashbridge/dashbridge.js', 'utf8')
+    + fs.readFileSync('pages/dashbridge/dashbridge-panel-tools-controller.js', 'utf8');
 const iframeSource = fs.readFileSync('js/content/grafana-iframe.js', 'utf8');
 const panelToolsSource = fs.readFileSync('js/content/grafana-panel-tools.js', 'utf8');
 ['settingGrafanaCpuPanelTitle', 'settingGrafanaMemPanelTitle', 'settingGrafanaLoadPanelTitle'].forEach(id => {

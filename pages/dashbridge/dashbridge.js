@@ -2,6 +2,7 @@ let profiles = [];
 let activeProfileId = null;
 let panels = []; // Всегда синхронизирован с активным профилем
 let dashBridgeTimeController = null;
+let dashBridgePanelToolsController = null;
 
 function loadActiveProfileTimeState() {
     return dashBridgeTimeController.loadProfileState();
@@ -9,6 +10,18 @@ function loadActiveProfileTimeState() {
 
 function syncTimeControlsFromState() {
     return dashBridgeTimeController.syncControls();
+}
+
+function getPanelTools(panel) {
+    return dashBridgePanelToolsController.normalizeTools(panel);
+}
+
+function applyPanelTools(panel, iframe) {
+    return dashBridgePanelToolsController.apply(panel, iframe);
+}
+
+function openPanelTools(panel, iframe) {
+    return dashBridgePanelToolsController.open(panel, iframe);
 }
 const { showAlert, showConfirm, showPrompt } = window.DashBridgeModal;
 const {
@@ -118,6 +131,23 @@ let dragDropSide = null;
 let fullscreenPanelId = null;
 let defaultCapturePrepared = false;
 
+dashBridgePanelToolsController = DashBridgePanelToolsController.create({
+    postToDashboardFrame,
+    getCapturePrepared: () => defaultCapturePrepared,
+    getTransformSettings: () => grafanaTransformSettings,
+    getDefaultCpuCapacityCoefficient: () => grafanaTransformSettings.grafanaCpuCapacityCoefficient,
+    normalizePanelMetadataText,
+    savePanels,
+    forceLoadPanel,
+    refreshPanel,
+    settingsStorage: chrome.storage.sync,
+    getSettingsKeys: getGrafanaSettingsStorageKeys,
+    normalizeSettings: normalizeGrafanaSettings,
+    panelAnalysis: window.DashBridgeGrafanaPanelAnalysis,
+    settingsModal: window.DashBridgePanelSettingsModal,
+    escapeHtml,
+});
+
 // --- SVG-иконки ---
 const SVG_GRIP = `<svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" aria-hidden="true">
   <circle cx="2" cy="2"  r="1.4"/><circle cx="8" cy="2"  r="1.4"/>
@@ -172,254 +202,6 @@ const SVG_CAPTURE_COPY = `<svg width="19" height="19" viewBox="0 0 24 24" fill="
 const SVG_MORE = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>`;
 const SVG_ANALYSIS = `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V9M10 19V5M16 19v-7M3 19h18"/><circle cx="19" cy="6" r="2.5"/></svg>`;
 const SVG_REPORT = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v14H4z"/><path d="m4 7 8 6 8-6"/></svg>`;
-
-function getPanelTools(panel) {
-    const saved = panel.tools || {};
-    const isMemoryPanel = /\b(?:memory|ram)\b|памят/i.test(String(panel.title || ''));
-    // Previous visual-filter settings are deliberately ignored. Only the
-    // response-level filter is retained in the current panel schema.
-    const hasResponseSeriesFilter = saved.seriesFilterSettingsVersion === 2;
-    // The removed click-toggle mode is not migrated. Its transient native
-    // visibility state was unreliable after Grafana refreshes, so old legend
-    // selections are deliberately ignored instead of becoming data filters.
-    const keepCompleteHideSelection = saved.legendMode === 'fast_complete_hide';
-    return {
-        removeFill: !!saved.removeFill,
-        thickenLines: !!saved.thickenLines,
-        thickenLinesValue: saved.thickenLinesValue !== undefined ? Number(saved.thickenLinesValue) : 1.5,
-        invertLegend: !!saved.invertLegend,
-        capturePrepared: defaultCapturePrepared,
-        legendFilter: keepCompleteHideSelection && Array.isArray(saved.legendFilter) ? saved.legendFilter : [],
-        legendSelectionVersion: keepCompleteHideSelection && Number(saved.legendSelectionVersion) === 2 ? 2 : null,
-        legendVisibleSeries: keepCompleteHideSelection && Array.isArray(saved.legendVisibleSeries) ? saved.legendVisibleSeries : [],
-        legendSelectFilter: keepCompleteHideSelection && typeof saved.legendSelectFilter === 'string' ? saved.legendSelectFilter : '',
-        legendIgnoreFilter: keepCompleteHideSelection && typeof saved.legendIgnoreFilter === 'string' ? saved.legendIgnoreFilter : '',
-        legendMode: 'fast_complete_hide',
-        invertIdle: !!saved.invertIdle,
-        convertMemToUsed: !!saved.convertMemToUsed,
-        // Existing profiles may already have convertMemToUsed=false while a
-        // stale percent formatter is painted. Memory-titled panels opt into
-        // the byte-unit repair during migration as well.
-        forceMemByteUnit: !!saved.forceMemByteUnit || (!saved.convertMemToUsed && isMemoryPanel),
-        seriesQueryFilterEnabled: hasResponseSeriesFilter && !!saved.seriesQueryFilterEnabled && !saved.cpuCapacityFilterEnabled,
-        seriesQueryFilterHighlightEnabled: saved.seriesQueryFilterHighlightEnabled !== false,
-        seriesQueryFilterValue: Number.isFinite(Number(saved.seriesQueryFilterValue)) ? Number(saved.seriesQueryFilterValue) : 0,
-        seriesQueryFilterRawValue: Number.isFinite(Number(saved.seriesQueryFilterRawValue)) && saved.seriesQueryFilterRawValue !== null && saved.seriesQueryFilterRawValue !== ''
-            ? Number(saved.seriesQueryFilterRawValue)
-            : null,
-        seriesQueryFilterMode: saved.seriesQueryFilterMode === 'last' ? 'last' : 'max',
-        cpuCapacityFilterEnabled: !!saved.cpuCapacityFilterEnabled,
-        cpuCapacityFilterHighlightEnabled: saved.cpuCapacityFilterHighlightEnabled !== false,
-        cpuCapacityFilterCoefficient: Number.isFinite(Number(saved.cpuCapacityFilterCoefficient)) && Number(saved.cpuCapacityFilterCoefficient) > 0
-            ? Number(saved.cpuCapacityFilterCoefficient) : grafanaTransformSettings.grafanaCpuCapacityCoefficient,
-        cpuCapacityFilterMode: saved.cpuCapacityFilterMode === 'last' ? 'last' : 'max',
-        cpuCapacityFilterLoad1: saved.cpuCapacityFilterLoad1 !== false,
-        cpuCapacityFilterLoad5: saved.cpuCapacityFilterLoad5 === true,
-        cpuCapacityFilterLoad15: saved.cpuCapacityFilterLoad15 === true,
-        thresholdEnabled: !!saved.thresholdEnabled,
-        thresholdNotifyEnabled: saved.thresholdNotifyEnabled !== false,
-        thresholdValue: Number(saved.thresholdValue) || 0,
-        thresholdRawValue: Number.isFinite(Number(saved.thresholdRawValue)) && saved.thresholdRawValue !== null && saved.thresholdRawValue !== ''
-            ? Number(saved.thresholdRawValue)
-            : null,
-        thresholdUnit: normalizePanelMetadataText(saved.thresholdUnit)
-    };
-}
-
-function applyPanelTools(panel, iframe) {
-    // The cache is populated before frames are created and kept current by the
-    // sync-storage listener. Re-reading the same settings once per iframe made
-    // a dashboard with many panels issue a burst of duplicate IPC calls.
-    return postToDashboardFrame(iframe, {
-        action: 'applyPanelTools', tools: getPanelTools(panel), transformSettings: grafanaTransformSettings
-    });
-}
-
-const panelLegendWaiters = new Map();
-const panelThresholdWaiters = new Map();
-const panelThresholdStates = new Map();
-const panelTitleWaiters = new Map();
-
-function requestPanelTitle(panel, iframe) {
-    if (!panel || !iframe) return Promise.resolve('');
-    const requestId = `panel-title-${panel.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    return new Promise(resolve => {
-        const timeout = setTimeout(() => {
-            panelTitleWaiters.delete(requestId);
-            resolve('');
-        }, 1000);
-        panelTitleWaiters.set(requestId, title => {
-            clearTimeout(timeout);
-            panelTitleWaiters.delete(requestId);
-            resolve(title);
-        });
-        if (!postToDashboardFrame(iframe, { action: 'getDashbridgePanelTitle', requestId })) {
-            clearTimeout(timeout);
-            panelTitleWaiters.delete(requestId);
-            resolve('');
-        }
-    });
-}
-
-function ensureThresholdNotifications() {
-    let container = document.getElementById('dashbridgeThresholdNotifications');
-    if (!container) {
-        container = document.createElement('div');
-        container.id = 'dashbridgeThresholdNotifications';
-        container.setAttribute('aria-live', 'polite');
-        document.body.appendChild(container);
-    }
-    return container;
-}
-
-function updatePanelThresholdStatus(panel, status) {
-    const card = document.querySelector(`.panel-card[data-panel-id="${CSS.escape(panel.id)}"]`);
-    const previous = panelThresholdStates.get(panel.id) || { exceeded: false, dismissed: false };
-    const currentTools = panel.tools || {};
-    const rawFromStatus = status?.rawThreshold !== null && status?.rawThreshold !== ''
-        && Number.isFinite(Number(status?.rawThreshold))
-        ? Number(status.rawThreshold)
-        : null;
-    const storedRaw = Number.isFinite(Number(currentTools.thresholdRawValue)) && currentTools.thresholdRawValue !== null
-        ? Number(currentTools.thresholdRawValue)
-        : rawFromStatus;
-    const factor = Number(status?.factor);
-    const displayedValue = Number.isFinite(storedRaw) && Number.isFinite(factor) && factor > 0
-        ? storedRaw / factor
-        : currentTools.thresholdValue;
-    const safeStatusUnit = normalizePanelMetadataText(status?.unit);
-    if ((safeStatusUnit && currentTools.thresholdUnit !== safeStatusUnit)
-        || (Number.isFinite(storedRaw) && currentTools.thresholdRawValue !== storedRaw)
-        || (Number.isFinite(displayedValue) && currentTools.thresholdValue !== displayedValue)) {
-        panel.tools = {
-            ...currentTools,
-            thresholdUnit: safeStatusUnit || normalizePanelMetadataText(currentTools.thresholdUnit),
-            thresholdRawValue: Number.isFinite(storedRaw) ? storedRaw : currentTools.thresholdRawValue,
-            thresholdValue: Number.isFinite(displayedValue) ? displayedValue : currentTools.thresholdValue
-        };
-        savePanels();
-    }
-    const exceeded = !!status?.enabled && !!status?.exceeded;
-    card?.classList.toggle('threshold-exceeded', exceeded);
-    if (!exceeded) {
-        panelThresholdStates.set(panel.id, { exceeded: false, dismissed: false });
-        return;
-    }
-    if (status?.thresholdNotifyEnabled === false) {
-        document.querySelector(`.threshold-notification[data-panel-id="${CSS.escape(panel.id)}"]`)?.remove();
-        panelThresholdStates.set(panel.id, { exceeded: false, dismissed: false });
-        return;
-    }
-    if (previous.exceeded || previous.dismissed) {
-        panelThresholdStates.set(panel.id, { ...previous, exceeded: true });
-        return;
-    }
-    panelThresholdStates.set(panel.id, { exceeded: true, dismissed: false });
-    const notice = document.createElement('div');
-    notice.className = 'threshold-notification';
-    notice.dataset.panelId = panel.id;
-    notice.innerHTML = `
-        <strong>${escapeHtml(status.panelTitle || 'Панель Grafana')}</strong>
-        <button type="button" aria-label="Закрыть">×</button>
-        <span class="threshold-notification-status">Порог превышен</span>`;
-    notice.querySelector('button').addEventListener('click', () => {
-        notice.remove();
-        panelThresholdStates.set(panel.id, { exceeded: true, dismissed: true });
-    });
-    ensureThresholdNotifications().appendChild(notice);
-}
-
-function requestPanelLegendSeries(panel, iframe) {
-    return new Promise(resolve => {
-        const timer = setTimeout(() => {
-            panelLegendWaiters.delete(panel.id);
-            resolve([]);
-        }, 2500);
-        panelLegendWaiters.set(panel.id, series => {
-            clearTimeout(timer);
-            resolve(series);
-        });
-        if (!postToDashboardFrame(iframe, { action: 'getPanelLegendSeries', requestId: panel.id })) {
-            clearTimeout(timer);
-            panelLegendWaiters.delete(panel.id);
-            resolve([]);
-        }
-    });
-}
-
-function requestPanelThresholdStatus(panel, iframe) {
-    return new Promise(resolve => {
-        const timer = setTimeout(() => {
-            panelThresholdWaiters.delete(panel.id);
-            resolve(null);
-        }, 1500);
-        panelThresholdWaiters.set(panel.id, status => {
-            clearTimeout(timer);
-            resolve(status);
-        });
-        if (!postToDashboardFrame(iframe, { action: 'getPanelThresholdStatus', requestId: panel.id, threshold: getPanelTools(panel) })) {
-            clearTimeout(timer);
-            panelThresholdWaiters.delete(panel.id);
-            resolve(null);
-        }
-    });
-}
-
-function formatThresholdUnit(status) {
-    if (status?.unit) return `Единица: ${status.unit}`;
-    if (status?.engine && status.engine !== 'unknown') return 'Без единицы';
-    return 'Единица определяется по графику';
-}
-
-async function openPanelTools(panel, iframe) {
-    const tools = getPanelTools(panel);
-    const storedSettings = await chrome.storage.sync.get(getGrafanaSettingsStorageKeys());
-    const panelSettings = normalizeGrafanaSettings(storedSettings);
-    let resolvedTitle = panel.title;
-    let panelKind = window.DashBridgeGrafanaPanelAnalysis?.classifyPanelTitle(resolvedTitle, panelSettings) || null;
-    // Most panels already have a persisted title and open immediately. Query
-    // the live iframe only when that title cannot select a specialised form.
-    if (!panelKind) {
-        const liveTitle = await requestPanelTitle(panel, iframe);
-        resolvedTitle = normalizePanelMetadataText(liveTitle, 240) || resolvedTitle;
-        panelKind = window.DashBridgeGrafanaPanelAnalysis?.classifyPanelTitle(resolvedTitle, panelSettings) || null;
-    }
-    if (resolvedTitle && panel.title !== resolvedTitle) {
-        panel.title = resolvedTitle;
-        savePanels();
-    }
-    return window.DashBridgePanelSettingsModal.open({
-        state: tools,
-        content: `${window.DashBridgePanelSettingsModal.transformFields(tools, { panelKind })}${window.DashBridgePanelSettingsModal.thresholdFields(tools)}${window.DashBridgePanelSettingsModal.legendFields(tools.legendMode, tools)}`,
-        advanced: {
-            cpuCapacityFilterCoefficientDefault: panelSettings.grafanaCpuCapacityCoefficient,
-            getLegendSeries: () => requestPanelLegendSeries(panel, iframe),
-            getThresholdStatus: () => requestPanelThresholdStatus(panel, iframe),
-            formatThresholdUnit
-        },
-        onSave: nextTools => {
-            const previousTools = getPanelTools(panel);
-            // The calculated response owns a percent field config. Grafana can
-            // retain that config when native byte series return, so remember
-            // that this panel must explicitly restore its byte unit.
-            nextTools.forceMemByteUnit = nextTools.convertMemToUsed
-                ? false
-                : (previousTools.convertMemToUsed || previousTools.forceMemByteUnit);
-            panel.tools = nextTools;
-            savePanels();
-            const liveApplyKeys = ['thresholdEnabled', 'thresholdNotifyEnabled', 'thresholdValue', 'thresholdRawValue', 'thresholdUnit'];
-            const liveApplyOnlyChange = liveApplyKeys.some(key => previousTools[key] !== nextTools[key])
-                && Object.keys(nextTools).filter(key => !liveApplyKeys.includes(key))
-                    .every(key => JSON.stringify(previousTools[key]) === JSON.stringify(nextTools[key]));
-            if (liveApplyOnlyChange) {
-                const targetIframe = forceLoadPanel(panel.id);
-                if (targetIframe) void applyPanelTools(panel, targetIframe);
-            } else {
-                refreshPanel(panel.id);
-            }
-        }
-    });
-}
 
 const dashBridgeReportController = DashBridgeReportController.create({
     reportEngine: DashBridgeReport,
@@ -1498,8 +1280,7 @@ function appendDashboardPanelCards(addedPanels) {
 function removeDashboardPanelCard(panelId) {
     if (dashBridgePanelAnalysisController.isPanel(panelId)) closeDashboardPanelAnalysis();
     findPanelCard(panelId)?.remove();
-    panelThresholdStates.delete(panelId);
-    document.querySelector(`.threshold-notification[data-panel-id="${CSS.escape(panelId)}"]`)?.remove();
+    dashBridgePanelToolsController.removePanel(panelId);
     if (fullscreenPanelId === panelId) fullscreenPanelId = null;
     if (panels.length === 0) void renderDashboard();
 }
@@ -1654,8 +1435,7 @@ window.addEventListener('message', (e) => {
     }
 
     if (e.data.action === 'dashbridgePanelTitleResponse' && typeof e.data.requestId === 'string') {
-        const resolve = panelTitleWaiters.get(e.data.requestId);
-        if (resolve) resolve(normalizePanelMetadataText(e.data.title, 240));
+        dashBridgePanelToolsController.acceptTitleResponse(e.data);
         return;
     }
 
@@ -1683,28 +1463,13 @@ window.addEventListener('message', (e) => {
 
     if (e.data.action === 'panelLegendSeries' && typeof e.data.requestId === 'string') {
         const panel = panels.find(item => item.id === sourceIframe.closest('.panel-card')?.dataset.panelId);
-        const resolve = panel && panelLegendWaiters.get(e.data.requestId);
-        if (resolve && panel?.id === e.data.requestId) {
-            panelLegendWaiters.delete(e.data.requestId);
-            resolve(Array.isArray(e.data.series) ? e.data.series : []);
-        }
+        dashBridgePanelToolsController.acceptLegendSeries(e.data, panel);
         return;
     }
 
     if (e.data.action === 'panelThresholdStatus') {
         const panel = getPanelForIframe(sourceIframe);
-        const resolve = panel && panelThresholdWaiters.get(e.data.requestId);
-        if (resolve && panel?.id === e.data.requestId) {
-            panelThresholdWaiters.delete(e.data.requestId);
-            const safeStatusUnit = normalizePanelMetadataText(e.data.status?.unit);
-            if (safeStatusUnit && panel.tools?.thresholdUnit !== safeStatusUnit) {
-                panel.tools = { ...panel.tools, thresholdUnit: safeStatusUnit };
-                savePanels();
-            }
-            resolve(e.data.status || null);
-            return;
-        }
-        if (panel) updatePanelThresholdStatus(panel, e.data.status);
+        dashBridgePanelToolsController.acceptThresholdStatus(e.data, panel);
         return;
     }
 

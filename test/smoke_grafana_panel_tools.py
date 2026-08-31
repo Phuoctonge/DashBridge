@@ -9,7 +9,8 @@ PANEL_STATE = (ROOT / "js/content/grafana-panel-state.js").read_text(encoding="u
 VISUAL_ENGINE = (ROOT / "js/content/grafana-visual-engine.js").read_text(encoding="utf-8")
 PANEL_DEFINITION = (ROOT / "js/content/grafana-panel-definition.js").read_text(encoding="utf-8")
 CPU_CAPACITY_FILTER = (ROOT / "js/content/grafana-cpu-capacity-filter.js").read_text(encoding="utf-8")
-DASHBOARD = (ROOT / "pages/dashbridge/dashbridge.js").read_text(encoding="utf-8")
+DASHBOARD = (ROOT / "pages/dashbridge/dashbridge.js").read_text(encoding="utf-8") \
+    + (ROOT / "pages/dashbridge/dashbridge-panel-tools-controller.js").read_text(encoding="utf-8")
 TIME_CONTROLLER = (ROOT / "pages/dashbridge/dashbridge-time-controller.js").read_text(encoding="utf-8")
 IFRAME = (ROOT / "js/content/grafana-iframe.js").read_text(encoding="utf-8")
 POPUP = (ROOT / "pages/popup/popup.html").read_text(encoding="utf-8")
@@ -289,9 +290,9 @@ checks = {
     "Shared Grafana settings are isolated from host header and theme CSS": '<header class="panel-tools-modal-header">' not in PANEL_SETTINGS
         and "--bg-color:#f8fafc" in PANEL_SETTINGS
         and "dashbridge-panel-settings-dark" in PANEL_SETTINGS,
-    "DashBridge uses the same settings shell and advanced handlers as native Grafana": "DashBridgePanelSettingsModal.open({" in DASHBOARD
+    "DashBridge uses the same settings shell and advanced handlers as native Grafana": "settingsModal.open({" in DASHBOARD
         and "advanced: {" in DASHBOARD
-        and "DashBridgePanelSettingsModal.create({" not in DASHBOARD,
+        and "settingsModal.create({" not in DASHBOARD,
     "Grafana panel menu exposes the shared legend filter": "legendFields(state.legendMode, state)" in COMMON and "getLegendSeries: () => getPanelLegendSeries(panel)" in COMMON,
     "legend pattern fields have safe defaults in both panel hosts": "legendSelectFilter: ''" in NATIVE_PANEL_SETTINGS
         and "legendIgnoreFilter: ''" in NATIVE_PANEL_SETTINGS
