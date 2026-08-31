@@ -5,10 +5,10 @@ from support.smoke import run_checks
 ROOT = Path(__file__).resolve().parent.parent
 tools = (ROOT / "js/content/grafana-panel-tools.js").read_text(encoding="utf-8")
 state = (ROOT / "js/content/grafana-panel-state.js").read_text(encoding="utf-8")
-dashboard = (ROOT / "pages/dashbridge/dashbridge.js").read_text(encoding="utf-8")
+dashboard = (ROOT / "pages/dashbridge/dashbridge.js").read_text(encoding="utf-8") + (ROOT / "pages/dashbridge/dashbridge-profile-controller.js").read_text(encoding="utf-8")
 dashboard_capture = (ROOT / "pages/dashbridge/dashbridge-capture.js").read_text(encoding="utf-8")
 renderer = (ROOT / "pages/dashbridge/dashbridge-renderer.js").read_text(encoding="utf-8")
-batch = (ROOT / "pages/batch/batch.js").read_text(encoding="utf-8")
+batch = (ROOT / "pages/batch/batch.js").read_text(encoding="utf-8") + (ROOT / "pages/batch/batch-operation-controller.js").read_text(encoding="utf-8")
 runner = (ROOT / "pages/batch/batch-capture-runner.js").read_text(encoding="utf-8")
 layout = (ROOT / "js/content/grafana-compact-layout.js").read_text(encoding="utf-8")
 visual_engine = (ROOT / "js/content/grafana-visual-engine.js").read_text(encoding="utf-8")
@@ -20,7 +20,7 @@ checks = {
     "Iframe resize jiggle is disabled for the layout experiment": "jiggleDashboardFrameWidth" not in dashboard
         and "dashbridgeJiggle" not in dashboard,
     "Batch capture window has an owner": "createBatchCaptureWindowRunner" in runner and "captureWindowRunner.acquire" in batch and "captureWindowRunner.release" in batch,
-    "DashBridge has a rendering boundary": "const DashBridgeRenderer" in renderer and "renderProfileList" in renderer and "DashBridgeRenderer.renderProfileList" in dashboard,
+    "DashBridge has a rendering boundary": "const DashBridgeRenderer" in renderer and "renderProfileList" in renderer and "renderer.renderProfileList" in dashboard,
     "Panel-local capture shares layout restoration": "const layout = window.DashBridgeGrafanaCompactLayout;" in tools
         and "restoreFlot" in layout and "restoreUPlot" in layout,
     "Panel-local capture delegates Flot and uPlot layout work": "redrawFlot" in layout

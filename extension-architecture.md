@@ -159,7 +159,9 @@ grafana-panel-tools.js
 | Tab capture/crop | `grafana-panel-capture.js` | Batch/legacy Popup flow. |
 | URL/dashboard API | `grafana-url.js`, `grafana-dashboard-api.js` | Batch. |
 | Batch presets | `grafana-batch-panel-rules.js` | Batch. |
-| Profiles | `dashbridge-profile-store.js` | `dashbridge.js`. |
+| Profiles storage | `dashbridge-profile-store.js` | `dashbridge-profile-controller.js`. |
+| Profiles UI/lifecycle | `dashbridge-profile-controller.js` | `dashbridge.js`; tab-local selection, cross-tab sync, panel-state checkpoint. |
+| DashBridge iframe transport | `dashbridge-frame-controller.js` | `dashbridge.js`; trusted origin, ready state and navigation reset. |
 | Неблокирующие модальные диалоги DashBridge | `dashbridge-modal.js` | Профили, импорт/экспорт, настройки и capture в `dashbridge.js`. |
 | URL и идентичность панелей DashBridge | `dashbridge-panel-url.js`, `grafana-panel-identity.js` | Добавление, поиск дублей, импорт и iframe-настройки в `dashbridge.js`. |
 | JSON transfer панелей DashBridge | `dashbridge-panel-transfer.js` | Полный export payload, строгая нормализация import, новые ID и удаление канонических дублей; FileReader/download lifecycle остаётся в `dashbridge.js`. |
@@ -174,6 +176,9 @@ grafana-panel-tools.js
 | Sync input writes | `sync-input-writer.js` | Частые поля UI. |
 | Bounded diagnostics | `bounded-journal.js` | MAIN и test tooling. |
 | ZIP/лимиты | `archive-download.js`, `archive-budget.js` | Batch, exports. |
+| Batch panel-rules UI | `batch-panel-rules-ui.js` | `batch.js`; editor, validation, delayed persistence and stale-load guard. |
+| Batch operation lifecycle | `batch-operation-controller.js` | `batch.js`; cancellation, progress, capture-window ownership and archive helpers. |
+| Recorder replay | `recorder-replay.js` | `recorder.js`; step normalization/execution, navigation and network-idle waits. |
 | Анализ CPU/RAM | `grafana-panel-analysis.js` | Расчёт, thresholds и clipboard-формат кнопок CPU Usage/Memory. |
 | Grafana time | `grafana-time.js` | DashBridge, iframe. |
 | Clipboard диапазона | `grafana-time-picker-clipboard.js`, `dashbridge-time-state.js` | Direct Grafana, DashBridge. |
@@ -223,7 +228,8 @@ disabled-пункты показывают профили, в которых п�
 
 ```text
 dashbridge-profile-store.js
-  → dashbridge.js
+  → dashbridge-profile-controller.js
+     → dashbridge.js
      ├── dashbridge-renderer.js
      ├── dashbridge-report-transport.js
      ├── dashbridge-report-audit.js
@@ -231,7 +237,8 @@ dashbridge-profile-store.js
      ├── dashbridge-capture.js
      ├── dashbridge-time-state.js
      └── dashbridge-crosshair.js
-  ↔ postMessage конкретного iframe
+dashbridge-frame-controller.js
+  → dashbridge.js ↔ postMessage конкретного iframe
 grafana-iframe.js (isolated) ↔ grafana-panel-tools.js (MAIN)
 ```
 
@@ -391,7 +398,9 @@ warning строго меньше critical. Если для TOP-3 доступн
 
 ```text
 batch.js
-  ├── UI/state/lifecycle
+  ├── UI/page state
+  ├── batch-panel-rules-ui.js
+  ├── batch-operation-controller.js
   ├── panel loader/series selection
   ├── capture utils/runner
   → dashboard API + legend + capture
@@ -444,6 +453,10 @@ memory/body budget и создаёт DEFLATE-контейнер. При импо
 значений и ограниченный render-cycle. `recorder.js` сохраняет CDP/session/
 download lifecycle и применяет подготовленный импорт к живому state только
 после успешного завершения всех проверок.
+`recorder-replay.js` владеет replay lifecycle: нормализует шаги, ожидает DOM,
+навигацию и network idle, проверяет отмену и завершает сравнение. Он получает
+live session/CDP зависимости явно от `recorder.js`, который остаётся владельцем
+контролируемой вкладки, debugger attach/detach и общего состояния сессии.
 `recorder-dashflow-export.js` является чистой проекцией live CDP-запросов в
 канонический `network.json` и производный HAR 1.2: нормализует headers/cookies,
 query, body metadata, timings, cache/TLS/initiator и страницы сценария, не
