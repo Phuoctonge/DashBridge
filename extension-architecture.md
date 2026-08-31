@@ -426,9 +426,11 @@ v2 с manifest, окружением, лимитами и показателям
 сериализует уже подготовленные manifest/flow/network/HAR/streams, проверяет
 memory/body budget и создаёт DEFLATE-контейнер. При импорте до возврата
 результата он проверяет ZIP-структуру, распакованные размеры, schema, пути тел,
-суммарные лимиты и SHA-256. `recorder.js` сохраняет CDP/UI/download lifecycle и
-применяет подготовленный импорт к живому state только после успешного
-завершения всех проверок.
+суммарные лимиты и SHA-256. `recorder-view.js` владеет DOM-rendering сценария,
+трафика, деталей запроса и сравнения, включая редактирование чувствительных
+значений и ограниченный render-cycle. `recorder.js` сохраняет CDP/session/
+download lifecycle и применяет подготовленный импорт к живому state только
+после успешного завершения всех проверок.
 `recorder-dashflow-export.js` является чистой проекцией live CDP-запросов в
 канонический `network.json` и производный HAR 1.2: нормализует headers/cookies,
 query, body metadata, timings, cache/TLS/initiator и страницы сценария, не

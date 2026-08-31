@@ -116,7 +116,7 @@ assert(recorderCss.includes('.comparison-controls > :not(.sr-only) { flex: 1 1 1
     'comparison controls must fill narrow layouts without overflow');
 assert(recorderCss.includes('.network-switches { display: grid; grid-template-columns: minmax(0,1fr);'),
     'cache and cookie switches must be arranged vertically');
-for (const asset of ['vendor/jszip.min.js', 'js/shared/dashflow-schema.js', 'js/shared/dashflow-compare.js', 'js/shared/dashflow-xlsx.js', '../shared/operation-progress-window.js', 'recorder-dashflow-export.js', 'recorder-dashflow-io.js', 'recorder.js']) {
+for (const asset of ['vendor/jszip.min.js', 'js/shared/dashflow-schema.js', 'js/shared/dashflow-compare.js', 'js/shared/dashflow-xlsx.js', '../shared/operation-progress-window.js', 'recorder-dashflow-export.js', 'recorder-dashflow-io.js', 'recorder-view.js', 'recorder.js']) {
     assert(html.includes(asset), `recorder page must load ${asset}`);
 }
 assert(html.indexOf('vendor/jszip.min.js') < html.indexOf('recorder.js'), 'JSZip must load before the recorder controller');
@@ -124,8 +124,11 @@ assert(html.indexOf('recorder-dashflow-io.js') < html.indexOf('recorder.js'),
     'DashFlow I/O must load before the recorder controller');
 assert(html.indexOf('recorder-dashflow-export.js') < html.indexOf('recorder.js'),
     'DashFlow export builders must load before the recorder controller');
+assert(html.indexOf('recorder-view.js') < html.indexOf('recorder.js'),
+    'Recorder view must load before the lifecycle controller');
 
 const recorder = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recorder.js'), 'utf8');
+const recorderView = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recorder-view.js'), 'utf8');
 const dashflowIo = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recorder-dashflow-io.js'), 'utf8');
 const dashflowExport = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recorder-dashflow-export.js'), 'utf8');
 assert(recorder.includes('Network.getResponseBody'), 'network recorder must capture response bodies through CDP');
@@ -172,11 +175,11 @@ assert(recorder.includes('document.getElementById(locator.id)') && recorder.incl
 assert(recorder.includes('Неоднозначный локатор') && recorder.includes('Надёжный элемент не найден'),
     'replay must stop instead of guessing when a locator is ambiguous or stale');
 assert(recorder.includes('activeStepId: null'), 'traffic requests must be attributed to the active scenario step');
-assert(recorder.includes("heading.className = 'traffic-step-group'"), 'traffic table must render a heading for every scenario step');
-assert(recorder.includes("heading.className = 'comparison-step-group'"), 'comparison table must render a heading for every visible scenario step');
+assert(recorderView.includes("heading.className = 'traffic-step-group'"), 'traffic table must render a heading for every scenario step');
+assert(recorderView.includes("heading.className = 'comparison-step-group'"), 'comparison table must render a heading for every visible scenario step');
 assert(recorder.includes('selectedStepId: null'), 'steps sidebar must support filtering traffic by a selected step');
-assert(recorder.includes('sensitiveNamePattern'), 'request details must mask credential-like fields by default');
-assert(recorder.includes('200 - (performance.now() - lastRenderAt)'), 'live traffic rendering must be throttled');
+assert(recorderView.includes('sensitiveNamePattern'), 'request details must mask credential-like fields by default');
+assert(recorderView.includes('200 - (performance.now() - lastRenderAt)'), 'live traffic rendering must be throttled');
 assert(recorder.includes('DashBridgeOperationProgress?.create'), 'record and replay must expose the shared cancellable progress window');
 assert(recorder.includes("title: 'Traffic Recorder · Replay'") && recorder.includes("unit: 'запросов'"),
     'progress window must distinguish recording traffic from replay steps');
@@ -186,10 +189,10 @@ assert(!recorder.includes('operationProgressController?.open({') && !recorder.in
     'Recorder must not open the removed popup side panel');
 assert(recorder.includes("if (state.stopRequested) throw new Error('Операция остановлена пользователем')"),
     'forced replay cancellation must interrupt asynchronous waits');
-assert(recorder.includes('→ navigate ${step._dashbridge.navigationUrl}'), 'traffic group heading must expose navigation caused by an action');
-assert(recorder.match(/→ navigate \$\{step\._dashbridge\.navigationUrl\}/g)?.length >= 2, 'steps sidebar and traffic groups must both expose action navigation');
-assert(recorder.includes("String(url || '').toLowerCase().includes(fragment)"), 'comparison URL filter must match domains, paths and query parameters');
-assert(recorder.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'), 'comparison export must download a real XLSX workbook');
+assert(recorderView.includes('→ navigate ${step._dashbridge.navigationUrl}'), 'traffic group heading must expose navigation caused by an action');
+assert(recorderView.match(/→ navigate \$\{step\._dashbridge\.navigationUrl\}/g)?.length >= 2, 'steps sidebar and traffic groups must both expose action navigation');
+assert(recorderView.includes("String(url || '').toLowerCase().includes(fragment)"), 'comparison URL filter must match domains, paths and query parameters');
+assert(recorderView.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'), 'comparison export must download a real XLSX workbook');
 assert(recorder.includes('function postLifecycle(message)'), 'lifecycle messages must tolerate a disconnected extension port');
 assert(!recorder.includes("lifecyclePort.postMessage({ type: 'unbind' })"), 'cleanup must not write directly to a possibly disconnected port');
 assert(recorder.includes('state.importing') && dashflowIo.includes('const requests = new Map()'),
