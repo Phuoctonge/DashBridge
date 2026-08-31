@@ -6,6 +6,7 @@ const path = require('path');
 const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
 const html = read('pages/dashbridge/dashbridge.html');
 const dashboard = read('pages/dashbridge/dashbridge.js');
+const reportUi = read('pages/dashbridge/dashbridge-report-ui.js');
 const reportTransport = read('pages/dashbridge/dashbridge-report-transport.js');
 const tools = read('js/content/grafana-panel-tools.js');
 const visual = read('js/content/grafana-visual-engine.js');
@@ -14,10 +15,14 @@ const schema = read('js/shared/local-state-schema.js');
 const css = read('pages/dashbridge/dashbridge.css');
 
 assert(html.includes('id="generateReportBtn"') && html.includes('id="configureReportBtn"'));
-assert(html.indexOf('js/shared/dashbridge-report.js') < html.indexOf('dashbridge.js'),
-    'report engine must load before the dashboard controller');
+assert(html.indexOf('js/shared/dashbridge-report.js') < html.indexOf('dashbridge-report-ui.js')
+    && html.indexOf('dashbridge-report-ui.js') < html.indexOf('dashbridge.js'),
+    'report engine and UI must load in dependency order before the dashboard controller');
 assert(html.indexOf('dashbridge-report-transport.js') < html.indexOf('dashbridge.js'),
     'report transport must load before the dashboard controller');
+assert(html.indexOf('dashbridge-report-ui.js') < html.indexOf('dashbridge.js')
+    && dashboard.includes('window.DashBridgeReportUi.create({'),
+    'report UI must load before the dashboard controller and receive explicit dependencies');
 assert(reportTransport.includes("action: 'collectPanelReportSnapshot'")
     && dashboard.includes("e.data.action === 'panelReportSnapshot'")
     && dashboard.includes('dashBridgeReportTransport.acceptSnapshot')
@@ -93,18 +98,18 @@ assert(dashboard.includes('function setDashboardPanelDataStatus(panel, snapshot)
     && dashboard.includes("new Set(['timeout', 'iframe_unavailable', 'request_error', 'configuration_error'])")
     && css.includes('.dashbridge-panel-data-status'),
     'dashboard cards must show failures that happen outside the Grafana iframe');
-assert(dashboard.includes('report-test-header') && dashboard.includes('{{stableLoadDuration}}')
-    && dashboard.includes('{{testDuration}}'),
+assert(reportUi.includes('report-test-header') && reportUi.includes('{{stableLoadDuration}}')
+    && reportUi.includes('{{testDuration}}'),
     'report editor must expose the load-test summary context through the automatic header switch');
-assert(dashboard.includes('reportVariableReferenceMarkup')
-    && dashboard.includes('Справочник переменных шаблона')
-    && dashboard.includes('Название текущего профиля DashBridge.')
-    && dashboard.indexOf('${reportVariableReferenceMarkup()}') > dashboard.indexOf('report-panel-list'),
+assert(reportUi.includes('reportVariableReferenceMarkup')
+    && reportUi.includes('Справочник переменных шаблона')
+    && reportUi.includes('Название текущего профиля DashBridge.')
+    && reportUi.indexOf('${reportVariableReferenceMarkup()}') > reportUi.indexOf('report-panel-list'),
     'described variable reference must be rendered after the panel cards');
-assert(dashboard.includes('{{vCpu}} / {{cpuCapacity}}')
-    && dashboard.includes('{{rawName}}')
-    && dashboard.includes('{{seriesThreshold}}')
-    && dashboard.includes('{{dataStatus}}'),
+assert(reportUi.includes('{{vCpu}} / {{cpuCapacity}}')
+    && reportUi.includes('{{rawName}}')
+    && reportUi.includes('{{seriesThreshold}}')
+    && reportUi.includes('{{dataStatus}}'),
     'the report editor must document vCPU-aware and raw series-name variables');
 assert(tools.includes("filtered_empty: 'Нет превышений по заданному фильтру'")
     && tools.includes("empty_source: 'Источник вернул пустой набор данных'")
@@ -128,12 +133,12 @@ assert(!reportCollectorSource.includes("if (['http_error', 'network_error', 'dec
     && reportCollectorSource.indexOf('records = tableRecords;')
         < reportCollectorSource.indexOf('const failureKinds = new Set'),
     'visible table/chart data must be collected before a transport status is treated as a report error');
-assert(dashboard.includes('value="cpu_capacity"')
-    && dashboard.includes("config.sla.source === 'cpu_capacity'")
+assert(reportUi.includes('value="cpu_capacity"')
+    && reportUi.includes("config.sla.source === 'cpu_capacity'")
     && dashboard.includes("source: 'cpu_capacity', operator: 'gt', coefficient"),
     'Load Average reports must expose the same dynamic vCPU threshold as the graph filter');
-assert(dashboard.includes('{{testDuration}} = время от этой даты')
-    && dashboard.includes('{{stableLoadDuration}} = время от этой даты'),
+assert(reportUi.includes('{{testDuration}} = время от этой даты')
+    && reportUi.includes('{{stableLoadDuration}} = время от этой даты'),
     'the report header must explain that duration variables are calculated from manually entered start times');
 assert(visual.includes('const legendMaxByName = () =>')
     && visual.includes('legendMaximums.get(reportSeriesName(item.label')
@@ -155,15 +160,15 @@ assert(css.includes('.report-settings-modal [hidden]')
     && css.includes('display: none !important;')
     && css.includes('.report-template-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));'),
     'irrelevant SLA fields must be hidden and report templates must stay readable');
-assert(dashboard.includes('report-collapsible-section')
+assert(reportUi.includes('report-collapsible-section')
     && dashboard.includes('openPanelReportEditor')
-    && dashboard.includes('Если требования соблюдены')
-    && dashboard.includes('Если требования нарушены')
-    && dashboard.includes('Дополнительные настройки'),
+    && reportUi.includes('Если требования соблюдены')
+    && reportUi.includes('Если требования нарушены')
+    && reportUi.includes('Дополнительные настройки'),
     'each graph must expose a focused two-outcome phrase editor with optional advanced settings');
-assert(dashboard.includes('Автоматически по порогу графика')
-    && dashboard.includes('Без SLA — информационная фраза')
-    && dashboard.includes('Только при нарушении SLA'),
+assert(reportUi.includes('Автоматически по порогу графика')
+    && reportUi.includes('Без SLA — информационная фраза')
+    && reportUi.includes('Только при нарушении SLA'),
     'common panel setup must use outcome-oriented choices and automatic Grafana thresholds');
 assert(dashboard.includes('dashboardLayoutSignature')
     && dashboard.includes('if (!dashboardLayoutChanged) return;'),
@@ -173,7 +178,7 @@ assert(dashboard.includes('!iframe?.isConnected')
     && dashboard.includes('sourceIframe.dataset.dashbridgeOrigin = e.origin;')
     && dashboard.includes("iframe.dataset.dashbridgeLoaded = 'false';"),
     'postMessage must reject detached or unverified iframe windows before using a Grafana target origin');
-assert(!dashboard.includes('Единица измерения\n')
+assert(!reportUi.includes('Единица измерения\n')
     && visual.includes('const resolvedUnit = String(sla.unit || unit ||'),
     'the report editor must infer the unit from Grafana instead of asking the user');
 assert(tools.includes("debugLog('Skipping visual engine: no current or previous visual work')")

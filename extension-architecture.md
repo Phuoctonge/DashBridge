@@ -163,6 +163,7 @@ grafana-panel-tools.js
 | Неблокирующие модальные диалоги DashBridge | `dashbridge-modal.js` | Профили, импорт/экспорт, настройки и capture в `dashbridge.js`. |
 | URL и идентичность панелей DashBridge | `dashbridge-panel-url.js`, `grafana-panel-identity.js` | Добавление, поиск дублей, импорт и iframe-настройки в `dashbridge.js`. |
 | JSON transfer панелей DashBridge | `dashbridge-panel-transfer.js` | Полный export payload, строгая нормализация import, новые ID и удаление канонических дублей; FileReader/download lifecycle остаётся в `dashbridge.js`. |
+| UI сводного отчёта и SLA | `dashbridge-report-ui.js` | Настройка профиля, редактор фраз панели, валидация warning/critical и modal cleanup; состояние передаётся через явные callbacks `dashbridge.js`. |
 | Transport сводного отчёта | `dashbridge-report-transport.js` | Ожидание iframe, request ID, timeout/abort и точная корреляция ответа. |
 | Версия данных DashBridge | `dashbridge-data-migration.js` | Startup `dashbridge.js`. |
 | Import/recovery | `local-state-schema.js` | Options, Worklog, profiles. |
