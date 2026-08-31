@@ -18,6 +18,9 @@ const css = read('pages/dashbridge/dashbridge.css');
 
 assert(html.includes('id="generateReportBtn"') && html.includes('id="testReportBtn"')
     && html.includes('id="configureReportBtn"'));
+assert(html.indexOf('id="generateReportBtn"') < html.indexOf('id="configureReportBtn"')
+    && html.indexOf('id="configureReportBtn"') < html.indexOf('id="testReportBtn"'),
+    'Message Test Runner must remain the final action in the report menu');
 assert(html.indexOf('js/shared/dashbridge-report.js') < html.indexOf('dashbridge-report-ui.js')
     && html.indexOf('dashbridge-report-ui.js') < html.indexOf('dashbridge.js'),
     'report engine and UI must load in dependency order before the dashboard controller');
