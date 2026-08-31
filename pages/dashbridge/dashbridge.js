@@ -60,6 +60,13 @@ const {
     post: postToDashboardFrame,
     navigate: navigateDashboardFrame,
 } = DashBridgeFrameController;
+const dashBridgePanelAnalysisController = DashBridgePanelAnalysisController.create({
+    postToDashboardFrame,
+    normalizePanelMetadataText,
+    analysisApi: window.DashBridgeGrafanaPanelAnalysis,
+});
+const openDashboardPanelAnalysis = dashBridgePanelAnalysisController.open;
+const closeDashboardPanelAnalysis = dashBridgePanelAnalysisController.close;
 
 let crosshairMode = 'line';
 let crosshairThickness = 1;
@@ -403,142 +410,6 @@ const dashBridgeReportTestRunner = dashBridgeReportController.testRunner;
 const collectProfileReport = dashBridgeReportController.collect;
 const openReportPreview = dashBridgeReportController.openPreview;
 const setDashboardPanelDataStatus = dashBridgeReportController.setPanelDataStatus;
-
-let activeDashboardPanelAnalysis = null;
-
-function requestDashboardPanelAnalysis(state) {
-    if (!state) return false;
-    return postToDashboardFrame(state.iframe, {
-        action: 'startEmbeddedPanelAnalysis',
-        requestId: state.requestId,
-        analysisType: state.type,
-        panelTitle: normalizePanelMetadataText(state.panel?.title, 240)
-    });
-}
-
-function closeDashboardPanelAnalysis() {
-    const active = activeDashboardPanelAnalysis;
-    if (!active) return;
-    activeDashboardPanelAnalysis = null;
-    postToDashboardFrame(active.iframe, {
-        action: 'cancelEmbeddedPanelAnalysis', requestId: active.requestId
-    });
-    active.overlay.remove();
-}
-
-function openDashboardPanelAnalysis(panel, iframe, type) {
-    if (!panel || !iframe || !['cpu', 'ram'].includes(type)) return;
-    closeDashboardPanelAnalysis();
-    const requestId = `dashboard-analysis-${panel.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const create = (tag, className = '', text = '') => {
-        const node = document.createElement(tag);
-        if (className) node.className = className;
-        if (text) node.textContent = text;
-        return node;
-    };
-    const overlay = create('div', 'modal-overlay dashboard-panel-analysis-overlay');
-    const dialog = create('section', 'modal-content dashboard-panel-analysis-modal');
-    dialog.setAttribute('role', 'dialog');
-    dialog.setAttribute('aria-modal', 'true');
-    const header = create('div', 'dashboard-panel-analysis-header');
-    const heading = create('h3', '', `Анализ ${type.toUpperCase()} — ${window.DashBridgeGrafanaPanelAnalysis?.baseTitle(panel.title) || panel.title || ''}`);
-    const close = create('button', 'dashboard-panel-analysis-close');
-    close.type = 'button'; close.title = 'Закрыть'; close.setAttribute('aria-label', 'Закрыть');
-    close.innerHTML = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg>';
-    header.append(heading, close);
-    const modes = create('div', 'dashboard-panel-analysis-modes');
-    const period = create('button', 'btn btn-primary active', 'Максимум за период');
-    const latest = create('button', 'btn btn-outline', 'Последнее значение');
-    period.type = latest.type = 'button';
-    modes.append(period, latest);
-    const status = create('div', 'dashboard-panel-analysis-status', 'Загрузка данных выбранной панели…');
-    const output = create('div', 'dashboard-panel-analysis-output');
-    const actions = create('div', 'dashboard-panel-analysis-actions');
-    const copyAll = create('button', 'btn btn-outline', 'Скопировать список');
-    const copyTop = create('button', 'btn btn-outline', 'Скопировать TOP-3');
-    copyAll.type = copyTop.type = 'button';
-    actions.append(copyAll, copyTop);
-    dialog.append(header, modes, status, output, actions);
-    overlay.appendChild(dialog);
-    document.body.appendChild(overlay);
-    overlay.style.display = 'flex';
-
-    const state = {
-        requestId, panel, iframe, type, overlay, mode: 'period', snapshot: null, notice: '', status: 'loading',
-        receive(message) {
-            this.status = message.status || 'loading';
-            this.notice = typeof message.notice === 'string' ? message.notice.substring(0, 500) : '';
-            if (message.snapshot && typeof message.snapshot === 'object') this.snapshot = message.snapshot;
-            render();
-        }
-    };
-    activeDashboardPanelAnalysis = state;
-
-    const render = () => {
-        if (activeDashboardPanelAnalysis !== state) return;
-        period.classList.toggle('btn-primary', state.mode === 'period');
-        period.classList.toggle('btn-outline', state.mode !== 'period');
-        latest.classList.toggle('btn-primary', state.mode === 'latest');
-        latest.classList.toggle('btn-outline', state.mode !== 'latest');
-        period.classList.toggle('active', state.mode === 'period');
-        latest.classList.toggle('active', state.mode === 'latest');
-        const selected = state.snapshot?.[state.mode];
-        const items = Array.isArray(selected?.items) ? selected.items : [];
-        output.replaceChildren();
-        actions.hidden = !items.length;
-        if (state.status === 'loading' && !state.snapshot) {
-            status.textContent = 'Загрузка данных выбранной панели…';
-            return;
-        }
-        if (!items.length) {
-            status.textContent = state.notice || `Метрики ${type.toUpperCase()} не найдены в ответе выбранной панели.`;
-            return;
-        }
-        status.textContent = `Найдено серверов: ${items.length}.${state.notice ? ` ${state.notice}` : ''}`;
-        const table = create('table', 'dashboard-panel-analysis-table');
-        const head = create('thead'); const headRow = create('tr');
-        headRow.append(create('th', '', 'Сервер'), create('th', '', `${type.toUpperCase()} (%)`));
-        head.appendChild(headRow);
-        const body = create('tbody');
-        const warning = Number(state.snapshot.warning);
-        const critical = Number(state.snapshot.critical);
-        items.forEach(item => {
-            const row = create('tr');
-            const server = create('td', '', String(item.server || ''));
-            const valueNumber = Number(item.value);
-            const value = create('td', Number.isFinite(valueNumber) && valueNumber >= critical
-                ? 'critical' : (Number.isFinite(valueNumber) && valueNumber >= warning ? 'warning' : 'normal'));
-            value.textContent = Number.isFinite(valueNumber) ? `${valueNumber.toFixed(2)}%` : '—';
-            row.append(server, value); body.appendChild(row);
-        });
-        table.append(head, body); output.appendChild(table);
-    };
-    const copyText = async (button, key) => {
-        const selected = state.snapshot?.[state.mode];
-        const text = typeof selected?.[key] === 'string' ? selected[key] : '';
-        if (!text) return;
-        const original = button.textContent;
-        try {
-            await navigator.clipboard.writeText(text);
-            button.textContent = 'Скопировано';
-        } catch {
-            button.textContent = 'Ошибка копирования';
-        }
-        setTimeout(() => { if (button.isConnected) button.textContent = original; }, 2000);
-    };
-    period.addEventListener('click', () => { state.mode = 'period'; render(); });
-    latest.addEventListener('click', () => { state.mode = 'latest'; render(); });
-    copyAll.addEventListener('click', () => { void copyText(copyAll, 'copyAll'); });
-    copyTop.addEventListener('click', () => { void copyText(copyTop, 'copyTop'); });
-    close.addEventListener('click', closeDashboardPanelAnalysis);
-    const sent = requestDashboardPanelAnalysis(state);
-    if (!sent) {
-        state.status = 'empty';
-        state.notice = 'Панель Grafana ещё не готова к анализу.';
-        render();
-    }
-    close.focus();
-}
 
 // ════════════════════════════════════════════════════════
 //  Инициализация
@@ -1185,7 +1056,7 @@ function setupEventListeners() {
     document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
         if (dashboardPicker.style.display === 'flex') closeDashboardPicker();
-        if (activeDashboardPanelAnalysis) closeDashboardPanelAnalysis();
+        closeDashboardPanelAnalysis();
         closePanelExtraActions();
         if (fullscreenPanelId) toggleFullscreen(fullscreenPanelId);
     });
@@ -1492,7 +1363,7 @@ function openIframeSettings(panel) {
 async function togglePanelPause(id) {
     const panel = panels.find(item => item.id === id);
     if (!panel) return;
-    if (activeDashboardPanelAnalysis?.panel?.id === panel.id) closeDashboardPanelAnalysis();
+    if (dashBridgePanelAnalysisController.isPanel(panel)) closeDashboardPanelAnalysis();
     panel.paused = !panel.paused;
     savePanels();
     replaceDashboardPanelCard(panel.id);
@@ -1598,7 +1469,7 @@ function appendDashboardPanelCards(addedPanels) {
 }
 
 function removeDashboardPanelCard(panelId) {
-    if (activeDashboardPanelAnalysis?.panel?.id === panelId) closeDashboardPanelAnalysis();
+    if (dashBridgePanelAnalysisController.isPanel(panelId)) closeDashboardPanelAnalysis();
     findPanelCard(panelId)?.remove();
     panelThresholdStates.delete(panelId);
     document.querySelector(`.threshold-notification[data-panel-id="${CSS.escape(panelId)}"]`)?.remove();
@@ -1651,7 +1522,7 @@ function reconcileDashboardPanelCards(previousPanels = []) {
         if (!card) {
             card = createDashboardPanelCard(panel, container);
         } else if (frameChanged || pausedTitleChanged) {
-            if (activeDashboardPanelAnalysis?.panel?.id === panel.id) closeDashboardPanelAnalysis();
+            if (dashBridgePanelAnalysisController.isPanel(panel)) closeDashboardPanelAnalysis();
             replaceDashboardPanelCard(panel.id);
             card = findPanelCard(panel.id);
         } else {
@@ -2039,10 +1910,7 @@ window.addEventListener('message', (e) => {
 
     if (e.data.action === 'dashbridgePanelAnalysisUpdate'
         && typeof e.data.requestId === 'string') {
-        const active = activeDashboardPanelAnalysis;
-        if (active && active.requestId === e.data.requestId && active.iframe === sourceIframe) {
-            active.receive(e.data);
-        }
+        dashBridgePanelAnalysisController.accept(e.data, sourceIframe);
         return;
     }
 
@@ -2090,17 +1958,13 @@ window.addEventListener('message', (e) => {
             refresh: globalRefresh
         });
         if (panel) applyPanelTools(panel, sourceIframe);
-        if (activeDashboardPanelAnalysis?.iframe === sourceIframe) {
-            requestDashboardPanelAnalysis(activeDashboardPanelAnalysis);
-        }
+        dashBridgePanelAnalysisController.retryForFrame(sourceIframe);
         return;
     }
 
     if (e.data.action === 'dashbridgePanelRendered') {
         sourceIframe.dataset.dashbridgeRendered = 'true';
-        if (activeDashboardPanelAnalysis?.iframe === sourceIframe) {
-            requestDashboardPanelAnalysis(activeDashboardPanelAnalysis);
-        }
+        dashBridgePanelAnalysisController.retryForFrame(sourceIframe);
         if (new URLSearchParams(location.search).has('guiCapture')) {
             chrome.runtime.sendMessage({ type: 'dashbridge-gui-capture-ready' }).catch(() => undefined);
         }

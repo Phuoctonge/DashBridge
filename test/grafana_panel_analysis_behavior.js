@@ -193,7 +193,9 @@ assert.strictEqual(analysis.serverNameForCopy('server-06.example:9182 replica', 
 
 const panelTools = fs.readFileSync('js/content/grafana-panel-tools.js', 'utf8');
 const contentBridge = fs.readFileSync('js/content/content.js', 'utf8');
-const dashboard = fs.readFileSync('pages/dashbridge/dashbridge.js', 'utf8');
+const dashboardPage = fs.readFileSync('pages/dashbridge/dashbridge.js', 'utf8');
+const dashboardAnalysis = fs.readFileSync('pages/dashbridge/dashbridge-panel-analysis-controller.js', 'utf8');
+const dashboard = `${dashboardPage}\n${dashboardAnalysis}`;
 assert(panelTools.includes('const syncPanelAnalysisAction = (host, panel, header) =>')
     && panelTools.includes('analysis?.classifyTitle(getPanelAnalysisTitle(panel, header), readPanelAnalysisSettings())')
     && panelTools.includes("analysis.analyzePanel({ panel, type, mode: 'period', settings })")
@@ -269,10 +271,10 @@ assert(dashboard.includes('openDashboardPanelAnalysis(panel, iframeEl, type)')
     && dashboard.includes("action: 'startEmbeddedPanelAnalysis'")
     && dashboard.includes("e.data.action === 'dashbridgePanelAnalysisUpdate'")
     && dashboard.includes('dashboard-panel-analysis-overlay')
-    && dashboard.includes('document.body.appendChild(overlay)')
+    && dashboard.includes('documentRef.body.appendChild(overlay)')
     && dashboard.includes("action: 'cancelEmbeddedPanelAnalysis'")
-    && dashboard.includes('active.requestId === e.data.requestId && active.iframe === sourceIframe')
-    && dashboard.includes('if (activeDashboardPanelAnalysis) closeDashboardPanelAnalysis()')
+    && dashboard.includes('active.requestId !== message?.requestId || active.iframe !== iframe')
+    && dashboard.includes('dashBridgePanelAnalysisController.accept(e.data, sourceIframe)')
     && dashboard.includes('DashBridgeGrafanaPanelAnalysis?.classifyTitle(panel?.title, grafanaTransformSettings)')
     && panelTools.includes("if (event.data?.action === 'startEmbeddedPanelAnalysis')")
     && panelTools.includes("if (event.data?.action === 'cancelEmbeddedPanelAnalysis')")

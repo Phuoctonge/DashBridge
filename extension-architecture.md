@@ -162,6 +162,7 @@ grafana-panel-tools.js
 | Profiles storage | `dashbridge-profile-store.js` | `dashbridge-profile-controller.js`. |
 | Profiles UI/lifecycle | `dashbridge-profile-controller.js` | `dashbridge.js`; tab-local selection, cross-tab sync, panel-state checkpoint. |
 | DashBridge iframe transport | `dashbridge-frame-controller.js` | `dashbridge.js`; trusted origin, ready state and navigation reset. |
+| DashBridge panel analysis UI | `dashbridge-panel-analysis-controller.js` | CPU/RAM modal, exact iframe/request correlation, retry after iframe readiness and cancel cleanup. |
 | Неблокирующие модальные диалоги DashBridge | `dashbridge-modal.js` | Профили, импорт/экспорт, настройки и capture в `dashbridge.js`. |
 | URL и идентичность панелей DashBridge | `dashbridge-panel-url.js`, `grafana-panel-identity.js` | Добавление, поиск дублей, импорт и iframe-настройки в `dashbridge.js`. |
 | JSON transfer панелей DashBridge | `dashbridge-panel-transfer.js` | Полный export payload, строгая нормализация import, новые ID и удаление канонических дублей; FileReader/download lifecycle остаётся в `dashbridge.js`. |
@@ -241,6 +242,8 @@ dashbridge-profile-store.js
      └── dashbridge-crosshair.js
 dashbridge-frame-controller.js
   → dashbridge.js ↔ postMessage конкретного iframe
+dashbridge-panel-analysis-controller.js
+  → dashbridge.js ↔ выбранный iframe CPU/RAM analysis
 grafana-iframe.js (isolated) ↔ grafana-panel-tools.js (MAIN)
 ```
 

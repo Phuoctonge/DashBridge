@@ -6,6 +6,7 @@ const fs = require('fs');
 const source = fs.readFileSync('pages/dashbridge/dashbridge.js', 'utf8');
 const profileSource = fs.readFileSync('pages/dashbridge/dashbridge-profile-controller.js', 'utf8');
 const frameSource = fs.readFileSync('pages/dashbridge/dashbridge-frame-controller.js', 'utf8');
+const analysisSource = fs.readFileSync('pages/dashbridge/dashbridge-panel-analysis-controller.js', 'utf8');
 const iframeSource = fs.readFileSync('js/content/grafana-iframe.js', 'utf8');
 const html = fs.readFileSync('pages/dashbridge/dashbridge.html', 'utf8');
 const css = fs.readFileSync('pages/dashbridge/dashbridge.css', 'utf8');
@@ -57,11 +58,10 @@ const readySource = source.slice(readyStart, readyEnd);
 const renderedEnd = source.indexOf("if (e.data.action === 'panelLegendSeries'", readyEnd);
 const renderedSource = source.slice(readyEnd, renderedEnd);
 assert(readyStart >= 0 && readyEnd > readyStart
-    && source.includes('function requestDashboardPanelAnalysis(state)')
-    && readySource.includes('activeDashboardPanelAnalysis?.iframe === sourceIframe')
-    && readySource.includes('requestDashboardPanelAnalysis(activeDashboardPanelAnalysis)')
+    && analysisSource.includes("action: 'startEmbeddedPanelAnalysis'")
+    && readySource.includes('dashBridgePanelAnalysisController.retryForFrame(sourceIframe)')
     && renderedEnd > readyEnd
-    && renderedSource.includes('requestDashboardPanelAnalysis(activeDashboardPanelAnalysis)'),
+    && renderedSource.includes('dashBridgePanelAnalysisController.retryForFrame(sourceIframe)'),
     'an analysis dialog must resume observing after its Grafana iframe reloads');
 
 const storageSyncStart = profileSource.indexOf('const syncProfilesFromStorage = async () => {');
