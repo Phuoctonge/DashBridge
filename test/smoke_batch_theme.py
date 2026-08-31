@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parent.parent
 HTML = (ROOT / "pages/batch/batch.html").read_text(encoding="utf-8")
 CSS = (ROOT / "pages/batch/batch.css").read_text(encoding="utf-8")
 JS = (ROOT / "pages/batch/batch.js").read_text(encoding="utf-8")
+PICKER = (ROOT / "pages/batch/batch-panel-picker.js").read_text(encoding="utf-8")
 
 
 checks = {
@@ -17,7 +18,7 @@ checks = {
     "inline URL fields are overridden with theme tokens": "#pasteUrl," in CSS and "#seriesTimestamps" in CSS,
     "parameters card has a dedicated themed class": "batch-parameters-card" in HTML,
     "dynamic series cards use themed classes": "card.className = 'batch-series-card';" in JS and ".batch-series-card {" in CSS,
-    "dynamic panel titles do not force white": "batch-panel-title" in JS and "color:#fff" not in JS,
+    "dynamic panel titles do not force white": "batch-panel-title" in PICKER and "color:#fff" not in PICKER,
     "panel picker keeps checkbox, title and ID in fixed columns": ".panel-list-item {\n    display: grid;" in CSS
         and "grid-template-columns: auto minmax(0, 1fr) auto;" in CSS,
     "panel picker scrolls its list without hiding the apply action": ".batch-panel-picker-list {" in CSS

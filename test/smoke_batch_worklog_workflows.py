@@ -5,6 +5,7 @@ from support.smoke import run_checks
 
 ROOT = Path(__file__).resolve().parent.parent
 BATCH = (ROOT / "pages/batch/batch.js").read_text(encoding="utf-8")
+BATCH_PICKER = (ROOT / "pages/batch/batch-panel-picker.js").read_text(encoding="utf-8")
 BATCH_STATE = (ROOT / "pages/batch/batch-state.js").read_text(encoding="utf-8")
 BATCH_UTILS = (ROOT / "pages/batch/batch-capture-utils.js").read_text(encoding="utf-8")
 BATCH_LOADER = (ROOT / "pages/batch/batch-panel-loader.js").read_text(encoding="utf-8")
@@ -72,7 +73,7 @@ checks = {
         and "if (loadedCards)" in BATCH,
     "batch Series API temporarily foregrounds Grafana for native data": "const navigateGrafanaSeriesCaptureTab" in BATCH
         and "url: captureUrl" in BATCH and "active: true" in BATCH
-        and "chrome.tabs.update(batchTab.id, { active: true })" in BATCH
+        and "chrome.tabs.update(batchTab.id, { active: true })" in BATCH_PICKER
         and "waitForCapturedSeries" in BATCH,
     "batch Series does not wait for Grafana tab completion": "await waitForTabComplete(tabId)" not in BATCH,
     "Grafana captures native Series API responses at document start": "grafana-series-capture.js" in (ROOT / "js/shared/grafana-runtime-manifest.js").read_text(encoding="utf-8")

@@ -6,6 +6,7 @@ from support.smoke import CheckCollector
 ROOT = Path(__file__).resolve().parents[1]
 HTML = (ROOT / 'pages/batch/batch.html').read_text(encoding='utf-8')
 JS = (ROOT / 'pages/batch/batch.js').read_text(encoding='utf-8')
+PICKER = (ROOT / 'pages/batch/batch-panel-picker.js').read_text(encoding='utf-8')
 CAPTURE_UTILS = (ROOT / 'pages/batch/batch-capture-utils.js').read_text(encoding='utf-8')
 CSS = (ROOT / 'pages/batch/batch.css').read_text(encoding='utf-8')
 PANEL_LOADER = (ROOT / 'pages/batch/batch-panel-loader.js').read_text(encoding='utf-8')
@@ -17,7 +18,7 @@ check = CheckCollector()
 check('Series loader status element exists', 'id="seriesLoaderStatus"' in HTML)
 check('Series processing disables its own start button', 'startSeriesBtn.disabled = active' in JS)
 check('Series cancellation remains visible while Series runs', 'cancelBtn.hidden = !active' in JS and 'mainActionArea.hidden' not in JS.split('function setProcessing', 1)[1].split('}', 1)[0])
-check('Authorization recovery has a finite timeout', 'AUTH_RECOVERY_TIMEOUT_MS' in JS and 'setTimeout' in JS)
+check('Authorization recovery has a finite timeout', 'AUTH_RECOVERY_TIMEOUT_MS' in PICKER and 'setTimeout' in PICKER)
 check('Standalone Series filenames include a stable occurrence suffix', 'seriesIndex' in JS and 'occurrence' in JS)
 check('Batch filenames are unique and Confluence-safe', 'buildCaptureFilename' in CAPTURE_UTILS
       and 'BatchCaptureUtils.createFilenameFactory' in JS and '`[${pid}]_' not in JS
