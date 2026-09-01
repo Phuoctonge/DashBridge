@@ -110,7 +110,7 @@ grafana-cpu-capacity-filter.js
 grafana-panel-tools.js
 ```
 
-`background.js` регистрирует список через `registerContentScripts` с
+`background-grafana-infrastructure.js` регистрирует список через `registerContentScripts` с
 `world: 'MAIN'`, `runAt: 'document_start'`, `allFrames: true`. Регистрация
 покрывает только хосты из `grafanaIframeDomains` и маршруты `/d/`, `/d-solo/`,
 включая Grafana под base path. После установки, запуска или изменения доменов
