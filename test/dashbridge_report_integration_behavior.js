@@ -7,8 +7,9 @@ const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
 const html = read('pages/dashbridge/dashbridge.html');
 const dashboardPage = read('pages/dashbridge/dashbridge.js');
 const dashboardUi = read('pages/dashbridge/dashbridge-page-ui-controller.js');
+const dashboardMessages = read('pages/dashbridge/dashbridge-iframe-message-controller.js');
 const reportController = read('pages/dashbridge/dashbridge-report-controller.js');
-const dashboard = `${dashboardPage}\n${dashboardUi}\n${reportController}`;
+const dashboard = `${dashboardPage}\n${dashboardUi}\n${dashboardMessages}\n${reportController}`;
 const profileController = read('pages/dashbridge/dashbridge-profile-controller.js');
 const frameController = read('pages/dashbridge/dashbridge-frame-controller.js');
 const reportUi = read('pages/dashbridge/dashbridge-report-ui.js');
@@ -47,8 +48,8 @@ assert(html.indexOf('dashbridge-report-ui.js') < html.indexOf('dashbridge.js')
     && dashboard.includes('window.DashBridgeReportUi.create({'),
     'report UI must load before the dashboard controller and receive explicit dependencies');
 assert(reportTransport.includes("action: 'collectPanelReportSnapshot'")
-    && dashboard.includes("e.data.action === 'panelReportSnapshot'")
-    && dashboard.includes('dashBridgeReportTransport.acceptSnapshot')
+    && dashboard.includes("event.data.action === 'panelReportSnapshot'")
+    && dashboard.includes('acceptReportSnapshot(event.data.requestId, sourceIframe, event.data.snapshot)')
     && reportTransport.includes('waiter.iframe !== sourceIframe'),
     'dashboard must correlate every report response with its exact iframe');
 assert(tools.includes("event.data?.action === 'collectPanelReportSnapshot'")
@@ -198,7 +199,7 @@ assert(profileController.includes('dashboardLayoutSignature')
     'report-only saves must not reconcile or move live Grafana iframe cards');
 assert(frameController.includes('!iframe?.isConnected')
     && frameController.includes('iframe.dataset.dashbridgeOrigin !== targetOrigin')
-    && dashboard.includes('sourceIframe.dataset.dashbridgeOrigin = e.origin;')
+    && dashboard.includes('sourceIframe.dataset.dashbridgeOrigin = event.origin;')
     && frameController.includes("iframe.dataset.dashbridgeLoaded = 'false';"),
     'postMessage must reject detached or unverified iframe windows before using a Grafana target origin');
 assert(!reportUi.includes('Единица измерения\n')

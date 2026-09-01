@@ -576,91 +576,25 @@ dashBridgePageUiController = DashBridgePageUiController.create({
 window.deletePanel = dashBridgePanelActionsController.deletePanel;
 window.refreshPanel = dashBridgePanelActionsController.refreshPanel;
 
-window.addEventListener('message', (e) => {
-    if (!e.data || !e.data.action) return;
-
-    // Проверка безопасности: принимаем сообщения только от iframe-ов, открытых на нашем дашборде
-    const sourceIframe = Array.from(document.querySelectorAll('iframe[name="dashbridge-iframe"]'))
-        .find(ifr => ifr.contentWindow === e.source);
-    if (!sourceIframe || getFrameOrigin(sourceIframe) !== e.origin) return;
-
-    if (e.data.action === 'panelReportSnapshot' && typeof e.data.requestId === 'string') {
-        dashBridgeReportTransport.acceptSnapshot(e.data.requestId, sourceIframe, e.data.snapshot);
-        return;
-    }
-
-    if (e.data.action === 'dashbridgePanelAnalysisUpdate'
-        && typeof e.data.requestId === 'string') {
-        dashBridgePanelAnalysisController.accept(e.data, sourceIframe);
-        return;
-    }
-
-    if (e.data.action === 'dashbridgePanelCaptureRequest'
-        && typeof e.data.requestId === 'string'
-        && ['download', 'copy'].includes(e.data.outputAction)) {
-        const panel = getPanelForIframe(sourceIframe);
-        void captureDashbridgePanel(sourceIframe, panel, e.data);
-        return;
-    }
-
-    if (e.data.action === 'dashbridgeCapturePreparedChanged' && typeof e.data.enabled === 'boolean') {
-        setDashboardCapturePrepared(e.data.enabled);
-        return;
-    }
-
-    if (e.data.action === 'dashbridgePanelTitle') {
-        const panel = getPanelForIframe(sourceIframe);
-        const title = typeof e.data.title === 'string' ? e.data.title.trim().slice(0, 240) : '';
-        if (panel && title && panel.title !== title) {
-            panel.title = title;
-            savePanels();
-            syncPanelAnalysisAction(panel, sourceIframe.closest('.panel-card'));
-        }
-        return;
-    }
-
-    if (e.data.action === 'dashbridgePanelTitleResponse' && typeof e.data.requestId === 'string') {
-        dashBridgePanelToolsController.acceptTitleResponse(e.data);
-        return;
-    }
-
-    if (e.data.action === 'dashbridgeIframeReady') {
-        // `load` can fire for an inherited about:blank document. A message from
-        // the content script proves that the Grafana document now owns this window.
-        sourceIframe.dataset.dashbridgeOrigin = e.origin;
-        sourceIframe.dataset.dashbridgeLoaded = 'true';
-        postToDashboardFrame(sourceIframe, { action: 'setCrosshairMode', mode: crosshairMode, thickness: crosshairThickness });
-        const panel = getPanelForIframe(sourceIframe);
-        dashBridgeTimeController.sendTimeUpdate(sourceIframe);
-        if (panel) applyPanelTools(panel, sourceIframe);
-        dashBridgePanelAnalysisController.retryForFrame(sourceIframe);
-        return;
-    }
-
-    if (e.data.action === 'dashbridgePanelRendered') {
-        sourceIframe.dataset.dashbridgeRendered = 'true';
-        dashBridgePanelAnalysisController.retryForFrame(sourceIframe);
-        if (new URLSearchParams(location.search).has('guiCapture')) {
-            chrome.runtime.sendMessage({ type: 'dashbridge-gui-capture-ready' }).catch(() => undefined);
-        }
-        return;
-    }
-
-    if (e.data.action === 'panelLegendSeries' && typeof e.data.requestId === 'string') {
-        const panel = panels.find(item => item.id === sourceIframe.closest('.panel-card')?.dataset.panelId);
-        dashBridgePanelToolsController.acceptLegendSeries(e.data, panel);
-        return;
-    }
-
-    if (e.data.action === 'panelThresholdStatus') {
-        const panel = getPanelForIframe(sourceIframe);
-        dashBridgePanelToolsController.acceptThresholdStatus(e.data, panel);
-        return;
-    }
-
-    if (e.data.action === 'broadcastCrosshair' && e.data.percentX !== undefined) {
-        broadcastCrosshair(e.data.percentX, e.data.timestamp, sourceIframe);
-    } else if (e.data.action === 'broadcastCrosshairHide') {
-        hideCrosshair();
-    }
-});
+DashBridgeIframeMessageController.create({
+    getFrameOrigin,
+    getPanelForIframe,
+    getPanels: () => panels,
+    acceptReportSnapshot: dashBridgeReportTransport.acceptSnapshot,
+    acceptPanelAnalysis: dashBridgePanelAnalysisController.accept,
+    capturePanel: captureDashbridgePanel,
+    setCapturePrepared: setDashboardCapturePrepared,
+    savePanels,
+    syncPanelAnalysisAction,
+    acceptTitleResponse: dashBridgePanelToolsController.acceptTitleResponse,
+    postToDashboardFrame,
+    getCrosshairMode: () => crosshairMode,
+    getCrosshairThickness: () => crosshairThickness,
+    sendTimeUpdate: dashBridgeTimeController.sendTimeUpdate,
+    applyPanelTools,
+    retryPanelAnalysis: dashBridgePanelAnalysisController.retryForFrame,
+    acceptLegendSeries: dashBridgePanelToolsController.acceptLegendSeries,
+    acceptThresholdStatus: dashBridgePanelToolsController.acceptThresholdStatus,
+    broadcastCrosshair,
+    hideCrosshair,
+}).setup();

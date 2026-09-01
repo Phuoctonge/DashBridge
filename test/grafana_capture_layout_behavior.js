@@ -31,7 +31,8 @@ assert(narrow.left >= 12 && narrow.top >= 12, 'prepared panel must stay inside t
 const tools = fs.readFileSync('js/content/grafana-panel-tools.js', 'utf8');
 const dashboard = fs.readFileSync('pages/dashbridge/dashbridge.js', 'utf8')
     + fs.readFileSync('pages/dashbridge/dashbridge-panel-actions-controller.js', 'utf8')
-    + fs.readFileSync('pages/dashbridge/dashbridge-page-ui-controller.js', 'utf8');
+    + fs.readFileSync('pages/dashbridge/dashbridge-page-ui-controller.js', 'utf8')
+    + fs.readFileSync('pages/dashbridge/dashbridge-iframe-message-controller.js', 'utf8');
 const dashboardCapture = fs.readFileSync('pages/dashbridge/dashbridge-capture.js', 'utf8');
 const dashboardCss = fs.readFileSync('pages/dashbridge/dashbridge.css', 'utf8');
 const dashboardHtml = fs.readFileSync('pages/dashbridge/dashbridge.html', 'utf8');

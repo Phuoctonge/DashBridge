@@ -11,6 +11,7 @@ const pageSource = [
     'dashbridge-panel-actions-controller.js',
     'dashbridge-panel-card-controller.js',
     'dashbridge-page-ui-controller.js',
+    'dashbridge-iframe-message-controller.js',
 ].map(file => fs.readFileSync(path.join(root, 'pages', 'dashbridge', file), 'utf8')).join('\n');
 const html = fs.readFileSync(path.join(root, 'pages', 'dashbridge', 'dashbridge.html'), 'utf8');
 assert(html.indexOf('dashbridge-panel-analysis-controller.js') < html.indexOf('dashbridge.js'),
@@ -18,8 +19,8 @@ assert(html.indexOf('dashbridge-panel-analysis-controller.js') < html.indexOf('d
 assert(pageSource.includes('panelAnalysis.isPanel(panel)')
     && pageSource.includes('panelAnalysis.isPanel(panelId)')
     && pageSource.includes('panelAnalysis: dashBridgePanelAnalysisController')
-    && pageSource.includes('dashBridgePanelAnalysisController.accept(e.data, sourceIframe)')
-    && pageSource.match(/dashBridgePanelAnalysisController\.retryForFrame\(sourceIframe\)/g)?.length === 2
+    && pageSource.includes('acceptPanelAnalysis(event.data, sourceIframe)')
+    && pageSource.match(/retryPanelAnalysis\(sourceIframe\)/g)?.length === 2
     && pageSource.includes('closePanelAnalysis();'),
     'pause, removal, reconciliation, escape, rerender and iframe messages must retain one analysis owner');
 

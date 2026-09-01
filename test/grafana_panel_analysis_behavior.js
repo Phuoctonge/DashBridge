@@ -196,7 +196,8 @@ const contentBridge = fs.readFileSync('js/content/content.js', 'utf8');
 const dashboardPage = fs.readFileSync('pages/dashbridge/dashbridge.js', 'utf8');
 const dashboardAnalysis = fs.readFileSync('pages/dashbridge/dashbridge-panel-analysis-controller.js', 'utf8');
 const dashboardActions = fs.readFileSync('pages/dashbridge/dashbridge-panel-actions-controller.js', 'utf8');
-const dashboard = `${dashboardPage}\n${dashboardAnalysis}\n${dashboardActions}`;
+const dashboardMessages = fs.readFileSync('pages/dashbridge/dashbridge-iframe-message-controller.js', 'utf8');
+const dashboard = `${dashboardPage}\n${dashboardAnalysis}\n${dashboardActions}\n${dashboardMessages}`;
 assert(panelTools.includes('const syncPanelAnalysisAction = (host, panel, header) =>')
     && panelTools.includes('analysis?.classifyTitle(getPanelAnalysisTitle(panel, header), readPanelAnalysisSettings())')
     && panelTools.includes("analysis.analyzePanel({ panel, type, mode: 'period', settings })")
@@ -270,12 +271,12 @@ assert(embeddedStart >= 0 && embeddedEnd > embeddedStart
     'DashBridge analysis must show the current panel and passively follow its configured auto-refresh');
 assert(dashboard.includes('openPanelAnalysis(panel, iframe, type)')
     && dashboard.includes("action: 'startEmbeddedPanelAnalysis'")
-    && dashboard.includes("e.data.action === 'dashbridgePanelAnalysisUpdate'")
+    && dashboard.includes("event.data.action === 'dashbridgePanelAnalysisUpdate'")
     && dashboard.includes('dashboard-panel-analysis-overlay')
     && dashboard.includes('documentRef.body.appendChild(overlay)')
     && dashboard.includes("action: 'cancelEmbeddedPanelAnalysis'")
     && dashboard.includes('active.requestId !== message?.requestId || active.iframe !== iframe')
-    && dashboard.includes('dashBridgePanelAnalysisController.accept(e.data, sourceIframe)')
+    && dashboard.includes('acceptPanelAnalysis(event.data, sourceIframe)')
     && dashboard.includes('DashBridgeGrafanaPanelAnalysis?.classifyTitle(panel?.title, grafanaTransformSettings)')
     && panelTools.includes("if (event.data?.action === 'startEmbeddedPanelAnalysis')")
     && panelTools.includes("if (event.data?.action === 'cancelEmbeddedPanelAnalysis')")

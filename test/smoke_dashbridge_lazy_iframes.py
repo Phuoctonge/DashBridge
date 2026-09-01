@@ -7,6 +7,7 @@ from support.smoke import run_checks
 ROOT = Path(__file__).parent.parent
 src = (ROOT / 'pages/dashbridge/dashbridge.js').read_text(encoding='utf-8')
 page_ui = (ROOT / 'pages/dashbridge/dashbridge-page-ui-controller.js').read_text(encoding='utf-8')
+messages = (ROOT / 'pages/dashbridge/dashbridge-iframe-message-controller.js').read_text(encoding='utf-8')
 cards = (ROOT / 'pages/dashbridge/dashbridge-panel-card-controller.js').read_text(encoding='utf-8')
 capture = (ROOT / 'pages/dashbridge/dashbridge-capture.js').read_text(encoding='utf-8')
 renderer = (ROOT / 'pages/dashbridge/dashbridge-renderer.js').read_text(encoding='utf-8')
@@ -37,7 +38,7 @@ checks = {
     'paused panels are excluded from archive':
         'panels.filter(panel => !panel.paused)' in capture,
     'archive waits for a rendered Grafana panel':
-        'waitForPanelRendered(iframe)' in capture and "dataset.dashbridgeRendered = 'true'" in src,
+        'waitForPanelRendered(iframe)' in capture and "dataset.dashbridgeRendered = 'true'" in messages,
     'archive uses the same prepared capture dimensions':
         "outputAction: 'archive'" in capture
         and 'const dimensions = getCompactCaptureDimensions()' in capture

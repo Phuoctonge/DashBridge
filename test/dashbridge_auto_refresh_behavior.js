@@ -12,6 +12,7 @@ const panelToolsSource = fs.readFileSync('pages/dashbridge/dashbridge-panel-tool
 const panelAdditionSource = fs.readFileSync('pages/dashbridge/dashbridge-panel-addition-controller.js', 'utf8');
 const panelCardSource = fs.readFileSync('pages/dashbridge/dashbridge-panel-card-controller.js', 'utf8');
 const panelActionsSource = fs.readFileSync('pages/dashbridge/dashbridge-panel-actions-controller.js', 'utf8');
+const messageSource = fs.readFileSync('pages/dashbridge/dashbridge-iframe-message-controller.js', 'utf8');
 const iframeSource = fs.readFileSync('js/content/grafana-iframe.js', 'utf8');
 const html = fs.readFileSync('pages/dashbridge/dashbridge.html', 'utf8');
 const css = fs.readFileSync('pages/dashbridge/dashbridge.css', 'utf8');
@@ -57,16 +58,16 @@ assert(absoluteStart >= 0 && absoluteEnd > absoluteStart
     && absoluteSource.indexOf('broadcast()') > absoluteSource.indexOf('if (requiresNavigation)'),
     'absolute ranges must navigate once while relative ranges keep the seamless update path');
 
-const readyStart = source.indexOf("if (e.data.action === 'dashbridgeIframeReady')");
-const readyEnd = source.indexOf("if (e.data.action === 'dashbridgePanelRendered')", readyStart);
-const readySource = source.slice(readyStart, readyEnd);
-const renderedEnd = source.indexOf("if (e.data.action === 'panelLegendSeries'", readyEnd);
-const renderedSource = source.slice(readyEnd, renderedEnd);
+const readyStart = messageSource.indexOf("if (event.data.action === 'dashbridgeIframeReady')");
+const readyEnd = messageSource.indexOf("if (event.data.action === 'dashbridgePanelRendered')", readyStart);
+const readySource = messageSource.slice(readyStart, readyEnd);
+const renderedEnd = messageSource.indexOf("if (event.data.action === 'panelLegendSeries'", readyEnd);
+const renderedSource = messageSource.slice(readyEnd, renderedEnd);
 assert(readyStart >= 0 && readyEnd > readyStart
     && analysisSource.includes("action: 'startEmbeddedPanelAnalysis'")
-    && readySource.includes('dashBridgePanelAnalysisController.retryForFrame(sourceIframe)')
+    && readySource.includes('retryPanelAnalysis(sourceIframe)')
     && renderedEnd > readyEnd
-    && renderedSource.includes('dashBridgePanelAnalysisController.retryForFrame(sourceIframe)'),
+    && renderedSource.includes('retryPanelAnalysis(sourceIframe)'),
     'an analysis dialog must resume observing after its Grafana iframe reloads');
 
 const storageSyncStart = profileSource.indexOf('const syncProfilesFromStorage = async () => {');
