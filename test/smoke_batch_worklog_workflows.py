@@ -22,6 +22,7 @@ SERIES_CAPTURE = (ROOT / "js/content/grafana-series-capture.js").read_text(encod
 ARCHIVE = (ROOT / "js/shared/archive-download.js").read_text(encoding="utf-8")
 URLS = (ROOT / "js/shared/grafana-url.js").read_text(encoding="utf-8")
 RUNTIME = (ROOT / "js/shared/grafana-runtime.js").read_text(encoding="utf-8")
+PANEL_CAPTURE_RUNTIME = (ROOT / "js/content/grafana-panel-capture-runtime.js").read_text(encoding="utf-8")
 
 
 checks = {
@@ -50,8 +51,8 @@ checks = {
         and "operation.getCaptureOptions('compactCaptureMain')" in BATCH
         and "operation.getCaptureOptions('compactCaptureSeries')" in BATCH,
     "batch compact capture uses the shared prepared panel layout": "DashBridgeGrafanaBatchCapture?.prepare" in (ROOT / "js/shared/grafana-panel-capture.js").read_text(encoding="utf-8")
-        and "const batchCaptureApi = Object.freeze" in (ROOT / "js/content/grafana-panel-tools.js").read_text(encoding="utf-8")
-        and "window.DashBridgeGrafanaBatchCapture = batchCaptureApi" in (ROOT / "js/content/grafana-panel-tools.js").read_text(encoding="utf-8"),
+        and "const batchCaptureApi = Object.freeze" in PANEL_CAPTURE_RUNTIME
+        and "window.DashBridgeGrafanaBatchCapture = batchCaptureApi" in PANEL_CAPTURE_RUNTIME,
     "batch defaults Grafana capture theme to light without persistence": 'value="light" checked' in HTML and "state.captureTheme" not in BATCH,
     "batch keeps current Grafana theme URL-neutral": "url.searchParams.delete('theme')" in URLS,
     "batch applies explicit Grafana themes to capture URLs": "theme === 'light' || theme === 'dark'" in URLS,

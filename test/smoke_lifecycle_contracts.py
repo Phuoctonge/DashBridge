@@ -3,7 +3,8 @@ from pathlib import Path
 from support.smoke import run_checks
 
 ROOT = Path(__file__).resolve().parent.parent
-tools = (ROOT / "js/content/grafana-panel-tools.js").read_text(encoding="utf-8")
+tools = (ROOT / "js/content/grafana-panel-tools.js").read_text(encoding="utf-8") \
+    + (ROOT / "js/content/grafana-panel-capture-runtime.js").read_text(encoding="utf-8")
 state = (ROOT / "js/content/grafana-panel-state.js").read_text(encoding="utf-8")
 dashboard = (ROOT / "pages/dashbridge/dashbridge.js").read_text(encoding="utf-8") + (ROOT / "pages/dashbridge/dashbridge-profile-controller.js").read_text(encoding="utf-8")
 dashboard_capture = (ROOT / "pages/dashbridge/dashbridge-capture.js").read_text(encoding="utf-8")

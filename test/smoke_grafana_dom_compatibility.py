@@ -14,6 +14,7 @@ FALLBACK_FILES = [
     ROOT / "js/shared/grafana-panel-capture.js",
     ROOT / "js/shared/grafana-legend-engine.js",
     ROOT / "js/content/grafana-panel-tools.js",
+    ROOT / "js/content/grafana-panel-capture-runtime.js",
     ROOT / "js/content/grafana-visual-engine.js",
 ]
 NODE = os.environ.get("DASHBRIDGE_NODE") or shutil.which("node")
