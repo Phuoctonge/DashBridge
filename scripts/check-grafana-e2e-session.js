@@ -5,6 +5,7 @@ const path = require('node:path');
 const { chromium } = require('@playwright/test');
 const {
     projectRoot,
+    reconcileRegisteredGrafanaRuntime,
     resolveProfileRoot,
     validateGrafanaUrls,
     waitForExtensionWorker
@@ -33,6 +34,16 @@ async function main() {
     const results = [];
     try {
         const extensionId = await waitForExtensionWorker(context);
+        const runtimePage = context.pages()[0] || await context.newPage();
+        await runtimePage.goto(`chrome-extension://${extensionId}/pages/test-runner/test-runner.html`, {
+            waitUntil: 'domcontentloaded',
+            timeout: 30_000
+        });
+        await runtimePage.waitForFunction(() => (
+            Array.isArray(globalThis.DashBridgeGrafanaRuntimeManifest?.files)
+        ), null, { timeout: 30_000 });
+        const runtimeRegistration = await runtimePage.evaluate(reconcileRegisteredGrafanaRuntime);
+        await runtimePage.close();
         for (const value of grafanaUrls) {
             const target = new URL(value);
             const page = await context.newPage();
@@ -65,6 +76,7 @@ async function main() {
             checkedAt: new Date().toISOString(),
             extensionId,
             profileRoot,
+            runtimeRegistration,
             results
         };
         const resultsRoot = path.join(projectRoot, 'test-results');

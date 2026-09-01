@@ -50,6 +50,47 @@ async function waitForExtensionWorker(context) {
     return new URL(worker.url()).host;
 }
 
+async function reconcileRegisteredGrafanaRuntime({ settleMs = 4_000, pollMs = 200 } = {}) {
+    const runtimeFiles = [...(globalThis.DashBridgeGrafanaRuntimeManifest?.files || [])];
+    const scripting = globalThis.chrome?.scripting;
+    if (!runtimeFiles.length || typeof scripting?.getRegisteredContentScripts !== 'function'
+        || typeof scripting?.updateContentScripts !== 'function') {
+        throw new Error('Current Grafana runtime manifest or scripting API is unavailable');
+    }
+
+    const isOwnedRegistration = registration => registration?.id === 'dashbridge-grafana-main-runtime-v1'
+        || registration?.id?.startsWith('dashbridge-grafana-explicit-');
+    const hasCurrentFiles = registration => JSON.stringify(registration?.js || [])
+        === JSON.stringify(runtimeFiles);
+    const updated = new Set();
+    const deadline = Date.now() + Math.max(0, Number(settleMs) || 0);
+    const delay = () => new Promise(resolve => setTimeout(resolve, Math.max(0, Number(pollMs) || 0)));
+
+    // MV3 may restore persisted registrations shortly after the worker becomes
+    // visible. Keep polling when none exist so a late stale registration cannot
+    // race the preflight and inject an old split-module list into Grafana.
+    while (true) {
+        const owned = (await scripting.getRegisteredContentScripts()).filter(isOwnedRegistration);
+        for (const registration of owned.filter(item => !hasCurrentFiles(item))) {
+            await scripting.updateContentScripts([{ id: registration.id, js: [...runtimeFiles] }]);
+            updated.add(registration.id);
+        }
+        if (owned.length || Date.now() >= deadline) break;
+        await delay();
+    }
+
+    const registrations = (await scripting.getRegisteredContentScripts()).filter(isOwnedRegistration);
+    const stale = registrations.filter(item => !hasCurrentFiles(item));
+    if (stale.length) {
+        throw new Error(`Stale Grafana runtime registration remains: ${stale.map(item => item.id).join(', ')}`);
+    }
+    return {
+        checked: registrations.length,
+        updated: [...updated],
+        currentFileCount: runtimeFiles.length,
+    };
+}
+
 async function main() {
     const grafanaUrls = validateGrafanaUrls(process.argv.slice(2));
     const profileRoot = resolveProfileRoot();
@@ -110,4 +151,10 @@ if (require.main === module) {
     });
 }
 
-module.exports = { projectRoot, resolveProfileRoot, validateGrafanaUrls, waitForExtensionWorker };
+module.exports = {
+    projectRoot,
+    reconcileRegisteredGrafanaRuntime,
+    resolveProfileRoot,
+    validateGrafanaUrls,
+    waitForExtensionWorker,
+};

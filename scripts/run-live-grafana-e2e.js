@@ -6,6 +6,7 @@ const path = require('node:path');
 const { chromium } = require('@playwright/test');
 const {
     projectRoot,
+    reconcileRegisteredGrafanaRuntime,
     resolveProfileRoot,
     validateGrafanaUrls,
     waitForExtensionWorker
@@ -259,6 +260,7 @@ async function main() {
     let snapshot;
     let failureReport = '';
     let failureDiagnostics = [];
+    let runtimeRegistration = null;
     let interrupted = false;
 
     const stop = async () => {
@@ -292,6 +294,10 @@ async function main() {
             waitUntil: 'domcontentloaded',
             timeout: 30_000
         });
+        await runnerPage.waitForFunction(() => (
+            Array.isArray(globalThis.DashBridgeGrafanaRuntimeManifest?.files)
+        ), null, { timeout: 30_000 });
+        runtimeRegistration = await runnerPage.evaluate(reconcileRegisteredGrafanaRuntime);
         await runnerPage.waitForFunction(() => (
             globalThis.document.documentElement.dataset.dashbridgeTestRunnerReady === 'true'
         ), null, { timeout: RUNNER_READY_TIMEOUT_MS });
@@ -341,6 +347,7 @@ async function main() {
             chromeVersion: await context.browser()?.version(),
             extensionId,
             profileRoot,
+            runtimeRegistration,
             snapshot: compact,
             failureDiagnostics,
             evidence
@@ -357,6 +364,7 @@ async function main() {
             startedAt,
             failedAt: new Date().toISOString(),
             error: { name: error.name, message: error.message, stack: error.stack || null },
+            runtimeRegistration,
             snapshot: snapshot ? compactSnapshot(snapshot) : null,
             failureDiagnostics,
             evidence

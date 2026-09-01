@@ -14,6 +14,9 @@ assert(uiSource.includes("dataset.dashbridgeTestRunnerReady = 'true'")
 assert(runnerSource.includes('const RUNNER_READY_TIMEOUT_MS = 10 * 60_000;')
     && runnerSource.includes('timeout: RUNNER_READY_TIMEOUT_MS'),
     'Playwright must allow bounded stale OPFS cleanup before declaring the runner unavailable');
+assert(runnerSource.includes('runtimeRegistration = await runnerPage.evaluate(reconcileRegisteredGrafanaRuntime)')
+    && runnerSource.includes('runtimeRegistration,'),
+    'live E2E must reconcile and report stale MAIN runtime registrations before opening Grafana');
 assert(runnerSource.includes('dataStatus: runtime.dataStatus || null'),
     'failed live diagnostics must retain the compact intentional-empty status');
 assert(!runnerSource.includes('diagnosticSpool.readCompactedTest(test.diagnosticRef)')
