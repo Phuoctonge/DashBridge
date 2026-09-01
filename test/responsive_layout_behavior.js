@@ -88,7 +88,8 @@ assert(panelSettings.includes('const getInterfaceScale = () =>')
     'floating graph settings, threshold fields and Load Average controls must scale independently of their host and stay viewport-bound');
 
 const dashbridgeCss = read('pages/dashbridge/dashbridge.css');
-const grafanaPanelTools = read('js/content/grafana-panel-tools.js');
+const grafanaPanelTools = read('js/content/grafana-panel-tools.js')
+    + read('js/content/grafana-panel-menu-runtime.js');
 const grafanaContent = read('js/content/content.js');
 assert(dashbridgeCss.includes('width: min(45rem, calc(100vw - 2.5rem))')
     && dashbridgeCss.includes('max-height: calc(100dvh - 2.5rem)')

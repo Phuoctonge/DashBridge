@@ -3,7 +3,7 @@ from support.smoke import read, run_checks
 
 
 if __name__ == "__main__":
-    tools = read("js/content/grafana-panel-tools.js")
+    tools = read("js/content/grafana-panel-tools.js") + read("js/content/grafana-panel-menu-runtime.js")
     content = read("js/content/content.js")
     background = read("js/background.js")
     storage = read("js/background-profile-storage.js")

@@ -26,6 +26,7 @@
         'js/content/grafana-network.js',
         'js/content/grafana-cpu-capacity-filter.js',
         'js/content/grafana-panel-capture-runtime.js',
+        'js/content/grafana-panel-menu-runtime.js',
         'js/content/grafana-panel-tools.js'
     ]);
     const matchesForHostname = hostname => {

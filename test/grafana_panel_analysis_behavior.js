@@ -191,7 +191,8 @@ assert.strictEqual(analysis.serverNameForCopy('server-06.example:9182 replica', 
     ...defaults, trimDomainEnabled: false
 }), 'server-06.example:9182 replica', 'copying must remove only a trailing configured suffix');
 
-const panelTools = fs.readFileSync('js/content/grafana-panel-tools.js', 'utf8');
+const panelTools = fs.readFileSync('js/content/grafana-panel-tools.js', 'utf8')
+    + fs.readFileSync('js/content/grafana-panel-menu-runtime.js', 'utf8');
 const contentBridge = fs.readFileSync('js/content/content.js', 'utf8');
 const dashboardPage = fs.readFileSync('pages/dashbridge/dashbridge.js', 'utf8');
 const dashboardAnalysis = fs.readFileSync('pages/dashbridge/dashbridge-panel-analysis-controller.js', 'utf8');
