@@ -11,9 +11,13 @@ except (AttributeError, OSError):
     pass
 
 ROOT = Path(__file__).resolve().parent.parent
-SUITE = (ROOT / "pages/test-runner/test-runner-suite.js").read_text(encoding="utf-8")
+SUITE = "\n".join((ROOT / f"pages/test-runner/{name}").read_text(encoding="utf-8") for name in [
+    "test-runner-diagnostics.js", "test-runner-transitions.js", "test-runner-suite.js"
+])
 CORE = (ROOT / "pages/test-runner/test-runner-core.js").read_text(encoding="utf-8")
-UI = (ROOT / "pages/test-runner/test-runner-ui.js").read_text(encoding="utf-8")
+UI = "\n".join((ROOT / f"pages/test-runner/{name}").read_text(encoding="utf-8") for name in [
+    "test-runner-artifact-serialization.js", "test-runner-spool.js", "test-runner-ui.js"
+])
 REPORT = (ROOT / "pages/test-runner/test-runner-report.js").read_text(encoding="utf-8")
 PANEL_TOOLS = (ROOT / "js/content/grafana-panel-tools.js").read_text(encoding="utf-8") \
     + (ROOT / "js/content/grafana-panel-data-runtime.js").read_text(encoding="utf-8")

@@ -5,10 +5,19 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 
-const suiteCode = fs.readFileSync(
+const diagnosticsCode = fs.readFileSync(
+    path.join(__dirname, '..', 'pages/test-runner/test-runner-diagnostics.js'),
+    'utf8'
+);
+const transitionsCode = fs.readFileSync(
+    path.join(__dirname, '..', 'pages/test-runner/test-runner-transitions.js'),
+    'utf8'
+);
+const catalogCode = fs.readFileSync(
     path.join(__dirname, '..', 'pages/test-runner/test-runner-suite.js'),
     'utf8'
 );
+const suiteCode = `${diagnosticsCode}\n${transitionsCode}\n${catalogCode}`;
 
 // Контракт автоматической диагностики остаётся доступным в suite.
 [
@@ -42,10 +51,9 @@ const coreCode = fs.readFileSync(
     assert(coreCode.includes(fragment), `Отсутствует core-диагностика: ${fragment}`);
 });
 
-const uiCode = fs.readFileSync(
-    path.join(__dirname, '..', 'pages/test-runner/test-runner-ui.js'),
-    'utf8'
-);
+const uiCode = ['test-runner-artifact-serialization.js', 'test-runner-spool.js', 'test-runner-ui.js']
+    .map(name => fs.readFileSync(path.join(__dirname, '..', 'pages/test-runner', name), 'utf8'))
+    .join('\n');
 [
     'DashBridgeTestReport.createArtifactStreamPlan',
     'serializeSpoolArtifact(lastSnapshot, diagnosticSpool, exportMetadata,',

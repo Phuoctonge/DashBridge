@@ -5,12 +5,11 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'pages', 'test-runner', 'test-runner-ui.js'), 'utf8');
+const source = fs.readFileSync(path.join(__dirname, '..', 'pages', 'test-runner', 'test-runner-artifact-serialization.js'), 'utf8');
 const start = source.indexOf('async function serializeJsonInChunks(');
 assert(start >= 0, 'chunked JSON serializer is missing');
 
-const end = source.indexOf('async function exportDiagnostics(', start);
-assert(end > start, 'chunked JSON serializer boundary is missing');
+const end = source.length;
 
 const context = {
     Blob,

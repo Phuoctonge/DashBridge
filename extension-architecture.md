@@ -639,9 +639,10 @@ package-файлы, `node_modules` и результаты тестов не в�
 вручную один раз внутри браузера, без передачи credentials тестовому коду.
 `scripts/run-live-grafana-e2e.js` является внешним Playwright-оркестратором, а
 не вторым владельцем сценариев: он открывает существующий extension Test Runner,
-передаёт ему один или два dashboard URL и ждёт его публичный snapshot. Fast и
-Full матрицы, OFF→ON/reset, повторный refresh, uPlot/Flot invariants и cleanup
-остаются во владельце `pages/test-runner/test-runner-suite.js`. Оркестратор
+передаёт ему один или два dashboard URL и ждёт его публичный snapshot. Захват
+evidence принадлежит `test-runner-diagnostics.js`, причинный OFF→ON/reset и
+повторный refresh — `test-runner-transitions.js`, а стабильные ID и generated
+Fast/Full матрицы — `test-runner-suite.js`. Оркестратор
 пишет полный локальный JSON и компактный failure-report в игнорируемый
 `test-results/`; в Node-процесс передаются только bounded console/network
 evidence и диагностика проваленных тестов без изображений и крупных payload.
@@ -654,7 +655,9 @@ evidence и диагностика проваленных тестов без и
 профиль, быстрые сценарии, последние FAIL, последние NOT RUN или произвольный
 набор. Выбор хранится в `storage.local`; пустой набор не запускается.
 
-После завершения UI сохраняет только компактную историю результатов по тестам
+`test-runner-spool.js` владеет OPFS lifecycle и дедупликацией evidence, а
+`test-runner-artifact-serialization.js` — потоковой JSON-сериализацией без
+удержания полного результата в памяти. После завершения UI сохраняет только компактную историю результатов по тестам
 и не более 20 последних запусков. Она нужна для понятных имён в истории и
 повторного запуска проблемного набора; полная диагностическая evidence
 по-прежнему принадлежит OPFS/локальному JSON, а не `storage.local`.

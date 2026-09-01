@@ -8,7 +8,9 @@ const path = require('path');
 const vm = require('vm');
 
 const reportSource = fs.readFileSync(path.join(__dirname, '..', 'pages', 'test-runner', 'test-runner-report.js'), 'utf8');
-const uiSource = fs.readFileSync(path.join(__dirname, '..', 'pages', 'test-runner', 'test-runner-ui.js'), 'utf8');
+const uiSource = ['test-runner-artifact-serialization.js', 'test-runner-spool.js', 'test-runner-ui.js']
+    .map(name => fs.readFileSync(path.join(__dirname, '..', 'pages', 'test-runner', name), 'utf8'))
+    .join('\n');
 const coreSource = fs.readFileSync(path.join(__dirname, '..', 'pages', 'test-runner', 'test-runner-core.js'), 'utf8');
 const classStart = uiSource.indexOf('class DiagnosticSpool');
 const classEnd = uiSource.indexOf('// --- Утилиты ---', classStart);

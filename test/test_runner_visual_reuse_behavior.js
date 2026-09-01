@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'pages', 'test-runner', 'test-runner-suite.js'), 'utf8');
+const source = fs.readFileSync(path.join(__dirname, '..', 'pages', 'test-runner', 'test-runner-diagnostics.js'), 'utf8');
 const extractFunction = name => {
     const start = source.indexOf(`function ${name}(`);
     assert(start >= 0, `${name} not found`);
