@@ -54,6 +54,7 @@ modal_content = DASHBRIDGE_MODAL_JS.read_text(encoding="utf-8")
 panel_url_content = DASHBRIDGE_PANEL_URL_JS.read_text(encoding="utf-8")
 panel_transfer_content = DASHBRIDGE_PANEL_TRANSFER_JS.read_text(encoding="utf-8")
 panel_addition_content = (ROOT / "pages/dashbridge/dashbridge-panel-addition-controller.js").read_text(encoding="utf-8")
+panel_card_content = (ROOT / "pages/dashbridge/dashbridge-panel-card-controller.js").read_text(encoding="utf-8")
 dashbridge_html = DASHBRIDGE_HTML.read_text(encoding="utf-8")
 
 # ════════════════════════════════════════════════════════
@@ -464,8 +465,8 @@ if iframe_save_src:
 print("\n--- updatePanelCard ---")
 
 update_card = re.search(
-    r"function updatePanelCard\(panelId\)\s*\{(.*?)\n\}",
-    content,
+    r"const updatePanelCard = \(panelId, \{ reloadFrame = true \} = \{\}\) => \{(.*?)\n        \};",
+    panel_card_content,
     re.S
 )
 test(
@@ -481,7 +482,7 @@ test(
 )
 test(
     "updatePanelCard уводит загруженный iframe через navigateDashboardFrame",
-    "navigateDashboardFrame(iframe, newSrc)" in update_card_src
+    "navigateDashboardFrame(iframe, nextSrc)" in update_card_src
 )
 test(
     "updatePanelCard снимает data-src у уже загруженного iframe",
@@ -490,13 +491,13 @@ test(
 )
 test(
     "updatePanelCard выставляет data-src ровно один раз (ветка ожидания)",
-    update_card_src.count("iframe.dataset.src = newSrc") == 1,
-    f"найдено {update_card_src.count('iframe.dataset.src = newSrc')}"
+    update_card_src.count("iframe.dataset.src = nextSrc") == 1,
+    f"найдено {update_card_src.count('iframe.dataset.src = nextSrc')}"
 )
 test(
     "updatePanelCard не перезагружает iframe при неизменном URL",
-    "iframe.src !== newSrc" in update_card_src
-    and "iframe.dataset.src !== newSrc" in update_card_src
+    "iframe.src !== nextSrc" in update_card_src
+    and "iframe.dataset.src !== nextSrc" in update_card_src
 )
 
 # ════════════════════════════════════════════════════════

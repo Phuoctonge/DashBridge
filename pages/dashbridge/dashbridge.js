@@ -3,6 +3,43 @@ let activeProfileId = null;
 let panels = []; // Всегда синхронизирован с активным профилем
 let dashBridgeTimeController = null;
 let dashBridgePanelToolsController = null;
+let dashBridgePanelCardController = null;
+
+function forceLoadPanel(id) {
+    return dashBridgePanelCardController.forceLoadPanel(id);
+}
+
+function updatePanelCard(panelId, options) {
+    return dashBridgePanelCardController.updatePanelCard(panelId, options);
+}
+
+function replaceDashboardPanelCard(panelId) {
+    return dashBridgePanelCardController.replacePanelCard(panelId);
+}
+
+function appendDashboardPanelCards(addedPanels) {
+    return dashBridgePanelCardController.appendPanelCards(addedPanels);
+}
+
+function removeDashboardPanelCard(panelId) {
+    return dashBridgePanelCardController.removePanelCard(panelId);
+}
+
+function panelFrameSignature(panel) {
+    return dashBridgePanelCardController.panelFrameSignature(panel);
+}
+
+function adoptPanelState(target, source) {
+    return dashBridgePanelCardController.adoptPanelState(target, source);
+}
+
+function reconcileDashboardPanelCards(previousPanels) {
+    return dashBridgePanelCardController.reconcilePanelCards(previousPanels);
+}
+
+function renderDashboard() {
+    return dashBridgePanelCardController.renderDashboard();
+}
 
 function loadActiveProfileTimeState() {
     return dashBridgeTimeController.loadProfileState();
@@ -658,55 +695,6 @@ window.refreshPanel = refreshPanel;
 //  Рендер дашборда
 // ════════════════════════════════════════════════════════
 
-function forceLoadPanel(id) {
-    const iframe = document.getElementById('iframe-' + id);
-    if (!iframe) return null;
-    const pendingSrc = iframe.dataset.src;
-    if (pendingSrc && !iframe.src) {
-        navigateDashboardFrame(iframe, pendingSrc);
-        iframe.removeAttribute('data-src');
-    }
-    return iframe;
-}
-
-function updatePanelCard(panelId) {
-    const { reloadFrame = true } = arguments[1] || {};
-    const panel = panels.find(p => p.id === panelId);
-    if (!panel) return;
-
-    const card = document.querySelector(`.panel-card[data-panel-id="${panelId}"]`);
-    if (!card) return;
-
-    // Update card dimensions
-    card.dataset.panelSize = panel.width === '100%' ? 'full' : (panel.width === '33%' ? 'third' : 'half');
-    card.dataset.heightMode = panel.height === '350px' ? 'auto' : 'fixed';
-    card.style.height = panel.height;
-
-    // «Открыть в Grafana» читает адрес из data-url — синхронизируем с новым src.
-    const openBtn = card.querySelector('.btn-open');
-    if (openBtn) openBtn.dataset.url = panel.src;
-
-    // Update iframe src if panel is not paused
-    if (!panel.paused && reloadFrame) {
-        const iframe = card.querySelector('iframe');
-        if (iframe) {
-            const newSrc = applyPanelParamsToUrl(panel);
-            // Only reload iframe if URL actually changed
-            if (iframe.src !== newSrc && iframe.dataset.src !== newSrc) {
-                if (iframe.src) {
-                    // Уже загруженный iframe переводим на новый URL.
-                    // data-src не выставляем: он хранит только ещё не применённый URL.
-                    iframe.removeAttribute('data-src');
-                    navigateDashboardFrame(iframe, newSrc);
-                } else {
-                    // Кадр ещё ждёт попадания в viewport — обновляем отложенный URL.
-                    iframe.dataset.src = newSrc;
-                }
-            }
-        }
-    }
-}
-
 function openIframeSettings(panel) {
     const selectedGrafanaTheme = ['light', 'dark'].includes(panel.grafanaTheme) ? panel.grafanaTheme : 'follow';
     const overlay = document.createElement('div');
@@ -792,25 +780,7 @@ async function togglePanelPause(id) {
     replaceDashboardPanelCard(panel.id);
 }
 
-function createDashboardPanelCard(panel, container) {
-    const card = DashBridgeRenderer.createPanelCard({
-            panel,
-            iframeSrc: applyPanelParamsToUrl(panel),
-            analysisType: getPanelAnalysisType(panel),
-            icons: { grip: SVG_GRIP, expand: SVG_EXPAND, refresh: SVG_REFRESH, pause: SVG_PAUSE, resume: SVG_RESUME, captureSave: SVG_CAPTURE_SAVE, captureCopy: SVG_CAPTURE_COPY, iframeSettings: SVG_IFRAME_SETTINGS, panelSettings: SVG_PANEL_SETTINGS, report: SVG_REPORT, more: SVG_MORE, analysis: SVG_ANALYSIS, open: SVG_OPEN, delete: SVG_DELETE }
-    });
-
-
-    const iframeEl = card.querySelector('iframe');
-
-    if (!panel.paused) {
-        navigateDashboardFrame(iframeEl, iframeEl.dataset.src);
-        iframeEl.removeAttribute('data-src');
-    }
-
-    dashBridgeDragController.bindCard(card, panel, container);
-
-    // ── Кнопки ──────────────────────────────────────────────────────────
+function bindDashboardPanelActions(card, panel, iframeEl) {
     card.querySelector('.btn-fullscreen')?.addEventListener('click', () => toggleFullscreen(panel.id));
     card.querySelector('.btn-refresh')?.addEventListener('click', () => refreshPanel(panel.id));
     card.querySelector('.btn-pause')?.addEventListener('click', () => togglePanelPause(panel.id));
@@ -840,122 +810,6 @@ function createDashboardPanelCard(panel, container) {
         window.open(applyPanelParamsToUrl(panel, e.currentTarget.dataset.url), '_blank', 'noopener,noreferrer');
     });
     card.querySelector('.btn-delete').addEventListener('click', () => deletePanel(panel.id));
-    return card;
-}
-
-function replaceDashboardPanelCard(panelId) {
-    const panel = panels.find(item => item.id === panelId);
-    const currentCard = findPanelCard(panelId);
-    const container = document.getElementById('dashboard');
-    if (!panel || !currentCard || !container) return;
-    const wasFullscreen = currentCard.classList.contains('fullscreen');
-    const replacement = createDashboardPanelCard(panel, container);
-    if (wasFullscreen) {
-        replacement.classList.add('fullscreen');
-        const fullscreenButton = replacement.querySelector('.btn-fullscreen');
-        if (fullscreenButton) {
-            fullscreenButton.innerHTML = SVG_COLLAPSE;
-            fullscreenButton.title = 'Свернуть (Esc)';
-        }
-    }
-    currentCard.replaceWith(replacement);
-}
-
-function appendDashboardPanelCards(addedPanels) {
-    const container = document.getElementById('dashboard');
-    if (!container || !Array.isArray(addedPanels) || !addedPanels.length) return;
-    container.querySelector('.empty-state')?.remove();
-    const fragment = document.createDocumentFragment();
-    addedPanels.forEach(panel => fragment.appendChild(createDashboardPanelCard(panel, container)));
-    container.appendChild(fragment);
-}
-
-function removeDashboardPanelCard(panelId) {
-    if (dashBridgePanelAnalysisController.isPanel(panelId)) closeDashboardPanelAnalysis();
-    findPanelCard(panelId)?.remove();
-    dashBridgePanelToolsController.removePanel(panelId);
-    if (fullscreenPanelId === panelId) fullscreenPanelId = null;
-    if (panels.length === 0) void renderDashboard();
-}
-
-function panelFrameSignature(panel) {
-    try {
-        return JSON.stringify({
-            src: panel?.src || '',
-            grafanaTheme: panel?.grafanaTheme || 'follow',
-            paused: !!panel?.paused,
-            tools: panel?.tools || {}
-        });
-    } catch {
-        return '';
-    }
-}
-
-function adoptPanelState(target, source) {
-    Object.keys(target).forEach(key => {
-        if (!Object.prototype.hasOwnProperty.call(source, key)) delete target[key];
-    });
-    Object.assign(target, source);
-    return target;
-}
-
-function reconcileDashboardPanelCards(previousPanels = []) {
-    const container = document.getElementById('dashboard');
-    if (!container) return;
-    if (panels.length === 0) {
-        void renderDashboard();
-        return;
-    }
-
-    container.querySelector('.empty-state')?.remove();
-    const previousById = new Map(previousPanels.map(panel => [panel.id, panel]));
-    const nextIds = new Set(panels.map(panel => panel.id));
-    container.querySelectorAll('.panel-card').forEach(card => {
-        if (!nextIds.has(card.dataset.panelId)) removeDashboardPanelCard(card.dataset.panelId);
-    });
-
-    panels.forEach(panel => {
-        const previous = previousById.get(panel.id);
-        let card = findPanelCard(panel.id);
-        const previousFrameSignature = previous?.frameSignature ?? panelFrameSignature(previous);
-        const frameChanged = previous && previousFrameSignature !== panelFrameSignature(panel);
-        const pausedTitleChanged = previous?.paused && previous.title !== panel.title;
-        if (!card) {
-            card = createDashboardPanelCard(panel, container);
-        } else if (frameChanged || pausedTitleChanged) {
-            if (dashBridgePanelAnalysisController.isPanel(panel)) closeDashboardPanelAnalysis();
-            replaceDashboardPanelCard(panel.id);
-            card = findPanelCard(panel.id);
-        } else {
-            updatePanelCard(panel.id, { reloadFrame: false });
-            syncPanelAnalysisAction(panel, card);
-        }
-        if (card) container.appendChild(card);
-    });
-}
-
-async function renderDashboard() {
-    closeDashboardPanelAnalysis();
-    const container = document.getElementById('dashboard');
-    container.innerHTML = '';
-
-    if (panels.length === 0) {
-        const profile = getActiveProfile();
-        container.innerHTML = `<div class="empty-state">
-            <h2>Профиль «${escapeHtml(profile?.name || 'Default')}» пуст</h2>
-            <p style="margin-top: 10px; opacity: 0.7;">Нажмите «Добавить панель» и вставьте ссылку Embed из Grafana.</p>
-        </div>`;
-        return;
-    }
-
-    // DocumentFragment: 1 reflow вместо N при рендере 20-30 панелей
-    const fragment = document.createDocumentFragment();
-    for (const panel of panels) {
-        fragment.appendChild(createDashboardPanelCard(panel, container));
-    }
-
-    // Один appendChild фрагмента — 1 reflow вместо N
-    container.appendChild(fragment);
 }
 
 // ════════════════════════════════════════════════════════
@@ -983,6 +837,44 @@ const dashBridgeCapture = DashBridgeCapture.create({
 const captureAllDashboardPanels = dashBridgeCapture.captureAll;
 const runDashboardToolbarCapture = dashBridgeCapture.captureFromToolbar;
 const captureDashbridgePanel = dashBridgeCapture.capturePanel;
+
+dashBridgePanelCardController = DashBridgePanelCardController.create({
+    renderer: DashBridgeRenderer,
+    getPanels: () => panels,
+    getActiveProfile,
+    applyPanelParamsToUrl,
+    navigateDashboardFrame,
+    bindCardDrag: dashBridgeDragController.bindCard,
+    bindPanelActions: bindDashboardPanelActions,
+    findPanelCard,
+    getPanelAnalysisType,
+    syncPanelAnalysisAction,
+    closePanelAnalysis: closeDashboardPanelAnalysis,
+    isPanelAnalysisOpen: dashBridgePanelAnalysisController.isPanel,
+    onPanelRemoved: panelId => {
+        if (dashBridgePanelAnalysisController.isPanel(panelId)) closeDashboardPanelAnalysis();
+        dashBridgePanelToolsController.removePanel(panelId);
+        if (fullscreenPanelId === panelId) fullscreenPanelId = null;
+    },
+    escapeHtml,
+    icons: {
+        grip: SVG_GRIP,
+        expand: SVG_EXPAND,
+        collapse: SVG_COLLAPSE,
+        refresh: SVG_REFRESH,
+        pause: SVG_PAUSE,
+        resume: SVG_RESUME,
+        captureSave: SVG_CAPTURE_SAVE,
+        captureCopy: SVG_CAPTURE_COPY,
+        iframeSettings: SVG_IFRAME_SETTINGS,
+        panelSettings: SVG_PANEL_SETTINGS,
+        report: SVG_REPORT,
+        more: SVG_MORE,
+        analysis: SVG_ANALYSIS,
+        open: SVG_OPEN,
+        delete: SVG_DELETE,
+    },
+});
 
 window.addEventListener('message', (e) => {
     if (!e.data || !e.data.action) return;

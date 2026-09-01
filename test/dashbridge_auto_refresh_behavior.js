@@ -10,6 +10,7 @@ const frameSource = fs.readFileSync('pages/dashbridge/dashbridge-frame-controlle
 const analysisSource = fs.readFileSync('pages/dashbridge/dashbridge-panel-analysis-controller.js', 'utf8');
 const panelToolsSource = fs.readFileSync('pages/dashbridge/dashbridge-panel-tools-controller.js', 'utf8');
 const panelAdditionSource = fs.readFileSync('pages/dashbridge/dashbridge-panel-addition-controller.js', 'utf8');
+const panelCardSource = fs.readFileSync('pages/dashbridge/dashbridge-panel-card-controller.js', 'utf8');
 const iframeSource = fs.readFileSync('js/content/grafana-iframe.js', 'utf8');
 const html = fs.readFileSync('pages/dashbridge/dashbridge.html', 'utf8');
 const css = fs.readFileSync('pages/dashbridge/dashbridge.css', 'utf8');
@@ -77,7 +78,7 @@ assert(storageSyncStart >= 0 && storageSyncEnd > storageSyncStart
     'profile storage events must wait for the newest local snapshot before deciding to rebuild iframes');
 
 const pauseStart = source.indexOf('async function togglePanelPause(id)');
-const pauseEnd = source.indexOf('function createDashboardPanelCard(', pauseStart);
+const pauseEnd = source.indexOf('function bindDashboardPanelActions(', pauseStart);
 const pauseSource = source.slice(pauseStart, pauseEnd);
 assert(pauseStart >= 0 && pauseEnd > pauseStart
     && pauseSource.includes('replaceDashboardPanelCard(panel.id);')
@@ -100,7 +101,7 @@ assert(iframeSettingsStart >= 0 && iframeSettingsEnd > iframeSettingsStart
     'layout-only iframe settings must not navigate the selected Grafana frame');
 
 assert(profileSource.includes('else reconcileDashboardPanelCards(previousPanelStates);')
-    && source.includes('updatePanelCard(panel.id, { reloadFrame: false });')
+    && panelCardSource.includes('updatePanelCard(panel.id, { reloadFrame: false });')
     && panelAdditionSource.includes('appendPanelCards([addedPanel]);')
     && panelAdditionSource.includes('appendPanelCards(newPanels);')
     && source.includes('appendPanelCards: appendDashboardPanelCards')

@@ -8,6 +8,7 @@ const themeCss = read('pages/shared/theme.css');
 const themeJs = read('pages/shared/theme.js');
 const dashboardCss = read('pages/dashbridge/dashbridge.css');
 const dashboardJs = read('pages/dashbridge/dashbridge.js');
+const dashboardCards = read('pages/dashbridge/dashbridge-panel-card-controller.js');
 const renderer = read('pages/dashbridge/dashbridge-renderer.js');
 const optionsHtml = read('pages/options/options.html');
 const optionsJs = read('pages/options/options.js');
@@ -42,7 +43,7 @@ assert(renderer.includes("card.dataset.panelSize = panel.width === '100%'"),
 assert(renderer.includes("card.dataset.heightMode = panel.height === '350px' ? 'auto' : 'fixed'"),
     'legacy default height must become responsive while custom heights stay fixed');
 assert(!renderer.includes('card.style.width = width'), 'panel width must no longer be frozen inline');
-assert(dashboardJs.includes("card.dataset.panelSize = panel.width === '100%'"),
+assert(dashboardCards.includes("card.dataset.panelSize = panel.width === '100%'"),
     'editing a panel must refresh its semantic grid size');
 
 assert(read('pages/batch/batch.css').includes('max-width: 80rem'), 'Batch must use the wider responsive workspace');

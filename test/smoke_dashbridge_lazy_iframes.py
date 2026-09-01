@@ -6,6 +6,7 @@ from support.smoke import run_checks
 
 ROOT = Path(__file__).parent.parent
 src = (ROOT / 'pages/dashbridge/dashbridge.js').read_text(encoding='utf-8')
+cards = (ROOT / 'pages/dashbridge/dashbridge-panel-card-controller.js').read_text(encoding='utf-8')
 capture = (ROOT / 'pages/dashbridge/dashbridge-capture.js').read_text(encoding='utf-8')
 renderer = (ROOT / 'pages/dashbridge/dashbridge-renderer.js').read_text(encoding='utf-8')
 html = (ROOT / 'pages/dashbridge/dashbridge.html').read_text(encoding='utf-8')
@@ -20,7 +21,7 @@ checks = {
     'paused card does not create an iframe':
         "panel.paused ? this.createPausedPanelBody(panel) : this.createLivePanelBody" in renderer,
     'active iframe starts during dashboard render':
-        re.search(r"if \(!panel\.paused\)\s*\{\s*navigateDashboardFrame\(iframeEl, iframeEl\.dataset\.src\)", src) is not None,
+        re.search(r"if \(!panel\.paused\)\s*\{\s*navigateDashboardFrame\(iframe, iframe\.dataset\.src\)", cards) is not None,
     'header contains current-profile ZIP button':
         'id="captureAllPanelsBtn"' in html and 'captureAllDashboardPanels' in src
         and 'captureAll' in capture,
@@ -46,7 +47,7 @@ checks = {
     'capture always restores its card':
         "card.classList.remove('dashbridge-panel-capture-active')" in capture and 'window.scrollTo(scroll.x, scroll.y)' in capture,
     'dashboard still batches card DOM insertion':
-        'document.createDocumentFragment()' in src and 'container.appendChild(fragment)' in src,
+        'documentRef.createDocumentFragment()' in cards and 'container.appendChild(fragment)' in cards,
 }
 
 run_checks(checks)

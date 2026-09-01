@@ -10,6 +10,7 @@ PANEL_URL = (ROOT / "pages/dashbridge/dashbridge-panel-url.js").read_text(encodi
 PANEL_TRANSFER = (ROOT / "pages/dashbridge/dashbridge-panel-transfer.js").read_text(encoding="utf-8")
 PANEL_TRANSFER_CONTROLLER = (ROOT / "pages/dashbridge/dashbridge-panel-transfer-controller.js").read_text(encoding="utf-8")
 PANEL_ADDITION_CONTROLLER = (ROOT / "pages/dashbridge/dashbridge-panel-addition-controller.js").read_text(encoding="utf-8")
+PANEL_CARD_CONTROLLER = (ROOT / "pages/dashbridge/dashbridge-panel-card-controller.js").read_text(encoding="utf-8")
 PROFILE_STORE = (ROOT / "js/shared/dashbridge-profile-store.js").read_text(encoding="utf-8")
 TIME_STATE = (ROOT / "pages/dashbridge/dashbridge-time-state.js").read_text(encoding="utf-8")
 TIME_CONTROLLER = (ROOT / "pages/dashbridge/dashbridge-time-controller.js").read_text(encoding="utf-8")
@@ -42,8 +43,8 @@ checks = {
         and "detectGrafanaTimeFormat(urlValue)" in TIME_STATE,
     "time controls are present": all(token in HTML for token in ['id="absTimeFrom"', 'id="absTimeTo"', 'id="applyAbsoluteTime"']),
     "crosshair mode is stored": "dashbridge_crosshairMode" in JS,
-    "active panels load eagerly and paused panels remain excluded": "navigateDashboardFrame(iframeEl, iframeEl.dataset.src)" in JS
-        and "if (!panel.paused)" in JS and "dashbridgeLazyLoadEnabled" not in JS,
+    "active panels load eagerly and paused panels remain excluded": "navigateDashboardFrame(iframe, iframe.dataset.src)" in PANEL_CARD_CONTROLLER
+        and "if (!panel.paused)" in PANEL_CARD_CONTROLLER and "dashbridgeLazyLoadEnabled" not in JS,
     "quick panel addition UI is present": all(token in HTML for token in ['id="quickAddPanelsBtn"', 'id="quickAddDashboardUrl"', 'id="quickAddPanelIds"']),
     "quick panel addition builds d-solo URLs": "function buildDashBridgeSoloPanelUrl" in PANEL_URL and "url.searchParams.set('panelId', panelId)" in PANEL_URL,
     "quick panel addition validates and deduplicates IDs": "function parseQuickPanelIds" in PANEL_URL and "new Set(tokens)" in PANEL_URL,
