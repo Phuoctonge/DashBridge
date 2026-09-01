@@ -5,6 +5,7 @@ ROOT = Path(__file__).resolve().parents[1]
 HTML = (ROOT / 'pages/dashbridge/dashbridge.html').read_text(encoding='utf-8')
 PAGE = (ROOT / 'pages/dashbridge/dashbridge.js').read_text(encoding='utf-8')
 CARD = (ROOT / 'pages/dashbridge/dashbridge-panel-card-controller.js').read_text(encoding='utf-8')
+ACTIONS = (ROOT / 'pages/dashbridge/dashbridge-panel-actions-controller.js').read_text(encoding='utf-8')
 RENDERER = (ROOT / 'pages/dashbridge/dashbridge-renderer.js').read_text(encoding='utf-8')
 
 
@@ -14,9 +15,9 @@ check = CheckCollector()
 check('paused cards render a clear non-live placeholder', 'paused-placeholder' in RENDERER and 'На паузе' in RENDERER)
 check('paused cards do not render a snapshot image', 'paused-snapshot' not in RENDERER)
 check('dashboard no longer loads snapshot helper', 'dashbridge-paused-snapshots.js' not in HTML)
-pause_start = PAGE.index('async function togglePanelPause(id)')
-pause_end = PAGE.index('function bindDashboardPanelActions')
-pause_body = PAGE[pause_start:pause_end]
+pause_start = ACTIONS.index('const togglePanelPause = async id =>')
+pause_end = ACTIONS.index('const bindPanelActions =', pause_start)
+pause_body = ACTIONS[pause_start:pause_end]
 check('pause changes state without waiting for or capturing a frame', 'panel.paused = !panel.paused;' in pause_body and 'waitForDashboardFrameLoad' not in pause_body and 'captureCard' not in pause_body)
 check('pause implementation contains no retired snapshot runtime', 'DashBridgePausedSnapshots' not in PAGE and 'pausedSnapshots' not in PAGE and 'pausedPanelRenderWaiters' not in PAGE)
 check('global refresh does not process paused panels', 'refreshPausedPanels' not in PAGE)

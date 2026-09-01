@@ -11,6 +11,7 @@ const analysisSource = fs.readFileSync('pages/dashbridge/dashbridge-panel-analys
 const panelToolsSource = fs.readFileSync('pages/dashbridge/dashbridge-panel-tools-controller.js', 'utf8');
 const panelAdditionSource = fs.readFileSync('pages/dashbridge/dashbridge-panel-addition-controller.js', 'utf8');
 const panelCardSource = fs.readFileSync('pages/dashbridge/dashbridge-panel-card-controller.js', 'utf8');
+const panelActionsSource = fs.readFileSync('pages/dashbridge/dashbridge-panel-actions-controller.js', 'utf8');
 const iframeSource = fs.readFileSync('js/content/grafana-iframe.js', 'utf8');
 const html = fs.readFileSync('pages/dashbridge/dashbridge.html', 'utf8');
 const css = fs.readFileSync('pages/dashbridge/dashbridge.css', 'utf8');
@@ -77,27 +78,28 @@ assert(storageSyncStart >= 0 && storageSyncEnd > storageSyncStart
         < storageSyncSource.indexOf('await profileStore.load();'),
     'profile storage events must wait for the newest local snapshot before deciding to rebuild iframes');
 
-const pauseStart = source.indexOf('async function togglePanelPause(id)');
-const pauseEnd = source.indexOf('function bindDashboardPanelActions(', pauseStart);
-const pauseSource = source.slice(pauseStart, pauseEnd);
+const pauseStart = panelActionsSource.indexOf('const togglePanelPause = async id =>');
+const pauseEnd = panelActionsSource.indexOf('const bindPanelActions =', pauseStart);
+const pauseSource = panelActionsSource.slice(pauseStart, pauseEnd);
 assert(pauseStart >= 0 && pauseEnd > pauseStart
-    && pauseSource.includes('replaceDashboardPanelCard(panel.id);')
+    && pauseSource.includes('replacePanelCard(panel.id);')
     && !pauseSource.includes('renderDashboard();'),
     'pausing one panel must replace only that card instead of reloading every Grafana iframe');
 
-const deleteStart = source.indexOf('async function deletePanel(id)');
-const deleteEnd = source.indexOf('function refreshPanel(id)', deleteStart);
-const deleteSource = source.slice(deleteStart, deleteEnd);
+const deleteStart = panelActionsSource.indexOf('const deletePanel = async id =>');
+const deleteEnd = panelActionsSource.indexOf('const refreshPanel =', deleteStart);
+const deleteSource = panelActionsSource.slice(deleteStart, deleteEnd);
 assert(deleteStart >= 0 && deleteEnd > deleteStart
-    && deleteSource.includes('removeDashboardPanelCard(id);')
+    && deleteSource.includes('removePanelCard(id);')
     && !deleteSource.includes('renderDashboard();'),
     'deleting one panel must remove only its card');
 
-const iframeSettingsStart = source.indexOf('function openIframeSettings(panel)');
-const iframeSettingsEnd = source.indexOf('async function togglePanelPause(id)', iframeSettingsStart);
-const iframeSettingsSource = source.slice(iframeSettingsStart, iframeSettingsEnd);
+const iframeSettingsStart = panelActionsSource.indexOf('const openIframeSettings = panel =>');
+const iframeSettingsEnd = panelActionsSource.indexOf('const togglePanelPause =', iframeSettingsStart);
+const iframeSettingsSource = panelActionsSource.slice(iframeSettingsStart, iframeSettingsEnd);
 assert(iframeSettingsStart >= 0 && iframeSettingsEnd > iframeSettingsStart
-    && iframeSettingsSource.includes('reloadFrame: previousSrc !== panel.src || previousGrafanaTheme !== panel.grafanaTheme'),
+    && iframeSettingsSource.includes('reloadFrame: previousSrc !== panel.src')
+    && iframeSettingsSource.includes('|| previousGrafanaTheme !== panel.grafanaTheme'),
     'layout-only iframe settings must not navigate the selected Grafana frame');
 
 assert(profileSource.includes('else reconcileDashboardPanelCards(previousPanelStates);')

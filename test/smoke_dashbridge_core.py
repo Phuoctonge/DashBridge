@@ -41,7 +41,8 @@ def read_file():
         + (ROOT / "pages/dashbridge/dashbridge-profile-controller.js").read_text(encoding="utf-8") \
         + (ROOT / "pages/dashbridge/dashbridge-drag-controller.js").read_text(encoding="utf-8") \
         + (ROOT / "pages/dashbridge/dashbridge-panel-transfer-controller.js").read_text(encoding="utf-8") \
-        + (ROOT / "pages/dashbridge/dashbridge-panel-addition-controller.js").read_text(encoding="utf-8")
+        + (ROOT / "pages/dashbridge/dashbridge-panel-addition-controller.js").read_text(encoding="utf-8") \
+        + (ROOT / "pages/dashbridge/dashbridge-panel-actions-controller.js").read_text(encoding="utf-8")
 
 
 print("=" * 70)
@@ -55,6 +56,7 @@ panel_url_content = DASHBRIDGE_PANEL_URL_JS.read_text(encoding="utf-8")
 panel_transfer_content = DASHBRIDGE_PANEL_TRANSFER_JS.read_text(encoding="utf-8")
 panel_addition_content = (ROOT / "pages/dashbridge/dashbridge-panel-addition-controller.js").read_text(encoding="utf-8")
 panel_card_content = (ROOT / "pages/dashbridge/dashbridge-panel-card-controller.js").read_text(encoding="utf-8")
+panel_actions_content = (ROOT / "pages/dashbridge/dashbridge-panel-actions-controller.js").read_text(encoding="utf-8")
 dashbridge_html = DASHBRIDGE_HTML.read_text(encoding="utf-8")
 
 # ════════════════════════════════════════════════════════
@@ -121,8 +123,8 @@ print("\n--- 1.3. window.open безопасность ---")
 
 # window.open должен иметь noopener,noreferrer (с учётом вложенных скобок)
 window_open_safe = re.search(
-    r"window\.open\(applyPanelParamsToUrl\([^\n]+\),\s*['\"]_blank['\"],\s*['\"]noopener,noreferrer['\"]",
-    content
+    r"openWindow\([\s\S]*?applyPanelParamsToUrl\([^\n]+\),[\s\S]*?['\"]_blank['\"],[\s\S]*?['\"]noopener,noreferrer['\"]",
+    panel_actions_content
 )
 test(
     "window.open использует noopener,noreferrer",
@@ -264,8 +266,8 @@ test(
 
 # deletePanel должен быть async
 delete_panel_async = re.search(
-    r"async\s+function\s+deletePanel\s*\(",
-    content
+    r"const\s+deletePanel\s*=\s*async\s+id\s*=>",
+    panel_actions_content
 )
 test(
     "deletePanel() — async",
@@ -393,8 +395,8 @@ test(
 normalize_calls = re.findall(r"(?<!function )normalizeGrafanaPanelUrl\(", content)
 test(
     "normalizeGrafanaPanelUrl обслуживает добавление и правку URL",
-    len(normalize_calls) == 1
-    and "normalizePanelUrl: normalizeGrafanaPanelUrl" in content
+    len(normalize_calls) == 0
+    and content.count("normalizePanelUrl: normalizeGrafanaPanelUrl") == 2
     and "url = normalizePanelUrl(url)" in panel_addition_content,
     f"прямых вызовов найдено {len(normalize_calls)}"
 )
@@ -425,8 +427,8 @@ test(
 # Обработчик сохранения в «Настройки iframe» — источник исходного бага:
 # ранее он писал panel.src напрямую из поля ввода
 iframe_save_handler = re.search(
-    r"\.iframe-settings-save['\"]\)\.addEventListener\(['\"]click['\"],\s*async.*?\n    \}\);",
-    content,
+    r"\.iframe-settings-save['\"]\)\.addEventListener\(['\"]click['\"],\s*async.*?\n\s*\}\);",
+    panel_actions_content,
     re.S
 )
 test(
@@ -441,7 +443,7 @@ test(
 )
 test(
     "Настройки iframe нормализуют URL перед сохранением",
-    "normalizeGrafanaPanelUrl(rawUrl)" in iframe_save_src,
+    "normalizePanelUrl(rawUrl)" in iframe_save_src,
     "без нормализации карточка показывает полный дашборд Grafana"
 )
 test(
@@ -451,7 +453,7 @@ test(
 )
 # Нормализация должна идти после валидации и до присваивания
 if iframe_save_src:
-    normalize_at = iframe_save_src.find("normalizeGrafanaPanelUrl(rawUrl)")
+    normalize_at = iframe_save_src.find("normalizePanelUrl(rawUrl)")
     assign_at = iframe_save_src.find("panel.src = url;")
     test(
         "Нормализация выполняется до присваивания panel.src",

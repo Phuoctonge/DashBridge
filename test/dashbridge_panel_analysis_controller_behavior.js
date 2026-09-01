@@ -6,12 +6,17 @@ const path = require('path');
 const vm = require('vm');
 
 const root = path.join(__dirname, '..');
-const pageSource = fs.readFileSync(path.join(root, 'pages', 'dashbridge', 'dashbridge.js'), 'utf8');
+const pageSource = [
+    'dashbridge.js',
+    'dashbridge-panel-actions-controller.js',
+    'dashbridge-panel-card-controller.js',
+].map(file => fs.readFileSync(path.join(root, 'pages', 'dashbridge', file), 'utf8')).join('\n');
 const html = fs.readFileSync(path.join(root, 'pages', 'dashbridge', 'dashbridge.html'), 'utf8');
 assert(html.indexOf('dashbridge-panel-analysis-controller.js') < html.indexOf('dashbridge.js'),
     'panel analysis controller must load before its page consumer');
-assert(pageSource.includes('dashBridgePanelAnalysisController.isPanel(panel)')
-    && pageSource.includes('dashBridgePanelAnalysisController.isPanel(panelId)')
+assert(pageSource.includes('panelAnalysis.isPanel(panel)')
+    && pageSource.includes('panelAnalysis.isPanel(panelId)')
+    && pageSource.includes('panelAnalysis: dashBridgePanelAnalysisController')
     && pageSource.includes('dashBridgePanelAnalysisController.accept(e.data, sourceIframe)')
     && pageSource.match(/dashBridgePanelAnalysisController\.retryForFrame\(sourceIframe\)/g)?.length === 2
     && pageSource.includes('closeDashboardPanelAnalysis();'),

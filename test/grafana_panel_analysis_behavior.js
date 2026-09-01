@@ -195,7 +195,8 @@ const panelTools = fs.readFileSync('js/content/grafana-panel-tools.js', 'utf8');
 const contentBridge = fs.readFileSync('js/content/content.js', 'utf8');
 const dashboardPage = fs.readFileSync('pages/dashbridge/dashbridge.js', 'utf8');
 const dashboardAnalysis = fs.readFileSync('pages/dashbridge/dashbridge-panel-analysis-controller.js', 'utf8');
-const dashboard = `${dashboardPage}\n${dashboardAnalysis}`;
+const dashboardActions = fs.readFileSync('pages/dashbridge/dashbridge-panel-actions-controller.js', 'utf8');
+const dashboard = `${dashboardPage}\n${dashboardAnalysis}\n${dashboardActions}`;
 assert(panelTools.includes('const syncPanelAnalysisAction = (host, panel, header) =>')
     && panelTools.includes('analysis?.classifyTitle(getPanelAnalysisTitle(panel, header), readPanelAnalysisSettings())')
     && panelTools.includes("analysis.analyzePanel({ panel, type, mode: 'period', settings })")
@@ -267,7 +268,7 @@ assert(embeddedStart >= 0 && embeddedEnd > embeddedStart
     && !embeddedSource.includes('setTimeout(')
     && !embeddedSource.includes('Локальное обновление панели недоступно'),
     'DashBridge analysis must show the current panel and passively follow its configured auto-refresh');
-assert(dashboard.includes('openDashboardPanelAnalysis(panel, iframeEl, type)')
+assert(dashboard.includes('openPanelAnalysis(panel, iframe, type)')
     && dashboard.includes("action: 'startEmbeddedPanelAnalysis'")
     && dashboard.includes("e.data.action === 'dashbridgePanelAnalysisUpdate'")
     && dashboard.includes('dashboard-panel-analysis-overlay')

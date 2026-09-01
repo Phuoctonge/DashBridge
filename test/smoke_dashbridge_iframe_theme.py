@@ -4,6 +4,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 DASHBOARD = (ROOT / "pages" / "dashbridge" / "dashbridge.js").read_text(encoding="utf-8")
+ACTIONS = (ROOT / "pages" / "dashbridge" / "dashbridge-panel-actions-controller.js").read_text(encoding="utf-8")
 TIME_CONTROLLER = (ROOT / "pages" / "dashbridge" / "dashbridge-time-controller.js").read_text(encoding="utf-8")
 THEME_RUNTIME = (ROOT / "pages" / "shared" / "theme.js").read_text(encoding="utf-8")
 
@@ -19,7 +20,7 @@ for required in (
     "url.searchParams.set('theme', resolveTheme(panel))",
     "windowRef.addEventListener('dashbridge-theme-change'",
 ):
-    assert required in DASHBOARD + TIME_CONTROLLER, f"missing iframe theme contract: {required}"
+    assert required in DASHBOARD + ACTIONS + TIME_CONTROLLER, f"missing iframe theme contract: {required}"
 
 assert "new CustomEvent('dashbridge-theme-change'" in THEME_RUNTIME, "theme runtime does not notify DashBridge"
 print("PASS DashBridge iframe theme contract")

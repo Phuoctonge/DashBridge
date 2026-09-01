@@ -10,7 +10,8 @@ VISUAL_ENGINE = (ROOT / "js/content/grafana-visual-engine.js").read_text(encodin
 PANEL_DEFINITION = (ROOT / "js/content/grafana-panel-definition.js").read_text(encoding="utf-8")
 CPU_CAPACITY_FILTER = (ROOT / "js/content/grafana-cpu-capacity-filter.js").read_text(encoding="utf-8")
 DASHBOARD = (ROOT / "pages/dashbridge/dashbridge.js").read_text(encoding="utf-8") \
-    + (ROOT / "pages/dashbridge/dashbridge-panel-tools-controller.js").read_text(encoding="utf-8")
+    + (ROOT / "pages/dashbridge/dashbridge-panel-tools-controller.js").read_text(encoding="utf-8") \
+    + (ROOT / "pages/dashbridge/dashbridge-panel-actions-controller.js").read_text(encoding="utf-8")
 TIME_CONTROLLER = (ROOT / "pages/dashbridge/dashbridge-time-controller.js").read_text(encoding="utf-8")
 IFRAME = (ROOT / "js/content/grafana-iframe.js").read_text(encoding="utf-8")
 POPUP = (ROOT / "pages/popup/popup.html").read_text(encoding="utf-8")

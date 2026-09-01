@@ -29,7 +29,8 @@ assert(Math.abs(narrow.width / narrow.height - 1000 / 520) < 0.005, 'prepared ca
 assert(narrow.left >= 12 && narrow.top >= 12, 'prepared panel must stay inside the visible viewport');
 
 const tools = fs.readFileSync('js/content/grafana-panel-tools.js', 'utf8');
-const dashboard = fs.readFileSync('pages/dashbridge/dashbridge.js', 'utf8');
+const dashboard = fs.readFileSync('pages/dashbridge/dashbridge.js', 'utf8')
+    + fs.readFileSync('pages/dashbridge/dashbridge-panel-actions-controller.js', 'utf8');
 const dashboardCapture = fs.readFileSync('pages/dashbridge/dashbridge-capture.js', 'utf8');
 const dashboardCss = fs.readFileSync('pages/dashbridge/dashbridge.css', 'utf8');
 const dashboardHtml = fs.readFileSync('pages/dashbridge/dashbridge.html', 'utf8');
@@ -106,7 +107,9 @@ assert(!dashboard.includes("card.querySelector('.btn-capture-toggle')")
     && dashboard.includes("card.querySelector('.btn-capture-save')")
     && dashboard.includes("card.querySelector('.btn-capture-copy')"),
     'DashBridge cards must keep save/copy actions while compact mode has one header control');
-assert(dashboard.includes('runDashboardToolbarCapture(panel, iframeEl'), 'DashBridge toolbar must reuse the existing panel capture pipeline');
+assert(dashboard.includes("runToolbarCapture(panel, iframe, 'download'")
+    && dashboard.includes("runToolbarCapture(panel, iframe, 'copy'"),
+    'DashBridge toolbar must reuse the existing panel capture pipeline');
 assert(dashboard.includes('setDashboardCapturePrepared(!defaultCapturePrepared)'), 'DashBridge toolbar toggle must update the shared prepared-capture setting');
 assert(dashboardCapture.includes("'box-sizing', 'border'"), 'DashBridge capture must snapshot its temporary border override');
 assert(dashboardCapture.includes("setProperty('border', 'none', 'important')"), 'the card border must not distort the prepared iframe aspect ratio');
