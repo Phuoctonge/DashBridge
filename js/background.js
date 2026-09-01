@@ -6,7 +6,7 @@
 //     chrome.windows.create({ url: "pages/popup/popup.html", type: "popup", width: 300, height: 400 });
 // });
 
-importScripts('../vendor/jszip.min.js', 'shared/grafana-settings.js', 'shared/url-validation.js', 'shared/dnr-rules.js', 'shared/grafana-runtime-manifest.js', 'shared/local-state-schema.js', 'shared/grafana-panel-identity.js');
+importScripts('../vendor/jszip.min.js', 'shared/grafana-settings.js', 'shared/url-validation.js', 'shared/dnr-rules.js', 'shared/grafana-runtime-manifest.js', 'shared/local-state-schema.js', 'shared/grafana-panel-identity.js', 'background-gui-capture.js');
 
 const LEGACY_GRAFANA_RULE_ID_START = 1000;
 const LEGACY_GRAFANA_RULE_ID_END = 1099;
@@ -382,147 +382,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     }
 });
 
-const guiCaptureWait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-const GUI_CAPTURE_INTERVAL_MS = 750;
-const GUI_CAPTURE_SOURCE_BUDGET_BYTES = 128 * 1024 * 1024;
-const GUI_CAPTURE_ARCHIVE_BUDGET_BYTES = 64 * 1024 * 1024;
-const guiCaptureReadyWaiters = new Map();
-
-function reserveGuiCaptureBytes(usedBytes, nextBytes, maxBytes = GUI_CAPTURE_SOURCE_BUDGET_BYTES) {
-    const total = Math.max(0, Number(usedBytes) || 0) + Math.max(0, Number(nextBytes) || 0);
-    if (total > maxBytes) {
-        throw new RangeError(`Снимки GUI превышают безопасный лимит ${Math.round(maxBytes / 1024 / 1024)} МиБ.`);
-    }
-    return total;
-}
-
-function assertGuiCaptureArchiveSize(blob, maxBytes = GUI_CAPTURE_ARCHIVE_BUDGET_BYTES) {
-    if (!blob || !Number.isFinite(blob.size) || blob.size > maxBytes) {
-        throw new RangeError(`ZIP GUI превышает безопасный лимит ${Math.round(maxBytes / 1024 / 1024)} МиБ.`);
-    }
-    return blob;
-}
-
-const waitForGuiCaptureReady = (tabId, timeoutMs = 15_000) => new Promise(resolve => {
-    const previous = guiCaptureReadyWaiters.get(tabId);
-    if (previous) previous(false);
-    const finish = ready => {
-        clearTimeout(timeout);
-        if (guiCaptureReadyWaiters.get(tabId) === finish) guiCaptureReadyWaiters.delete(tabId);
-        resolve(ready);
-    };
-    const timeout = setTimeout(() => finish(false), timeoutMs);
-    guiCaptureReadyWaiters.set(tabId, finish);
-});
-
-const blobToDataUrl = async (blob) => {
-    const bytes = new Uint8Array(await blob.arrayBuffer());
-    const chunkSize = 0x8000;
-    let binary = '';
-    for (let offset = 0; offset < bytes.length; offset += chunkSize) {
-        binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
-    }
-    return `data:application/zip;base64,${btoa(binary)}`;
-};
-
-const waitForGuiCaptureTab = (tabId) => new Promise(resolve => {
-    const timeout = setTimeout(() => {
-        chrome.tabs.onUpdated.removeListener(onUpdated);
-        resolve();
-    }, 6000);
-    const onUpdated = (updatedTabId, changeInfo) => {
-        if (updatedTabId === tabId && changeInfo.status === 'complete') {
-            clearTimeout(timeout);
-            chrome.tabs.onUpdated.removeListener(onUpdated);
-            resolve();
-        }
-    };
-    chrome.tabs.onUpdated.addListener(onUpdated);
-});
-
-async function collectGuiScreenshotsInternal() {
-    await chrome.storage.local.set({ guiCaptureStatus: { state: 'running', message: 'Сбор скриншотов запущен', updatedAt: Date.now() } });
-    if (typeof JSZip !== 'function') throw new Error('Модуль упаковки ZIP не загружен');
-    const popupUrl = chrome.runtime.getURL('pages/popup/popup.html');
-    const pages = [
-        { name: '01_popup_grafana_dashboards.png', popup: ['tab-grafana', 'grafana-links'] },
-        { name: '04_popup_grafana_links.png', popup: ['tab-grafana', 'grafana-links'] },
-        { name: '05_popup_grafana_batch.png', popup: ['tab-grafana', 'grafana-batch'] },
-        { name: '06_popup_grafana_debug.png', popup: ['tab-grafana', 'grafana-debug'] },
-        { name: '07_popup_jira.png', popup: ['tab-jira'] },
-        { name: '09_popup_tdm.png', popup: ['tab-tdm'] },
-        { name: '10_options.png', url: chrome.runtime.getURL('pages/options/options.html') },
-        { name: '11_dashbridge.png', url: chrome.runtime.getURL('pages/dashbridge/dashbridge.html') },
-        { name: '12_batch.png', url: chrome.runtime.getURL('pages/batch/batch.html') },
-        { name: '13_worklog.png', url: chrome.runtime.getURL('pages/worklog/worklog.html') }
-    ];
-    const captureWindow = await chrome.windows.create({ url: popupUrl, type: 'popup', focused: true, width: 366, height: 760 });
-    const tabId = captureWindow.tabs && captureWindow.tabs[0] && captureWindow.tabs[0].id;
-    if (!captureWindow.id || !tabId) throw new Error('Не удалось открыть окно для снимков');
-
-    try {
-    const zip = new JSZip();
-        let capturedSourceBytes = 0;
-        for (let index = 0; index < pages.length; index += 1) {
-            const page = pages[index];
-            const dashbridgeReady = page.name === '11_dashbridge.png'
-                ? waitForGuiCaptureReady(tabId)
-                : null;
-            if (page.url) {
-                await chrome.windows.update(captureWindow.id, { state: 'maximized' });
-                const loaded = waitForGuiCaptureTab(tabId);
-                await chrome.tabs.update(tabId, { url: page.url });
-                await loaded;
-            } else {
-                await chrome.windows.update(captureWindow.id, { state: 'normal' });
-                await chrome.windows.update(captureWindow.id, { width: 366, height: 760 });
-                const [mainTab, subTab] = page.popup;
-                const captureUrl = new URL(popupUrl);
-                captureUrl.searchParams.set('guiCapture', String(index));
-                captureUrl.searchParams.set('guiTab', mainTab);
-                if (subTab) captureUrl.searchParams.set('guiSub', subTab);
-                const loaded = waitForGuiCaptureTab(tabId);
-                await chrome.tabs.update(tabId, { url: captureUrl.toString() });
-                await loaded;
-            }
-            // DashBridge reports a real chart canvas from its Grafana iframe.
-            if (page.name === '11_dashbridge.png') {
-                await dashbridgeReady;
-            } else {
-                await guiCaptureWait(GUI_CAPTURE_INTERVAL_MS);
-            }
-            const dataUrl = await chrome.tabs.captureVisibleTab(captureWindow.id, { format: 'png' });
-            const image = await fetch(dataUrl).then(response => response.blob());
-            if (!image) throw new Error(`Не удалось создать ${page.name}`);
-            capturedSourceBytes = reserveGuiCaptureBytes(capturedSourceBytes, image.size);
-            zip.file(page.name, image);
-        }
-        const archive = assertGuiCaptureArchiveSize(
-            await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } })
-        );
-        const archiveUrl = await blobToDataUrl(archive);
-        const date = new Date().toISOString().replace(/[:.]/g, '-');
-        await chrome.downloads.download({ url: archiveUrl, filename: `dashbridge_gui_${date}.zip`, saveAs: true });
-        await chrome.storage.local.set({ guiCaptureStatus: { state: 'complete', message: `Готово: ${pages.length} снимков переданы в загрузки. Окно можно закрыть после сохранения ZIP.`, updatedAt: Date.now() } });
-        const resultUrl = new URL(popupUrl);
-        resultUrl.searchParams.set('guiTab', 'tab-grafana');
-    resultUrl.searchParams.set('guiSub', 'grafana-debug');
-    await chrome.tabs.update(tabId, { url: resultUrl.toString() });
-    return pages.length;
-    } catch (error) {
-        await chrome.windows.remove(captureWindow.id).catch(() => undefined);
-        throw error;
-    }
-}
-
-let guiCaptureInProgress = false;
-let lastPanelVisibleCaptureAt = 0;
-async function collectGuiScreenshotsInBackground() {
-    if (guiCaptureInProgress) throw new Error('GUI capture is already running');
-    guiCaptureInProgress = true;
-    try { return await collectGuiScreenshotsInternal(); }
-    finally { guiCaptureInProgress = false; }
-}
+const guiCaptureController = DashBridgeBackgroundGuiCapture.create({ zipConstructor: JSZip });
 
 // This listener is a trust boundary: a new message type must validate its sender,
 // payload shape/size, and target scope in its own branch before using Chrome APIs.
@@ -534,10 +394,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             if (!await isTrustedGrafanaContentSender(_sender) || !_sender.tab?.windowId) {
                 throw new Error('Недоверенный запрос снимка Grafana.');
             }
-            const waitMs = Math.max(0, 600 - (Date.now() - lastPanelVisibleCaptureAt));
-            if (waitMs) await new Promise(resolve => setTimeout(resolve, waitMs));
-            lastPanelVisibleCaptureAt = Date.now();
-            return chrome.tabs.captureVisibleTab(_sender.tab.windowId, { format: 'png' });
+            return guiCaptureController.captureVisiblePanel(_sender);
         })().then(dataUrl => sendResponse({ ok: !!dataUrl, dataUrl: dataUrl || null }))
             .catch(error => sendResponse({ ok: false, error: error?.message || String(error) }));
         return true;
@@ -598,7 +455,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         return true;
     }
     if (message && message.type === 'dashbridge-gui-capture-ready' && _sender.tab) {
-        guiCaptureReadyWaiters.get(_sender.tab.id)?.(true);
+        guiCaptureController.markReady(_sender.tab.id);
         return undefined;
     }
     if (message && message.type === 'dashbridge-popup-capture-size' && _sender.tab && _sender.tab.windowId) {
@@ -612,7 +469,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             sendResponse({ ok: false, error: 'Unexpected sender' });
             return undefined;
         }
-        collectGuiScreenshotsInBackground()
+        guiCaptureController.collect()
             .then(count => sendResponse({ ok: true, count }))
             .catch(error => {
                 const messageText = error && error.message ? error.message : String(error);

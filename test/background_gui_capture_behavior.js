@@ -4,7 +4,13 @@ const vm = require('vm');
 
 let messageListener;
 const chrome = {
-    tabs: { onRemoved: { addListener() {} } },
+    tabs: {
+        onRemoved: { addListener() {} },
+        onUpdated: { addListener() {}, removeListener() {} },
+        captureVisibleTab: async () => 'data:image/png;base64,AA==',
+    },
+    windows: { create: async () => ({}), update: async () => {}, remove: async () => {} },
+    downloads: { download: async () => 1 },
     storage: {
         sync: { get: async () => ({ grafanaIframeDomains: ['grafana.test', 'strict.test:8443'] }), onChanged: { addListener() {} } },
         session: { remove: async () => {} },
@@ -19,16 +25,20 @@ const chrome = {
 };
 const context = {
     chrome, importScripts() {}, console, setTimeout, clearTimeout, URL, Date, Uint8Array,
+    fetch: async () => ({ blob: async () => ({ size: 1 }) }),
     DashBridgeGrafanaRuntimeManifest: { files: [], matchesForHostname: () => [] },
+    JSZip: function JSZip() {},
     getGrafanaSettingsDefaults: () => ({ grafanaIframeDomains: [] }),
     normalizeHttpHost: value => String(value).toLowerCase(),
     btoa: value => Buffer.from(value, 'binary').toString('base64')
 };
+vm.runInNewContext(fs.readFileSync('js/background-gui-capture.js', 'utf8'), context, { filename: 'background-gui-capture.js' });
 vm.runInNewContext(fs.readFileSync('js/background.js', 'utf8'), context, { filename: 'background.js' });
 
-const waitForGuiCaptureReady = vm.runInContext('waitForGuiCaptureReady', context);
-const reserveGuiCaptureBytes = vm.runInContext('reserveGuiCaptureBytes', context);
-const assertGuiCaptureArchiveSize = vm.runInContext('assertGuiCaptureArchiveSize', context);
+const guiCaptureController = vm.runInContext('guiCaptureController', context);
+const waitForGuiCaptureReady = guiCaptureController.waitForReady;
+const reserveGuiCaptureBytes = context.DashBridgeBackgroundGuiCapture.reserveBytes;
+const assertGuiCaptureArchiveSize = context.DashBridgeBackgroundGuiCapture.assertArchiveSize;
 const isTrustedExtensionPage = vm.runInContext('isTrustedExtensionPage', context);
 const isTrustedGrafanaContentSender = vm.runInContext('isTrustedGrafanaContentSender', context);
 assert.strictEqual(typeof waitForGuiCaptureReady, 'function', 'background must expose a tab-scoped GUI-ready waiter');

@@ -5,7 +5,8 @@ from support.smoke import CheckCollector
 
 ROOT = Path(__file__).resolve().parent.parent
 PAGE = (ROOT / 'pages/dashbridge/dashbridge-iframe-message-controller.js').read_text(encoding='utf-8')
-BACKGROUND = (ROOT / 'js/background.js').read_text(encoding='utf-8')
+BACKGROUND = (ROOT / 'js/background.js').read_text(encoding='utf-8') \
+    + (ROOT / 'js/background-gui-capture.js').read_text(encoding='utf-8')
 IFRAME = (ROOT / 'js/content/grafana-iframe.js').read_text(encoding='utf-8')
 
 
@@ -20,6 +21,6 @@ check('iframe readiness supports chart and table surfaces',
 check('iframe readiness avoids document-wide mutation observers',
       'new MutationObserver' not in IFRAME
       and 'readinessTimer = setTimeout(inspectReadiness, delay)' in IFRAME)
-check('background owns tab-scoped render waiters', 'waitForGuiCaptureReady' in BACKGROUND)
-check('DashBridge GUI capture creates and awaits render readiness', "? waitForGuiCaptureReady(tabId)" in BACKGROUND and 'await dashbridgeReady;' in BACKGROUND)
+check('background owns tab-scoped render waiters', 'const waitForReady =' in BACKGROUND)
+check('DashBridge GUI capture creates and awaits render readiness', '? waitForReady(tabId)' in BACKGROUND and 'await dashbridgeReady;' in BACKGROUND)
 check.finish()
