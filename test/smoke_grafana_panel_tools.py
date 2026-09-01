@@ -24,7 +24,6 @@ IFRAME = (ROOT / "js/content/grafana-iframe.js").read_text(encoding="utf-8")
 POPUP = (ROOT / "pages/popup/popup.html").read_text(encoding="utf-8")
 OPTIONS = (ROOT / "pages/options/options.js").read_text(encoding="utf-8")
 LEGEND_ENGINE = (ROOT / "js/shared/grafana-legend-engine.js").read_text(encoding="utf-8")
-BRIDGE = (ROOT / "js/shared/grafana-panel-tools-bridge.js").read_text(encoding="utf-8")
 COMMAND = (ROOT / "js/shared/grafana-command.js").read_text(encoding="utf-8")
 PANEL_SETTINGS = (ROOT / "js/shared/grafana-panel-settings-modal.js").read_text(encoding="utf-8")
 LEGEND_SELECTION = (ROOT / "js/shared/grafana-legend-selection.js").read_text(encoding="utf-8")
@@ -215,10 +214,11 @@ checks = {
     "Panel tools do not install on non-Grafana pages": "const isGrafanaDashboardRoute" in COMMON
         and "if (!isGrafanaDashboardRoute && !isDashboardIframe) return;" in COMMON,
     "Shared command waits for the runtime": "panelToolsApplied" in COMMAND and "apply-timeout" in COMMAND,
-    "Bridge contains no unreachable legacy command path": "Legacy implementation retained below" not in BRIDGE
-        and BRIDGE.count("async function applySharedGrafanaPanelTools") == 1
-        and "let targetTabId = tabId;" not in BRIDGE,
-    "Shared command owns MAIN-world dispatch": "async function runGrafanaCommand" in COMMAND and "requestId" in COMMAND,
+    "Shared command contains one panel-tools adapter without a legacy path":
+        "Legacy implementation retained below" not in COMMAND
+        and COMMAND.count("async function applySharedGrafanaPanelTools") == 1,
+    "Shared command owns MAIN-world dispatch": "async function runGrafanaCommand" in COMMAND
+        and "requestId" in COMMAND,
     "Visual engine classifies active work": "const hasVisualWork" in COMMON,
     "style-only work does not install a legend visibility controller": "const hasLegendVisibilityWork" in COMMON
         and COMMON.count("seriesConfig: hasLegendVisibilityWork(tools) ? seriesConfig : null") == 2

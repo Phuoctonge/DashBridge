@@ -26,3 +26,17 @@ async function runGrafanaCommand({ tabId = null, command, payload = {}, refresh 
     if (refresh) await chrome.scripting.executeScript({ target: { tabId: targetTabId }, world: 'MAIN', func: () => document.querySelector('button[aria-label="Refresh dashboard"], .refresh-picker button, [data-testid="data-toolbar-refresh"], button[title="Refresh dashboard"]')?.click() });
     return { ok: true, confirmed: true };
 }
+
+// Applies the canonical panel-tools settings through the shared MAIN-world
+// command envelope. Batch callers keep one stable public function while the
+// transport and settings enrichment remain in the same owner module.
+async function applySharedGrafanaPanelTools(tools, { refresh = true, tabId = null } = {}) {
+    const storedTransformSettings = await chrome.storage.sync.get(getGrafanaSettingsStorageKeys());
+    const commandTransformSettings = normalizeGrafanaSettings(storedTransformSettings);
+    return runGrafanaCommand({
+        tabId,
+        command: 'applyPanelTools',
+        payload: { tools, transformSettings: commandTransformSettings },
+        refresh
+    });
+}

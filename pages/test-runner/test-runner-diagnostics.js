@@ -146,7 +146,7 @@ async function applyPanelTools(tabId, tools) {
     delete command.transformSettings;
     return execMain(tabId, (toolsArg) => new Promise(resolve => {
         // panel-tools intentionally ignores top-level tab messages until its
-        // caller opts in. Popup commands do this in runGrafanaCommand(); the
+        // caller opts in. Extension-page commands do this in runGrafanaCommand(); the
         // E2E runner must do the same or every command waits for the timeout.
         window.__dashbridgePanelToolsAllowTop = true;
         const reqId = `test_${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -1276,4 +1276,3 @@ async function waitForTargetQueryLifecycle(tabId, afterEventId, timeoutMs = 1200
         poll();
     }), [afterEventId, timeoutMs]);
 }
-

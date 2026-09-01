@@ -152,7 +152,7 @@ grafana-panel-tools.js
 | MAIN список/порядок | `grafana-runtime-manifest.js` | Background, Popup, Batch, runner. |
 | Bootstrap transform/refresh | `grafana-panel-bootstrap.js`, `grafana-refresh-policy.js` | DashBridge iframe MAIN startup. |
 | Запуск runtime | `background.js`, `grafana-runtime.js` | Все Grafana-сценарии. |
-| Команда в MAIN | `grafana-command.js`, `grafana-panel-tools-bridge.js` | Popup, Batch. |
+| Команда в MAIN | `grafana-command.js` | Batch; единый transport и применение настроек panel tools. |
 | Поиск панели/DOM | `grafana-dom.js` | Tools, capture, visual engine. |
 | Live panel state | `grafana-panel-state.js` | Tools, visual engine. |
 | Transport adapter | `grafana-network.js` | CPU/RAM, фильтры, diagnostics. |

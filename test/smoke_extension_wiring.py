@@ -35,10 +35,9 @@ checks = {
         for entry in MANIFEST["content_scripts"]
     ),
     "Required Chrome capabilities are declared": {"storage", "tabs", "scripting", "downloads"}.issubset(MANIFEST["permissions"]),
-    "Popup and Batch load the shared Grafana command runner": all(
-        'js/shared/grafana-command.js' in (ROOT / page).read_text(encoding="utf-8")
-        for page in ("pages/popup/popup.html", "pages/batch/batch.html")
-    ),
+    "Only Batch loads the shared Grafana command runner":
+        'js/shared/grafana-command.js' in (ROOT / "pages/batch/batch.html").read_text(encoding="utf-8")
+        and 'js/shared/grafana-command.js' not in (ROOT / "pages/popup/popup.html").read_text(encoding="utf-8"),
     "All interactive pages load canonical shared UI theme": all(
         '../shared/theme.css' in (ROOT / page).read_text(encoding="utf-8")
         for page in ("pages/popup/popup.html", "pages/batch/batch.html", "pages/dashbridge/dashbridge.html")
