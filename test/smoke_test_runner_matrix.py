@@ -18,6 +18,7 @@ REPORT = (ROOT / "pages/test-runner/test-runner-report.js").read_text(encoding="
 PANEL_TOOLS = (ROOT / "js/content/grafana-panel-tools.js").read_text(encoding="utf-8")
 GRAFANA_DOM = (ROOT / "js/content/grafana-dom.js").read_text(encoding="utf-8")
 VISUAL_ENGINE = (ROOT / "js/content/grafana-visual-engine.js").read_text(encoding="utf-8")
+SERIES_STYLES = (ROOT / "js/content/grafana-series-styles.js").read_text(encoding="utf-8")
 HTML = (ROOT / "pages/test-runner/test-runner.html").read_text(encoding="utf-8")
 
 
@@ -291,8 +292,8 @@ checks = {
         and "item.__dashbridgeFillDisabled === true ? false : display(item.fill)" in SUITE
         and "series.fill === false" in SUITE
         and "series.fill === series.originalFill" in SUITE
-        and "const fillDisabled = !!removeFill;" in VISUAL_ENGINE
-        and "series.__dashbridgeFillDisabled = fillDisabled;" in VISUAL_ENGINE
+        and "const fillDisabled = !!removeFill;" in SERIES_STYLES
+        and "series.__dashbridgeFillDisabled = fillDisabled;" in SERIES_STYLES
         and "const fnFill = makeFn(targetFill);" in VISUAL_ENGINE
         and "const moveToBottom = originalDirection === 'row';" in VISUAL_ENGINE
         and "series.width > series.originalWidth" in SUITE

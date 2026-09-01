@@ -12,6 +12,10 @@ const visualEngineSource = fs.readFileSync(
     path.join(__dirname, '..', 'js', 'content', 'grafana-visual-engine.js'),
     'utf8'
 );
+const seriesStylesSource = fs.readFileSync(
+    path.join(__dirname, '..', 'js', 'content', 'grafana-series-styles.js'),
+    'utf8'
+);
 
 assert(source.includes('const delays = [0, 80, 180, 350]'),
     'visual settings must be reapplied across the post-query renderer settling window');
@@ -28,8 +32,8 @@ assert(source.includes('generation !== visualStyleReapplyGeneration'),
     'rapid refreshes must not let stale retries overwrite current settings');
 assert(source.includes('getLocalStyleDebug?.({') && source.includes('styleState,'),
     'each retry must report the renderer state it actually produced');
-assert(visualEngineSource.includes('rendererInstanceId: getUPlotDiagnosticId(uplot)')
-    && visualEngineSource.includes('evaluatedFillValues:'),
+assert(seriesStylesSource.includes('rendererInstanceId: getUPlotDiagnosticId(uplot)')
+    && seriesStylesSource.includes('evaluatedFillValues:'),
     'style diagnostics must identify renderer remounts and report evaluated fill values');
 assert(source.includes('visualReapplyDiagnostic.pending = true')
     && source.includes('visualReapplyDiagnostic.pending = false'),
@@ -103,9 +107,9 @@ assert(source.includes('commandDiagnostic.legendVisibilityDeferred = !legendVisi
 assert(source.includes('if (overlay.textContent !== status.text) overlay.textContent = status.text;')
     && !/\n\s*overlay\.textContent = status\.text;/.test(source),
     'the document-wide title observer must not create a self-sustaining panel-status mutation loop');
-assert(visualEngineSource.includes('const configureLocalSeriesStyleGuard =')
-    && visualEngineSource.includes("attributeFilter: ['width', 'height', 'class']")
-    && visualEngineSource.includes('applyLocalSeriesStyles({ root, ...guard.settings })'),
+assert(seriesStylesSource.includes('const configureLocalSeriesStyleGuard =')
+    && seriesStylesSource.includes("attributeFilter: ['width', 'height', 'class']")
+    && seriesStylesSource.includes('applyLocalSeriesStyles({ root, ...guard.settings })'),
     'style-only state must be restored in the renderer replacement mutation before paint');
 assert(visualEngineSource.includes('const completeLegacyStyleApply = legacyResult =>')
     && visualEngineSource.includes('return completeLegacyStyleApply(legacyResult);')

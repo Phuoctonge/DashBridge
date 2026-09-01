@@ -2876,13 +2876,13 @@ function findEquivalentVisibilityEntry(entries, target, current) {
 const E2E_FEATURE_REGISTRY = [
     {
         id: 'removeFill', name: 'Заливка графика', description: 'Убирает цветную заливку под линиями и проверяет её точное восстановление.',
-        sourceFile: 'js/content/grafana-visual-engine.js', sourceSymbol: 'applyLocalSeriesStyles',
+        sourceFile: 'js/content/grafana-series-styles.js', sourceSymbol: 'applyLocalSeriesStyles',
         on: { visualSettings: { removeFill: true } }, off: { visualSettings: { removeFill: false } },
         invariant: matrixInvariants.removeFillOn, inactive: matrixInvariants.removeFillOff,
     },
     {
         id: 'thickenLines', name: 'Толщина линий', description: 'Утолщает все линии графика и проверяет возврат исходной толщины.',
-        sourceFile: 'js/content/grafana-visual-engine.js', sourceSymbol: 'applyLocalSeriesStyles',
+        sourceFile: 'js/content/grafana-series-styles.js', sourceSymbol: 'applyLocalSeriesStyles',
         on: { visualSettings: { thickenLines: true, thickenLinesValue: 3 } }, off: { visualSettings: { thickenLines: false, thickenLinesValue: 3 } },
         invariant: matrixInvariants.thickenLinesOn, inactive: matrixInvariants.thickenLinesOff,
     },

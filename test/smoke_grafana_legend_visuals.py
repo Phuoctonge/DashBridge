@@ -2,7 +2,9 @@
 from pathlib import Path
 from support.smoke import run_checks
 
-SRC = (Path(__file__).resolve().parent.parent / "js/content/grafana-visual-engine.js").read_text(encoding="utf-8")
+ROOT = Path(__file__).resolve().parent.parent
+SRC = (ROOT / "js/content/grafana-visual-engine.js").read_text(encoding="utf-8") \
+    + (ROOT / "js/content/grafana-series-styles.js").read_text(encoding="utf-8")
 
 checks = {
     "has contrast palette": "applyColors()" in SRC,
