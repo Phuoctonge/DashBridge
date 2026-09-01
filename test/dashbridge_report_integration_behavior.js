@@ -44,7 +44,10 @@ assert(html.indexOf('dashbridge-report-audit.js') < html.indexOf('dashbridge-rep
     && reportAudit.includes('runEngineSelfCheck')
     && reportTestRunner.includes("result(id, name, 'fixture'")
     && reportTestRunner.includes("source: 'live'")
-    && reportTestRunner.includes("'Большая таблица: 2500 серий'"),
+    && reportTestRunner.includes("'Большая таблица: 2500 серий'")
+    && reportTestRunner.includes("scenarios.filter(item => item.status === 'fail' || item.status === 'warning')")
+    && reportTestRunner.includes("audit.variables.filter(variable => variable.used)")
+    && reportTestRunner.includes("'report-runner-technical'"),
     'Message Test Runner must separate fixture and live suites while reusing one report collector');
 assert(html.indexOf('dashbridge-report-ui.js') < html.indexOf('dashbridge.js')
     && dashboard.includes('window.DashBridgeReportUi.create({'),

@@ -127,6 +127,9 @@
 .report-audit-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .report-audit-header h3, .report-audit-section h4 { margin: 0; }
 .report-audit-status { margin: 12px 0; color: var(--text-muted); }
+.report-audit-status.is-pass { color: #299c46; }
+.report-audit-status.is-warning { color: #b87500; }
+.report-audit-status.is-fail { color: #d7372f; }
 .report-audit-content { display: grid; gap: 18px; }
 .report-audit-summary { display: flex; flex-wrap: wrap; gap: 9px 18px; padding: 13px 15px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--bg-color); }
 .report-audit-section { display: grid; gap: 10px; min-width: 0; }
@@ -141,7 +144,26 @@
 .report-audit-variable { color: var(--primary); white-space: nowrap; font-family: monospace; }
 .report-audit-actions { position: sticky; bottom: -1.5rem; margin: 20px -1.5rem -1.5rem; padding: 14px 1.5rem; border-top: 1px solid var(--border-color); background: var(--card-bg); }
 .report-runner-source-note { margin: 10px 0 0; padding: 10px 12px; border-left: 3px solid var(--primary); background: var(--bg-color); color: var(--text-muted); font-size: .82rem; }
-.report-runner-scenarios { display: grid; gap: 9px; }
+.report-runner-summary { display: grid; gap: 5px; padding: 14px 16px; border: 1px solid var(--border-color); border-left: 4px solid var(--text-muted); border-radius: 9px; background: var(--bg-color); }
+.report-runner-summary.is-pass { border-left-color: #299c46; }
+.report-runner-summary.is-warning { border-left-color: #d98b00; }
+.report-runner-summary.is-fail { border-left-color: #e24d42; }
+.report-runner-summary strong { color: var(--text-main); font-size: .94rem; }
+.report-runner-summary span { color: var(--text-muted); font-size: .8rem; }
+.report-runner-problems { display: grid; gap: 9px; }
+.report-runner-problems h4 { margin: 4px 0 0; font-size: .9rem; }
+.report-runner-problems > p { margin: -3px 0 2px; color: var(--text-muted); font-size: .8rem; line-height: 1.45; }
+.report-runner-problem { border: 1px solid var(--border-color); border-left: 4px solid var(--text-muted); border-radius: 8px; background: var(--card-bg); }
+.report-runner-problem.is-fail { border-left-color: #e24d42; }
+.report-runner-problem.is-warning { border-left-color: #d98b00; }
+.report-runner-problem summary { padding: 11px 13px; cursor: pointer; color: var(--text-main); font-size: .84rem; font-weight: 650; }
+.report-runner-technical,
+.report-runner-audit-details { border: 1px solid var(--border-color); border-radius: 9px; background: var(--bg-color); }
+.report-runner-technical > summary,
+.report-runner-audit-details > summary { padding: 12px 14px; cursor: pointer; color: var(--text-main); font-size: .84rem; font-weight: 650; }
+.report-runner-technical[open] > summary,
+.report-runner-audit-details[open] > summary { border-bottom: 1px solid var(--border-color); }
+.report-runner-scenarios { display: grid; gap: 9px; padding: 12px; }
 .report-runner-scenario { border: 1px solid var(--border-color); border-left-width: 4px; border-radius: 8px; background: var(--card-bg); }
 .report-runner-scenario.is-pass { border-left-color: #299c46; }
 .report-runner-scenario.is-fail { border-left-color: #e24d42; }
@@ -150,7 +172,10 @@
 .report-runner-scenario summary { padding: 11px 13px; cursor: pointer; color: var(--text-main); font-size: .82rem; font-weight: 650; }
 .report-runner-details, .report-runner-evidence { margin: 0; padding: 10px 13px; border-top: 1px solid var(--border-color); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-muted); font: inherit; font-size: .8rem; }
 .report-runner-evidence { max-height: 260px; overflow: auto; color: var(--text-main); background: var(--bg-color); }
-.report-runner-audit { margin-top: 20px; }
+.report-runner-audit { margin-top: 2px; }
+.report-runner-audit-note { margin: 12px 14px; color: var(--text-muted); font-size: .8rem; line-height: 1.45; }
+.report-runner-audit-details .report-audit-table-wrap { margin: 0 12px 12px; }
+.report-runner-empty { margin: 12px 14px; color: var(--text-muted); font-size: .82rem; }
 .report-variable-reference { margin: 8px 0 28px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-color); overflow: hidden; }
 .report-variable-reference > summary { padding: 17px 20px; color: var(--text-main); cursor: pointer; font-size: .95rem; font-weight: 650; }
 .report-variable-reference[open] > summary { border-bottom: 1px solid var(--border-color); }

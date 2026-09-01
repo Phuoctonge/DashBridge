@@ -169,13 +169,34 @@
             host.textContent = '';
             const counts = Object.fromEntries(['pass', 'fail', 'warning', 'skip'].map(status => [status,
                 scenarios.filter(item => item.status === status).length]));
-            const summary = appendText(host, 'section', 'report-audit-summary report-runner-summary', '');
-            appendText(summary, 'strong', counts.fail ? 'report-audit-fail' : 'report-audit-pass',
-                counts.fail ? `FAIL: ${counts.fail}` : `PASS: ${counts.pass}`);
-            appendText(summary, 'span', '', `WARN: ${counts.warning}`);
-            appendText(summary, 'span', '', `SKIP: ${counts.skip}`);
-            appendText(summary, 'span', '', `Всего: ${scenarios.length}`);
-            const list = appendText(host, 'section', 'report-runner-scenarios', '');
+            const summaryTone = counts.fail ? 'is-fail' : counts.warning ? 'is-warning' : 'is-pass';
+            const summary = appendText(host, 'section', `report-runner-summary ${summaryTone}`, '');
+            appendText(summary, 'strong', '', counts.fail
+                ? `Найдены ошибки: ${counts.fail}`
+                : counts.warning ? `Работает с предупреждениями: ${counts.warning}` : 'Проверка проходит успешно');
+            appendText(summary, 'span', '', `${counts.pass} успешно · ${counts.skip} пропущено · ${scenarios.length} всего`);
+
+            const attention = scenarios.filter(item => item.status === 'fail' || item.status === 'warning');
+            if (attention.length) {
+                const problems = appendText(host, 'section', 'report-runner-problems', '');
+                appendText(problems, 'h4', '', 'Что требует внимания');
+                appendText(problems, 'p', '', 'Ниже показаны только ошибки и предупреждения. Нажмите на пункт, чтобы увидеть результат проверки.');
+                attention.forEach(item => {
+                    const details = document.createElement('details');
+                    details.className = `report-runner-problem is-${item.status}`;
+                    details.open = item.status === 'fail';
+                    problems.appendChild(details);
+                    appendText(details, 'summary', '', `${item.status === 'fail' ? 'Ошибка' : 'Предупреждение'} · ${item.name}`);
+                    appendText(details, 'pre', 'report-runner-details', item.details || 'Без подробностей.');
+                    if (item.evidence) appendText(details, 'pre', 'report-runner-evidence', item.evidence);
+                });
+            }
+
+            const technical = document.createElement('details');
+            technical.className = 'report-runner-technical';
+            host.appendChild(technical);
+            appendText(technical, 'summary', '', `Технические проверки (${scenarios.length})`);
+            const list = appendText(technical, 'section', 'report-runner-scenarios', '');
             scenarios.forEach(item => {
                 const details = document.createElement('details');
                 details.className = `report-runner-scenario is-${item.status}`; list.appendChild(details);
@@ -187,17 +208,30 @@
         };
         const renderAudit = (host, audit) => {
             host.textContent = '';
-            appendText(host, 'h4', '', 'Переменные реального профиля');
-            const tableWrap = appendText(host, 'div', 'report-audit-table-wrap', '');
+            const usedVariables = audit.variables.filter(variable => variable.used);
+            const missingVariables = usedVariables.filter(variable => !variable.hasData);
+            const disclosure = document.createElement('details');
+            disclosure.className = 'report-runner-audit-details';
+            host.appendChild(disclosure);
+            appendText(disclosure, 'summary', '', missingVariables.length
+                ? `Переменные активных шаблонов · без данных: ${missingVariables.length}`
+                : `Переменные активных шаблонов · ${usedVariables.length} проверено`);
+            appendText(disclosure, 'p', 'report-runner-audit-note',
+                `Показаны только переменные, используемые текущим профилем. Неиспользуемые скрыты: ${audit.variables.length - usedVariables.length}.`);
+            if (!usedVariables.length) {
+                appendText(disclosure, 'p', 'report-runner-empty', 'В активных шаблонах нет переменных.');
+                return;
+            }
+            const tableWrap = appendText(disclosure, 'div', 'report-audit-table-wrap', '');
             const table = document.createElement('table'); table.className = 'report-audit-table'; tableWrap.appendChild(table);
             const head = document.createElement('thead'); const row = document.createElement('tr'); head.appendChild(row);
-            ['Переменная', 'Область', 'Используется', 'Получила данные', 'Значение'].forEach(value => appendText(row, 'th', '', value));
+            ['Переменная', 'Где используется', 'Данные', 'Значение'].forEach(value => appendText(row, 'th', '', value));
             table.appendChild(head); const body = document.createElement('tbody'); table.appendChild(body);
-            audit.variables.forEach(variable => {
+            const scopeLabels = { profile: 'Общий шаблон', panel: 'Фраза панели', list: 'Строка списка' };
+            usedVariables.forEach(variable => {
                 const current = document.createElement('tr'); body.appendChild(current);
                 appendText(current, 'td', 'report-audit-variable', `{{${variable.name}}}`);
-                appendText(current, 'td', '', variable.scope);
-                appendText(current, 'td', variable.used ? 'report-audit-pass' : 'report-audit-muted', variable.used ? 'Да' : 'Нет');
+                appendText(current, 'td', '', scopeLabels[variable.scope] || variable.scope);
                 appendText(current, 'td', variable.hasData ? 'report-audit-pass' : 'report-audit-warning', variable.hasData ? 'Да' : 'Нет');
                 appendText(current, 'td', '', variable.value || '—');
             });
@@ -211,7 +245,7 @@
             appendText(header, 'h3', '', 'Message Test Runner');
             const closeButton = appendText(header, 'button', 'btn btn-outline report-audit-close', 'Закрыть'); closeButton.type = 'button';
             appendText(modal, 'p', 'report-runner-source-note',
-                'Тестовые данные проверяют все ветви движка. Реальные данные запрашиваются один раз из панелей активного профиля.');
+                'Сначала проверяем движок на тестовых данных, затем один раз собираем сообщение из активного профиля.');
             const status = appendText(modal, 'p', 'report-audit-status', 'Подготовка…'); status.setAttribute('role', 'status');
             const scenarioHost = appendText(modal, 'div', 'report-audit-content', '');
             const auditHost = appendText(modal, 'section', 'report-audit-section report-runner-audit', '');
@@ -233,11 +267,20 @@
                     const live = evaluateLiveSuite(reportEngine, auditEngine, collected);
                     scenarios.push(...live.scenarios); renderScenarios(scenarioHost, scenarios); renderAudit(auditHost, live.audit);
                     const failures = scenarios.filter(item => item.status === 'fail').length;
-                    status.textContent = failures ? `Завершено. Провалено сценариев: ${failures}.` : 'Завершено. Все обязательные сценарии пройдены.';
+                    const warnings = scenarios.filter(item => item.status === 'warning').length;
+                    const failureWord = failures === 1 ? 'ошибку'
+                        : failures % 10 >= 2 && failures % 10 <= 4 && (failures % 100 < 10 || failures % 100 >= 20)
+                            ? 'ошибки' : 'ошибок';
+                    status.className = `report-audit-status ${failures ? 'is-fail' : warnings ? 'is-warning' : 'is-pass'}`;
+                    status.textContent = failures
+                        ? `Проверка завершена: исправьте ${failures} ${failureWord} ниже.`
+                        : warnings ? `Проверка завершена: сообщение формируется, но есть предупреждения (${warnings}).`
+                            : 'Проверка завершена: сообщение формируется корректно.';
                 } catch (error) {
                     if (error?.name !== 'AbortError') {
                         scenarios.push(result('live-collection', 'Получение реальных данных', 'live', now(), 'fail', error?.message || String(error)));
                         renderScenarios(scenarioHost, scenarios);
+                        status.className = 'report-audit-status is-fail';
                         status.textContent = 'Тестовые сценарии завершены, но живой прогон не смог получить данные.';
                     }
                 } finally {
