@@ -13,6 +13,8 @@ if __name__ == "__main__":
         sources={
             "pages/batch/batch.js": [
                 "function parseGrafanaUrl(url)",
+                "const startBtn = document.getElementById('startBtn')",
+                "startButton: startBtn",
                 "const loadSelectedSeriesPanels = async () =>",
                 "discoverSeriesForSlice",
                 "BatchSeriesSelection.resolvePatterns",

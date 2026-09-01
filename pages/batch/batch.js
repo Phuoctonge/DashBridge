@@ -145,9 +145,10 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // --- Engine State ---
+    const startBtn = document.getElementById('startBtn');
     const batchOperation = BatchOperationController.create({
         mainActionArea,
-        startButton: document.getElementById('startBtn'),
+        startButton: startBtn,
         startSeriesButton: document.getElementById('startSeriesBtn'),
         cancelButton: document.getElementById('cancelBtn'),
         showToast,
