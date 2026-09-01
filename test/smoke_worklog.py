@@ -13,5 +13,10 @@ if __name__ == "__main__":
                 "async function checkJiraAuth()", "sendAllBtn.onclick = async",
                 "function confirmWorklogAction(message)", "clearSentBtn.onclick = async",
             ],
+            "pages/worklog/worklog-jira-client.js": [
+                "const checkAuth = async", "const fetchIssueTitle = async",
+                "const submitWorklog = async", "timeZoneName: 'longOffset'",
+                "'X-Atlassian-Token': 'no-check'",
+            ],
         },
     )

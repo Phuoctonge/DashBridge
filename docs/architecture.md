@@ -204,6 +204,7 @@ grafana-panel-tools.js
 | Import/recovery | `local-state-schema.js` | Options, Worklog, profiles. |
 | Options config transfer | `options-config-transfer.js` | Options: allowlist/schema, validation, backup, FileReader/Blob URL и import/export lifecycle. |
 | Local writes | `storage-writer.js` | Profiles, Worklog, Batch. |
+| Worklog Jira transport | `worklog-jira-client.js` | Auth/issue/worklog HTTP, timezone serialization и Jira payload; page controller владеет таблицей/cache/history. |
 | Sync input writes | `sync-input-writer.js` | Частые поля UI. |
 | Bounded diagnostics | `bounded-journal.js` | MAIN и test tooling. |
 | ZIP/лимиты | `archive-download.js`, `archive-budget.js` | Batch, exports. |

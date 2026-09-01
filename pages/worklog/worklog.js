@@ -39,6 +39,10 @@ document.addEventListener("DOMContentLoaded", () => {
     let jiraDefaultTimeSpent = "";
     const MAX_HISTORY = 5;
     const worklogWriter = DashBridgeStorageWriter.createLocal();
+    const jiraClient = DashBridgeWorklogJiraClient.create({
+        getBaseUrl: () => jiraBaseUrl,
+        getTimeZone: () => jiraTz
+    });
 
     function confirmWorklogAction(message) {
         return new Promise(resolve => {
@@ -204,19 +208,14 @@ document.addEventListener("DOMContentLoaded", () => {
         log.summary = "Загрузка...";
         updateRowUI(logId);
 
-        try {
-            const res = await fetch(`${jiraBaseUrl}/rest/api/2/issue/${key}?fields=summary,parent`, {
-                headers: { 'X-Atlassian-Token': 'no-check' }
-            });
-            if (res.ok) {
-                const data = await res.json();
-                let title = data.fields?.summary || "Без названия";
-                if (data.fields?.parent) title = `${data.fields.parent.key} ${data.fields.parent.fields.summary} \n↳ ${key} ${title}`;
-                log.summary = title;
-                issueCache[key] = title;
-                saveToStorage();
-            } else { log.summary = "Задача не найдена"; }
-        } catch (e) { log.summary = "Ошибка загрузки"; }
+        const result = await jiraClient.fetchIssueTitle(key);
+        if (result.ok) {
+            log.summary = result.title;
+            issueCache[key] = result.title;
+            saveToStorage();
+        } else {
+            log.summary = result.reason === 'not-found' ? 'Задача не найдена' : 'Ошибка загрузки';
+        }
         updateRowUI(logId);
     }
 
@@ -492,11 +491,14 @@ document.addEventListener("DOMContentLoaded", () => {
     async function checkJiraAuth() {
         if (!authText) return;
         authText.textContent = "Проверка...";
-        try {
-            const res = await fetch(`${jiraBaseUrl}/rest/api/2/myself`, { headers: { 'X-Atlassian-Token': 'no-check' } });
-            if (res.ok) { const data = await res.json(); authText.textContent = `Авторизован: ${data.displayName}`; authDot.className = "auth-dot auth-ok"; }
-            else { authText.textContent = "Не авторизован"; authDot.className = "auth-dot auth-fail"; }
-        } catch (e) { authText.textContent = "Ошибка связи"; authDot.className = "auth-dot auth-fail"; }
+        const result = await jiraClient.checkAuth();
+        if (result.ok) {
+            authText.textContent = `Авторизован: ${result.displayName}`;
+            authDot.className = "auth-dot auth-ok";
+        } else {
+            authText.textContent = result.reason === 'network' ? 'Ошибка связи' : 'Не авторизован';
+            authDot.className = "auth-dot auth-fail";
+        }
     }
 
     function showRefreshIndicator() {
@@ -550,65 +552,16 @@ document.addEventListener("DOMContentLoaded", () => {
             try {
                 const d = parseDate(log.dateStarted);
                 if (isNaN(d.getTime())) throw new Error("Invalid date");
-
-                const pad = (n) => String(n).padStart(2, '0');
-                let iso;
-                if (jiraTz && jiraTz !== 'local') {
-                    try {
-                        const parts = new Intl.DateTimeFormat('en-US', {
-                            timeZone: jiraTz,
-                            year: 'numeric', month: '2-digit', day: '2-digit',
-                            hour: '2-digit', minute: '2-digit', second: '2-digit',
-                            hour12: false
-                        }).formatToParts(d);
-
-                        const getVal = (type) => parts.find(p => p.type === type).value;
-                        const yyyy = getVal('year');
-                        const mm = getVal('month');
-                        const dd = getVal('day');
-                        const hh = getVal('hour');
-                        const min = getVal('minute');
-
-                        const tzParts = new Intl.DateTimeFormat('en-US', {
-                            timeZone: jiraTz,
-                            timeZoneName: 'longOffset'
-                        }).formatToParts(d);
-                        const tzName = tzParts.find(p => p.type === 'timeZoneName').value;
-                        let tz = '+0000';
-                        if (tzName !== 'GMT') {
-                            const match = tzName.match(/GMT([+-])(\d+)(?::(\d+))?/);
-                            if (match) {
-                                const sign = match[1];
-                                const hStr = match[2].padStart(2, '0');
-                                const mStr = (match[3] || '00').padStart(2, '0');
-                                tz = sign + hStr + mStr;
-                            }
-                        }
-                        iso = `${yyyy}-${mm}-${dd}T${hh}:${min}:00.000${tz}`;
-                    } catch (e) {
-                        console.error("Timezone conversion error, falling back to local:", e);
-                        const offset = -d.getTimezoneOffset();
-                        const absOffset = Math.abs(offset);
-                        const tz = (offset >= 0 ? '+' : '-') + pad(Math.floor(absOffset / 60)) + pad(absOffset % 60);
-                        iso = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00.000${tz}`;
-                    }
-                } else {
-                    const offset = -d.getTimezoneOffset();
-                    const absOffset = Math.abs(offset);
-                    const tz = (offset >= 0 ? '+' : '-') + pad(Math.floor(absOffset / 60)) + pad(absOffset % 60);
-                    iso = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00.000${tz}`;
-                }
-
-                const res = await fetch(`${jiraBaseUrl}/rest/api/2/issue/${key}/worklog`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Atlassian-Token': 'no-check' },
-                    body: JSON.stringify({ timeSpent: `${String(log.timeSpent).replace(',', '.')}h`, comment: log.description || "", started: iso })
+                const result = await jiraClient.submitWorklog({
+                    key,
+                    timeSpent: log.timeSpent,
+                    description: log.description,
+                    date: d
                 });
-
-                if (!res.ok) {
-                    const errText = await res.text();
-                    console.error(`[Jira Error] ${res.status}: ${errText}`);
+                if (!result.ok) {
+                    console.error(`[Jira Error] ${result.status}: ${result.errorText}`);
                 }
-                worklogs[i].status = res.ok ? 'sent' : 'error';
+                worklogs[i].status = result.ok ? 'sent' : 'error';
             } catch (e) {
                 console.error("[Worklog Error]", e);
                 worklogs[i].status = 'error';
