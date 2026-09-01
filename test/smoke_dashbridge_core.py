@@ -39,7 +39,7 @@ def test(name, condition, detail=""):
 def read_file():
     return DASHBRIDGE_JS.read_text(encoding="utf-8") \
         + (ROOT / "pages/dashbridge/dashbridge-profile-controller.js").read_text(encoding="utf-8") \
-        + (ROOT / "pages/dashbridge/dashbridge-drag-controller.js").read_text(encoding="utf-8") \
+        + (ROOT / "pages/dashbridge/dashbridge-panel-card-controller.js").read_text(encoding="utf-8") \
         + (ROOT / "pages/dashbridge/dashbridge-panel-transfer-controller.js").read_text(encoding="utf-8") \
         + (ROOT / "pages/dashbridge/dashbridge-panel-addition-controller.js").read_text(encoding="utf-8") \
         + (ROOT / "pages/dashbridge/dashbridge-panel-actions-controller.js").read_text(encoding="utf-8") \

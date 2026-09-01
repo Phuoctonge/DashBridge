@@ -5,7 +5,7 @@ from support.smoke import run_checks
 
 ROOT = Path(__file__).resolve().parent.parent
 JS = (ROOT / "pages/dashbridge/dashbridge.js").read_text(encoding="utf-8") \
-    + (ROOT / "pages/dashbridge/dashbridge-drag-controller.js").read_text(encoding="utf-8")
+    + (ROOT / "pages/dashbridge/dashbridge-panel-card-controller.js").read_text(encoding="utf-8")
 RENDERER = (ROOT / "pages/dashbridge/dashbridge-renderer.js").read_text(encoding="utf-8")
 CSS = (ROOT / "pages/dashbridge/dashbridge.css").read_text(encoding="utf-8")
 
@@ -13,7 +13,7 @@ CSS = (ROOT / "pages/dashbridge/dashbridge.css").read_text(encoding="utf-8")
 checks = {
     "container owns dragover handling": "container.addEventListener('dragover'" in JS,
     "target side is resolved from pointer position": "dropSide = event.clientX < target.getBoundingClientRect().left" in JS,
-    "panel order is persisted from DOM": "const saveOrder = container =>" in JS,
+    "panel order is persisted from DOM": "const saveCardOrder = container =>" in JS,
     "free grid behavior is removed": "getGridDropPosition" not in JS and "resolveGridDrop" not in JS,
     "iframe cannot swallow a drop": ".dashboard-container.is-dragging iframe" in CSS and "pointer-events: none" in CSS,
     "left marker exists": ".panel-card.drag-over-left::before" in CSS,

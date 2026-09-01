@@ -26,7 +26,6 @@ before(dashbridgeHtml, 'dashbridge-profile-controller.js', 'dashbridge.js');
 before(dashbridgeHtml, 'dashbridge-time-state.js', 'dashbridge-time-controller.js');
 before(dashbridgeHtml, 'dashbridge-time-controller.js', 'dashbridge.js');
 before(dashbridgeHtml, 'dashbridge-panel-tools-controller.js', 'dashbridge.js');
-before(dashbridgeHtml, 'dashbridge-drag-controller.js', 'dashbridge.js');
 before(dashbridgeHtml, 'dashbridge-panel-transfer.js', 'dashbridge-panel-transfer-controller.js');
 before(dashbridgeHtml, 'dashbridge-panel-transfer-controller.js', 'dashbridge.js');
 before(dashbridgeHtml, 'dashbridge-panel-addition-controller.js', 'dashbridge.js');

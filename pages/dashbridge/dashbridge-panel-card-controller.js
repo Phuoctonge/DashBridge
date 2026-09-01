@@ -1,13 +1,14 @@
 (function initDashBridgePanelCardController(root) {
     'use strict';
 
-    function create({ renderer, getPanels, getActiveProfile, applyPanelParamsToUrl,
-        navigateDashboardFrame, bindCardDrag, bindPanelActions, findPanelCard, getPanelAnalysisType,
+    function create({ renderer, getPanels, setPanels, savePanels, getActiveProfile, applyPanelParamsToUrl,
+        navigateDashboardFrame, bindPanelActions, findPanelCard, getPanelAnalysisType,
         syncPanelAnalysisAction, closePanelAnalysis, isPanelAnalysisOpen, onPanelRemoved,
         escapeHtml, icons, documentRef = document }) {
         if (!renderer?.createPanelCard || typeof getPanels !== 'function'
+            || typeof setPanels !== 'function' || typeof savePanels !== 'function'
             || typeof getActiveProfile !== 'function' || typeof applyPanelParamsToUrl !== 'function'
-            || typeof navigateDashboardFrame !== 'function' || typeof bindCardDrag !== 'function'
+            || typeof navigateDashboardFrame !== 'function'
             || typeof bindPanelActions !== 'function' || typeof findPanelCard !== 'function'
             || typeof getPanelAnalysisType !== 'function'
             || typeof syncPanelAnalysisAction !== 'function' || typeof closePanelAnalysis !== 'function'
@@ -15,6 +16,71 @@
             || typeof escapeHtml !== 'function' || !icons?.collapse) {
             throw new TypeError('DashBridge panel card controller dependencies are incomplete');
         }
+
+        let draggedElement = null;
+        let targetElement = null;
+        let dropSide = null;
+
+        const clearDragMarkers = () => {
+            targetElement?.classList.remove('drag-over-left', 'drag-over-right');
+            targetElement = null;
+            dropSide = null;
+        };
+
+        const saveCardOrder = container => {
+            const panelsById = new Map(getPanels().map(panel => [panel.id, panel]));
+            setPanels([...container.querySelectorAll('.panel-card')]
+                .map(card => panelsById.get(card.dataset.panelId))
+                .filter(Boolean));
+            savePanels();
+        };
+
+        const setupDrag = () => {
+            const container = documentRef.getElementById('dashboard');
+            container.addEventListener('dragover', event => {
+                if (!draggedElement) return;
+                const target = event.target.closest('.panel-card');
+                if (!target || target === draggedElement || !container.contains(target)) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'move';
+                clearDragMarkers();
+                targetElement = target;
+                dropSide = event.clientX < target.getBoundingClientRect().left + target.offsetWidth / 2
+                    ? 'left' : 'right';
+                target.classList.add(dropSide === 'left' ? 'drag-over-left' : 'drag-over-right');
+            });
+            container.addEventListener('dragleave', event => {
+                if (event.target === container && !container.contains(event.relatedTarget)) clearDragMarkers();
+            });
+            container.addEventListener('drop', event => {
+                if (!draggedElement || !targetElement || !dropSide) return;
+                event.preventDefault();
+                if (dropSide === 'left') container.insertBefore(draggedElement, targetElement);
+                else container.insertBefore(draggedElement, targetElement.nextSibling);
+                saveCardOrder(container);
+                clearDragMarkers();
+            });
+        };
+
+        const bindCardDrag = (card, panel, container) => {
+            const handle = card.querySelector('.drag-handle');
+            handle.addEventListener('mousedown', () => { card.draggable = true; });
+            handle.addEventListener('mouseup', () => { card.draggable = false; });
+            card.addEventListener('dragstart', event => {
+                draggedElement = card;
+                card.classList.add('dragging');
+                container.classList.add('is-dragging');
+                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.setData('text/plain', panel.id);
+            });
+            card.addEventListener('dragend', () => {
+                card.draggable = false;
+                card.classList.remove('dragging');
+                container.classList.remove('is-dragging');
+                clearDragMarkers();
+                draggedElement = null;
+            });
+        };
 
         const forceLoadPanel = id => {
             const iframe = documentRef.getElementById('iframe-' + id);
@@ -179,6 +245,7 @@
 
         return Object.freeze({
             forceLoadPanel,
+            setupDrag,
             updatePanelCard,
             createPanelCard,
             replacePanelCard,

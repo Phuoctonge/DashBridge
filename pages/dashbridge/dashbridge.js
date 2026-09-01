@@ -184,12 +184,6 @@ dashBridgePanelToolsController = DashBridgePanelToolsController.create({
     settingsModal: window.DashBridgePanelSettingsModal,
     escapeHtml,
 });
-const dashBridgeDragController = DashBridgeDragController.create({
-    getPanels: () => panels,
-    setPanels: value => { panels = value; },
-    savePanels,
-});
-const setupDashboardDragAndDrop = dashBridgeDragController.setup;
 const dashBridgePanelTransferController = DashBridgePanelTransferController.create({
     transfer: window.DashBridgePanelTransfer,
     showAlert,
@@ -324,7 +318,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     syncDashboardCaptureToggles(defaultCapturePrepared);
     setupTimeControls();
     setupEventListeners();
-    setupDashboardDragAndDrop();
+    dashBridgePanelCardController.setupDrag();
     const crosshairSlider = document.getElementById('crosshairThicknessSlider');
     if (crosshairSlider) crosshairSlider.value = crosshairThickness;
     updateCrosshairBtn();
@@ -513,10 +507,11 @@ dashBridgePanelActionsController = DashBridgePanelActionsController.create({
 dashBridgePanelCardController = DashBridgePanelCardController.create({
     renderer: DashBridgeRenderer,
     getPanels: () => panels,
+    setPanels: value => { panels = value; },
+    savePanels,
     getActiveProfile,
     applyPanelParamsToUrl,
     navigateDashboardFrame,
-    bindCardDrag: dashBridgeDragController.bindCard,
     bindPanelActions: dashBridgePanelActionsController.bindPanelActions,
     findPanelCard,
     getPanelAnalysisType,

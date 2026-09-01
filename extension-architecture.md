@@ -164,8 +164,7 @@ grafana-panel-tools.js
 | DashBridge iframe transport | `dashbridge-iframe-message-controller.js` | Двусторонняя trust boundary: guarded post/navigation reset, проверка source + exact origin, dispatch report/analysis/capture/tools/crosshair и iframe ready/rendered lifecycle. |
 | DashBridge time/URL lifecycle | `dashbridge-time-controller.js` | Profile-owned range/refresh, controls, clipboard, theme-aware panel URL, iframe time broadcast and Refresh Off transition. |
 | DashBridge panel tools/status | `dashbridge-panel-tools-controller.js` | Нормализация tools, settings modal, correlated title/legend/threshold requests, threshold state and notifications. |
-| DashBridge card drag lifecycle | `dashbridge-drag-controller.js` | Drag enable/reset, drop markers, DOM reorder and persisted panel order. |
-| DashBridge card/iframe lifecycle | `dashbridge-panel-card-controller.js` | Создание и точечная замена карточек, eager iframe navigation активных панелей, layout-only update, reconciliation и cleanup удаления. |
+| DashBridge card/iframe lifecycle | `dashbridge-panel-card-controller.js` | Создание и точечная замена карточек, drag/reorder с сохранением порядка, eager iframe navigation активных панелей, layout-only update, reconciliation и cleanup удаления. |
 | Действия карточек DashBridge | `dashbridge-panel-actions-controller.js` | Refresh, pause, fullscreen, удаление, iframe settings и привязка toolbar-кнопок; сохраняет точечный update без общего remount. |
 | Верхний UI DashBridge | `dashbridge-page-ui-controller.js` | Header/dropdown, профильные действия, capture и crosshair controls, делегирование setup добавления/transfer и закрытие transient UI по Escape/outside click. |
 | DashBridge panel analysis UI | `dashbridge-panel-analysis-controller.js` | CPU/RAM modal, exact iframe/request correlation, retry after iframe readiness and cancel cleanup. |
