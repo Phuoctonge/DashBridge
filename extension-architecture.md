@@ -192,6 +192,7 @@ grafana-panel-tools.js
 | Batch main run | `batch-main-run-controller.js` | Валидация и последовательный сбор полного dashboard, panel rules, PNG/ZIP manifest и частичный результат через общий operation lifecycle. |
 | Batch Series discovery | `batch-series-discovery-controller.js` | Dashboard API/query signatures, временная Grafana-вкладка, ранний MAIN capture, bounded settle/timeout, abort cleanup и fallback `panel-ID`/numeric ID. |
 | Batch Series run | `batch-series-run-controller.js` | Group/standalone selection, legend filtering, sequential capture, ZIP manifest, partial result и cleanup discovery tab через общий operation lifecycle. |
+| Recorder network capture | `recorder-network-capture.js` | CDP request/response correlation, bounded body/stream/page capture и completeness; session attach/detach остаётся в `recorder.js`. |
 | Recorder replay | `recorder-replay.js` | `recorder.js`; step normalization/execution, navigation and network-idle waits. |
 | Анализ CPU/RAM | `grafana-panel-analysis.js` | Расчёт, thresholds и clipboard-формат кнопок CPU Usage/Memory. |
 | Grafana time | `grafana-time.js` | DashBridge, iframe. |

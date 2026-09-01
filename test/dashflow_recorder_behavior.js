@@ -116,7 +116,7 @@ assert(recorderCss.includes('.comparison-controls > :not(.sr-only) { flex: 1 1 1
     'comparison controls must fill narrow layouts without overflow');
 assert(recorderCss.includes('.network-switches { display: grid; grid-template-columns: minmax(0,1fr);'),
     'cache and cookie switches must be arranged vertically');
-for (const asset of ['vendor/jszip.min.js', 'js/shared/dashflow-schema.js', 'js/shared/dashflow-compare.js', 'js/shared/dashflow-xlsx.js', '../shared/operation-progress-window.js', 'recorder-dashflow-export.js', 'recorder-dashflow-io.js', 'recorder-view.js', 'recorder-replay.js', 'recorder.js']) {
+for (const asset of ['vendor/jszip.min.js', 'js/shared/dashflow-schema.js', 'js/shared/dashflow-compare.js', 'js/shared/dashflow-xlsx.js', '../shared/operation-progress-window.js', 'recorder-dashflow-export.js', 'recorder-dashflow-io.js', 'recorder-view.js', 'recorder-replay.js', 'recorder-network-capture.js', 'recorder.js']) {
     assert(html.includes(asset), `recorder page must load ${asset}`);
 }
 assert(html.indexOf('vendor/jszip.min.js') < html.indexOf('recorder.js'), 'JSZip must load before the recorder controller');
@@ -126,19 +126,22 @@ assert(html.indexOf('recorder-dashflow-export.js') < html.indexOf('recorder.js')
     'DashFlow export builders must load before the recorder controller');
 assert(html.indexOf('recorder-view.js') < html.indexOf('recorder.js'),
     'Recorder view must load before the lifecycle controller');
+assert(html.indexOf('recorder-network-capture.js') < html.indexOf('recorder.js'),
+    'Recorder network capture must load before the session lifecycle controller');
 
 const recorder = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recorder.js'), 'utf8');
 const recorderView = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recorder-view.js'), 'utf8');
 const recorderReplay = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recorder-replay.js'), 'utf8');
+const recorderNetwork = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recorder-network-capture.js'), 'utf8');
 const dashflowIo = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recorder-dashflow-io.js'), 'utf8');
 const dashflowExport = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recorder-dashflow-export.js'), 'utf8');
-assert(recorder.includes('Network.getResponseBody'), 'network recorder must capture response bodies through CDP');
-assert(recorder.includes('Network.getRequestPostData'), 'request bodies missing from requestWillBeSent must be retrieved through CDP');
-assert(recorder.includes('function headerValue(headers, wantedName)')
-    && recorder.includes("headerValue(request.requestHeaders, 'content-type')"),
+assert(recorderNetwork.includes('Network.getResponseBody'), 'network recorder must capture response bodies through CDP');
+assert(recorderNetwork.includes('Network.getRequestPostData'), 'request bodies missing from requestWillBeSent must be retrieved through CDP');
+assert(recorderNetwork.includes('const headerValue = (headers, wantedName) =>')
+    && recorderNetwork.includes("request.requestHeaders, 'content-type'"),
     'multipart request-body detection must retain its local case-insensitive header lookup');
-assert(recorder.includes('schema.classifyResponseBodyCapture'), 'response body capture must use the tested no-body and size policy');
-assert(recorder.includes('schema.base64DecodedByteLength'), 'binary response metadata must use exact Base64 padding-aware size');
+assert(recorderNetwork.includes('schema.classifyResponseBodyCapture'), 'response body capture must use the tested no-body and size policy');
+assert(recorderNetwork.includes('schema.base64DecodedByteLength'), 'binary response metadata must use exact Base64 padding-aware size');
 assert(dashflowExport.includes('schema.buildHarTimings'), 'HAR export must use the tested CDP timing conversion');
 assert(dashflowIo.includes('assertEntrySize') && recorder.includes('estimateDashflowWorkingSet'),
     'DashFlow import and save must reject oversized decompressed entries before expensive processing');
@@ -146,18 +149,18 @@ assert(dashflowIo.includes("zip.file('network.json'") && dashflowIo.includes("zi
     'DashFlow v2 must persist canonical network data and streaming protocols separately from HAR');
 assert(recorder.includes("String(bodyIndex).padStart(6, '0')"),
     'response body paths must remain unique even when sanitized CDP request IDs collide');
-assert(recorder.includes('responseBodyCapture') && recorder.includes('requestBodyCapture') && recorder.includes('pendingCapturesAtStop'),
+assert(recorderNetwork.includes('responseBodyCapture') && recorderNetwork.includes('requestBodyCapture') && recorder.includes('pendingCapturesAtStop'),
     'every body capture must have an explicit completeness status');
-assert(recorder.includes('Network.dataReceived') && recorder.includes('Network.requestServedFromCache')
-    && recorder.includes('Network.resourceChangedPriority'), 'canonical capture must retain transfer size, cache and priority events');
-assert(recorder.includes('webSocket|eventSourceMessageReceived|webTransport') && recorder.includes('MAX_STREAM_PAYLOAD_BYTES'),
+assert(recorderNetwork.includes('Network.dataReceived') && recorderNetwork.includes('Network.requestServedFromCache')
+    && recorderNetwork.includes('Network.resourceChangedPriority'), 'canonical capture must retain transfer size, cache and priority events');
+assert(recorderNetwork.includes('webSocket|eventSourceMessageReceived|webTransport') && recorder.includes('MAX_STREAM_PAYLOAD_BYTES'),
     'bounded WebSocket, SSE and WebTransport metadata must be captured');
-assert(recorder.includes('Page.navigatedWithinDocument') && recorder.includes('Page.lifecycleEvent'),
+assert(recorderNetwork.includes('Page.navigatedWithinDocument') && recorderNetwork.includes('Page.lifecycleEvent'),
     'same-document navigation and page lifecycle events must be retained');
 assert(dashflowExport.includes('queryString = [...new URLRef(request.url).searchParams]')
     && dashflowExport.includes('serverIPAddress') && dashflowExport.includes('_dashbridgeCdpTiming'),
     'derived HAR must include query parameters, connection endpoint and CDP timing metadata');
-assert(recorder.includes('Network.requestWillBeSentExtraInfo'), 'network recorder must retain auth/cookie request headers');
+assert(recorderNetwork.includes('Network.requestWillBeSentExtraInfo'), 'network recorder must retain auth/cookie request headers');
 assert(recorder.includes('Network.setCacheDisabled'), 'record and replay must bypass the browser cache');
 assert(recorder.includes('Network.setBypassServiceWorker'), 'record and replay must bypass Service Worker caches');
 assert(recorder.includes('isAllowedIncognitoAccess'), 'ephemeral cookies require explicit Chrome incognito access');
@@ -203,9 +206,9 @@ const importRead = recorder.indexOf('const imported = await dashflowIo.read(file
 const importCommit = recorder.indexOf('await stopActiveSession(false); resetSession();', importRead);
 assert(importRead >= 0 && importCommit > importRead,
     'Recorder must not reset the live session until the archive has fully validated');
-assert(recorder.includes('earlyPlaceholder && !earlyPlaceholder.url') && recorder.includes('chain[index] = key'),
+assert(recorderNetwork.includes('earlyPlaceholder && !earlyPlaceholder.url') && recorderNetwork.includes('chain[index] = key'),
     'request placeholders must preserve out-of-order ExtraInfo, including redirect chains');
-assert(recorder.includes('request.associatedCookies !== undefined') && recorder.includes('request.blockedCookies !== undefined'),
+assert(recorderNetwork.includes('request.associatedCookies !== undefined') && recorderNetwork.includes('request.blockedCookies !== undefined'),
     'early request and response ExtraInfo headers must not be overwritten by the basic CDP events');
 assert(recorder.includes('finalizeUnexpectedSession'),
     'closing the controlled tab or losing the debugger must finalize pending capture state');

@@ -49,7 +49,7 @@ const extensionRuntimeGlobals = readonly([
     'DashBridgePanelAnalysisController',
     'DashBridgePageUiController', 'DashBridgePanelCardController', 'DashBridgePanelToolsController',
     'DashBridgePanelTransferController', 'DashBridgeProfileController',
-    'DashBridgeRecorderReplay', 'DashBridgeRecorderView', 'DashBridgeReportAudit',
+    'DashBridgeRecorderNetworkCapture', 'DashBridgeRecorderReplay', 'DashBridgeRecorderView', 'DashBridgeReportAudit',
     'DashBridgeReportController', 'DashBridgeReportTestRunner',
     'DashBridgeTimeController',
     'DASHBRIDGE_TEST_SUITE', 'DIAGNOSTIC_CAPTURE_MODES',
