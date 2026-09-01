@@ -17,6 +17,7 @@ batch = (ROOT / "pages/batch/batch.js").read_text(encoding="utf-8") \
 runner = (ROOT / "pages/batch/batch-capture-runner.js").read_text(encoding="utf-8")
 layout = (ROOT / "js/content/grafana-compact-layout.js").read_text(encoding="utf-8")
 visual_engine = (ROOT / "js/content/grafana-visual-engine.js").read_text(encoding="utf-8") \
+    + (ROOT / "js/content/grafana-legend-visuals.js").read_text(encoding="utf-8") \
     + (ROOT / "js/content/grafana-series-styles.js").read_text(encoding="utf-8")
 checks = {
     "Panel state is keyed independently of DOM node": "const states" in state and "keyFor" in state,

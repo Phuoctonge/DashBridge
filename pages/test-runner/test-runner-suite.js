@@ -2888,7 +2888,7 @@ const E2E_FEATURE_REGISTRY = [
     },
     {
         id: 'invertLegend', name: 'Положение легенды', description: 'Перемещает легенду справа вниз или снизу вправо и проверяет восстановление.',
-        sourceFile: 'js/content/grafana-visual-engine.js', sourceSymbol: 'applyPopupLegendAndVisuals',
+        sourceFile: 'js/content/grafana-legend-visuals.js', sourceSymbol: 'applyPopupLegendAndVisuals',
         on: { visualSettings: { invertLegend: true } }, off: { visualSettings: { invertLegend: false } },
         invariant: matrixInvariants.invertLegendOn, inactive: matrixInvariants.invertLegendOff,
     },

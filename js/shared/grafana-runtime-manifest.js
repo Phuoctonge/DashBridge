@@ -15,6 +15,7 @@
         'js/content/grafana-panel-definition.js',
         'js/content/grafana-unit.js',
         'js/content/grafana-table-report.js',
+        'js/content/grafana-legend-visuals.js',
         'js/content/grafana-threshold-visuals.js',
         'js/content/grafana-report-snapshot.js',
         'js/content/grafana-series-styles.js',

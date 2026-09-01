@@ -66,7 +66,8 @@ shared_contract_ok = (
     'const panelKey = panel =>' in DOM.read_text(encoding="utf-8")
     and 'window.DashBridgeGrafanaDom = { panelSelectors, visiblePanels, panelKey,' in DOM.read_text(encoding="utf-8")
 )
-visual_engine = (ROOT / "js/content/grafana-visual-engine.js").read_text(encoding="utf-8")
+visual_engine = (ROOT / "js/content/grafana-visual-engine.js").read_text(encoding="utf-8") \
+    + (ROOT / "js/content/grafana-legend-visuals.js").read_text(encoding="utf-8")
 legend_layout_ok = (
     "legendRow?.closest(`table" in visual_engine
     and "const findFlexChild" in visual_engine

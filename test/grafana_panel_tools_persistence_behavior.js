@@ -14,6 +14,9 @@ const visualEngineSource = fs.readFileSync(
 ) + fs.readFileSync(
     path.join(__dirname, '..', 'js', 'content', 'grafana-threshold-visuals.js'),
     'utf8'
+) + fs.readFileSync(
+    path.join(__dirname, '..', 'js', 'content', 'grafana-legend-visuals.js'),
+    'utf8'
 );
 const seriesStylesSource = fs.readFileSync(
     path.join(__dirname, '..', 'js', 'content', 'grafana-series-styles.js'),

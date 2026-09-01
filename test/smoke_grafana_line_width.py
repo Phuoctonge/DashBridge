@@ -3,7 +3,8 @@ from pathlib import Path
 from support.smoke import run_checks
 
 ROOT = Path(__file__).resolve().parent.parent
-SRC = (ROOT / "js/content/grafana-visual-engine.js").read_text(encoding="utf-8")
+SRC = (ROOT / "js/content/grafana-visual-engine.js").read_text(encoding="utf-8") \
+    + (ROOT / "js/content/grafana-legend-visuals.js").read_text(encoding="utf-8")
 
 checks = {
     "shared visual engine is registered": "window.DashBridgeGrafanaVisualEngine" in SRC,

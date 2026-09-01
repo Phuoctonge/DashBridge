@@ -80,7 +80,7 @@ assert(controllerSchedule.includes('renderCpuCapacityLegendColumn(root, controll
     && controllerSchedule.includes('reflowChart?.({ root })')
     && !controllerSchedule.includes('syncResponseFilterPresentation'),
     'legend remount guard must reflow only a changed vCPU column without re-arming the Flot response filter');
-const visualEngine = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-visual-engine.js'), 'utf8');
+const visualEngine = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-legend-visuals.js'), 'utf8');
 assert(visualEngine.includes('.dashbridge-legend-bottom tr > .dashbridge-vcpu-legend-cell')
     && visualEngine.includes('flex:0 0 48px !important'),
     'bottom legends must keep the vCPU header and values on one fixed column grid');

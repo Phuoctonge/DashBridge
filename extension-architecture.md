@@ -153,6 +153,7 @@ grafana-panel-tools.js
 | Снимок данных панели для отчёта | `grafana-report-snapshot.js` | `grafana-visual-engine.js`; чистая агрегация Flot/uPlot/Table без собственного observer lifecycle. |
 | Локальные стили серий | `grafana-series-styles.js` | `grafana-visual-engine.js`; fill/line-width, panel-scoped reapply observer, renderer reflow и диагностика с единым cleanup. |
 | Threshold visuals | `grafana-threshold-visuals.js` | `grafana-visual-engine.js`; линии и highlight overlays Flot/uPlot, unit lookup, data/layout observers, RAF и полный cleanup. |
+| Legend visuals | `grafana-legend-visuals.js` | `grafana-visual-engine.js`; layout, palette, uPlot/Flot visibility controllers и единый реестр legacy observer cleanup. |
 | Настройки панели | `grafana-panel-settings-modal.js` | Direct Grafana, DashBridge. |
 | Allowlist легенды | `grafana-legend-selection.js` | Tools, карточки. |
 | Load по vCPU | `grafana-cpu-capacity-filter.js` | Transport pipeline. |

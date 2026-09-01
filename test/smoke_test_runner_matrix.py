@@ -17,7 +17,8 @@ UI = (ROOT / "pages/test-runner/test-runner-ui.js").read_text(encoding="utf-8")
 REPORT = (ROOT / "pages/test-runner/test-runner-report.js").read_text(encoding="utf-8")
 PANEL_TOOLS = (ROOT / "js/content/grafana-panel-tools.js").read_text(encoding="utf-8")
 GRAFANA_DOM = (ROOT / "js/content/grafana-dom.js").read_text(encoding="utf-8")
-VISUAL_ENGINE = (ROOT / "js/content/grafana-visual-engine.js").read_text(encoding="utf-8")
+VISUAL_ENGINE = (ROOT / "js/content/grafana-visual-engine.js").read_text(encoding="utf-8") \
+    + (ROOT / "js/content/grafana-legend-visuals.js").read_text(encoding="utf-8")
 SERIES_STYLES = (ROOT / "js/content/grafana-series-styles.js").read_text(encoding="utf-8")
 HTML = (ROOT / "pages/test-runner/test-runner.html").read_text(encoding="utf-8")
 
