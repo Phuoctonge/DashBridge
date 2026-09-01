@@ -375,99 +375,22 @@
         },
     });
 
-    async function startRecording() {
-        const startUrl = schema.normalizeHttpUrl(ui.startUrl.value);
-        if (!startUrl) { setStatus('Введите корректный адрес сайта, например site.ru', true); return; }
-        ui.startUrl.value = startUrl;
-        try {
-            await operationProgressController?.openPictureInPicture({
-                title: 'Traffic Recorder', phase: 'Запись трафика', width: 390, height: 300
-            });
-            void saveRecorderSettings().catch(() => undefined);
-            await sessionTransport.ensureDebuggerPermission();
-            await stopActiveSession(false);
-            resetSession();
-            state.sessionOptions = { disableCache: ui.disableCache.checked, disableCookies: ui.disableCookies.checked };
-            state.mode = 'recording'; state.startUrl = startUrl; state.createdAt = new Date().toISOString(); state.sessionStartedAt = Date.now();
-            state.title = new URL(startUrl).hostname; updateControls();
-            const layout = sessionTransport.buildWindowLayout();
-            const tabId = await sessionTransport.createControlledTab(layout);
-            await sessionTransport.attachNetwork(tabId);
-            addNavigateStep(startUrl);
-            setStatus('Запись активна. Выполняйте сценарий в открывшейся вкладке.');
-            await chrome.tabs.update(tabId, { url: startUrl });
-            updateRecordingProgress();
-        } catch (error) {
-            await stopActiveSession(false);
-            operationProgressController?.finish({ status: 'error', message: `Не удалось начать запись: ${error?.message || error}` });
-            setStatus(`Не удалось начать запись: ${error?.message || error}`, true);
-        }
-    }
-
-    async function stopActiveSession(showStatus = true) {
-        if (!['recording', 'replaying'].includes(state.mode) && !state.attached) return;
-        if (showStatus) state.stopRequested = true;
-        await delay(250);
-        const pendingCaptures = () => [...state.pendingBodyCaptures, ...state.pendingRequestBodyCaptures];
-        if (pendingCaptures().length) {
-            await Promise.race([
-                Promise.allSettled(pendingCaptures()),
-                delay(3_000),
-            ]);
-        }
-        state.completeness.pendingCapturesAtStop = pendingCaptures().length;
-        for (const request of state.requests.values()) {
-            if (request.responseBodyCapture?.status === 'pending') {
-                networkCapture.setResponseBodyStatus(request, 'unavailable', 'capture-stopped');
-            }
-            if (request.requestBodyCapture?.status === 'pending') {
-                request.requestBodyCapture = { status: 'failed', reason: 'capture-stopped' };
-                state.completeness.requestBodiesFailed += 1;
-            }
-        }
-        await sessionTransport.detachNetwork();
-        state.captureFinishedAt = new Date().toISOString();
-        const ephemeralWindowId = state.sessionOptions.disableCookies ? state.windowId : null;
-        state.mode = 'idle';
-        state.sessionStartedAt = null;
-        state.tabId = null; state.windowId = null;
-        if (Number.isInteger(ephemeralWindowId)) await chrome.windows.remove(ephemeralWindowId).catch(() => undefined);
-        if (showStatus) {
-            operationProgressController?.cancel();
-            setStatus(`Сессия остановлена: ${state.steps.length} шагов, ${state.requests.size} запросов.`);
-        }
-        scheduleRender();
-    }
-
-    async function finalizeUnexpectedSession(message, { debuggerDetached = false } = {}) {
-        if (!['recording', 'replaying'].includes(state.mode)) return;
-        const ephemeralWindowId = state.sessionOptions.disableCookies ? state.windowId : null;
-        state.attached = false;
-        state.detachedUnexpectedly = true;
-        state.captureFinishedAt = new Date().toISOString();
-        state.completeness.pendingCapturesAtStop = state.pendingBodyCaptures.size + state.pendingRequestBodyCaptures.size;
-        if (debuggerDetached) state.completeness.unexpectedDebuggerDetach = true;
-        for (const request of state.requests.values()) {
-            if (request.responseBodyCapture?.status === 'pending') {
-                networkCapture.setResponseBodyStatus(
-                    request,
-                    'unavailable',
-                    debuggerDetached ? 'debugger-detached' : 'controlled-tab-closed',
-                );
-            }
-            if (request.requestBodyCapture?.status === 'pending') {
-                request.requestBodyCapture = { status: 'failed', reason: debuggerDetached ? 'debugger-detached' : 'controlled-tab-closed' };
-                state.completeness.requestBodiesFailed += 1;
-            }
-        }
-        state.inFlight.clear();
-        state.mode = 'idle'; state.sessionStartedAt = null;
-        state.tabId = null; state.windowId = null;
-        sessionTransport.postLifecycle({ type: 'unbind' });
-        operationProgressController?.finish({ status: 'error', message });
-        setStatus(message, true); scheduleRender();
-        if (Number.isInteger(ephemeralWindowId)) await chrome.windows.remove(ephemeralWindowId).catch(() => undefined);
-    }
+    const sessionController = DashBridgeRecorderSessionController.create({
+        state,
+        ui,
+        schema,
+        transport: sessionTransport,
+        networkCapture,
+        delay,
+        resetSession,
+        addNavigateStep,
+        saveSettings: saveRecorderSettings,
+        setStatus,
+        updateControls,
+        updateRecordingProgress,
+        scheduleRender,
+        getProgressController: () => operationProgressController,
+    });
 
     const dashflowExport = DashBridgeDashflowExport.create({ schema, requestDuration, stepLabel });
 
@@ -606,7 +529,7 @@
 
             // Commit only after every entry has passed structural, size and
             // integrity validation. A rejected file leaves the current state intact.
-            await stopActiveSession(false); resetSession();
+            await sessionController.stop(false); resetSession();
             state.loadedManifest = manifest; state.steps = flow.steps;
             state.title = String(flow.title || manifest.title || 'DashBridge recording');
             state.startUrl = manifest.startUrl || flow.steps.find(step => step.type === 'navigate')?.url || '';
@@ -636,7 +559,7 @@
         networkIdleMs: NETWORK_IDLE_MS,
         networkIdleTimeoutMs: NETWORK_IDLE_TIMEOUT_MS,
         ensureDebuggerPermission: sessionTransport.ensureDebuggerPermission,
-        stopActiveSession,
+        stopActiveSession: sessionController.stop,
         resetSession,
         buildRecorderWindowLayout: sessionTransport.buildWindowLayout,
         createControlledTab: sessionTransport.createControlledTab,
@@ -683,7 +606,10 @@
         state.attached = false;
         sessionTransport.postLifecycle({ type: 'unbind' });
         if (state.detaching) return;
-        void finalizeUnexpectedSession(`Chrome отключил запись трафика: ${reason}`, { debuggerDetached: true });
+        void sessionController.finalizeUnexpected(
+            `Chrome отключил запись трафика: ${reason}`,
+            { debuggerDetached: true },
+        );
     });
     chrome.runtime.onMessage.addListener((message, sender) => {
         if (message?.type === 'dashbridge-recorder-environment' && sender.tab?.id === state.tabId
@@ -702,11 +628,11 @@
     });
     chrome.tabs.onRemoved.addListener(tabId => {
         if (tabId !== state.tabId) return;
-        void finalizeUnexpectedSession('Контролируемая вкладка закрыта.');
+        void sessionController.finalizeUnexpected('Контролируемая вкладка закрыта.');
     });
 
-    ui.start.addEventListener('click', startRecording);
-    ui.stop.addEventListener('click', () => stopActiveSession(true));
+    ui.start.addEventListener('click', sessionController.start);
+    ui.stop.addEventListener('click', () => sessionController.stop(true));
     ui.save.addEventListener('click', saveDashflow);
     ui.replay.addEventListener('click', startReplay);
     ui.file.addEventListener('change', () => loadDashflow(ui.file.files?.[0]));
@@ -751,7 +677,9 @@
         void saveRecorderSettings().catch(() => undefined);
         void operationProgressController?.release();
     });
-    operationProgressController = globalThis.DashBridgeOperationProgress?.create({ onCancel: () => stopActiveSession(true) }) || null;
+    operationProgressController = globalThis.DashBridgeOperationProgress?.create({
+        onCancel: () => sessionController.stop(true),
+    }) || null;
     void restoreRecorderSettings().finally(() => {
         updateControls(); refreshIncognitoAccess(); renderSteps(); renderTraffic(); renderRequestDetails();
     });
