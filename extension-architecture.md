@@ -195,6 +195,7 @@ grafana-panel-tools.js
 | Recorder network capture | `recorder-network-capture.js` | CDP request/response correlation, bounded body/stream/page capture и completeness; session transport передаётся явно. |
 | Recorder session transport | `recorder-session-transport.js` | Lifecycle port/heartbeat, CDP attach/detach/configuration, controlled/incognito window и scoped scenario injection. |
 | Recorder session orchestration | `recorder-session-controller.js` | Record Start/Stop, pending body settlement, ephemeral-window cleanup и аварийная финализация без владения CDP transport. |
+| Recorder DashFlow orchestration | `recorder-dashflow-controller.js` | Save preflight, manifest/network/HAR/body assembly, download URL lifecycle и atomic validated import commit. |
 | Recorder replay | `recorder-replay.js` | `recorder.js`; step normalization/execution, navigation and network-idle waits. |
 | Анализ CPU/RAM | `grafana-panel-analysis.js` | Расчёт, thresholds и clipboard-формат кнопок CPU Usage/Memory. |
 | Grafana time | `grafana-time.js` | DashBridge, iframe. |
@@ -478,9 +479,9 @@ memory/body budget и создаёт DEFLATE-контейнер. При импо
 lifecycle-port, CDP attach/detach, controlled/incognito window и scoped
 injection. `recorder-session-controller.js` владеет Record Start/Stop,
 settlement незавершённых body capture, закрытием ephemeral window и аварийной
-финализацией. `recorder.js` связывает session, replay, UI и download/import
-orchestration и применяет подготовленный импорт к живому state только после
-успешного завершения всех проверок.
+финализацией. `recorder-dashflow-controller.js` владеет save preflight,
+сборкой архива, download URL lifecycle и атомарным применением полностью
+проверенного импорта. `recorder.js` связывает session, replay и UI-контроллеры.
 `recorder-replay.js` владеет replay lifecycle: нормализует шаги, ожидает DOM,
 навигацию и network idle, проверяет отмену и завершает сравнение. Он получает
 live session/CDP зависимости явно от `recorder.js`; transport остаётся

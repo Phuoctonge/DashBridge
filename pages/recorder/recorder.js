@@ -427,130 +427,33 @@
         }
     });
 
-    function estimateDashflowWorkingSet() {
-        // During save, bodies coexist as strings/Base64, decoded bytes and ZIP
-        // entries. Keep the estimate conservative to avoid exhausting Chrome.
-        return state.totalBodyBytes * 3 + state.totalRequestBodyBytes * 4 + state.streamPayloadBytes * 4
-            + state.requests.size * 2048 + state.steps.length * 2048;
-    }
-
-    async function saveDashflow() {
-        try {
-            if (typeof JSZip !== 'function') throw new Error('JSZip не загружен');
-            if (estimateDashflowWorkingSet() > MAX_DASHFLOW_WORKING_SET_BYTES) {
-                throw new RangeError('Запись слишком велика для безопасного сохранения одним .dashflow; уменьшите сценарий');
-            }
-            setStatus('Подготовка .dashflow…'); ui.save.disabled = true;
-            const bodies = [];
-            let bodyIndex = 0;
-            for (const request of state.requests.values()) {
-                if (request.responseBody === undefined) continue;
-                const bytes = bodyBytes(request);
-                request.bodyBytes = bytes.byteLength;
-                const safeId = String(request.requestId).replace(/[^a-zA-Z0-9_.-]/g, '_').slice(0, 96) || 'request';
-                bodyIndex += 1;
-                request.bodyPath = `bodies/${String(bodyIndex).padStart(6, '0')}_${safeId}.bin`;
-                request.bodySha256 = request.bodySha256 || await sha256(bytes);
-                bodies.push({ path: request.bodyPath, bytes });
-            }
-            const flow = {
-                title: state.title || 'DashBridge recording', timeout: 15_000, steps: state.steps,
-                _dashbridge: { networkMode: {
-                    cacheDisabled: state.sessionOptions.disableCache,
-                    bypassServiceWorker: state.sessionOptions.disableCache,
-                    ephemeralCookies: state.sessionOptions.disableCookies,
-                } },
-            };
-            const manifest = schema.createManifest({
-                title: flow.title, startUrl: state.startUrl || state.steps.find(step => step.type === 'navigate')?.url,
-                createdAt: state.createdAt, requestCount: state.requests.size, stepCount: state.steps.length,
-                containsSecrets: state.steps.some(step => step._dashbridge?.secret) || state.requests.size > 0,
-                networkMode: {
-                    cacheDisabled: state.sessionOptions.disableCache,
-                    ephemeralCookies: state.sessionOptions.disableCookies,
-                },
-                finishedAt: state.captureFinishedAt || new Date().toISOString(),
-                environment: state.environment || {
-                    userAgent: navigator.userAgent,
-                    language: navigator.language,
-                    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || '',
-                    extensionVersion: chrome.runtime.getManifest().version,
-                },
-                captureLimits: {
-                    requests: MAX_REQUESTS, requestBodyBytesPerRequest: MAX_REQUEST_BODY_BYTES,
-                    requestBodyBytesTotal: MAX_TOTAL_REQUEST_BODY_BYTES,
-                    responseBodyBytesPerRequest: MAX_BODY_BYTES,
-                    responseBodyBytesTotal: MAX_TOTAL_BODY_BYTES, streamEvents: MAX_STREAM_EVENTS,
-                    streamPayloadBytesTotal: MAX_STREAM_PAYLOAD_BYTES, pendingCaptureWaitMs: 3_000,
-                    pageEvents: MAX_PAGE_EVENTS,
-                    archiveWorkingSetBytes: MAX_DASHFLOW_WORKING_SET_BYTES,
-                },
-                completeness: state.completeness,
-            });
-            // The container is ZIP-compatible, but octet-stream prevents the
-            // Windows save dialog from replacing the product extension with .zip.
-            const blob = await dashflowIo.write({
-                manifest,
-                flow,
-                network: dashflowExport.buildNetwork({
-                    requests: state.requests.values(),
-                    createdAt: state.createdAt,
-                    finishedAt: state.captureFinishedAt,
-                    pageEvents: state.pageEvents
-                }),
-                har: dashflowExport.buildHar({
-                    requests: state.requests.values(),
-                    steps: state.steps,
-                    createdAt: state.createdAt,
-                    extensionVersion: chrome.runtime.getManifest().version
-                }),
-                streams: { version: 1, payloadBytes: state.streamPayloadBytes, events: state.streams },
-                bodies,
-                responseBodyBytes: state.totalBodyBytes
-            });
-            const url = URL.createObjectURL(blob);
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const filename = `${schema.safeFilename(flow.title)}_${timestamp}.dashflow`;
-            try { await chrome.downloads.download({ url, filename, saveAs: true }); }
-            finally { setTimeout(() => URL.revokeObjectURL(url), 1000); }
-            state.loadedManifest = manifest; setStatus(`Файл ${filename} передан в загрузки Chrome.`);
-        } catch (error) {
-            setStatus(`Не удалось сохранить .dashflow: ${error?.message || error}`, true);
-        } finally { updateControls(); }
-    }
-
-    async function loadDashflow(file) {
-        if (state.importing || ['recording', 'replaying'].includes(state.mode)) return;
-        state.importing = true; updateControls();
-        try {
-            setStatus('Чтение .dashflow…');
-            const imported = await dashflowIo.read(file);
-            const { manifest, flow, network, streams } = imported;
-
-            // Commit only after every entry has passed structural, size and
-            // integrity validation. A rejected file leaves the current state intact.
-            await sessionController.stop(false); resetSession();
-            state.loadedManifest = manifest; state.steps = flow.steps;
-            state.title = String(flow.title || manifest.title || 'DashBridge recording');
-            state.startUrl = manifest.startUrl || flow.steps.find(step => step.type === 'navigate')?.url || '';
-            state.createdAt = manifest.createdAt || new Date().toISOString(); ui.startUrl.value = state.startUrl;
-            state.requests = imported.requests;
-            state.totalRequestBodyBytes = imported.totalRequestBodyBytes;
-            state.totalBodyBytes = imported.totalBodyBytes;
-            state.pageEvents = Array.isArray(network.pageEvents) ? network.pageEvents : [];
-            state.streams = streams.events; state.streamPayloadBytes = imported.streamPayloadBytes;
-            state.environment = manifest.environment || null;
-            state.captureFinishedAt = manifest.capture?.finishedAt || network.finishedAt || null;
-            state.completeness = manifest.capture?.completeness || state.completeness;
-            state.baselineRequests = new Map([...state.requests].map(([key, request]) => [key, { ...request }]));
-            void saveRecorderSettings().catch(() => undefined);
-            setStatus(`Загружено: ${state.steps.length} шагов, baseline ${state.requests.size} запросов.`); scheduleRender();
-        } catch (error) {
-            setStatus(`Не удалось открыть .dashflow: ${error?.message || error}`, true);
-        } finally {
-            state.importing = false; ui.file.value = ''; updateControls();
-        }
-    }
+    const dashflowController = DashBridgeRecorderDashflowController.create({
+        state,
+        ui,
+        schema,
+        io: dashflowIo,
+        exporter: dashflowExport,
+        zipConstructor: JSZip,
+        sha256,
+        bodyBytes,
+        stopSession: sessionController.stop,
+        resetSession,
+        saveSettings: saveRecorderSettings,
+        setStatus,
+        updateControls,
+        scheduleRender,
+        limits: {
+            maxRequests: MAX_REQUESTS,
+            maxRequestBodyBytes: MAX_REQUEST_BODY_BYTES,
+            maxTotalRequestBodyBytes: MAX_TOTAL_REQUEST_BODY_BYTES,
+            maxBodyBytes: MAX_BODY_BYTES,
+            maxTotalBodyBytes: MAX_TOTAL_BODY_BYTES,
+            maxStreamEvents: MAX_STREAM_EVENTS,
+            maxStreamPayloadBytes: MAX_STREAM_PAYLOAD_BYTES,
+            maxPageEvents: MAX_PAGE_EVENTS,
+            maxWorkingSetBytes: MAX_DASHFLOW_WORKING_SET_BYTES,
+        },
+    });
 
     const recorderReplay = DashBridgeRecorderReplay.create({
         state,
@@ -633,9 +536,9 @@
 
     ui.start.addEventListener('click', sessionController.start);
     ui.stop.addEventListener('click', () => sessionController.stop(true));
-    ui.save.addEventListener('click', saveDashflow);
+    ui.save.addEventListener('click', dashflowController.save);
     ui.replay.addEventListener('click', startReplay);
-    ui.file.addEventListener('change', () => loadDashflow(ui.file.files?.[0]));
+    ui.file.addEventListener('change', () => dashflowController.load(ui.file.files?.[0]));
     ui.file.closest('.file-button')?.addEventListener('keydown', event => {
         if (event.key !== 'Enter' && event.key !== ' ') return;
         event.preventDefault();

@@ -39,6 +39,7 @@ before(recorderHtml, 'recorder-replay.js', 'recorder.js');
 before(recorderHtml, 'recorder-session-transport.js', 'recorder.js');
 before(recorderHtml, 'recorder-network-capture.js', 'recorder.js');
 before(recorderHtml, 'recorder-session-controller.js', 'recorder.js');
+before(recorderHtml, 'recorder-dashflow-controller.js', 'recorder.js');
 before(batchHtml, 'batch-panel-rules-ui.js', 'batch.js');
 before(batchHtml, 'batch-operation-controller.js', 'batch.js');
 before(batchHtml, 'batch-page-controller.js', 'batch.js');
