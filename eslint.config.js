@@ -77,7 +77,8 @@ const extensionRuntimeGlobals = readonly([
     'readNetworkDiagnosticArchive', 'readQueryLifecycle', 'readRuntimeDiagnosticEvents',
     'resolvePanelId', 'restoreAutoRefresh', 'runGrafanaCommand', 'runTransitionTest',
     'runtimeSnapshotRef', 'serializeGrafanaAbsoluteTime', 'serializeJsonInChunks', 'serializeSpoolArtifact',
-    'setGrafanaLegendVisibility', 'triggerRefresh', 'waitForTargetQueryLifecycle'
+    'setGrafanaLegendVisibility', 'triggerRefresh', 'waitForTargetQueryLifecycle',
+    '_tdmExportScriptInternal'
 ]);
 
 const nodeGlobals = readonly([

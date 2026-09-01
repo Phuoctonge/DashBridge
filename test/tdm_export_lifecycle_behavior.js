@@ -2,8 +2,10 @@
 const assert = require('assert');
 const fs = require('fs');
 
-const source = fs.readFileSync('pages/popup/popup-tdm.js', 'utf8');
-const formatterSource = source.slice(0, source.indexOf('document.addEventListener'));
+const controllerSource = fs.readFileSync('pages/popup/popup-tdm.js', 'utf8');
+const pageExportSource = fs.readFileSync('pages/popup/popup-tdm-page-export.js', 'utf8');
+const source = `${controllerSource}\n${pageExportSource}`;
+const formatterSource = controllerSource.slice(0, controllerSource.indexOf('document.addEventListener'));
 const formatProgress = Function(formatterSource + '; return formatTdmExportProgress;')();
 assert(source.includes('originalDistanceFromBottom'), 'TDM export must snapshot the chat scroll position');
 assert(source.includes('finally') && source.includes('chatContainer.scrollTop = Math.max(0, chatContainer.scrollHeight - originalDistanceFromBottom)'),

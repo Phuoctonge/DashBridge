@@ -191,6 +191,7 @@ grafana-panel-tools.js
 | Orchestration сводного отчёта | `dashbridge-report-controller.js` | SLA панели, параллельный сбор, карточки ошибок, preview и общий live collector Message Test Runner. |
 | Аудит сводного отчёта | `dashbridge-report-audit.js` | Чистый анализ переменных, `panel:key`, живых значений и итогового текста без UI и записей. |
 | Message Test Runner | `dashbridge-report-test-runner.js` | Детерминированные сценарии всех ветвей рендера и один живой интеграционный прогон активного профиля через общий collector `dashbridge.js`. |
+| TDM export | `popup-tdm.js`, `popup-tdm-page-export.js` | Popup владеет пользовательским действием, настройками и download lifecycle; отдельная самодостаточная функция исполняется через `chrome.scripting.executeScript` внутри активной TDM-страницы. |
 | Снимки DashBridge | `dashbridge-capture.js` | Общий prepared-toggle, broadcast размеров, одиночный save/copy, последовательный ZIP, throttling и восстановление карточки. |
 | Версия данных DashBridge | `dashbridge-data-migration.js` | Startup `dashbridge.js`. |
 | Import/recovery | `local-state-schema.js` | Options, Worklog, profiles. |
