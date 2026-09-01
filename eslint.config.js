@@ -36,7 +36,7 @@ const extensionRuntimeGlobals = readonly([
     'DashBridgeGrafanaReportSnapshot', 'DashBridgeGrafanaRuntimeManifest',
     'DashBridgeGrafanaSeriesStyles', 'DashBridgeGrafanaThresholdVisuals',
     'DashBridgeGrafanaSettings', 'DashBridgeGrafanaTime', 'DashBridgeLocalStateSchema',
-    'DashBridgeOperationProgress', 'DashBridgePanelDefinition', 'DashBridgeProfileStore',
+    'DashBridgeOperationProgress', 'DashBridgeOptionsConfigTransfer', 'DashBridgePanelDefinition', 'DashBridgeProfileStore',
     'DashBridgeReport', 'DashBridgeReportTransport', 'DashBridgeStorageWriter',
     'DashBridgeSyncInputWriter', 'DashBridgeTheme', 'DashBridgeTimeState',
     'DashBridgeUpdateMetadata', 'DashBridgeUrlPolicy', 'DashBridgeVisualEngine',

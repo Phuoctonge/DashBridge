@@ -4,7 +4,10 @@ const fs = require('fs');
 const vm = require('vm');
 
 const optionsHtml = fs.readFileSync('pages/options/options.html', 'utf8');
-const optionsSource = fs.readFileSync('pages/options/options.js', 'utf8');
+const optionsSource = [
+    'pages/options/options-config-transfer.js',
+    'pages/options/options.js'
+].map(file => fs.readFileSync(file, 'utf8')).join('\n');
 const tdmSource = fs.readFileSync('pages/popup/popup-tdm.js', 'utf8');
 const contentSource = fs.readFileSync('js/content/content.js', 'utf8');
 const dashboardSource = fs.readFileSync('pages/dashbridge/dashbridge.js', 'utf8');
@@ -73,7 +76,7 @@ assert(optionsSource.includes("const raw = document.getElementById(inputId).valu
     && optionsSource.includes("raw === '' ? Number.NaN : Number(raw)"),
     'an empty threshold field must be rejected instead of being silently saved as zero');
 const thresholdPairs = optionsSource.match(/const analysisThresholdPairs = Object\.freeze\(\[[\s\S]*?\n    \]\);/)?.[0];
-const effectiveImportValidator = optionsSource.match(/function validateEffectiveImportedThresholds\([\s\S]*?\n    \}/)?.[0];
+const effectiveImportValidator = optionsSource.match(/function validateEffectiveImportedThresholds\([\s\S]*?\n        \}/)?.[0];
 assert(thresholdPairs && effectiveImportValidator,
     'Options import must expose executable effective CPU/RAM threshold validation');
 const importThresholdContext = {

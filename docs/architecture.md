@@ -202,6 +202,7 @@ grafana-panel-tools.js
 | Снимки DashBridge | `dashbridge-capture.js` | Общий prepared-toggle, broadcast размеров, одиночный save/copy, последовательный ZIP, throttling и восстановление карточки. |
 | Версия данных DashBridge | `dashbridge-data-migration.js` | Startup `dashbridge.js`. |
 | Import/recovery | `local-state-schema.js` | Options, Worklog, profiles. |
+| Options config transfer | `options-config-transfer.js` | Options: allowlist/schema, validation, backup, FileReader/Blob URL и import/export lifecycle. |
 | Local writes | `storage-writer.js` | Profiles, Worklog, Batch. |
 | Sync input writes | `sync-input-writer.js` | Частые поля UI. |
 | Bounded diagnostics | `bounded-journal.js` | MAIN и test tooling. |
