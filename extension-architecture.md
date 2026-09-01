@@ -108,6 +108,7 @@ bounded-journal.js
 grafana-network.js
 grafana-cpu-capacity-filter.js
 grafana-panel-capture-runtime.js
+grafana-panel-data-runtime.js
 grafana-panel-menu-runtime.js
 grafana-panel-tools.js
 ```
@@ -161,6 +162,7 @@ grafana-panel-tools.js
 | Load по vCPU | `grafana-cpu-capacity-filter.js` | Transport pipeline. |
 | Compact renderer | `grafana-compact-layout.js` | Capture prepare/restore. |
 | Panel capture lifecycle | `grafana-panel-capture-runtime.js` | MAIN: временная перестройка панели, Batch API, ожидание результата и гарантированный restore; создаётся `grafana-panel-tools.js`. |
+| Panel data/transform lifecycle | `grafana-panel-data-runtime.js` | MAIN: CPU/RAM/series transforms, scoped fetch/XHR interception, response diagnostics и calculated title; создаётся `grafana-panel-tools.js`. |
 | Panel menu/analysis UI lifecycle | `grafana-panel-menu-runtime.js` | MAIN: toolbar mount/remount, CPU/RAM dialog, embedded analysis updates и observer cleanup; создаётся `grafana-panel-tools.js`. |
 | Crop/PNG/clipboard | `grafana-capture-output.js` | Isolated Grafana, DashBridge. |
 | Batch legend | `grafana-legend-engine.js` | Batch. |

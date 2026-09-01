@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-panel-tools.js'), 'utf8');
+const source = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-panel-data-runtime.js'), 'utf8');
 const start = source.indexOf('const createResponseFilterWorkspace');
 const end = source.indexOf('    const prepareCpuCapacityRequestBody', start);
 assert(start >= 0 && end > start, 'response-filter workspace helpers must remain independently testable');

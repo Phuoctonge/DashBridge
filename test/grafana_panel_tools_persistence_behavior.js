@@ -7,6 +7,9 @@ const path = require('path');
 const source = fs.readFileSync(
     path.join(__dirname, '..', 'js', 'content', 'grafana-panel-tools.js'),
     'utf8'
+) + fs.readFileSync(
+    path.join(__dirname, '..', 'js', 'content', 'grafana-panel-data-runtime.js'),
+    'utf8'
 );
 const visualEngineSource = fs.readFileSync(
     path.join(__dirname, '..', 'js', 'content', 'grafana-visual-engine.js'),

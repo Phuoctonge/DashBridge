@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 
 const toolsSource = fs.readFileSync(
-    path.join(__dirname, '..', 'js', 'content', 'grafana-panel-tools.js'),
+    path.join(__dirname, '..', 'js', 'content', 'grafana-panel-data-runtime.js'),
     'utf8'
 );
 const visualSource = fs.readFileSync(

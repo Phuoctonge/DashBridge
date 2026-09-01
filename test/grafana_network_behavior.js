@@ -8,7 +8,7 @@ context.globalThis = context;
 vm.createContext(context);
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-network.js'), 'utf8'), context);
 const network = context.DashBridgeGrafanaNetwork;
-const panelToolsSource = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-panel-tools.js'), 'utf8');
+const panelToolsSource = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-panel-data-runtime.js'), 'utf8');
 (async () => {
     const request = new Request('https://grafana.test/api/ds/query', { method: 'POST', body: '{"queries":[]}' });
     assert.strictEqual(await network.readFetchBody(request), '{"queries":[]}');

@@ -4,7 +4,7 @@ const assert = require('assert');
 const fs = require('fs');
 const vm = require('vm');
 
-const source = fs.readFileSync('js/content/grafana-panel-tools.js', 'utf8');
+const source = fs.readFileSync('js/content/grafana-panel-data-runtime.js', 'utf8');
 const start = source.indexOf('    const calculatedTitleOriginalText =');
 const end = source.indexOf('    const observeCalculatedTitle =', start);
 assert(start >= 0 && end > start, 'calculated-title lifecycle must remain independently testable');

@@ -4,7 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const panelTools = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-panel-tools.js'), 'utf8');
+const panelTools = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-panel-tools.js'), 'utf8')
+    + fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-panel-data-runtime.js'), 'utf8');
 const cpuFilter = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-cpu-capacity-filter.js'), 'utf8');
 
 assert(panelTools.includes("highlightKind: 'series-query-filter'"),
