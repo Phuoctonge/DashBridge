@@ -36,6 +36,7 @@ before(dashbridgeHtml, 'dashbridge-iframe-message-controller.js', 'dashbridge.js
 before(recorderHtml, 'recorder-replay.js', 'recorder.js');
 before(recorderHtml, 'recorder-session-transport.js', 'recorder.js');
 before(recorderHtml, 'recorder-settings.js', 'recorder.js');
+before(recorderHtml, 'recorder-action-capture.js', 'recorder.js');
 before(recorderHtml, 'recorder-network-capture.js', 'recorder.js');
 before(recorderHtml, 'recorder-session-controller.js', 'recorder.js');
 before(recorderHtml, 'recorder-dashflow-controller.js', 'recorder.js');
