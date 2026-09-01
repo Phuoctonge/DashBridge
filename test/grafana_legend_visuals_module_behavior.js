@@ -15,6 +15,9 @@ context.window.window = context.window;
 context.window.document = context.document;
 vm.createContext(context);
 vm.runInContext(fs.readFileSync(
+    path.join(__dirname, '..', 'js', 'content', 'grafana-legend-visibility-adapters.js'), 'utf8'
+), context);
+vm.runInContext(fs.readFileSync(
     path.join(__dirname, '..', 'js', 'content', 'grafana-legend-visuals.js'), 'utf8'
 ), context);
 

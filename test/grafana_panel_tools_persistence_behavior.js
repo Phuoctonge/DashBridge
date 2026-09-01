@@ -21,6 +21,9 @@ const visualEngineSource = fs.readFileSync(
     path.join(__dirname, '..', 'js', 'content', 'grafana-threshold-visuals.js'),
     'utf8'
 ) + fs.readFileSync(
+    path.join(__dirname, '..', 'js', 'content', 'grafana-legend-visibility-adapters.js'),
+    'utf8'
+) + fs.readFileSync(
     path.join(__dirname, '..', 'js', 'content', 'grafana-legend-visuals.js'),
     'utf8'
 );
