@@ -55,12 +55,15 @@ const coreCode = fs.readFileSync(
     assert(coreCode.includes(fragment), `Отсутствует core-диагностика: ${fragment}`);
 });
 
-const uiCode = ['test-runner-artifact-serialization.js', 'test-runner-spool.js', 'test-runner-ui.js']
+const uiCode = [
+    'test-runner-artifact-serialization.js', 'test-runner-spool.js',
+    'test-runner-export-controller.js', 'test-runner-diagnostic-viewer.js', 'test-runner-ui.js'
+]
     .map(name => fs.readFileSync(path.join(__dirname, '..', 'pages/test-runner', name), 'utf8'))
     .join('\n');
 [
     'DashBridgeTestReport.createArtifactStreamPlan',
-    'serializeSpoolArtifact(lastSnapshot, diagnosticSpool, exportMetadata,',
+    'serializeSpoolArtifact(snapshot, getSpool(), exportMetadata,',
     'function showDiagnostic(test, urlResult)',
     'Предупреждения Grafana (не влияют на PASS/FAIL)',
     'Доказательства переходов:',

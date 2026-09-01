@@ -46,6 +46,8 @@ let operationProgressSnapshot = null;
 // This store owns one private OPFS directory for a run and leaves the results
 // table with only the fields it actually renders.
 let diagnosticSpool = null;
+let diagnosticViewer = null;
+let exportController = null;
 
 function esc(str) {
     return String(str ?? '')
@@ -214,14 +216,14 @@ function renderResultsTable(snapshot) {
             const urlResult = lastSnapshot?.results?.[Number(button.dataset.urlIndex)];
             const test = urlResult?.tests?.[Number(button.dataset.testIndex)];
             const fullTest = test?.diagnosticRef ? await diagnosticSpool?.readTest(test.diagnosticRef) : test;
-            if (fullTest?.diagnostic) showDiagnostic(fullTest, urlResult);
+            if (fullTest?.diagnostic) diagnosticViewer?.showDiagnostic(fullTest, urlResult);
         });
     });
     elResultsTable.querySelectorAll('.tr-test-info-btn').forEach(button => {
         button.addEventListener('click', () => {
             const urlResult = lastSnapshot?.results?.[Number(button.dataset.urlIndex)];
             const test = urlResult?.tests?.[Number(button.dataset.testIndex)];
-            if (test) showTestDescription(test);
+            if (test) diagnosticViewer?.showTestDescription(test);
         });
     });
 }
@@ -298,455 +300,7 @@ function setButtonState(running) {
     if (!running) updateSelectionSummary();
 }
 
-// --- Отчёт (текстовый / Markdown) ---
 
-function buildTextReport(snapshot) {
-    if (!snapshot || !snapshot.results.length) return '(нет результатов)';
-
-    const lines = [];
-    const skipped = snapshot.skipped || 0;
-    const aborted = snapshot.abortedNotRun || 0;
-    const completed = snapshot.completed ?? snapshot.done;
-    const active = completed - skipped;
-    lines.push('# DashBridge E2E Test Report');
-    lines.push(`Дата: ${new Date().toLocaleString('ru-RU')}`);
-    lines.push(`План: ${snapshot.planned ?? snapshot.total}; начато: ${snapshot.started ?? completed}; завершено: ${completed}; не запущено: ${aborted}`);
-    lines.push(`Итого: ✓ ${snapshot.passed} / ${active}   ✗ ${snapshot.failed}${skipped > 0 ? `   ◌ ${skipped} пропущено` : ''}${aborted > 0 ? `   ⊘ ${aborted} не запущено` : ''}`);
-    lines.push('');
-
-    snapshot.results.forEach(urlResult => {
-        const total = urlResult.planned ?? urlResult.tests.length;
-        const urlSkipped = urlResult.tests.filter(t => t.skip).length;
-        const urlAborted = urlResult.tests.filter(t => t.aborted).length;
-        const passed = urlResult.tests.filter(t => !t.skip && !t.aborted && t.pass).length;
-        const failed = urlResult.tests.filter(t => !t.skip && !t.aborted && !t.pass).length;
-        lines.push(`## ${urlResult.url}`);
-        lines.push(`Engine: ${urlResult.engine || '—'}  Grafana: ${urlResult.grafanaVersion ? 'v' + urlResult.grafanaVersion : '—'}`);
-        lines.push(`✓ ${passed} / ${urlResult.completed ?? urlResult.tests.length - urlSkipped - urlAborted}${urlSkipped > 0 ? `  ◌ ${urlSkipped} пропущено` : ''}${urlAborted > 0 ? `  ⊘ ${urlAborted} не запущено` : ''}${urlResult.probeError ? '  ⚠ ' + urlResult.probeError : ''}`);
-        lines.push('');
-        lines.push('| ID  | Категория     | Тест                                                  | Результат | Детали                                               |');
-        lines.push('|-----|---------------|-------------------------------------------------------|-----------|------------------------------------------------------|');
-        urlResult.tests.forEach(t => {
-            const id = t.id.padEnd(4);
-            const cat = categoryLabel(t.category).padEnd(13);
-            const name = t.name.substring(0, 52).padEnd(53);
-            const res = (t.aborted ? '⊘ NOT RUN' : (t.skip ? '◌ SKIP' : (t.pass ? '✓ PASS' : '✗ FAIL'))).padEnd(9);
-            const det = (t.details || '').substring(0, 52);
-            lines.push(`| ${id}| ${cat}| ${name}| ${res}| ${det.padEnd(52)} |`);
-        });
-        lines.push('');
-    });
-
-    return lines.join('\n');
-}
-
-async function copyReport() {
-    if (!lastSnapshot) return;
-    await copyTextToClipboard(buildTextReport(lastSnapshot), elCopyBtn);
-}
-
-function buildFailureReport(snapshot) {
-    if (!snapshot || !snapshot.results.length) return '(нет результатов)';
-
-    const skipped = snapshot.skipped || 0;
-    const aborted = snapshot.abortedNotRun || 0;
-    const active = (snapshot.completed ?? snapshot.done) - skipped;
-    const lines = [
-        '# DashBridge E2E — ошибки и пропуски',
-        `Дата: ${new Date().toLocaleString('ru-RU')}`,
-        `Провалено: ${snapshot.failed} из ${active}${skipped ? `; пропущено: ${skipped}` : ''}${aborted ? `; не запущено: ${aborted}` : ''}`,
-        ''
-    ];
-
-    snapshot.results.forEach(urlResult => {
-        const notable = urlResult.tests.filter(test => test.aborted || test.skip || !test.pass);
-        if (!notable.length) return;
-
-        lines.push(`## ${urlResult.url}`);
-        lines.push(`Engine: ${urlResult.engine || '—'}; Grafana: ${urlResult.grafanaVersion ? `v${urlResult.grafanaVersion}` : '—'}`);
-        notable.forEach(test => {
-            const status = test.aborted ? 'NOT RUN' : (test.skip ? 'SKIP' : 'FAIL');
-            const duration = formatDuration(test.durationMs) || '—';
-            lines.push(`- [${status}] [${test.id}] ${test.name} (${duration})${test.details ? ` — ${test.details}` : ''}`);
-        });
-        lines.push('');
-    });
-
-    return lines.join('\n');
-}
-
-async function copyFailureReport() {
-    if (!lastSnapshot) return;
-    await copyTextToClipboard(buildFailureReport(lastSnapshot), elCopyFailBtn);
-}
-
-function showTestDescription(test) {
-    const popup = window.open('', `dashbridge-test-info-${test.id}`, 'popup=yes,width=680,height=620,resizable=yes,scrollbars=yes');
-    if (!popup) return;
-    popup.document.open();
-    popup.document.write('<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Описание E2E-теста</title></head><body></body></html>');
-    popup.document.close();
-    const style = popup.document.createElement('style');
-    style.textContent = 'body{margin:0;padding:28px;background:#0f172a;color:#e2e8f0;font:14px/1.55 Inter,system-ui,sans-serif}main{max-width:760px;margin:auto}h1{font-size:24px;margin:0 0 8px}.id{color:#93c5fd;font:13px Consolas,monospace}.card{margin-top:18px;padding:16px;border:1px solid #475569;border-radius:10px;background:#1e293b}h2{font-size:16px;margin:0 0 8px}ol{padding-left:22px}code{color:#93c5fd}';
-    popup.document.head.appendChild(style);
-    const main = popup.document.createElement('main');
-    const title = popup.document.createElement('h1');
-    title.textContent = test.feature?.label || test.name;
-    const id = popup.document.createElement('div');
-    id.className = 'id';
-    id.textContent = `${test.id}${test.feature?.technicalName ? ` · ${test.feature.technicalName}` : ''}`;
-    const description = popup.document.createElement('section');
-    description.className = 'card';
-    const descriptionTitle = popup.document.createElement('h2');
-    descriptionTitle.textContent = 'Что проверяет';
-    const descriptionText = popup.document.createElement('p');
-    descriptionText.textContent = test.feature?.description || 'Причинная E2E-проверка DashBridge.';
-    description.append(descriptionTitle, descriptionText);
-    main.append(title, id, description);
-    const steps = test.feature?.steps || [];
-    if (steps.length) {
-        const section = popup.document.createElement('section');
-        section.className = 'card';
-        const heading = popup.document.createElement('h2');
-        heading.textContent = 'Последовательность действий';
-        const list = popup.document.createElement('ol');
-        steps.forEach(step => {
-            const item = popup.document.createElement('li');
-            item.textContent = step.replace(/^\d+\.\s*/, '');
-            list.appendChild(item);
-        });
-        section.append(heading, list);
-        main.appendChild(section);
-    }
-    if (test.feature?.sourceFile) {
-        const source = popup.document.createElement('section');
-        source.className = 'card';
-        const heading = popup.document.createElement('h2');
-        heading.textContent = 'Проверяемый код';
-        const code = popup.document.createElement('code');
-        code.textContent = `${test.feature.sourceFile}${test.feature.sourceSymbol ? ` · ${test.feature.sourceSymbol}` : ''}`;
-        source.append(heading, code);
-        main.appendChild(source);
-    }
-    popup.document.body.appendChild(main);
-    popup.focus();
-}
-
-function showDiagnostic(test, urlResult) {
-    const visualAudit = DashBridgeTestReport.buildVisualAudit(test);
-    const payload = {
-        schema: 'dashbridge-e2e-diagnostic-view/v1',
-        url: urlResult.url,
-        engine: urlResult.engine,
-        grafanaVersion: urlResult.grafanaVersion,
-        test: {
-            id: test.id,
-            name: test.name,
-            feature: test.feature || null,
-            pass: test.pass,
-            skip: test.skip,
-            aborted: !!test.aborted,
-            details: test.details,
-            durationMs: test.durationMs,
-            visualAudit,
-            diagnostic: test.diagnostic,
-        },
-    };
-    // noopener makes window.open() return null in Chromium, so the old code
-    // always treated an already opened tab as blocked and left it at about:blank.
-    const popup = window.open('', '_blank', 'width=1280,height=860');
-    if (!popup) {
-        const compactNotice = JSON.stringify({
-            schema: payload.schema,
-            url: payload.url,
-            test: { id: test.id, name: test.name, details: test.details },
-            notice: 'Полный объект слишком велик для буфера обмена; используйте экспорт JSON.',
-        }, null, 2);
-        void copyTextToClipboard(compactNotice, null);
-        if (elStatusLine) {
-            elStatusLine.textContent = 'Диагностика скопирована в буфер: браузер заблокировал окно просмотра';
-            elStatusLine.className = 'tr-status tr-status-warn';
-        }
-        return;
-    }
-
-    const imagePool = new Map();
-    const collectImages = (obj) => {
-        if (!obj || typeof obj !== 'object') return;
-        if (Array.isArray(obj)) { obj.forEach(collectImages); return; }
-        if (obj.hash && obj.dataUrl) imagePool.set(obj.hash, obj.dataUrl);
-        Object.values(obj).forEach(collectImages);
-    };
-    collectImages(payload);
-
-    const addSnapshot = (host, title, snapshot, seenVisuals = null) => {
-        const unique = (kind, image) => {
-            if (!image?.dataUrl) return false;
-            const key = `${kind}:${image.hash || image.dataUrl}`;
-            if (seenVisuals?.has(key)) return false;
-            seenVisuals?.add(key);
-            return true;
-        };
-        const viewportImage = unique('viewport', snapshot?.viewportImage) ? snapshot.viewportImage : null;
-        const panelImage = unique('panel', snapshot?.panelImage) ? snapshot.panelImage : null;
-        const canvas = (snapshot?.canvas || []).filter(item => unique('canvas', item));
-        if (!canvas.length && !panelImage && !viewportImage) return;
-        const section = popup.document.createElement('section');
-        section.className = 'snapshot';
-        const heading = popup.document.createElement('h2');
-        heading.textContent = title;
-        section.appendChild(heading);
-
-        const state = popup.document.createElement('div');
-        state.className = 'snapshot-state';
-        const markers = snapshot?.markers || {};
-        const markerText = [
-            markers.legendBottom ? 'легенда снизу' : '',
-            markers.hidden ? `скрыто: ${markers.hidden}` : '',
-            markers.dimmed ? `затемнено: ${markers.dimmed}` : '',
-            markers.threshold ? `порог: ${markers.threshold}` : '',
-        ].filter(Boolean);
-        const series = (snapshot?.series || []).map(item => item.label).filter(Boolean);
-        state.textContent = [
-            snapshot?.renderer ? `Рендерер: ${snapshot.renderer}` : '',
-            Number.isFinite(snapshot?.chartSeriesCount) ? `серий: ${snapshot.chartSeriesCount}` : '',
-            markerText.join(' · '),
-            series.length ? `ряды: ${series.slice(0, 8).join(', ')}${series.length > 8 ? '…' : ''}` : '',
-            snapshot?.legend?.entries ? `легенда: ${snapshot.legend.bottomEntries}/${snapshot.legend.entries} строк в нижнем контейнере` : '',
-        ].filter(Boolean).join('  | ');
-        if (state.textContent) section.appendChild(state);
-
-        if (snapshot?.logs && snapshot.logs.length > 0) {
-            const logsBlock = popup.document.createElement('pre');
-            logsBlock.className = 'snapshot-logs';
-            logsBlock.textContent = snapshot.logs.join('\n');
-            section.appendChild(logsBlock);
-        }
-
-        const images = popup.document.createElement('div');
-        images.className = 'images';
-        if (viewportImage?.dataUrl) {
-            const figure = popup.document.createElement('figure');
-            const image = popup.document.createElement('img');
-            image.src = viewportImage.dataUrl;
-            image.alt = `${title}, весь видимый экран вкладки`;
-            image.title = 'Нажмите, чтобы открыть оригинал PNG в новой вкладке';
-            image.addEventListener('click', () => window.open(viewportImage.dataUrl, '_blank', 'noopener,noreferrer'));
-            const caption = popup.document.createElement('figcaption');
-            caption.textContent = `Вся видимая вкладка · ${viewportImage.width}×${viewportImage.height} · ${viewportImage.hash}`;
-            figure.append(image, caption);
-            images.appendChild(figure);
-        }
-        if (panelImage?.dataUrl) {
-            const figure = popup.document.createElement('figure');
-            const image = popup.document.createElement('img');
-            image.src = panelImage.dataUrl;
-            image.alt = `${title}, панель вместе с легендой`;
-            image.title = 'Нажмите, чтобы открыть оригинал PNG в новой вкладке';
-            image.addEventListener('click', () => window.open(panelImage.dataUrl, '_blank', 'noopener,noreferrer'));
-            const caption = popup.document.createElement('figcaption');
-            caption.textContent = `Панель целиком (график + HTML-легенда) · ${panelImage.width}×${panelImage.height}`;
-            figure.append(image, caption);
-            images.appendChild(figure);
-        }
-        canvas.forEach((item, index) => {
-            const figure = popup.document.createElement('figure');
-            const caption = popup.document.createElement('figcaption');
-            caption.textContent = `Canvas ${index + 1} · ${item.width}×${item.height} · ${item.hash} · ${item.bytes} B`;
-            const url = item.dataUrl || imagePool.get(item.hash);
-            if (url) {
-                const image = popup.document.createElement('img');
-                image.src = url;
-                image.alt = `${title}, canvas ${index + 1}`;
-                image.title = 'Нажмите, чтобы открыть оригинал PNG в новой вкладке';
-                image.addEventListener('click', () => window.open(url, '_blank', 'noopener,noreferrer'));
-                figure.appendChild(image);
-            } else {
-                const unavailable = popup.document.createElement('div');
-                unavailable.className = 'unavailable';
-                unavailable.textContent = 'Изображение отсутствует: этот отчёт создан до включения захвата PNG.';
-                figure.appendChild(unavailable);
-            }
-            figure.appendChild(caption);
-            images.appendChild(figure);
-        });
-        section.appendChild(images);
-        host.appendChild(section);
-    };
-
-    const popupTheme = document.documentElement.getAttribute('data-theme') || 'light';
-    try { popup.opener = null; } catch (_) { }
-    popup.document.open();
-    popup.document.write(`<!doctype html><html lang="ru" data-theme="${esc(popupTheme)}"><head><meta charset="utf-8"><title>Диагностика ${esc(test.id)}</title><style>
-      :root{color-scheme:light;--primary:#2563eb;--success:#15803d;--danger:#ef4444;--warning:#f59e0b;--bg:#f1f5f9;--card:#fff;--surface:#f8fafc;--text:#0f172a;--muted:#64748b;--border:#cbd5e1;--shadow:0 4px 6px -1px rgba(0,0,0,.08)}
-      [data-theme="dark"]{color-scheme:dark;--primary:#60a5fa;--success:#4ade80;--danger:#f87171;--warning:#fbbf24;--bg:#0f172a;--card:#1e293b;--surface:#334155;--text:#f1f5f9;--muted:#cbd5e1;--border:#475569;--shadow:0 4px 6px -1px rgba(0,0,0,.35)}
-      *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 Inter,-apple-system,system-ui,sans-serif}.page{max-width:1180px;margin:0 auto;padding:28px 32px 48px}h1{margin:0;font-size:28px;line-height:1.2;letter-spacing:-.02em}h2{margin:0 0 10px;font-size:18px}header{border-bottom:1px solid var(--border);padding-bottom:20px;margin-bottom:24px}.meta{color:var(--primary);margin:8px 0 16px}.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px}.fact{padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow)}.fact b{display:block;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em}.fact span{display:block;margin-top:3px;font-weight:650}.pass{color:var(--success)}.fail{color:var(--danger)}.skip{color:var(--warning)}.result{margin:16px 0 0;padding:12px 14px;border-left:3px solid var(--primary);background:var(--card);border-radius:0 8px 8px 0;white-space:pre-wrap}.snapshot{margin:26px 0;padding-top:2px}.snapshot-state{margin:-3px 0 10px;color:var(--muted);font:12px/1.45 Consolas,monospace;overflow-wrap:anywhere}.snapshot-logs{margin:10px 0;padding:10px;border:1px solid color-mix(in srgb,var(--success) 35%,var(--border));border-left:3px solid var(--success);border-radius:6px;background:#071b13;color:#86efac;font:12px/1.45 Consolas,monospace;overflow-x:auto;white-space:pre-wrap}.images{display:grid;grid-template-columns:1fr;gap:16px}figure{margin:0;border:1px solid var(--border);border-radius:10px;padding:10px;background:var(--card);box-shadow:var(--shadow);min-width:0}img{display:block;width:100%;height:auto;background:#fff;cursor:zoom-in;border-radius:5px}figcaption{margin-top:8px;color:var(--muted);font:12px/1.4 Consolas,monospace}.unavailable{padding:16px;background:var(--surface);color:var(--warning);border-radius:6px}details{margin-top:28px;border-top:1px solid var(--border);padding-top:16px}summary{cursor:pointer;color:var(--primary);font-weight:650}pre{margin:12px 0 0;white-space:pre-wrap;word-break:break-word;color:var(--text);font:12px/1.45 Consolas,monospace}@media(max-width:600px){.page{padding:20px 16px}h1{font-size:23px}}</style></head><body><main class="page"></main></body></html>`);
-    popup.document.close();
-    const syncPopupTheme = event => {
-        if (popup.closed) return;
-        popup.document.documentElement.setAttribute('data-theme', event.detail?.theme || document.documentElement.getAttribute('data-theme') || 'light');
-    };
-    window.addEventListener('dashbridge-theme-change', syncPopupTheme);
-    popup.addEventListener('unload', () => window.removeEventListener('dashbridge-theme-change', syncPopupTheme), { once: true });
-    const body = popup.document.querySelector('.page');
-    const header = popup.document.createElement('header');
-    const heading = popup.document.createElement('h1');
-    heading.textContent = `Диагностика ${test.id}: ${test.feature?.label || test.name}`;
-    header.appendChild(heading);
-    const meta = popup.document.createElement('div');
-    meta.className = 'meta';
-    meta.textContent = `${urlResult.engine || '—'} · Grafana ${urlResult.grafanaVersion || '—'}`;
-    header.appendChild(meta);
-    const facts = popup.document.createElement('div');
-    facts.className = 'facts';
-    const status = test.aborted ? 'NOT RUN' : (test.skip ? 'SKIP' : (test.pass ? 'PASS' : 'FAIL'));
-    const verdict = test.diagnostic?.verdict || {};
-    const runtime = verdict.runtime || {};
-    const transitionFacts = (test.diagnostic?.transitions || []).map(step => {
-        const outcome = step.verdict?.outcome || (step.invariant?.skip ? 'skip' : (step.invariant?.pass ? 'pass' : 'fail'));
-        const persistence = step.persistence || step.command?.persistence;
-        const persistenceFact = persistence?.required
-            ? ` | persistence=${persistence.passed ? 'PROVEN' : 'FAILED'} (${persistence.reason || 'без причины'})`
-            : '';
-        return `${step.index || '—'}: ${outcome.toUpperCase()} — ${step.verdict?.reason || step.invariant?.reason || step.label}${persistenceFact}`;
-    });
-    const factValues = [
-        ['Результат', status, status.toLowerCase()],
-        ['Функциональная проверка', verdict.functionalPass === false ? 'FAIL' : (verdict.functionalPass === true ? 'PASS' : '—'), verdict.functionalPass === false ? 'fail' : (verdict.functionalPass === true ? 'pass' : '')],
-        ['Ошибки DashBridge', String(runtime.dashBridgeErrorCount ?? 0), runtime.dashBridgeErrorCount ? 'fail' : 'pass'],
-        ['Предупреждения Grafana', String(runtime.grafanaWarningCount ?? 0), runtime.grafanaWarningCount ? 'skip' : ''],
-        ['console.warn', String(runtime.warningCount ?? 0), runtime.warningCount ? 'skip' : ''],
-        ['Длительность', formatDuration(test.durationMs || 0), ''],
-        ['Панель', test.diagnostic?.before?.panelId || test.diagnostic?.baseline?.panelId || '—', ''],
-        ['Рендерер', test.diagnostic?.before?.renderer || test.diagnostic?.baseline?.renderer || urlResult.engine || '—', ''],
-        ...(test.feature?.sourceFile ? [['Исходный код', `${test.feature.sourceFile}${test.feature.sourceSymbol ? ` · ${test.feature.sourceSymbol}` : ''}`, '']] : []),
-    ];
-    factValues.forEach(([label, value, className]) => {
-        const fact = popup.document.createElement('div');
-        fact.className = 'fact';
-        fact.innerHTML = `<b>${esc(label)}</b><span class="${className}">${esc(value)}</span>`;
-        facts.appendChild(fact);
-    });
-    header.appendChild(facts);
-    if (test.feature?.description) {
-        const featureDescription = popup.document.createElement('div');
-        featureDescription.className = 'result';
-        featureDescription.textContent = test.feature.description;
-        header.appendChild(featureDescription);
-    }
-    if (test.details) {
-        const result = popup.document.createElement('div');
-        result.className = 'result';
-        result.textContent = test.details;
-        header.appendChild(result);
-    }
-    body.appendChild(header);
-    if (visualAudit.transitions.length) {
-        const visualSummary = popup.document.createElement('div');
-        visualSummary.className = 'result';
-        visualSummary.textContent = [
-            `Visual audit: ${visualAudit.complete ? 'все обязательные доказательства собраны' : 'набор доказательств неполный'}`,
-            ...visualAudit.transitions.map(transition => {
-                const features = transition.activeFeatures.length ? transition.activeFeatures.join(' + ') : 'all-off';
-                const pixel = transition.pixelDelta
-                    ? `; histogram Δ=${transition.pixelDelta.histogramDistance}; luminance Δ=${transition.pixelDelta.luminanceMeanDelta}` : '';
-                return `Шаг ${transition.index} [${features}]: imageChanged=${transition.imageChanged}; semanticChanged=${transition.semanticChanged}${pixel}; issues=${transition.issues.join(', ') || 'нет'}`;
-            }),
-        ].join('\n');
-        body.appendChild(visualSummary);
-    }
-    if (visualAudit.issues.length || !visualAudit.complete) {
-        const visualWarning = popup.document.createElement('div');
-        visualWarning.className = 'result skip';
-        visualWarning.textContent = [
-            `Автоматический visual audit: ${visualAudit.suspicious ? 'ПОДОЗРИТЕЛЬНЫЙ PASS' : 'есть замечания'}`,
-            visualAudit.missingPhases.length ? `Нет обязательных доказательств: ${visualAudit.missingPhases.join(', ')}` : '',
-            ...visualAudit.issues.map(issue => `${issue.transition ? `Шаг ${issue.transition}: ` : ''}${issue.code}${issue.phase ? ` (${issue.phase})` : ''}`),
-        ].filter(Boolean).join('\n');
-        body.appendChild(visualWarning);
-    }
-    if (transitionFacts.length) {
-        const transitionResult = popup.document.createElement('div');
-        transitionResult.className = 'result';
-        transitionResult.textContent = `Доказательства переходов:\n${transitionFacts.join('\n')}`;
-        body.appendChild(transitionResult);
-    }
-    const actionTimeline = test.diagnostic?.actionTimeline || [];
-    if (actionTimeline.length) {
-        const actionResult = popup.document.createElement('div');
-        actionResult.className = 'result';
-        actionResult.textContent = `Журнал действий (${actionTimeline.length}):\n${actionTimeline.map(action => {
-            const checkpoints = action.checkpoints?.filter(item => item.at).length || 0;
-            const changes = (action.diffs || []).reduce((sum, diff) => sum + (diff.changeCount || 0), 0);
-            const status = action.output?.status || (action.output?.pass === true ? 'pass' : 'observed');
-            return `${action.sequence}. ${action.description || action.action} — ${status}; ${action.durationMs ?? '—'} мс; checkpoints=${checkpoints}; changedPaths=${changes}`;
-        }).join('\n')}`;
-        body.appendChild(actionResult);
-    }
-    const grafanaWarnings = runtime.grafanaWarnings || [];
-    if (grafanaWarnings.length) {
-        const warningResult = popup.document.createElement('div');
-        warningResult.className = 'result skip';
-        warningResult.textContent = `Предупреждения Grafana (не влияют на PASS/FAIL):\n${grafanaWarnings.map(event => (event.args || []).join(' ')).join('\n')}`;
-        body.appendChild(warningResult);
-    }
-    const seenVisuals = new Set();
-    const visualGalleryNote = popup.document.createElement('div');
-    visualGalleryNote.className = 'result';
-    visualGalleryNote.textContent = 'Уникальные визуальные доказательства: одинаковые viewport, panel и canvas повторно не показываются. Полный технический timeline остаётся в JSON.';
-    body.appendChild(visualGalleryNote);
-    const addUniqueSnapshot = (title, snapshot) => addSnapshot(body, title, snapshot, seenVisuals);
-    addUniqueSnapshot('Страница при открытии сценария', test.diagnostic?.opened);
-    addUniqueSnapshot('Внешний снимок: до запуска сценария', test.diagnostic?.before);
-    if (test.diagnostic?.baseline) {
-        addUniqueSnapshot('Базовое состояние сценария', test.diagnostic.baseline);
-    }
-    (test.diagnostic?.transitions || []).forEach(step => {
-        const number = step.index ? `Шаг ${step.index}` : 'Шаг';
-        addUniqueSnapshot(`${number}: ${step.label} — непосредственно до команды`, step.before);
-        addUniqueSnapshot(`${number}: ${step.label} — после команды, до Refresh`, step.command?.afterCommandBeforeRefresh);
-        const persistence = step.persistence || step.command?.persistence;
-        if (persistence?.required) {
-            addUniqueSnapshot(`${number}: ${step.label} — после первого refresh`, persistence.beforeRefresh);
-            addUniqueSnapshot(`${number}: ${step.label} — после второго refresh без повторной команды`, step.after);
-        } else {
-            addUniqueSnapshot(`${number}: ${step.label} — состояние после команды и refresh`, step.after);
-        }
-    });
-    addUniqueSnapshot('Внешний снимок: после завершения сценария', test.diagnostic?.after);
-    addUniqueSnapshot('После команды гарантированного сброса, до Refresh', test.diagnostic?.reset?.command?.afterCommandBeforeRefresh);
-    addUniqueSnapshot('После гарантированного сброса', test.diagnostic?.reset?.after);
-    const details = popup.document.createElement('details');
-    const summary = popup.document.createElement('summary');
-    summary.textContent = 'Полная JSON-диагностика теста';
-    const rawHint = popup.document.createElement('p');
-    rawHint.textContent = 'Диагностика может быть слишком большой для отображения как один текстовый DOM-узел.';
-    const rawDownload = popup.document.createElement('button');
-    rawDownload.textContent = 'Скачать JSON этого теста';
-    rawDownload.addEventListener('click', async () => {
-        rawDownload.disabled = true;
-        rawDownload.textContent = 'Сборка JSON частями…';
-        try {
-            const blob = await createChunkedJsonBlob(payload, progress => {
-                rawDownload.textContent = `Сборка: ${(progress.characters / 1024 / 1024).toFixed(1)} МБ`;
-            });
-            const rawUrl = URL.createObjectURL(blob);
-            const link = popup.document.createElement('a');
-            link.href = rawUrl;
-            link.download = `dashbridge-${test.id}-diagnostic.json`;
-            link.click();
-            setTimeout(() => URL.revokeObjectURL(rawUrl), 60_000);
-            rawDownload.textContent = `Скачивание начато: ${(blob.size / 1024 / 1024).toFixed(1)} МБ`;
-        } catch (error) {
-            rawDownload.textContent = `Ошибка: ${error?.message || String(error)}`;
-        } finally {
-            rawDownload.disabled = false;
-        }
-    });
-    details.append(summary, rawHint, rawDownload);
-    body.appendChild(details);
-    popup.focus();
-}
 
 function stopOperationProgressTimer() {
     if (operationProgressTimer !== null) clearInterval(operationProgressTimer);
@@ -807,120 +361,6 @@ function finishOperationProgressWindow(snapshot, { error = null } = {}) {
     operationProgressStartedAt = null;
 }
 
-async function exportDiagnostics() {
-    if (!lastSnapshot?.results?.length) return;
-    if (elExportDiagnosticsBtn) elExportDiagnosticsBtn.disabled = true;
-    const exportDate = new Date();
-    const filename = `dashbridge-e2e-diagnostics-${localExportTimestamp(exportDate)}.json`;
-    let fileHandle = null;
-    try {
-        if (typeof window.showSaveFilePicker === 'function') {
-            try {
-                fileHandle = await window.showSaveFilePicker({
-                    suggestedName: filename,
-                    types: [{ description: 'JSON diagnostics', accept: { 'application/json': ['.json'] } }],
-                });
-            } catch (error) {
-                if (error?.name === 'AbortError') return;
-                console.warn('[TestRunner] Direct file picker unavailable, using Blob fallback', error);
-            }
-        }
-        if (elStatusLine) {
-            elStatusLine.textContent = 'Подготовка полного диагностического отчёта…';
-            elStatusLine.className = 'tr-status tr-status-warn';
-        }
-        await new Promise(resolve => setTimeout(resolve, 0));
-        const manifest = chrome.runtime?.getManifest?.() || {};
-        const exportMetadata = {
-            exportedAt: exportDate.toISOString(),
-            exportedAtLocal: localIsoTimestamp(exportDate),
-            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || null,
-            extensionVersion: manifest.version || null,
-            userAgent: navigator.userAgent,
-            platform: navigator.platform || null,
-        };
-        const updateSerializationProgress = progress => {
-            if (!elStatusLine) return;
-            const sizeMb = (progress.characters / 1024 / 1024).toFixed(1);
-            elStatusLine.textContent = progress.complete
-                ? `JSON собран частями: ${sizeMb} МБ`
-                : `Сборка JSON частями: ${sizeMb} МБ, узлов ${progress.nodes.toLocaleString('ru-RU')}`;
-        };
-        let temporaryRoot = null;
-        let temporaryName = null;
-        if (!fileHandle) {
-            if (typeof navigator.storage?.getDirectory !== 'function') {
-                throw new Error('Браузер не предоставляет потоковую запись на диск; Blob-экспорт отключён для защиты вкладки от Out of Memory');
-            }
-            temporaryRoot = await navigator.storage.getDirectory();
-            temporaryName = `dashbridge-e2e-export-${Date.now()}-${Math.random().toString(36).slice(2)}.json`;
-            fileHandle = await temporaryRoot.getFileHandle(temporaryName, { create: true });
-        }
-        const writable = await fileHandle.createWritable();
-        let progress;
-        try {
-            progress = await serializeSpoolArtifact(lastSnapshot, diagnosticSpool, exportMetadata,
-                chunk => writable.write(chunk), updateSerializationProgress);
-            await writable.close();
-        } catch (error) {
-            await writable.abort?.(error).catch?.(() => { });
-            if (temporaryRoot && temporaryName) await temporaryRoot.removeEntry(temporaryName).catch(() => { });
-            throw error;
-        }
-        if (temporaryRoot && temporaryName) {
-            const diskBackedFile = await fileHandle.getFile();
-            const url = URL.createObjectURL(diskBackedFile);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = filename;
-            link.click();
-            setTimeout(() => {
-                URL.revokeObjectURL(url);
-                void temporaryRoot.removeEntry(temporaryName).catch(() => { });
-            // A multi-gigabyte browser download can legitimately take several
-            // minutes. Keep the disk-backed source alive without retaining it
-            // in JS heap, then reclaim the private temporary file.
-            }, 30 * 60_000);
-            if (elStatusLine) {
-                elStatusLine.textContent = `Диагностика собрана во временный файл и передана браузеру: ${(progress.characters / 1024 / 1024).toFixed(1)} МБ`;
-                elStatusLine.className = 'tr-status tr-status-ok';
-            }
-        } else {
-            if (elStatusLine) {
-                elStatusLine.textContent = `Диагностика записана на диск: ${(progress.characters / 1024 / 1024).toFixed(1)} МБ`;
-                elStatusLine.className = 'tr-status tr-status-ok';
-            }
-        }
-    } catch (error) {
-        console.error('[TestRunner] Diagnostic export failed', error);
-        if (elStatusLine) {
-            elStatusLine.textContent = `Не удалось экспортировать диагностику: ${error?.message || String(error)}`;
-            elStatusLine.className = 'tr-status tr-status-fail';
-        }
-    } finally {
-        if (elExportDiagnosticsBtn) elExportDiagnosticsBtn.disabled = false;
-    }
-}
-
-async function copyTextToClipboard(text, button) {
-    try {
-        await navigator.clipboard.writeText(text);
-    } catch (_) {
-        const textarea = document.createElement('textarea');
-        textarea.value = text;
-        textarea.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-    }
-
-    if (button) {
-        const label = button.textContent;
-        button.textContent = '✓ Скопировано';
-        setTimeout(() => { button.textContent = label; }, 1800);
-    }
-}
 
 // --- Запуск ---
 
@@ -1183,6 +623,34 @@ async function initTestRunnerUI() {
         onCancel: handleAbort,
         closeDelayMs: 6000,
     }) || null;
+    exportController = globalThis.DashBridgeTestExportController?.create({
+        getSnapshot: () => lastSnapshot,
+        getSpool: () => diagnosticSpool,
+        elCopyBtn,
+        elCopyFailBtn,
+        elExportDiagnosticsBtn,
+        elStatusLine,
+        categoryLabel,
+        formatDuration,
+        serializeSpoolArtifact,
+        localExportTimestamp,
+        localIsoTimestamp,
+    }) || null;
+    diagnosticViewer = globalThis.DashBridgeTestDiagnosticViewer?.create({
+        report: DashBridgeTestReport,
+        createChunkedJsonBlob,
+        copyTextToClipboard: exportController?.copyTextToClipboard,
+        setStatus: (text, className) => {
+            if (!elStatusLine) return;
+            elStatusLine.textContent = text;
+            elStatusLine.className = className;
+        },
+        esc,
+        formatDuration,
+    }) || null;
+    if (!exportController || !diagnosticViewer) {
+        throw new Error('Test Runner UI controllers are unavailable');
+    }
 
     // The report cannot be resumed after this page is closed (the UI snapshot
     // is intentionally memory-only), so reclaim an interrupted run's private
@@ -1221,9 +689,9 @@ async function initTestRunnerUI() {
         updateSelectionSummary();
     });
     elAbortBtn?.addEventListener('click', handleAbort);
-    elCopyBtn?.addEventListener('click', copyReport);
-    elCopyFailBtn?.addEventListener('click', copyFailureReport);
-    elExportDiagnosticsBtn?.addEventListener('click', exportDiagnostics);
+    elCopyBtn?.addEventListener('click', exportController.copyReport);
+    elCopyFailBtn?.addEventListener('click', exportController.copyFailureReport);
+    elExportDiagnosticsBtn?.addEventListener('click', exportController.exportDiagnostics);
     elClearBtn?.addEventListener('click', handleClear);
     chrome.storage.onChanged.addListener((changes, area) => {
         if (area !== 'local' || !changes.trTestSelection) return;

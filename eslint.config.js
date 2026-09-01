@@ -57,6 +57,7 @@ const extensionRuntimeGlobals = readonly([
     'DashBridgeRecorderSessionTransport', 'DashBridgeRecorderSettings',
     'DashBridgeRecorderView', 'DashBridgeReportAudit',
     'DashBridgeReportController', 'DashBridgeReportTestRunner',
+    'DashBridgeTestDiagnosticViewer', 'DashBridgeTestExportController',
     'DashBridgeTimeController',
     'DASHBRIDGE_TEST_SUITE', 'DIAGNOSTIC_CAPTURE_MODES',
     'activeSetInvariant', 'applyGrafanaCompleteHideSelection', 'applyPanelTools',

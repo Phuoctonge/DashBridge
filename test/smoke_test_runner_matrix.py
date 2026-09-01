@@ -17,7 +17,8 @@ SUITE = "\n".join((ROOT / f"pages/test-runner/{name}").read_text(encoding="utf-8
 ])
 CORE = (ROOT / "pages/test-runner/test-runner-core.js").read_text(encoding="utf-8")
 UI = "\n".join((ROOT / f"pages/test-runner/{name}").read_text(encoding="utf-8") for name in [
-    "test-runner-artifact-serialization.js", "test-runner-spool.js", "test-runner-ui.js"
+    "test-runner-artifact-serialization.js", "test-runner-spool.js",
+    "test-runner-export-controller.js", "test-runner-diagnostic-viewer.js", "test-runner-ui.js"
 ])
 REPORT = (ROOT / "pages/test-runner/test-runner-report.js").read_text(encoding="utf-8")
 PANEL_TOOLS = (ROOT / "js/content/grafana-panel-tools.js").read_text(encoding="utf-8") \
@@ -399,7 +400,7 @@ checks = {
     "diagnostic export has lifecycle accounting schema": (
         "dashbridge-e2e-diagnostics/v4" in REPORT
         and "DashBridgeTestReport.createArtifactStreamPlan" in UI
-        and "serializeSpoolArtifact(lastSnapshot, diagnosticSpool, exportMetadata," in UI
+        and "serializeSpoolArtifact(snapshot, getSpool(), exportMetadata," in UI
         and "reconciliation" in REPORT
         and "primaryFailure" in REPORT
         and "failureClusters" in REPORT

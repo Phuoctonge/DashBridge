@@ -50,9 +50,9 @@
       "reason": "Single causal transition/reset lifecycle; splitting would divide one state machine."
     },
     "pages/test-runner/test-runner-ui.js": {
-      "maxLines": 1260,
-      "maxBytes": 71680,
-      "reason": "Single Test Runner page controller; diagnostics, serialization and spool owners are already extracted."
+      "maxLines": 730,
+      "maxBytes": 40960,
+      "reason": "Single Test Runner page/run-state controller; diagnostic windows and export/clipboard resource owners are extracted."
     }
   }
 }

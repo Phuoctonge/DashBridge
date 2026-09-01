@@ -662,6 +662,11 @@ Fast/Full матрицы — `test-runner-suite.js`. Оркестратор
 evidence и диагностика проваленных тестов без изображений и крупных payload.
 Снимок создаётся только при фатальной ошибке внешнего запуска.
 
+UI Test Runner координирует запуск и таблицу в `test-runner-ui.js`.
+`test-runner-diagnostic-viewer.js` владеет отдельными окнами описания/diagnostics,
+theme listener и Blob URL одного теста; `test-runner-export-controller.js` владеет
+Markdown/clipboard и потоковой записью полного OPFS diagnostic export.
+
 `pages/test-runner/test-runner-suite.js` также является единым каталогом
 стабильных ID, человекочитаемых названий, описаний, шагов и владельцев кода для
 каждого E2E-сценария. Основное окно передаёт выбранные ID в core после
