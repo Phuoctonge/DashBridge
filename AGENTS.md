@@ -3,7 +3,7 @@
 ## Обязательная точка входа
 
 Перед анализом архитектуры, ревью безопасности, диагностикой поведения или
-изменением расширения полностью прочитай `extension-architecture.md`. Это
+изменением расширения полностью прочитай `docs/architecture.md`. Это
 основная карта действующего runtime, владельцев логики, границ доверия,
 lifecycle-контрактов и намеренных ограничений.
 
@@ -13,9 +13,25 @@ lifecycle-контрактов и намеренных ограничений.
   downloads, debugger и других границ полномочий;
 - `docs/development-guide.md` — перед изменением кода, storage/schema,
   интеграций, renderer или release-потока.
+- `docs/module-design.md` — перед созданием, разделением, объединением или
+  переносом JavaScript-модулей.
 
 Не начинай вывод по отдельному файлу, пока не установлены его контекст
 (MAIN/isolated/extension page/service worker), владелец lifecycle и потребители.
+
+## Создание и границы модулей
+
+Новый handwritten production JavaScript в `js/` или `pages/` не должен
+превышать 700 строк или 64 КиБ UTF-8 без документированного исключения в
+`scripts/module-size-budgets.json`. Целевой размер — 300–500 строк. Размер сам
+по себе не является причиной разделения: state, lifecycle и cleanup одного
+владельца нельзя разносить по файлам.
+
+Перед созданием, разделением, объединением или переносом модуля полностью
+прочитай `docs/module-design.md`, затем запусти
+`node scripts/check-module-boundaries.js`. Новый файл допустим только если он
+уменьшает объём знаний для изменения функции и имеет явные dependencies,
+публичный контракт, владельца состояния и cleanup.
 
 ## Как проверять необычные решения
 
@@ -48,13 +64,15 @@ clipboard или временно перестраивает панель. Сн�
 3. получи контекст символа и при необходимости путь между владельцем и
    потребителем: `gitnexus context <symbol>` и `gitnexus trace <from> <to>`;
 4. проверь незакоммиченные изменения: `gitnexus detect-changes`;
-5. запусти `node scripts/check-dependency-contracts.js` и проверь точным поиском
+5. запусти `node scripts/check-module-boundaries.js`, затем
+   `node scripts/check-dependency-contracts.js` и проверь точным поиском
    строковые контракты (message action/type, CustomEvent, storage key, DOM id и
    selector). Для файла используй
    `node scripts/check-dependency-contracts.js --explain <path>`;
-6. после правки снова выполни dependency guard и полный прогон тестов.
+6. после правки снова выполни module budget, dependency guard и полный прогон
+   тестов.
 
-GitNexus дополняет, но не заменяет `extension-architecture.md`: отсутствующий
+GitNexus дополняет, но не заменяет `docs/architecture.md`: отсутствующий
 результат в графе не означает, что classic-script, runtime loader или строковый
 контракт не используется. Не удаляй код, пока все найденные потребители не
 классифицированы и не обновлены вместе с владельцем контракта.

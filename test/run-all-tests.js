@@ -6,6 +6,8 @@ const path = require('path');
 
 const failures = [];
 const runners = [
+    [path.resolve(__dirname, '..', 'scripts', 'check-module-boundaries.js')],
+    [path.resolve(__dirname, '..', 'scripts', 'check-documentation-links.js')],
     [path.resolve(__dirname, '..', 'scripts', 'check-dependency-contracts.js')],
     [path.join(__dirname, 'run-js-tests.js'), ...process.argv.slice(2)],
     [path.join(__dirname, 'run-python-smoke-tests.js'), ...process.argv.slice(2)],

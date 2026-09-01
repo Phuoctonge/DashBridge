@@ -2,7 +2,7 @@
 
 Здесь перечисляются только направления, которые ещё не завершены. Архитектура
 и реализованное поведение описаны в
-[`../extension-architecture.md`](../extension-architecture.md), правила
+[`architecture.md`](architecture.md), правила
 изменений — в [`development-guide.md`](development-guide.md).
 
 ## P0 — ручной browser acceptance перед выпуском

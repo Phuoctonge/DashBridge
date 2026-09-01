@@ -39,7 +39,8 @@ manifest.json
 ├── js/content/                 # MAIN/isolated runtime сайтов
 ├── test/                       # Node/Python behavior, browser smoke, probes
 ├── package.json                # Только dev-анализ: ESLint и Playwright
-├── docs/                       # Действующие пояснения и краткая история
+├── docs/architecture.md        # Источник истины по runtime и владельцам
+├── docs/module-design.md       # Границы и бюджеты JavaScript-модулей
 └── docs/roadmap.md             # Только актуальный незавершённый roadmap
 ```
 
@@ -626,9 +627,9 @@ node test/run-js-tests.js
 node test/run-python-smoke-tests.js
 ```
 
-На 2026-08-31: 105 JavaScript behavior-файлов и 41 исполняемый Python
-smoke/security/audit-файл. Все 84 production JavaScript-файла проходят
-`node --check`.
+Актуальное количество production-файлов и проверок печатают канонические
+runners; документация намеренно не дублирует быстро устаревающие счётчики.
+Все production JavaScript-файлы проходят синтаксическую проверку, а
 `DASHBRIDGE_PYTHON` задаёт Python, если он не находится автоматически.
 
 Дополнительный dev-контур устанавливается через `npm ci --ignore-scripts` и

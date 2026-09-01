@@ -1,0 +1,58 @@
+{
+  "default": {
+    "maxLines": 700,
+    "maxBytes": 65536
+  },
+  "exceptions": {
+    "js/content/grafana-panel-tools.js": {
+      "maxLines": 2300,
+      "maxBytes": 135168,
+      "reason": "MAIN dispatcher and tightly coupled panel/threshold coordination facade; extracted lifecycles remain separate owners."
+    },
+    "js/content/grafana-threshold-visuals.js": {
+      "maxLines": 780,
+      "maxBytes": 49152,
+      "reason": "Single renderer lifecycle covering the shared uPlot/Flot threshold contract."
+    },
+    "js/content/grafana-panel-data-runtime.js": {
+      "maxLines": 720,
+      "maxBytes": 49152,
+      "reason": "Single fetch/XHR interception and request-correlation lifecycle; pure transforms are already extracted."
+    },
+    "js/content/grafana-legend-visuals.js": {
+      "maxLines": 1000,
+      "maxBytes": 65536,
+      "reason": "Stable legend facade and shared layout lifecycle; renderer visibility adapters are already extracted."
+    },
+    "pages/test-runner/test-runner-core.js": {
+      "maxLines": 970,
+      "maxBytes": 49152,
+      "reason": "Authoritative E2E run state machine and public runner snapshot contract."
+    },
+    "pages/test-runner/test-runner-diagnostics.js": {
+      "maxLines": 1290,
+      "maxBytes": 69632,
+      "reason": "Single bounded evidence capture owner across supported renderer diagnostics."
+    },
+    "pages/test-runner/test-runner-report.js": {
+      "maxLines": 1175,
+      "maxBytes": 75776,
+      "reason": "Single interactive diagnostic report renderer and evidence navigation owner."
+    },
+    "pages/test-runner/test-runner-suite.js": {
+      "maxLines": 950,
+      "maxBytes": 59392,
+      "reason": "Generated scenario catalog and invariant composition source of truth."
+    },
+    "pages/test-runner/test-runner-transitions.js": {
+      "maxLines": 1110,
+      "maxBytes": 63488,
+      "reason": "Single causal transition/reset lifecycle; splitting would divide one state machine."
+    },
+    "pages/test-runner/test-runner-ui.js": {
+      "maxLines": 1260,
+      "maxBytes": 71680,
+      "reason": "Single Test Runner page controller; diagnostics, serialization and spool owners are already extracted."
+    }
+  }
+}

@@ -3,7 +3,7 @@
 Это краткая замена удалённым implementation-планам и аналитическим отчётам за
 июль–август 2026 года. Здесь сохранены только решения, которые всё ещё важны
 при изменении кода. Текущее устройство описано в
-[`../../extension-architecture.md`](../../extension-architecture.md).
+[`../architecture.md`](../architecture.md).
 
 ## Grafana runtime и renderer
 

@@ -1,21 +1,18 @@
 # DashBridge: ориентир для дальнейшей разработки
 
 > Сверено с версией 2.4.1, исходным кодом и тестами 2026-08-30. Архитектурный источник
-> истины — [`extension-architecture.md`](../extension-architecture.md), карта
+> истины — [`architecture.md`](architecture.md), карта
 > разрешений — [`permission-map.md`](permission-map.md), незавершённые
 > направления — [`roadmap.md`](roadmap.md). История не описывает
 > текущее поведение.
 
 ## Текущее состояние
 
-Расширение не требует сборки и загружается напрямую из исходной папки. На
-момент проверки проходят:
-
-- 105 JavaScript behavior-файлов;
-- 41 Python smoke/security/audit-файл;
-- `node --check` для всех 84 production JavaScript-файлов.
-- ESLint correctness-анализ production, tests и scripts;
-- автономный browser smoke всех восьми extension pages в чистом профиле.
+Расширение не требует сборки и загружается напрямую из исходной папки.
+Текущее количество production-файлов и проверок намеренно не фиксируется в
+документе: его печатают канонические runners. Полный прогон включает module
+budget, dependency contracts, все JavaScript/Python проверки, ESLint и
+автономный browser smoke extension pages в чистом профиле.
 
 Автотесты хорошо фиксируют структурные и поведенческие контракты, но не
 заменяют живую проверку Chrome/Grafana: renderer, clipboard, capture,
@@ -91,12 +88,12 @@ Browser smoke не требует пользователя и ловит оши�
 
 ### Крупные runtime-модули
 
-`grafana-panel-tools.js`, `grafana-visual-engine.js`, `dashbridge.js` и
-`batch.js` объединяют несколько тесно связанных lifecycle-сценариев. Они
-покрыты тестами, но локальная правка может иметь нелокальный эффект. При
-добавлении функции сначала ищите существующего владельца логики в
-`extension-architecture.md`; новый helper выносите только при ясном контракте
-входов, cleanup и минимум двух потребителях.
+Некоторые runtime- и Test Runner-модули остаются крупнее общего предела, потому
+что владеют единым state machine или сгенерированным каталогом. Их текущие
+no-growth бюджеты и причины находятся в `scripts/module-size-budgets.json`.
+При добавлении функции сначала ищите существующего владельца в
+`architecture.md`; правила разделения и объединения находятся в
+[`module-design.md`](module-design.md).
 
 ### Browser-only совместимость
 
@@ -252,7 +249,7 @@ foreach ($file in $files) { node --check $file }
 6. Для URL/message/import добавить отрицательный тест, а не только happy path.
 7. Если менялось permission или DNR, обновить `permission-map.md`.
 8. Если менялось фактическое поведение, владелец логики или необычный guard,
-   обновить `extension-architecture.md` в том же изменении.
+   обновить `architecture.md` в том же изменении.
 
 ## Выпуск версии
 

@@ -333,7 +333,7 @@ installer и их SHA-256, затем публикует GitHub Release с relea
 матрица влияния и обязательные проверки перед выпуском.
 
 AI-анализ и ревью репозитория начинают с [AGENTS.md](AGENTS.md), который
-назначает [extension-architecture.md](extension-architecture.md) обязательной
+назначает [docs/architecture.md](docs/architecture.md) обязательной
 архитектурной точкой входа.
 
 ---
