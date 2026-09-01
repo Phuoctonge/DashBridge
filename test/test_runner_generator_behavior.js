@@ -9,6 +9,10 @@ const diagnosticsCode = fs.readFileSync(
     path.join(__dirname, '..', 'pages/test-runner/test-runner-diagnostics.js'),
     'utf8'
 );
+const diagnosticDiffCode = fs.readFileSync(
+    path.join(__dirname, '..', 'pages/test-runner/test-runner-diagnostic-diff.js'),
+    'utf8'
+);
 const transitionsCode = fs.readFileSync(
     path.join(__dirname, '..', 'pages/test-runner/test-runner-transitions.js'),
     'utf8'
@@ -17,7 +21,7 @@ const catalogCode = fs.readFileSync(
     path.join(__dirname, '..', 'pages/test-runner/test-runner-suite.js'),
     'utf8'
 );
-const suiteCode = `${diagnosticsCode}\n${transitionsCode}\n${catalogCode}`;
+const suiteCode = `${diagnosticsCode}\n${diagnosticDiffCode}\n${transitionsCode}\n${catalogCode}`;
 
 // Контракт автоматической диагностики остаётся доступным в suite.
 [

@@ -30,9 +30,9 @@
       "reason": "Authoritative E2E run state machine and public runner snapshot contract."
     },
     "pages/test-runner/test-runner-diagnostics.js": {
-      "maxLines": 1290,
-      "maxBytes": 69632,
-      "reason": "Single bounded evidence capture owner across supported renderer diagnostics."
+      "maxLines": 1140,
+      "maxBytes": 61440,
+      "reason": "Single bounded evidence capture owner across supported renderer diagnostics; pure snapshot diffing is extracted."
     },
     "pages/test-runner/test-runner-report.js": {
       "maxLines": 1175,

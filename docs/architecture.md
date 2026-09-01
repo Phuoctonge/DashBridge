@@ -653,8 +653,9 @@ package-файлы, `node_modules` и результаты тестов не в�
 `scripts/run-live-grafana-e2e.js` является внешним Playwright-оркестратором, а
 не вторым владельцем сценариев: он открывает существующий extension Test Runner,
 передаёт ему один или два dashboard URL и ждёт его публичный snapshot. Захват
-evidence принадлежит `test-runner-diagnostics.js`, причинный OFF→ON/reset и
-повторный refresh — `test-runner-transitions.js`, а стабильные ID и generated
+evidence принадлежит `test-runner-diagnostics.js`, чистое bounded-сравнение
+двух runtime snapshots — `test-runner-diagnostic-diff.js`, причинный
+OFF→ON/reset и повторный refresh — `test-runner-transitions.js`, а стабильные ID и generated
 Fast/Full матрицы — `test-runner-suite.js`. Оркестратор
 пишет полный локальный JSON и компактный failure-report в игнорируемый
 `test-results/`; в Node-процесс передаются только bounded console/network

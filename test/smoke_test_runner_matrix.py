@@ -12,7 +12,8 @@ except (AttributeError, OSError):
 
 ROOT = Path(__file__).resolve().parent.parent
 SUITE = "\n".join((ROOT / f"pages/test-runner/{name}").read_text(encoding="utf-8") for name in [
-    "test-runner-diagnostics.js", "test-runner-transitions.js", "test-runner-suite.js"
+    "test-runner-diagnostics.js", "test-runner-diagnostic-diff.js",
+    "test-runner-transitions.js", "test-runner-suite.js"
 ])
 CORE = (ROOT / "pages/test-runner/test-runner-core.js").read_text(encoding="utf-8")
 UI = "\n".join((ROOT / f"pages/test-runner/{name}").read_text(encoding="utf-8") for name in [
