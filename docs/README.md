@@ -15,6 +15,8 @@
   зоны риска и обязательные проверки.
 - [`module-design.md`](module-design.md) — правила создания, разделения и
   объединения модулей, lifecycle-контракт и проверяемые пределы размера.
+- [`file-boundary-audit.md`](file-boundary-audit.md) — полный инвентарь
+  tracked-файлов со строками, байтами и решением оставить/разделить/объединить.
 - [`permission-map.md`](permission-map.md) — связь разрешений Chrome с
   функциями расширения.
 - [`dashflow-v2.md`](dashflow-v2.md) — формат записи Traffic Recorder,
