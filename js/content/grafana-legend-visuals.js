@@ -2,8 +2,8 @@
     'use strict';
     if (root.DashBridgeGrafanaLegendVisuals) return;
 
-    function create({ debugLog, extensionOrigin } = {}) {
-        if (typeof debugLog !== 'function' || typeof extensionOrigin !== 'string' || !extensionOrigin) {
+    function create({ debugLog } = {}) {
+        if (typeof debugLog !== 'function') {
             throw new TypeError('Grafana legend visuals dependencies are incomplete');
         }
 
@@ -406,13 +406,8 @@
                 return true;
             };
             const uplotResizedAfterLegendLayout = await resizeUPlotAfterLegendLayout();
-            // Grafana кэширует window.innerWidth и игнорирует resize, если он не изменился.
-            // Единственный 100% рабочий способ - попросить родительский Dashbridge 
-            // физически изменить ширину нашего iframe на 1px.
             if (legendLayout?.layoutChanged || uplotResizedAfterLegendLayout) {
-                if (window.parent !== window) {
-                    window.parent.postMessage({ action: 'dashbridgeNeedsResize' }, extensionOrigin);
-                } else {
+                if (window.parent === window) {
                     window.dispatchEvent(new Event('resize'));
                 }
             }
@@ -833,9 +828,7 @@
                         }, 450);
                     }
                 });
-                if (window.parent !== window) {
-                    window.parent.postMessage({ action: 'dashbridgeNeedsResize' }, extensionOrigin);
-                } else {
+                if (window.parent === window) {
                     window.dispatchEvent(new Event('resize'));
                 }
             }
@@ -981,4 +974,3 @@
 
     root.DashBridgeGrafanaLegendVisuals = Object.freeze({ create });
 })(window);
-

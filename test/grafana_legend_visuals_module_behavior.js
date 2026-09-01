@@ -23,7 +23,7 @@ vm.runInContext(fs.readFileSync(
 
 const factory = context.window.DashBridgeGrafanaLegendVisuals;
 assert(factory && Object.isFrozen(factory), 'legend visuals factory must expose one immutable MAIN dependency');
-const legend = factory.create({ debugLog() {}, extensionOrigin: 'chrome-extension://extension-id' });
+const legend = factory.create({ debugLog() {} });
 assert.strictEqual(legend.resetFlotSeriesVisibility({ root: {} }), false);
 assert.strictEqual(legend.findUPlotForThreshold({ querySelectorAll: () => [] }), null);
 assert.throws(() => factory.create({}), /dependencies are incomplete/);

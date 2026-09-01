@@ -64,9 +64,10 @@ checks = {
     "Grafana right-legend panels always relocate below": "graph-panel--legend-right" in visual_engine,
     "Legend relocation waits for two committed frames before sizing uPlot": "await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));" in visual_engine
         and "const uplotResizedAfterLegendLayout = await resizeUPlotAfterLegendLayout();" in visual_engine,
-    "Persistent legend refresh avoids redundant iframe resize": "layoutAlreadyApplied" in visual_engine
+    "Persistent legend refresh avoids redundant post-layout resize": "layoutAlreadyApplied" in visual_engine
         and "layoutChanged: false" in visual_engine
         and "if (legendLayout?.layoutChanged || uplotResizedAfterLegendLayout)" in visual_engine,
-    "Visual engine has an origin for parent resize messages": "const extensionOrigin = new URL(location.ancestorOrigins?.[0] || document.referrer || location.href).origin;" in visual_engine,
+    "Visual engine has no orphan parent resize contract": "dashbridgeNeedsResize" not in visual_engine
+        and "DashBridgeGrafanaLegendVisuals.create({ debugLog })" in visual_engine,
 }
 run_checks(checks)

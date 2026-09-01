@@ -38,7 +38,6 @@
         }
     };
 
-    const extensionOrigin = new URL(location.ancestorOrigins?.[0] || document.referrer || location.href).origin;
     const {
         applyPopupLegendAndVisuals,
         applyUPlotFastCompleteHide,
@@ -52,7 +51,7 @@
         resetFlotSeriesVisibility,
         resetSeriesVisibility,
         stopLegacyVisualObservers,
-    } = window.DashBridgeGrafanaLegendVisuals.create({ debugLog, extensionOrigin });
+    } = window.DashBridgeGrafanaLegendVisuals.create({ debugLog });
     const {
         getThresholdDebug,
         getThresholdUnit,
