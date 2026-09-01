@@ -164,6 +164,7 @@ grafana-panel-tools.js
 | DashBridge iframe transport | `dashbridge-frame-controller.js` | `dashbridge.js`; trusted origin, ready state and navigation reset. |
 | DashBridge time/URL lifecycle | `dashbridge-time-controller.js` | Profile-owned range/refresh, controls, clipboard, theme-aware panel URL, iframe time broadcast and Refresh Off transition. |
 | DashBridge panel tools/status | `dashbridge-panel-tools-controller.js` | Нормализация tools, settings modal, correlated title/legend/threshold requests, threshold state and notifications. |
+| DashBridge card drag lifecycle | `dashbridge-drag-controller.js` | Drag enable/reset, drop markers, DOM reorder and persisted panel order. |
 | DashBridge panel analysis UI | `dashbridge-panel-analysis-controller.js` | CPU/RAM modal, exact iframe/request correlation, retry after iframe readiness and cancel cleanup. |
 | Неблокирующие модальные диалоги DashBridge | `dashbridge-modal.js` | Профили, импорт/экспорт, настройки и capture в `dashbridge.js`. |
 | URL и идентичность панелей DashBridge | `dashbridge-panel-url.js`, `grafana-panel-identity.js` | Добавление, поиск дублей, импорт и iframe-настройки в `dashbridge.js`. |

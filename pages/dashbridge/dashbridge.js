@@ -121,12 +121,6 @@ const getPanelForIframe = dashBridgeTimeController.getPanelForIframe;
 const broadcastTimeUpdate = dashBridgeTimeController.broadcast;
 const setupTimeControls = dashBridgeTimeController.setupControls;
 
-// --- Drag & Drop state ---
-let draggedId = null;
-let draggedEl = null;
-let dragTargetEl = null;
-let dragDropSide = null;
-
 // --- Fullscreen state ---
 let fullscreenPanelId = null;
 let defaultCapturePrepared = false;
@@ -147,6 +141,12 @@ dashBridgePanelToolsController = DashBridgePanelToolsController.create({
     settingsModal: window.DashBridgePanelSettingsModal,
     escapeHtml,
 });
+const dashBridgeDragController = DashBridgeDragController.create({
+    getPanels: () => panels,
+    setPanels: value => { panels = value; },
+    savePanels,
+});
+const setupDashboardDragAndDrop = dashBridgeDragController.setup;
 
 // --- SVG-иконки ---
 const SVG_GRIP = `<svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" aria-hidden="true">
@@ -257,50 +257,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderProfileSwitcher();
     renderDashboard();
 });
-
-function clearDragMarkers(_container) {
-    dragTargetEl?.classList.remove('drag-over-left', 'drag-over-right');
-    dragTargetEl = null;
-    dragDropSide = null;
-}
-
-function savePanelOrder(container) {
-    const panelsById = new Map(panels.map(panel => [panel.id, panel]));
-    panels = [...container.querySelectorAll('.panel-card')]
-        .map(card => panelsById.get(card.dataset.panelId))
-        .filter(Boolean);
-    savePanels();
-}
-
-function setupDashboardDragAndDrop() {
-    const container = document.getElementById('dashboard');
-
-    container.addEventListener('dragover', (e) => {
-        if (!draggedEl) return;
-        const target = e.target.closest('.panel-card');
-        if (!target || target === draggedEl || !container.contains(target)) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-
-        clearDragMarkers(container);
-        dragTargetEl = target;
-        dragDropSide = e.clientX < target.getBoundingClientRect().left + target.offsetWidth / 2 ? 'left' : 'right';
-        target.classList.add(dragDropSide === 'left' ? 'drag-over-left' : 'drag-over-right');
-    });
-
-    container.addEventListener('dragleave', (e) => {
-        if (e.target === container && !container.contains(e.relatedTarget)) clearDragMarkers(container);
-    });
-
-    container.addEventListener('drop', (e) => {
-        if (!draggedEl || !dragTargetEl || !dragDropSide) return;
-        e.preventDefault();
-        if (dragDropSide === 'left') container.insertBefore(draggedEl, dragTargetEl);
-        else container.insertBefore(draggedEl, dragTargetEl.nextSibling);
-        savePanelOrder(container);
-        clearDragMarkers(container);
-    });
-}
 
 function getCompactCaptureDimensions() {
     return {
@@ -1194,28 +1150,7 @@ function createDashboardPanelCard(panel, container) {
         iframeEl.removeAttribute('data-src');
     }
 
-    // ── Drag & Drop ──────────────────────────────────────────────────────
-    const handle = card.querySelector('.drag-handle');
-    handle.addEventListener('mousedown', () => { card.draggable = true; });
-    // Сбрасываем draggable, если пользователь отпустил кнопку без drag
-    handle.addEventListener('mouseup', () => { card.draggable = false; });
-
-    card.addEventListener('dragstart', (e) => {
-        draggedId = panel.id;
-        draggedEl = card;
-        card.classList.add('dragging');
-        container.classList.add('is-dragging');
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', panel.id);
-    });
-    card.addEventListener('dragend', () => {
-        card.draggable = false;
-        card.classList.remove('dragging');
-        container.classList.remove('is-dragging');
-        clearDragMarkers(container);
-        draggedId = null;
-        draggedEl = null;
-    });
+    dashBridgeDragController.bindCard(card, panel, container);
 
     // ── Кнопки ──────────────────────────────────────────────────────────
     card.querySelector('.btn-fullscreen')?.addEventListener('click', () => toggleFullscreen(panel.id));

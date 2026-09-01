@@ -37,7 +37,9 @@ def test(name, condition, detail=""):
 
 
 def read_file():
-    return DASHBRIDGE_JS.read_text(encoding="utf-8") + (ROOT / "pages/dashbridge/dashbridge-profile-controller.js").read_text(encoding="utf-8")
+    return DASHBRIDGE_JS.read_text(encoding="utf-8") \
+        + (ROOT / "pages/dashbridge/dashbridge-profile-controller.js").read_text(encoding="utf-8") \
+        + (ROOT / "pages/dashbridge/dashbridge-drag-controller.js").read_text(encoding="utf-8")
 
 
 print("=" * 70)
@@ -79,7 +81,7 @@ test(
 # The initializer contains nested promise callbacks, so a [^}]* regex would
 # stop at the first callback rather than at the end of the listener.
 main_dom_start = content.find("document.addEventListener('DOMContentLoaded', async () => {")
-main_dom_end = content.find("function clearDragMarkers", main_dom_start)
+main_dom_end = content.find("function getCompactCaptureDimensions", main_dom_start)
 main_dom_loaded = main_dom_start >= 0 and main_dom_end > main_dom_start \
     and "setupTimeControls()" in content[main_dom_start:main_dom_end]
 test(

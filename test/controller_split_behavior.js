@@ -27,6 +27,7 @@ before(dashbridgeHtml, 'dashbridge-profile-controller.js', 'dashbridge.js');
 before(dashbridgeHtml, 'dashbridge-time-state.js', 'dashbridge-time-controller.js');
 before(dashbridgeHtml, 'dashbridge-time-controller.js', 'dashbridge.js');
 before(dashbridgeHtml, 'dashbridge-panel-tools-controller.js', 'dashbridge.js');
+before(dashbridgeHtml, 'dashbridge-drag-controller.js', 'dashbridge.js');
 before(recorderHtml, 'recorder-replay.js', 'recorder.js');
 before(batchHtml, 'batch-panel-rules-ui.js', 'batch.js');
 before(batchHtml, 'batch-operation-controller.js', 'batch.js');

@@ -14,7 +14,7 @@ const html = fs.readFileSync('pages/dashbridge/dashbridge.html', 'utf8');
 const css = fs.readFileSync('pages/dashbridge/dashbridge.css', 'utf8');
 
 const initStart = source.indexOf("document.addEventListener('DOMContentLoaded', async () => {");
-const initEnd = source.indexOf('function clearDragMarkers', initStart);
+const initEnd = source.indexOf('function getCompactCaptureDimensions', initStart);
 const initSource = source.slice(initStart, initEnd);
 assert(initStart >= 0 && initEnd > initStart
     && initSource.includes('const [storedSettings] = await Promise.all([')
