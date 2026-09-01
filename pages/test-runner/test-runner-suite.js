@@ -2917,7 +2917,7 @@ const E2E_FEATURE_REGISTRY = [
     },
     {
         id: 'thresholdEnabled', name: 'Порог на графике', description: 'Добавляет пороговую линию, проверяет расчёт для выбранной панели и безопасное снятие.',
-        sourceFile: 'js/content/grafana-visual-engine.js', sourceSymbol: 'setThreshold',
+        sourceFile: 'js/content/grafana-threshold-visuals.js', sourceSymbol: 'setThreshold',
         on: { transformSettings: { thresholdEnabled: true } }, off: { transformSettings: { thresholdEnabled: false } },
         invariant: matrixInvariants.thresholdOn, inactive: matrixInvariants.thresholdOff,
     },

@@ -149,7 +149,7 @@ assert(tools.includes("error?.name === 'AbortError' ? 'aborted' : 'network-error
     && visual.includes("'http_error', 'network_error', 'decode_error', 'aborted'"),
     'cancelled or superseded Grafana requests must not erase cached data or cover a rendered panel with a false network error');
 const reportCollectorStart = visual.indexOf('const collectPanelReportSnapshot');
-const reportCollectorEnd = visual.indexOf('const getThresholdDebug', reportCollectorStart);
+const reportCollectorEnd = visual.indexOf('return Object.freeze({ collectPanelReportSnapshot });', reportCollectorStart);
 const reportCollectorSource = visual.slice(reportCollectorStart, reportCollectorEnd);
 assert(!reportCollectorSource.includes("if (['http_error', 'network_error', 'decode_error', 'aborted'].includes(responseDataStatus.kind))")
     && reportCollectorSource.includes("const failureKinds = new Set(['http_error', 'network_error', 'decode_error', 'aborted']);")

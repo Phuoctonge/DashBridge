@@ -4,7 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-visual-engine.js'), 'utf8');
+const source = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-threshold-visuals.js'), 'utf8')
+    + fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-visual-engine.js'), 'utf8');
 const start = source.indexOf('const THRESHOLD_HIGHLIGHT_WIDTH_INCREMENT');
 const end = source.indexOf('    const buildThresholdHighlightSamples', start);
 assert(start >= 0 && end > start, 'threshold width helpers must remain independently testable');

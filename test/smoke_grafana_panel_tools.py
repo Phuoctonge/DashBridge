@@ -6,7 +6,8 @@ from support.smoke import run_checks
 ROOT = Path(__file__).resolve().parent.parent
 COMMON = (ROOT / "js/content/grafana-panel-tools.js").read_text(encoding="utf-8")
 PANEL_STATE = (ROOT / "js/content/grafana-panel-state.js").read_text(encoding="utf-8")
-VISUAL_ENGINE = (ROOT / "js/content/grafana-visual-engine.js").read_text(encoding="utf-8")
+VISUAL_ENGINE = (ROOT / "js/content/grafana-visual-engine.js").read_text(encoding="utf-8") \
+    + (ROOT / "js/content/grafana-threshold-visuals.js").read_text(encoding="utf-8")
 PANEL_DEFINITION = (ROOT / "js/content/grafana-panel-definition.js").read_text(encoding="utf-8")
 CPU_CAPACITY_FILTER = (ROOT / "js/content/grafana-cpu-capacity-filter.js").read_text(encoding="utf-8")
 DASHBOARD = (ROOT / "pages/dashbridge/dashbridge.js").read_text(encoding="utf-8") \
