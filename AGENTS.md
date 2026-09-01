@@ -53,6 +53,34 @@ clipboard или временно перестраивает панель. Сн�
 
 ## Проверка изменений
 
+### Локальные runtimes рабочей станции
+
+На текущем Windows-ПК используй проверенные исполняемые файлы:
+
+- Node.js: `C:\Program Files\nodejs\node.exe`;
+- npm: `C:\Program Files\nodejs\npm.cmd`;
+- Python: `C:\Users\Vanya\AppData\Local\Programs\Python\Python314\python.exe`.
+
+`C:\Windows\py.exe` на этой машине является только launcher без
+зарегистрированного интерпретатора. Его наличие не подтверждает доступность
+Python, а ошибка `No installed Python found` не означает, что самого
+`python.exe` нет.
+
+Перед полным прогоном задай Python явно и при необходимости вызывай Node по
+абсолютному пути:
+
+```powershell
+$env:DASHBRIDGE_PYTHON = 'C:\Users\Vanya\AppData\Local\Programs\Python\Python314\python.exe'
+& 'C:\Program Files\nodejs\node.exe' test/run-all-tests.js
+```
+
+Если runtime не запускается из sandbox или каталог установки недоступен для
+чтения, повтори безопасную проверку с разрешением вне sandbox. Не сообщай, что
+Node.js или Python отсутствует, только на основании неудачного `Get-Command`,
+`where.exe`, `py.exe` либо sandbox-проверки. После обновления runtime сначала
+проверь указанный путь; если версия была установлена в новый каталог, найди
+фактический executable и обнови этот раздел в том же изменении.
+
 ### Перед удалением или переносом кода
 
 Не считай отсутствие локальных вызовов доказательством, что код не используется.
