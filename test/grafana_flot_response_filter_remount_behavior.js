@@ -6,7 +6,7 @@ const vm = require('vm');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-panel-tools.js'), 'utf8');
 const start = source.indexOf('const responseSeriesFilterIsEnabled');
-const end = source.indexOf('    const normalizeCpuCapacityLegendName', start);
+const end = source.indexOf('    const cpuCapacityLegend =', start);
 assert(start >= 0 && end > start, 'Flot response-filter remount helper must remain independently testable');
 
 const calls = [];

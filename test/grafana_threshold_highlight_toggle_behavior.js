@@ -8,6 +8,7 @@ const panelTools = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', '
     + fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-panel-data-transforms.js'), 'utf8')
     + fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-panel-data-runtime.js'), 'utf8');
 const cpuFilter = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-cpu-capacity-filter.js'), 'utf8');
+const cpuLegend = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-cpu-capacity-legend.js'), 'utf8');
 
 assert(panelTools.includes("highlightKind: 'series-query-filter'"),
     'series-query threshold metadata must identify its owning filter');
@@ -55,6 +56,7 @@ const context = {
     dispatchEvent(event) { dispatch(event); return true; },
     document: {},
     registerRuntimeCleanup() {},
+    getLegendLabel: value => value,
     requestAnimationFrame: callback => { scheduledFrames.push(callback); return scheduledFrames.length; },
     cancelAnimationFrame() {},
     MutationObserver: class { observe() {} disconnect() {} },
@@ -80,6 +82,7 @@ const context = {
 context.window = context;
 context.globalThis = context;
 vm.createContext(context);
+vm.runInContext(cpuLegend, context);
 vm.runInContext(`${panelTools.slice(helperStart, helperEnd)}
 globalThis.setRules = rules => { visualMetadata.seriesThresholdHighlightRules = rules; };
 globalThis.sync = (root = { id: 'panel' }, state = tools) => syncThresholdHighlightState(root, state);

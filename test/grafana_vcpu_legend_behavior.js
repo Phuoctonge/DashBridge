@@ -4,30 +4,33 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-panel-tools.js'), 'utf8');
-const start = source.indexOf('const normalizeCpuCapacityLegendName');
-const end = source.indexOf('    const ensureCpuCapacityLegendStyle', start);
-assert(start >= 0 && end > start, 'vCPU legend matcher must remain independently testable');
+const moduleSource = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-cpu-capacity-legend.js'), 'utf8');
+const toolsSource = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-panel-tools.js'), 'utf8');
+const source = `${moduleSource}\n${toolsSource}`;
 
-const context = {};
+const context = { window: null };
 context.globalThis = context;
+context.window = context;
 vm.createContext(context);
-vm.runInContext(`const visualMetadata = { seriesCpuCapacityEntries: [] };
-${source.slice(start, end)}
-globalThis.setEntries = entries => { visualMetadata.seriesCpuCapacityEntries = entries; };
-globalThis.matchEntry = matchCpuCapacityLegendEntry;
-globalThis.attachCapacity = attachCpuCapacityToReportSnapshot;`, context);
+vm.runInContext(moduleSource, context);
+const visualMetadata = { seriesCpuCapacityEntries: [] };
+const runtime = context.DashBridgeGrafanaCpuCapacityLegend.create({
+    tools: {}, visualMetadata, getLegendLabel: value => value,
+    syncThresholdHighlightState() {}
+});
+context.setEntries = entries => { visualMetadata.seriesCpuCapacityEntries = entries; };
+context.attachCapacity = runtime.attachToReportSnapshot;
 
 context.setEntries([
     { value: 4, sourceNames: ['Value', 'sc2-sc-etl01p.passport.local:9182'] },
     { value: 16, sourceNames: ['Value', 'sc2-suo-coordinator02p.passport.local:9182'] }
 ]);
 assert.strictEqual(
-    context.matchEntry('sc2-sc-etl01p.passport.local:9182 Load 1m').value,
+    context.attachCapacity({ series: [{ name: 'sc2-sc-etl01p.passport.local:9182 Load 1m' }] }).series[0].cpuCapacity,
     4,
     'legend row must match capacity by instance embedded in the visible label'
 );
-assert.strictEqual(context.matchEntry('Value'), null,
+assert.strictEqual(context.attachCapacity({ series: [{ name: 'Value' }] }).series[0].cpuCapacity, undefined,
     'generic Grafana field names must not assign the first capacity to every row');
 const reportSnapshot = context.attachCapacity({ series: [
     { name: 'sc2-sc-etl01p.passport.local:9182 Load 1m', value: 29.72 },
@@ -47,37 +50,41 @@ assert.strictEqual(dynamicSnapshot.series[1].threshold, 12.8);
 assert.strictEqual(dynamicSnapshot.series[0].level, 'critical');
 assert.strictEqual(dynamicSnapshot.series[1].level, 'normal');
 
-assert(source.includes("insertCpuCapacityLegendCell(headerRow, headerAnchor, 'vCPU', true)"),
+assert(moduleSource.includes("insertCell(headerRow, headerAnchor, 'vCPU', true)"),
     'table legend must receive a vCPU header after the name column');
-assert(source.includes('if (tableCell?.parentElement === row) tableCell.after(cell);'),
+assert(moduleSource.includes('if (tableCell?.parentElement === row) tableCell.after(cell);'),
     'vCPU values must be inserted after the native series-name cell');
-assert(source.includes('const nativeValueCell = tableCell?.nextElementSibling;')
-    && source.includes("nativeValueCell.className.trim()"),
+assert(moduleSource.includes('const nativeValueCell = tableCell?.nextElementSibling;')
+    && moduleSource.includes("nativeValueCell.className.trim()"),
     'vCPU cells must inherit Grafana typography classes from the native min column');
-assert(!source.includes('font-variant-numeric:tabular-nums'),
+assert(!moduleSource.includes('font-variant-numeric:tabular-nums'),
     'custom numeric typography must not override Grafana legend fonts');
-assert(source.includes(": '—';") && source.includes("text === '—' ? 'Количество vCPU не определено'"),
+assert(moduleSource.includes(": '—';") && moduleSource.includes("text === '—' ? 'Количество vCPU не определено'"),
     'missing helper capacity must retain the column and display an em dash');
-assert(source.includes('new MutationObserver(controller.schedule)'),
+assert(moduleSource.includes('new MutationObserver(controller.schedule)'),
     'vCPU column must survive Grafana legend remounts');
-assert(source.includes('syncResponseFilterPresentation(thresholdRoot, state)'),
+assert(moduleSource.includes('const stop = () =>')
+    && moduleSource.includes('if (activeRoot) stopController(activeRoot);')
+    && toolsSource.includes('registerRuntimeCleanup(cpuCapacityLegend.stop);'),
+    'vCPU observers, listeners and RAF work must follow the panel-tools generation cleanup');
+assert(toolsSource.includes('syncResponseFilterPresentation(thresholdRoot, state)'),
     'View remount must restore the complete vCPU presentation');
-const presentationStart = source.indexOf('const syncResponseFilterPresentation');
-const presentationEnd = source.indexOf('    let visualStyleReapplyFrame', presentationStart);
-const presentation = source.slice(presentationStart, presentationEnd);
+const presentationStart = toolsSource.indexOf('const syncResponseFilterPresentation');
+const presentationEnd = toolsSource.indexOf('    let visualStyleReapplyFrame', presentationStart);
+const presentation = toolsSource.slice(presentationStart, presentationEnd);
 const capacityIndex = presentation.indexOf('syncCpuCapacityLegend(root, state)');
 const filterIndex = presentation.indexOf('syncFlotResponseFilterState(root, state)');
 const reflowIndex = presentation.indexOf('reflowChart?.({ root })');
 const highlightIndex = presentation.indexOf('syncThresholdHighlightState(root, state)');
 assert(capacityIndex >= 0 && capacityIndex < filterIndex && filterIndex < reflowIndex && reflowIndex < highlightIndex,
     'vCPU legend space and Flot filtering must commit before threshold highlights are projected');
-const controllerStart = source.indexOf('controller.schedule = () =>');
-const controllerEnd = source.indexOf('controller.observer = new MutationObserver', controllerStart);
-const controllerSchedule = source.slice(controllerStart, controllerEnd);
-assert(controllerSchedule.includes('renderCpuCapacityLegendColumn(root, controller.state)')
+const controllerStart = moduleSource.indexOf('controller.schedule = () =>');
+const controllerEnd = moduleSource.indexOf('controller.observer = new MutationObserver', controllerStart);
+const controllerSchedule = moduleSource.slice(controllerStart, controllerEnd);
+assert(controllerSchedule.includes('renderColumn(panelRoot, controller.state)')
     && controllerSchedule.includes('if (changes > 0)')
     && controllerSchedule.includes('controller.observer?.takeRecords?.()')
-    && controllerSchedule.includes('reflowChart?.({ root })')
+    && controllerSchedule.includes('reflowChart?.({ root: panelRoot })')
     && !controllerSchedule.includes('syncResponseFilterPresentation'),
     'legend remount guard must reflow only a changed vCPU column without re-arming the Flot response filter');
 const visualEngine = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-legend-visibility-adapters.js'), 'utf8')
@@ -89,36 +96,36 @@ assert(visualEngine.includes('.dashbridge-legend-bottom tr > :not(:first-child)'
     && visualEngine.includes('text-align:right !important')
     && !visualEngine.includes('min-width:max-content !important'),
     'live bottom legends must keep vCPU/min/max/current in equal fixed-width columns');
-assert(source.includes("cpuCapacityLegendSortDirection === null")
-    && source.includes("cpuCapacityLegendSortDirection === 'desc' ? 'asc' : null")
-    && source.includes('restoreOriginal: cpuCapacityLegendSortDirection === null'),
+assert(moduleSource.includes("sortDirection === null")
+    && moduleSource.includes("sortDirection === 'desc' ? 'asc' : null")
+    && moduleSource.includes('restoreOriginal: sortDirection === null'),
     'vCPU header must cycle through descending, ascending and unsorted states');
-assert(source.includes('controller.nativeSortListener = event =>')
-    && source.includes('cpuCapacityLegendSortDirection = null;'),
+assert(moduleSource.includes('controller.nativeSortListener = event =>')
+    && moduleSource.includes('sortDirection = null;'),
     'native legend sorting must clear the independent vCPU sorting state');
-assert(source.includes('if (!direction) return left.originalOrder - right.originalOrder;'),
+assert(moduleSource.includes('if (!direction) return left.originalOrder - right.originalOrder;'),
     'third vCPU header click must restore the original legend order');
-assert(source.includes("if (left.value === null) return 1;")
-    && source.includes("if (right.value === null) return -1;"),
+assert(moduleSource.includes("if (left.value === null) return 1;")
+    && moduleSource.includes("if (right.value === null) return -1;"),
     'unknown vCPU values must stay below finite values in both directions');
-assert(source.includes("difference || left.index - right.index"),
+assert(moduleSource.includes("difference || left.index - right.index"),
     'equal vCPU values must preserve their current stable order');
 
-const sortStart = source.indexOf('const sortCpuCapacityLegendRows');
-const sortEnd = source.indexOf('    const renderCpuCapacityLegendColumn', sortStart);
+const sortStart = moduleSource.indexOf('const sortRows');
+const sortEnd = moduleSource.indexOf('        const renderColumn', sortStart);
 const sortContext = {};
 sortContext.globalThis = sortContext;
 vm.createContext(sortContext);
-vm.runInContext(`let cpuCapacityLegendSortDirection = null;
-const cpuCapacityLegendOriginalOrders = new WeakMap();
-${source.slice(sortStart, sortEnd)}
-globalThis.setDirection = value => { cpuCapacityLegendSortDirection = value; };
+vm.runInContext(`let sortDirection = null;
+const originalOrders = new WeakMap();
+${moduleSource.slice(sortStart, sortEnd)}
+globalThis.setDirection = value => { sortDirection = value; };
 globalThis.setOriginalOrder = (parent, rows) => {
     const orders = new WeakMap();
     rows.forEach((row, index) => orders.set(row, index));
-    cpuCapacityLegendOriginalOrders.set(parent, { orders, next: rows.length });
+    originalOrders.set(parent, { orders, next: rows.length });
 };
-globalThis.sortRows = sortCpuCapacityLegendRows;`, sortContext);
+globalThis.sortRows = sortRows;`, sortContext);
 
 const parent = {
     rows: [],

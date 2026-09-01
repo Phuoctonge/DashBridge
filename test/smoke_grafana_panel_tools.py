@@ -5,6 +5,7 @@ from support.smoke import run_checks
 
 ROOT = Path(__file__).resolve().parent.parent
 COMMON = (ROOT / "js/content/grafana-panel-tools.js").read_text(encoding="utf-8") \
+    + (ROOT / "js/content/grafana-cpu-capacity-legend.js").read_text(encoding="utf-8") \
     + (ROOT / "js/content/grafana-panel-data-transforms.js").read_text(encoding="utf-8") \
     + (ROOT / "js/content/grafana-panel-data-runtime.js").read_text(encoding="utf-8") \
     + (ROOT / "js/content/grafana-panel-menu-runtime.js").read_text(encoding="utf-8")
@@ -188,7 +189,7 @@ checks = {
         and "collectCpuCapacityEntries" in COMMON
         and "dashbridge-vcpu-legend-cell" in COMMON
         and "syncCpuCapacityLegend" in COMMON
-        and "insertCpuCapacityLegendCell(headerRow, headerAnchor, 'vCPU', true)" in COMMON,
+        and "insertCell(headerRow, headerAnchor, 'vCPU', true)" in COMMON,
     "Dashboard exposes maximum and last-value series filter modes": "name=\"${key}Mode\" value=\"max\"" in PANEL_SETTINGS
         and "name=\"${key}Mode\" value=\"last\"" in PANEL_SETTINGS,
     "series threshold filter displays the detected unit": "panel-series-filter-unit" in PANEL_SETTINGS,

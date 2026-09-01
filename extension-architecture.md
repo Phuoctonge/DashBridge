@@ -112,6 +112,7 @@ grafana-panel-settings-modal.js
 bounded-journal.js
 grafana-network.js
 grafana-cpu-capacity-filter.js
+grafana-cpu-capacity-legend.js
 grafana-panel-capture-runtime.js
 grafana-panel-data-transforms.js
 grafana-panel-data-runtime.js
@@ -167,6 +168,7 @@ grafana-panel-tools.js
 | Настройки панели | `grafana-panel-settings-modal.js` | Direct Grafana, DashBridge. |
 | Allowlist легенды | `grafana-legend-selection.js` | Tools, карточки. |
 | Load по vCPU | `grafana-cpu-capacity-filter.js` | Transport pipeline. |
+| vCPU в легенде и отчёте | `grafana-cpu-capacity-legend.js` | MAIN: сопоставление series с capacity, колонка/сортировка легенды и ограниченный remount observer; создаётся `grafana-panel-tools.js`, который сохраняет порядок reflow/threshold и владеет cleanup поколения. |
 | Compact renderer | `grafana-compact-layout.js` | Capture prepare/restore. |
 | Panel capture lifecycle | `grafana-panel-capture-runtime.js` | MAIN: временная перестройка панели, Batch API, ожидание результата и гарантированный restore; создаётся `grafana-panel-tools.js`. |
 | Panel response transforms | `grafana-panel-data-transforms.js` | MAIN: CPU/RAM conversion, Table/series collection, threshold/vCPU extraction и response filtering без собственного transport lifecycle. |

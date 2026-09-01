@@ -26,6 +26,7 @@
         'js/shared/bounded-journal.js',
         'js/content/grafana-network.js',
         'js/content/grafana-cpu-capacity-filter.js',
+        'js/content/grafana-cpu-capacity-legend.js',
         'js/content/grafana-panel-capture-runtime.js',
         'js/content/grafana-panel-data-transforms.js',
         'js/content/grafana-panel-data-runtime.js',
