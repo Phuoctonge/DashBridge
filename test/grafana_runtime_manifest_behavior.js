@@ -24,10 +24,14 @@ assert(iframeScripts.indexOf('js/shared/grafana-panel-bootstrap.js') >= 0
 const basePathMatches = Array.from(context.DashBridgeGrafanaRuntimeManifest.matchesForHostname('grafana.test'));
 assert(basePathMatches.includes('*://grafana.test/*/d/*'));
 const background = fs.readFileSync(path.join(__dirname, '..', 'js', 'background.js'), 'utf8');
+const backgroundInfrastructure = fs.readFileSync(
+    path.join(__dirname, '..', 'js', 'background-grafana-infrastructure.js'), 'utf8'
+);
 const panelTools = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-panel-tools.js'), 'utf8');
-assert(background.includes('async function backfillOpenGrafanaFrames()'));
-assert(background.includes("loaded: window.__dashbridgePanelToolsRuntimeLoaded === true"));
-assert(background.includes('frameIds: [...new Set(missingFrameIds)]'));
+assert(background.includes("'background-grafana-infrastructure.js'"));
+assert(backgroundInfrastructure.includes('const backfillOpenFrames = async () =>'));
+assert(backgroundInfrastructure.includes("loaded: window.__dashbridgePanelToolsRuntimeLoaded === true"));
+assert(backgroundInfrastructure.includes('frameIds: [...new Set(frameIds)]'));
 assert(panelTools.includes('window.__dashbridgePanelToolsLifecycle?.cleanup?.()'));
 assert(panelTools.includes("document.removeEventListener('dashbridgeGrafanaMenuScopeChanged', syncPanelMenuScope)"));
 console.log('PASS Grafana MAIN runtime has one ordered installer and no static all-URL bundle');

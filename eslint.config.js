@@ -25,7 +25,8 @@ const webGlobals = readonly([
 ]);
 
 const extensionRuntimeGlobals = readonly([
-    'Chart', 'JSZip', 'DashBridgeArchiveBudget', 'DashBridgeBackgroundGuiCapture', 'DashBridgeBatchCaptureWindowRunner',
+    'Chart', 'JSZip', 'DashBridgeArchiveBudget', 'DashBridgeBackgroundGrafanaInfrastructure',
+    'DashBridgeBackgroundGuiCapture', 'DashBridgeBatchCaptureWindowRunner',
     'DashBridgeBatchPageState', 'DashBridgeBatchPanelRules', 'DashBridgeCaptureOutput',
     'DashBridgeComparisonXlsx', 'DashBridgeDashflowExport', 'DashBridgeDashflowIo',
     'DashBridgeDataMigration', 'DashBridgeFlowCompare', 'DashBridgeFlowSchema',

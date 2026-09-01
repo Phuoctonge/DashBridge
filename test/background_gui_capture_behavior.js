@@ -8,6 +8,11 @@ const chrome = {
         onRemoved: { addListener() {} },
         onUpdated: { addListener() {}, removeListener() {} },
         captureVisibleTab: async () => 'data:image/png;base64,AA==',
+        query: async () => [],
+    },
+    scripting: {
+        getRegisteredContentScripts: async () => [], registerContentScripts: async () => {},
+        unregisterContentScripts: async () => {}, executeScript: async () => [],
     },
     windows: { create: async () => ({}), update: async () => {}, remove: async () => {} },
     downloads: { download: async () => 1 },
@@ -17,7 +22,10 @@ const chrome = {
         local: { set: async () => {} },
         onChanged: { addListener() {} }
     },
-    declarativeNetRequest: { getDynamicRules: async () => [], updateDynamicRules: async () => {} },
+    declarativeNetRequest: {
+        getDynamicRules: async () => [], updateDynamicRules: async () => {},
+        getSessionRules: async () => [], updateSessionRules: async () => {},
+    },
     runtime: {
         id: 'extension-id', getURL: path => `chrome-extension://extension-id/${path || ''}`,
         onInstalled: { addListener() {} }, onStartup: { addListener() {} }, onMessage: { addListener(listener) { messageListener = listener; } }
@@ -27,11 +35,17 @@ const context = {
     chrome, importScripts() {}, console, setTimeout, clearTimeout, URL, Date, Uint8Array,
     fetch: async () => ({ blob: async () => ({ size: 1 }) }),
     DashBridgeGrafanaRuntimeManifest: { files: [], matchesForHostname: () => [] },
+    DashBridgeDnrRules: { planSessionRules: () => ({
+        rules: [], desiredRuleCount: 0, omittedRuleCount: 0, truncated: false, maxRules: 4000,
+    }) },
     JSZip: function JSZip() {},
     getGrafanaSettingsDefaults: () => ({ grafanaIframeDomains: [] }),
     normalizeHttpHost: value => String(value).toLowerCase(),
+    parseHttpUrl: value => { try { return new URL(`https://${value}`); } catch { return null; } },
     btoa: value => Buffer.from(value, 'binary').toString('base64')
 };
+vm.runInNewContext(fs.readFileSync('js/background-grafana-infrastructure.js', 'utf8'), context,
+    { filename: 'background-grafana-infrastructure.js' });
 vm.runInNewContext(fs.readFileSync('js/background-gui-capture.js', 'utf8'), context, { filename: 'background-gui-capture.js' });
 vm.runInNewContext(fs.readFileSync('js/background.js', 'utf8'), context, { filename: 'background.js' });
 
@@ -40,7 +54,9 @@ const waitForGuiCaptureReady = guiCaptureController.waitForReady;
 const reserveGuiCaptureBytes = context.DashBridgeBackgroundGuiCapture.reserveBytes;
 const assertGuiCaptureArchiveSize = context.DashBridgeBackgroundGuiCapture.assertArchiveSize;
 const isTrustedExtensionPage = vm.runInContext('isTrustedExtensionPage', context);
-const isTrustedGrafanaContentSender = vm.runInContext('isTrustedGrafanaContentSender', context);
+const isTrustedGrafanaContentSender = vm.runInContext(
+    'sender => grafanaInfrastructure.isTrustedContentSender(sender)', context
+);
 assert.strictEqual(typeof waitForGuiCaptureReady, 'function', 'background must expose a tab-scoped GUI-ready waiter');
 assert.strictEqual(reserveGuiCaptureBytes(5, 4, 10), 9);
 assert.throws(() => reserveGuiCaptureBytes(5, 6, 10), /безопасный лимит/);

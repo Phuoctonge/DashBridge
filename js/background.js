@@ -6,14 +6,8 @@
 //     chrome.windows.create({ url: "pages/popup/popup.html", type: "popup", width: 300, height: 400 });
 // });
 
-importScripts('../vendor/jszip.min.js', 'shared/grafana-settings.js', 'shared/url-validation.js', 'shared/dnr-rules.js', 'shared/grafana-runtime-manifest.js', 'shared/local-state-schema.js', 'shared/grafana-panel-identity.js', 'background-gui-capture.js');
+importScripts('../vendor/jszip.min.js', 'shared/grafana-settings.js', 'shared/url-validation.js', 'shared/dnr-rules.js', 'shared/grafana-runtime-manifest.js', 'shared/local-state-schema.js', 'shared/grafana-panel-identity.js', 'background-grafana-infrastructure.js', 'background-gui-capture.js');
 
-const LEGACY_GRAFANA_RULE_ID_START = 1000;
-const LEGACY_GRAFANA_RULE_ID_END = 1099;
-const GRAFANA_SESSION_RULE_ID_START = 2000;
-const GRAFANA_SESSION_RULE_LIMIT = 4000;
-const GRAFANA_MAIN_SCRIPT_ID = 'dashbridge-grafana-main-runtime-v1';
-const GRAFANA_MAIN_RUNTIME_FILES = DashBridgeGrafanaRuntimeManifest.files;
 const GRAFANA_TAB_VISUAL_STATE_PREFIX = 'grafanaVisualState:';
 const STORAGE_COMMIT_KEYS = new Set([
     'dashbridge_profiles', 'dashbridge_activeProfileId',
@@ -126,7 +120,7 @@ async function saveGrafanaPanelToProfile(message, sender) {
         throw new Error('Недоверенный запрос сохранения панели.');
     }
     const source = new URL(sender.url);
-    const allowedHosts = await getGrafanaIframeHosts();
+    const allowedHosts = await grafanaInfrastructure.getHosts();
     if (!['http:', 'https:'].includes(source.protocol)
         || !allowedHosts.some(host => host === source.host.toLowerCase() || host === source.hostname.toLowerCase())) {
         throw new Error('Этот домен Grafana не разрешён в настройках DashBridge.');
@@ -193,191 +187,25 @@ chrome.tabs.onRemoved.addListener(tabId => {
     if (!chrome.storage.session) return;
     chrome.storage.session.remove(`${GRAFANA_TAB_VISUAL_STATE_PREFIX}${tabId}`)
         .catch(error => console.warn('Failed to remove Grafana tab visual state:', error));
-    queueGrafanaIframeRulesSync().catch(error => console.warn('Failed to remove Grafana iframe tab rules:', error));
+    grafanaInfrastructure.queueRulesSync()
+        .catch(error => console.warn('Failed to remove Grafana iframe tab rules:', error));
 });
 
-function normalizeGrafanaIframeHost(value) {
-    return normalizeHttpHost(value);
-}
-
-async function getGrafanaIframeHosts() {
-    const { grafanaIframeDomains = getGrafanaSettingsDefaults().grafanaIframeDomains } = await chrome.storage.sync.get('grafanaIframeDomains');
-    return [...new Set((Array.isArray(grafanaIframeDomains) ? grafanaIframeDomains : [])
-        .map(normalizeGrafanaIframeHost)
-        .filter(Boolean))].slice(0, 100);
-}
-
-async function isTrustedGrafanaContentSender(sender) {
-    if (sender?.id !== chrome.runtime.id || !sender.tab || sender.frameId !== 0
-        || typeof sender.url !== 'string') return false;
-    let url;
-    try { url = new URL(sender.url); } catch { return false; }
-    if (!['http:', 'https:'].includes(url.protocol)
-        || !/(?:^|\/)d(?:-solo)?(?:\/|$)/.test(url.pathname)) return false;
-    const allowedHosts = await getGrafanaIframeHosts();
-    return allowedHosts.some(host => host === url.host.toLowerCase() || host === url.hostname.toLowerCase());
-}
-
-async function syncGrafanaMainRuntimeRegistration() {
-    const hosts = await getGrafanaIframeHosts();
-    const hostnames = [...new Set(hosts.map(host => parseHttpUrl(host)?.hostname.toLowerCase()).filter(Boolean))];
-    const matches = hostnames.flatMap(DashBridgeGrafanaRuntimeManifest.matchesForHostname);
-    const existing = await chrome.scripting.getRegisteredContentScripts({ ids: [GRAFANA_MAIN_SCRIPT_ID] });
-    const current = existing[0];
-    const sameList = (left, right) => JSON.stringify([...(left || [])].sort()) === JSON.stringify([...(right || [])].sort());
-    if (current
-        && sameList(current.matches, matches)
-        && sameList(current.js, GRAFANA_MAIN_RUNTIME_FILES)
-        && current.allFrames === true
-        && current.runAt === 'document_start'
-        && current.world === 'MAIN') {
-        return { matchCount: matches.length, unchanged: true };
-    }
-    if (existing.length) await chrome.scripting.unregisterContentScripts({ ids: [GRAFANA_MAIN_SCRIPT_ID] });
-    if (!matches.length) return { matchCount: 0 };
-    await chrome.scripting.registerContentScripts([{
-        id: GRAFANA_MAIN_SCRIPT_ID,
-        matches,
-        js: GRAFANA_MAIN_RUNTIME_FILES,
-        allFrames: true,
-        runAt: 'document_start',
-        world: 'MAIN',
-        persistAcrossSessions: true
-    }]);
-    return { matchCount: matches.length };
-}
-
-let grafanaRuntimeRegistrationQueue = Promise.resolve();
-function queueGrafanaRuntimeRegistrationSync() {
-    grafanaRuntimeRegistrationQueue = grafanaRuntimeRegistrationQueue
-        .catch(() => undefined).then(syncGrafanaMainRuntimeRegistration);
-    return grafanaRuntimeRegistrationQueue;
-}
-
-function isAllowedGrafanaFrameUrl(value, allowedHostnames) {
-    let url;
-    try { url = new URL(value); } catch { return false; }
-    return ['http:', 'https:'].includes(url.protocol)
-        && allowedHostnames.has(url.hostname.toLowerCase())
-        && /(?:^|\/)d(?:-solo)?(?:\/|$)/.test(url.pathname);
-}
-
-async function backfillOpenGrafanaFrames() {
-    const hosts = await getGrafanaIframeHosts();
-    const allowedHostnames = new Set(hosts
-        .map(host => parseHttpUrl(host)?.hostname.toLowerCase())
-        .filter(Boolean));
-    if (!allowedHostnames.size) return { scannedTabs: 0, injectedFrames: 0, failedTabs: 0 };
-    const tabs = await chrome.tabs.query({});
-    let scannedTabs = 0;
-    let injectedFrames = 0;
-    let failedTabs = 0;
-    for (const tab of tabs) {
-        if (!Number.isInteger(tab.id)) continue;
-        scannedTabs += 1;
-        try {
-            const probes = await chrome.scripting.executeScript({
-                target: { tabId: tab.id, allFrames: true },
-                world: 'MAIN',
-                func: () => ({
-                    url: location.href,
-                    loaded: window.__dashbridgePanelToolsRuntimeLoaded === true,
-                    captureOutputReady: typeof window.DashBridgeGrafanaCaptureOutput?.fitPreparedSize === 'function'
-                })
-            });
-            const missingFrameIds = probes
-                .filter(probe => isAllowedGrafanaFrameUrl(probe.result?.url, allowedHostnames)
-                    && (probe.result?.loaded !== true || probe.result?.captureOutputReady !== true))
-                .map(probe => probe.frameId)
-                .filter(Number.isInteger);
-            if (!missingFrameIds.length) continue;
-            const target = { tabId: tab.id, frameIds: [...new Set(missingFrameIds)] };
-            await chrome.scripting.executeScript({
-                target, world: 'MAIN',
-                func: () => { window.__dashbridgePanelToolsAllowTop = true; }
-            });
-            await chrome.scripting.executeScript({ target, world: 'MAIN', files: GRAFANA_MAIN_RUNTIME_FILES });
-            injectedFrames += target.frameIds.length;
-        } catch (_) {
-            // Browser-internal and discarded tabs are not scriptable. A later
-            // navigation is still covered by the persistent registration.
-            failedTabs += 1;
-        }
-    }
-    return { scannedTabs, injectedFrames, failedTabs };
-}
-
-async function getDashBridgeTabIds() {
-    const dashbridgeUrl = chrome.runtime.getURL('pages/dashbridge/dashbridge.html');
-    const tabs = await chrome.tabs.query({});
-    return tabs.filter(tab => typeof tab.url === 'string' && tab.url.startsWith(dashbridgeUrl))
-        .map(tab => tab.id).filter(Number.isInteger);
-}
-
-async function removeLegacyGrafanaIframeRules() {
-    const dynamicRules = await chrome.declarativeNetRequest.getDynamicRules();
-    const removeRuleIds = dynamicRules
-        .filter(rule => rule.id >= LEGACY_GRAFANA_RULE_ID_START && rule.id <= LEGACY_GRAFANA_RULE_ID_END)
-        .map(rule => rule.id);
-    if (removeRuleIds.length) await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds });
-}
-
-async function syncGrafanaIframeRules() {
-    const [hosts, tabIds, existingRules] = await Promise.all([
-        getGrafanaIframeHosts(), getDashBridgeTabIds(), chrome.declarativeNetRequest.getSessionRules()
-    ]);
-    const removeRuleIds = existingRules
-        .filter(rule => rule.id >= GRAFANA_SESSION_RULE_ID_START && rule.id < GRAFANA_SESSION_RULE_ID_START + GRAFANA_SESSION_RULE_LIMIT)
-        .map(rule => rule.id);
-    const plan = DashBridgeDnrRules.planSessionRules(hosts, tabIds, {
-        startId: GRAFANA_SESSION_RULE_ID_START, maxRules: GRAFANA_SESSION_RULE_LIMIT
-    });
-    const addRules = plan.rules;
-    await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds, addRules });
-    // Remove broad legacy rules only after Chrome accepted the tab-scoped set.
-    await removeLegacyGrafanaIframeRules();
-    return {
-        ruleCount: addRules.length,
-        tabCount: tabIds.length,
-        hostCount: hosts.length,
-        desiredRuleCount: plan.desiredRuleCount,
-        omittedRuleCount: plan.omittedRuleCount,
-        truncated: plan.truncated,
-        maxRules: plan.maxRules,
-    };
-}
-
-let grafanaIframeRulesSyncQueue = Promise.resolve();
-
-function queueGrafanaIframeRulesSync() {
-    grafanaIframeRulesSyncQueue = grafanaIframeRulesSyncQueue
-        .catch(() => undefined)
-        .then(syncGrafanaIframeRules);
-    return grafanaIframeRulesSyncQueue;
-}
-
-async function syncGrafanaInfrastructure({ backfillOpenFrames = false } = {}) {
-    const registration = await queueGrafanaRuntimeRegistrationSync();
-    const backfill = backfillOpenFrames
-        ? await backfillOpenGrafanaFrames()
-        : { skipped: true, scannedTabs: 0, injectedFrames: 0, failedTabs: 0 };
-    const rules = await queueGrafanaIframeRulesSync();
-    return { registration, backfill, rules };
-}
+const grafanaInfrastructure = DashBridgeBackgroundGrafanaInfrastructure.create();
 
 chrome.runtime.onInstalled.addListener(() => {
-    syncGrafanaInfrastructure({ backfillOpenFrames: true })
+    grafanaInfrastructure.sync({ backfillOpenFrames: true })
         .catch(error => console.error('Не удалось подготовить инфраструктуру Grafana:', error));
 });
 
 chrome.runtime.onStartup.addListener(() => {
-    syncGrafanaInfrastructure({ backfillOpenFrames: true })
+    grafanaInfrastructure.sync({ backfillOpenFrames: true })
         .catch(error => console.error('Не удалось подготовить инфраструктуру Grafana:', error));
 });
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === 'sync' && changes.grafanaIframeDomains) {
-        syncGrafanaInfrastructure({ backfillOpenFrames: true })
+        grafanaInfrastructure.sync({ backfillOpenFrames: true })
             .catch(error => console.error('Не удалось подготовить инфраструктуру Grafana:', error));
     }
 });
@@ -391,7 +219,7 @@ const guiCaptureController = DashBridgeBackgroundGuiCapture.create({ zipConstruc
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message?.type === 'dashbridge-capture-visible-tab') {
         (async () => {
-            if (!await isTrustedGrafanaContentSender(_sender) || !_sender.tab?.windowId) {
+            if (!await grafanaInfrastructure.isTrustedContentSender(_sender) || !_sender.tab?.windowId) {
                 throw new Error('Недоверенный запрос снимка Grafana.');
             }
             return guiCaptureController.captureVisiblePanel(_sender);
@@ -401,7 +229,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }
     if (message?.type === 'dashbridge-download-panel-capture') {
         (async () => {
-            if (!await isTrustedGrafanaContentSender(_sender)
+            if (!await grafanaInfrastructure.isTrustedContentSender(_sender)
                 || typeof message.dataUrl !== 'string'
                 || !message.dataUrl.startsWith('data:image/png;base64,')) {
                 throw new Error('Недоверенный запрос сохранения снимка Grafana.');
@@ -443,7 +271,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             sendResponse({ ok: false, error: 'Unexpected sender' });
             return undefined;
         }
-        syncGrafanaInfrastructure()
+        grafanaInfrastructure.sync()
             .then(details => sendResponse({
                 ok: !details.rules.truncated,
                 ...details.rules,
