@@ -7,6 +7,7 @@ const vm = require('vm');
 const domSource = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-dom.js'), 'utf8');
 const visualSource = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-report-snapshot.js'), 'utf8');
 const toolsSource = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-panel-tools.js'), 'utf8')
+    + fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-panel-data-transforms.js'), 'utf8')
     + fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-panel-data-runtime.js'), 'utf8');
 const row = name => ({ querySelector: () => ({ textContent: name }) });
 const rows = [row('Name'), row('GET /login'), row('POST /payment'), row('GET /login')];

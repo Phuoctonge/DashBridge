@@ -519,19 +519,19 @@ const E2E_FEATURE_REGISTRY = [
     },
     {
         id: 'invertIdle', name: 'CPU Idle → Load', description: 'Преобразует CPU Idle в вычисленную загрузку и проверяет исходные данные после выключения.',
-        sourceFile: 'js/content/grafana-panel-data-runtime.js', sourceSymbol: 'transformCpuData',
+        sourceFile: 'js/content/grafana-panel-data-transforms.js', sourceSymbol: 'transformCpuData',
         on: { transformSettings: { invertIdle: true } }, off: { transformSettings: { invertIdle: false } },
         invariant: matrixInvariants.invertIdleOn, inactive: matrixInvariants.invertIdleOff,
     },
     {
         id: 'convertMemToUsed', name: 'RAM → % Used', description: 'Пересчитывает память в процент использования и проверяет возврат исходных серий.',
-        sourceFile: 'js/content/grafana-panel-data-runtime.js', sourceSymbol: 'transformMemData',
+        sourceFile: 'js/content/grafana-panel-data-transforms.js', sourceSymbol: 'transformMemData',
         on: { transformSettings: { convertMemToUsed: true } }, off: { transformSettings: { convertMemToUsed: false } },
         invariant: matrixInvariants.convertMemOn, inactive: matrixInvariants.convertMemOff,
     },
     {
         id: 'seriesQueryFilter', name: 'Фильтр отображаемых серий', description: 'Фильтрует данные до renderer, включая допустимый пустой результат, и проверяет возврат полного ответа.',
-        sourceFile: 'js/content/grafana-panel-data-runtime.js', sourceSymbol: 'filterSeriesByThreshold',
+        sourceFile: 'js/content/grafana-panel-data-transforms.js', sourceSymbol: 'filterSeriesByThreshold',
         on: { transformSettings: { seriesQueryFilterEnabled: true, seriesQueryFilterValue: Number.MAX_SAFE_INTEGER, seriesQueryFilterRawValue: Number.MAX_SAFE_INTEGER, seriesQueryFilterMode: 'max' } },
         off: { transformSettings: { seriesQueryFilterEnabled: false } }, invariant: matrixInvariants.seriesFilterOn, inactive: matrixInvariants.seriesFilterOff,
     },

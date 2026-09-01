@@ -5,6 +5,7 @@ const path = require('path');
 const vm = require('vm');
 
 const panelTools = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-panel-tools.js'), 'utf8')
+    + fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-panel-data-transforms.js'), 'utf8')
     + fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-panel-data-runtime.js'), 'utf8');
 const cpuFilter = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-cpu-capacity-filter.js'), 'utf8');
 

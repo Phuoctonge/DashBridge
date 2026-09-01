@@ -5,6 +5,7 @@ from support.smoke import run_checks
 
 ROOT = Path(__file__).resolve().parent.parent
 COMMON = (ROOT / "js/content/grafana-panel-tools.js").read_text(encoding="utf-8") \
+    + (ROOT / "js/content/grafana-panel-data-transforms.js").read_text(encoding="utf-8") \
     + (ROOT / "js/content/grafana-panel-data-runtime.js").read_text(encoding="utf-8") \
     + (ROOT / "js/content/grafana-panel-menu-runtime.js").read_text(encoding="utf-8")
 PANEL_STATE = (ROOT / "js/content/grafana-panel-state.js").read_text(encoding="utf-8")

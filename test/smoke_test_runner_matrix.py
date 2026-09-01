@@ -20,6 +20,7 @@ UI = "\n".join((ROOT / f"pages/test-runner/{name}").read_text(encoding="utf-8") 
 ])
 REPORT = (ROOT / "pages/test-runner/test-runner-report.js").read_text(encoding="utf-8")
 PANEL_TOOLS = (ROOT / "js/content/grafana-panel-tools.js").read_text(encoding="utf-8") \
+    + (ROOT / "js/content/grafana-panel-data-transforms.js").read_text(encoding="utf-8") \
     + (ROOT / "js/content/grafana-panel-data-runtime.js").read_text(encoding="utf-8")
 GRAFANA_DOM = (ROOT / "js/content/grafana-dom.js").read_text(encoding="utf-8")
 VISUAL_ENGINE = (ROOT / "js/content/grafana-visual-engine.js").read_text(encoding="utf-8") \

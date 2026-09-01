@@ -4,7 +4,7 @@ const assert = require('assert');
 const fs = require('fs');
 const vm = require('vm');
 
-const source = fs.readFileSync('js/content/grafana-panel-data-runtime.js', 'utf8');
+const source = fs.readFileSync('js/content/grafana-panel-data-transforms.js', 'utf8');
 const match = source.match(/        const restoreMemByteUnit = data => \{[\s\S]*?\n        \};/);
 assert(match, 'restoreMemByteUnit implementation must exist');
 

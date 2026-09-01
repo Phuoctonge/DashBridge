@@ -11,6 +11,7 @@ const context = {
 };
 context.globalThis = context;
 vm.createContext(context);
+vm.runInContext(fs.readFileSync('js/content/grafana-panel-data-transforms.js', 'utf8'), context);
 vm.runInContext(fs.readFileSync('js/content/grafana-panel-data-runtime.js', 'utf8'), context);
 
 const tools = {

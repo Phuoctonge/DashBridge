@@ -8,6 +8,9 @@ const source = fs.readFileSync(
     path.join(__dirname, '..', 'js', 'content', 'grafana-panel-tools.js'),
     'utf8'
 ) + fs.readFileSync(
+    path.join(__dirname, '..', 'js', 'content', 'grafana-panel-data-transforms.js'),
+    'utf8'
+) + fs.readFileSync(
     path.join(__dirname, '..', 'js', 'content', 'grafana-panel-data-runtime.js'),
     'utf8'
 );
