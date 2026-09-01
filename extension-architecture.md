@@ -192,7 +192,8 @@ grafana-panel-tools.js
 | Batch main run | `batch-main-run-controller.js` | Валидация и последовательный сбор полного dashboard, panel rules, PNG/ZIP manifest и частичный результат через общий operation lifecycle. |
 | Batch Series discovery | `batch-series-discovery-controller.js` | Dashboard API/query signatures, временная Grafana-вкладка, ранний MAIN capture, bounded settle/timeout, abort cleanup и fallback `panel-ID`/numeric ID. |
 | Batch Series run | `batch-series-run-controller.js` | Group/standalone selection, legend filtering, sequential capture, ZIP manifest, partial result и cleanup discovery tab через общий operation lifecycle. |
-| Recorder network capture | `recorder-network-capture.js` | CDP request/response correlation, bounded body/stream/page capture и completeness; session attach/detach остаётся в `recorder.js`. |
+| Recorder network capture | `recorder-network-capture.js` | CDP request/response correlation, bounded body/stream/page capture и completeness; session transport передаётся явно. |
+| Recorder session transport | `recorder-session-transport.js` | Lifecycle port/heartbeat, CDP attach/detach/configuration, controlled/incognito window и scoped scenario injection. |
 | Recorder replay | `recorder-replay.js` | `recorder.js`; step normalization/execution, navigation and network-idle waits. |
 | Анализ CPU/RAM | `grafana-panel-analysis.js` | Расчёт, thresholds и clipboard-формат кнопок CPU Usage/Memory. |
 | Grafana time | `grafana-time.js` | DashBridge, iframe. |
@@ -451,7 +452,8 @@ Batch использует отдельное окно, ждёт нужную п
 
 ### Traffic Recorder
 
-`pages/recorder/recorder.html` владеет жизненным циклом контролируемой вкладки и CDP attach.
+`pages/recorder/recorder.html` загружает session transport, который владеет
+контролируемой вкладкой и CDP attach/detach.
 Lifecycle-port с heartbeat удерживает service worker доступным для аварийного
 detach, если Recorder закрыт или перезагружен.
 Обобщённый `scenario-recorder.js` динамически инжектируется только в эту
@@ -471,13 +473,16 @@ memory/body budget и создаёт DEFLATE-контейнер. При импо
 результата он проверяет ZIP-структуру, распакованные размеры, schema, пути тел,
 суммарные лимиты и SHA-256. `recorder-view.js` владеет DOM-rendering сценария,
 трафика, деталей запроса и сравнения, включая редактирование чувствительных
-значений и ограниченный render-cycle. `recorder.js` сохраняет CDP/session/
-download lifecycle и применяет подготовленный импорт к живому state только
-после успешного завершения всех проверок.
+значений и ограниченный render-cycle. `recorder-session-transport.js` владеет
+lifecycle-port, CDP attach/detach, controlled/incognito window и scoped
+injection. `recorder.js` сохраняет Start/Stop/session/download orchestration и
+применяет подготовленный импорт к живому state только после успешного
+завершения всех проверок.
 `recorder-replay.js` владеет replay lifecycle: нормализует шаги, ожидает DOM,
 навигацию и network idle, проверяет отмену и завершает сравнение. Он получает
-live session/CDP зависимости явно от `recorder.js`, который остаётся владельцем
-контролируемой вкладки, debugger attach/detach и общего состояния сессии.
+live session/CDP зависимости явно от `recorder.js`; transport остаётся
+единственным владельцем контролируемой вкладки и debugger attach/detach, а
+`recorder.js` — владельцем общего состояния сессии и аварийной финализации.
 `recorder-dashflow-export.js` является чистой проекцией live CDP-запросов в
 канонический `network.json` и производный HAR 1.2: нормализует headers/cookies,
 query, body metadata, timings, cache/TLS/initiator и страницы сценария, не

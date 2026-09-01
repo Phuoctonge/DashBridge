@@ -116,7 +116,7 @@ assert(recorderCss.includes('.comparison-controls > :not(.sr-only) { flex: 1 1 1
     'comparison controls must fill narrow layouts without overflow');
 assert(recorderCss.includes('.network-switches { display: grid; grid-template-columns: minmax(0,1fr);'),
     'cache and cookie switches must be arranged vertically');
-for (const asset of ['vendor/jszip.min.js', 'js/shared/dashflow-schema.js', 'js/shared/dashflow-compare.js', 'js/shared/dashflow-xlsx.js', '../shared/operation-progress-window.js', 'recorder-dashflow-export.js', 'recorder-dashflow-io.js', 'recorder-view.js', 'recorder-replay.js', 'recorder-network-capture.js', 'recorder.js']) {
+for (const asset of ['vendor/jszip.min.js', 'js/shared/dashflow-schema.js', 'js/shared/dashflow-compare.js', 'js/shared/dashflow-xlsx.js', '../shared/operation-progress-window.js', 'recorder-dashflow-export.js', 'recorder-dashflow-io.js', 'recorder-view.js', 'recorder-replay.js', 'recorder-session-transport.js', 'recorder-network-capture.js', 'recorder.js']) {
     assert(html.includes(asset), `recorder page must load ${asset}`);
 }
 assert(html.indexOf('vendor/jszip.min.js') < html.indexOf('recorder.js'), 'JSZip must load before the recorder controller');
@@ -128,11 +128,14 @@ assert(html.indexOf('recorder-view.js') < html.indexOf('recorder.js'),
     'Recorder view must load before the lifecycle controller');
 assert(html.indexOf('recorder-network-capture.js') < html.indexOf('recorder.js'),
     'Recorder network capture must load before the session lifecycle controller');
+assert(html.indexOf('recorder-session-transport.js') < html.indexOf('recorder.js'),
+    'Recorder session transport must load before the session lifecycle controller');
 
 const recorder = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recorder.js'), 'utf8');
 const recorderView = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recorder-view.js'), 'utf8');
 const recorderReplay = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recorder-replay.js'), 'utf8');
 const recorderNetwork = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recorder-network-capture.js'), 'utf8');
+const recorderTransport = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recorder-session-transport.js'), 'utf8');
 const dashflowIo = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recorder-dashflow-io.js'), 'utf8');
 const dashflowExport = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recorder-dashflow-export.js'), 'utf8');
 assert(recorderNetwork.includes('Network.getResponseBody'), 'network recorder must capture response bodies through CDP');
@@ -161,8 +164,8 @@ assert(dashflowExport.includes('queryString = [...new URLRef(request.url).search
     && dashflowExport.includes('serverIPAddress') && dashflowExport.includes('_dashbridgeCdpTiming'),
     'derived HAR must include query parameters, connection endpoint and CDP timing metadata');
 assert(recorderNetwork.includes('Network.requestWillBeSentExtraInfo'), 'network recorder must retain auth/cookie request headers');
-assert(recorder.includes('Network.setCacheDisabled'), 'record and replay must bypass the browser cache');
-assert(recorder.includes('Network.setBypassServiceWorker'), 'record and replay must bypass Service Worker caches');
+assert(recorderTransport.includes('Network.setCacheDisabled'), 'record and replay must bypass the browser cache');
+assert(recorderTransport.includes('Network.setBypassServiceWorker'), 'record and replay must bypass Service Worker caches');
 assert(recorder.includes('isAllowedIncognitoAccess'), 'ephemeral cookies require explicit Chrome incognito access');
 assert(recorder.includes('incognitoSetup.hidden = !ui.disableCookies.checked || state.incognitoAllowed'), 'incognito setup button visibility must follow live permission state');
 assert(recorder.includes('cookies: требуется разрешение incognito'), 'network mode must not claim an incognito session before access is granted');
@@ -187,7 +190,7 @@ assert(recorderView.includes('200 - (performance.now() - lastRenderAt)'), 'live 
 assert(recorder.includes('DashBridgeOperationProgress?.create'), 'record and replay must expose the shared cancellable progress window');
 assert(recorderReplay.includes("title: 'Traffic Recorder · Replay'") && recorder.includes("unit: 'запросов'"),
     'progress window must distinguish recording traffic from replay steps');
-assert(recorder.includes('openPictureInPicture') && recorder.includes('function buildRecorderWindowLayout()') && recorder.includes('...(layout?.controlled || {})'),
+assert(recorder.includes('openPictureInPicture') && recorderTransport.includes('const buildWindowLayout = () =>') && recorderTransport.includes('...(layout?.controlled || {})'),
     'Recorder must use an always-on-top PiP controller without reserving space for a side popup');
 assert(!recorder.includes('operationProgressController?.open({') && !recorder.includes('layout.progress'),
     'Recorder must not open the removed popup side panel');
@@ -197,8 +200,8 @@ assert(recorderView.includes('→ navigate ${step._dashbridge.navigationUrl}'), 
 assert(recorderView.match(/→ navigate \$\{step\._dashbridge\.navigationUrl\}/g)?.length >= 2, 'steps sidebar and traffic groups must both expose action navigation');
 assert(recorderView.includes("String(url || '').toLowerCase().includes(fragment)"), 'comparison URL filter must match domains, paths and query parameters');
 assert(recorderView.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'), 'comparison export must download a real XLSX workbook');
-assert(recorder.includes('function postLifecycle(message)'), 'lifecycle messages must tolerate a disconnected extension port');
-assert(!recorder.includes("lifecyclePort.postMessage({ type: 'unbind' })"), 'cleanup must not write directly to a possibly disconnected port');
+assert(recorderTransport.includes('const postLifecycle = message =>'), 'lifecycle messages must tolerate a disconnected extension port');
+assert(!recorderTransport.includes("lifecyclePort.postMessage({ type: 'unbind' })"), 'cleanup must not write directly to a possibly disconnected port');
 assert(recorder.includes('state.importing') && dashflowIo.includes('const requests = new Map()'),
     'DashFlow import must validate into local state and disable concurrent controls before committing');
 assert(dashflowIo.includes('assertWorkingSet'), 'DashFlow import must cap the aggregate decompressed working set');
@@ -223,7 +226,7 @@ assert(!actionRecorder.includes('clientX') && !actionRecorder.includes('clientY'
 assert(actionRecorder.includes("['data-testid', 'data-test-id', 'data-qa', 'data-cy']")
     && actionRecorder.includes('accessibleName'),
     'new recordings must capture several stable semantic locator strategies');
-assert(recorder.includes('incognito: state.sessionOptions.disableCookies'), 'Disable Cookies must use an isolated off-the-record window');
+assert(recorderTransport.includes('incognito: state.sessionOptions.disableCookies'), 'Disable Cookies must use an isolated off-the-record window');
 assert(!/cookies\.(?:remove|set)|removeCookies/.test(recorder), 'Recorder must never delete or overwrite cookies in the normal user profile');
 assert(recorder.includes('containsSecrets'), 'the archive manifest must disclose sensitive content');
 assert(recorder.includes('.dashflow'), 'downloads must use the agreed recording extension');

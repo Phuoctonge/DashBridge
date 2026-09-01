@@ -36,6 +36,7 @@ before(dashbridgeHtml, 'dashbridge-panel-actions-controller.js', 'dashbridge.js'
 before(dashbridgeHtml, 'dashbridge-page-ui-controller.js', 'dashbridge.js');
 before(dashbridgeHtml, 'dashbridge-iframe-message-controller.js', 'dashbridge.js');
 before(recorderHtml, 'recorder-replay.js', 'recorder.js');
+before(recorderHtml, 'recorder-session-transport.js', 'recorder.js');
 before(recorderHtml, 'recorder-network-capture.js', 'recorder.js');
 before(batchHtml, 'batch-panel-rules-ui.js', 'batch.js');
 before(batchHtml, 'batch-operation-controller.js', 'batch.js');

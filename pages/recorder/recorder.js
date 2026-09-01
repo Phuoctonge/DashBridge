@@ -81,50 +81,9 @@
     };
 
     const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-    let lifecyclePort = null;
     let operationProgressController = null;
     let settingsSaveTimer = null;
     let sessionIndicatorTimer = null;
-
-    function connectLifecyclePort() {
-        try {
-            const port = chrome.runtime.connect({ name: 'dashbridge-recorder-lifecycle' });
-            lifecyclePort = port;
-            port.onDisconnect.addListener(() => {
-                void chrome.runtime.lastError;
-                if (lifecyclePort === port) lifecyclePort = null;
-            });
-            return port;
-        } catch (_) {
-            lifecyclePort = null;
-            return null;
-        }
-    }
-
-    function postLifecycle(message) {
-        try {
-            const wasConnected = Boolean(lifecyclePort);
-            const connected = lifecyclePort || connectLifecyclePort();
-            if (!connected) return false;
-            if (!wasConnected && state.attached && message?.type !== 'bind') {
-                connected.postMessage({ type: 'bind', tabId: state.tabId });
-            }
-            connected.postMessage(message);
-            return true;
-        } catch (_) {
-            lifecyclePort = null;
-            return false;
-        }
-    }
-
-    connectLifecyclePort();
-    setInterval(() => {
-        if (state.attached) {
-            postLifecycle({ type: 'heartbeat' });
-        }
-    }, 20_000);
-    const debuggerTarget = () => ({ tabId: state.tabId });
-    const sendCdp = (method, params = {}) => chrome.debugger.sendCommand(debuggerTarget(), method, params);
 
     function setStatus(message, error = false) {
         ui.status.textContent = message;
@@ -222,6 +181,14 @@
         return state.incognitoAllowed;
     }
 
+    const sessionTransport = DashBridgeRecorderSessionTransport.create({
+        state,
+        refreshIncognitoAccess,
+        cdpVersion: CDP_VERSION,
+        maxBodyBytes: MAX_BODY_BYTES,
+        maxRequestBodyBytes: MAX_REQUEST_BODY_BYTES,
+    });
+
     function recorderSettingsSnapshot() {
         return {
             startUrl: String(ui.startUrl.value || '').slice(0, 4096),
@@ -312,86 +279,6 @@
         scheduleRender();
     }
 
-    async function ensureDebuggerPermission() {
-        // Chrome does not permit `debugger` in optional_permissions. The API is
-        // declared at install time but is attached only from an explicit Record/Replay click.
-        return true;
-    }
-
-    async function attachNetwork(tabId) {
-        state.tabId = tabId;
-        await chrome.debugger.attach({ tabId }, CDP_VERSION);
-        state.attached = true;
-        postLifecycle({ type: 'bind', tabId });
-        await Promise.all([
-            sendCdp('Network.enable', {
-                maxTotalBufferSize: 100 * 1024 * 1024, maxResourceBufferSize: MAX_BODY_BYTES,
-                maxPostDataSize: MAX_REQUEST_BODY_BYTES,
-            }),
-            sendCdp('Page.enable'),
-        ]);
-        await sendCdp('Page.setLifecycleEventsEnabled', { enabled: true }).catch(() => undefined);
-        await Promise.all([
-            sendCdp('Network.setCacheDisabled', { cacheDisabled: state.sessionOptions.disableCache }),
-            sendCdp('Network.setBypassServiceWorker', { bypass: state.sessionOptions.disableCache }),
-        ]);
-    }
-
-    async function detachNetwork() {
-        if (!state.attached || !Number.isInteger(state.tabId)) return;
-        const target = { tabId: state.tabId };
-        state.attached = false;
-        state.detaching = true;
-        postLifecycle({ type: 'unbind' });
-        try { await chrome.debugger.detach(target).catch(() => undefined); }
-        finally { state.detaching = false; }
-    }
-
-    async function assertIncognitoReady() {
-        if (!state.sessionOptions.disableCookies) return;
-        const allowed = await refreshIncognitoAccess();
-        if (!allowed) {
-            throw new Error('Для Disable Cookies включите «Разрешить использование в режиме инкогнито» в настройках расширения Chrome');
-        }
-        const windows = await chrome.windows.getAll({ populate: false });
-        if (windows.some(windowInfo => windowInfo.incognito)) {
-            throw new Error('Закройте остальные окна инкогнито: Chrome использует для них общее cookie-хранилище');
-        }
-    }
-
-    function buildRecorderWindowLayout() {
-        const availableLeft = Number.isFinite(globalThis.screen?.availLeft) ? Math.round(globalThis.screen.availLeft) : 0;
-        const availableTop = Number.isFinite(globalThis.screen?.availTop) ? Math.round(globalThis.screen.availTop) : 0;
-        const availableWidth = Math.max(0, Math.round(Number(globalThis.screen?.availWidth) || 0));
-        const availableHeight = Math.max(0, Math.round(Number(globalThis.screen?.availHeight) || 0));
-        return {
-            controlled: availableWidth >= 720 && availableHeight >= 500 ? {
-                left: availableLeft, top: availableTop, width: availableWidth, height: availableHeight, state: 'normal'
-            } : null,
-        };
-    }
-
-    async function createControlledTab(layout = null) {
-        await assertIncognitoReady();
-        const created = await chrome.windows.create({
-            url: 'about:blank', type: 'normal', focused: true,
-            incognito: state.sessionOptions.disableCookies,
-            ...(layout?.controlled || {}),
-        });
-        const tab = created.tabs?.[0];
-        if (!Number.isInteger(created.id) || !Number.isInteger(tab?.id)) throw new Error('Не удалось открыть контролируемую вкладку');
-        state.windowId = created.id;
-        return tab.id;
-    }
-
-    async function injectActionRecorder() {
-        if (!['recording', 'replaying'].includes(state.mode) || !Number.isInteger(state.tabId)) return;
-        await chrome.scripting.executeScript({
-            target: { tabId: state.tabId, allFrames: true },
-            files: ['js/content/scenario-recorder.js'],
-        }).catch(() => undefined);
-    }
-
     function addNavigateStep(url, at = Date.now()) {
         const normalized = schema.normalizeHttpUrl(url);
         if (!normalized) return;
@@ -469,11 +356,11 @@
     const networkCapture = DashBridgeRecorderNetworkCapture.create({
         state,
         schema,
-        sendCdp,
+        sendCdp: sessionTransport.sendCdp,
         sha256,
         bodyBytes,
         addNavigateStep,
-        injectActionRecorder,
+        injectActionRecorder: sessionTransport.injectActionRecorder,
         scheduleRender,
         setStatus,
         limits: {
@@ -497,15 +384,15 @@
                 title: 'Traffic Recorder', phase: 'Запись трафика', width: 390, height: 300
             });
             void saveRecorderSettings().catch(() => undefined);
-            await ensureDebuggerPermission();
+            await sessionTransport.ensureDebuggerPermission();
             await stopActiveSession(false);
             resetSession();
             state.sessionOptions = { disableCache: ui.disableCache.checked, disableCookies: ui.disableCookies.checked };
             state.mode = 'recording'; state.startUrl = startUrl; state.createdAt = new Date().toISOString(); state.sessionStartedAt = Date.now();
             state.title = new URL(startUrl).hostname; updateControls();
-            const layout = buildRecorderWindowLayout();
-            const tabId = await createControlledTab(layout);
-            await attachNetwork(tabId);
+            const layout = sessionTransport.buildWindowLayout();
+            const tabId = await sessionTransport.createControlledTab(layout);
+            await sessionTransport.attachNetwork(tabId);
             addNavigateStep(startUrl);
             setStatus('Запись активна. Выполняйте сценарий в открывшейся вкладке.');
             await chrome.tabs.update(tabId, { url: startUrl });
@@ -538,7 +425,7 @@
                 state.completeness.requestBodiesFailed += 1;
             }
         }
-        await detachNetwork();
+        await sessionTransport.detachNetwork();
         state.captureFinishedAt = new Date().toISOString();
         const ephemeralWindowId = state.sessionOptions.disableCookies ? state.windowId : null;
         state.mode = 'idle';
@@ -576,7 +463,7 @@
         state.inFlight.clear();
         state.mode = 'idle'; state.sessionStartedAt = null;
         state.tabId = null; state.windowId = null;
-        postLifecycle({ type: 'unbind' });
+        sessionTransport.postLifecycle({ type: 'unbind' });
         operationProgressController?.finish({ status: 'error', message });
         setStatus(message, true); scheduleRender();
         if (Number.isInteger(ephemeralWindowId)) await chrome.windows.remove(ephemeralWindowId).catch(() => undefined);
@@ -748,12 +635,12 @@
         delay,
         networkIdleMs: NETWORK_IDLE_MS,
         networkIdleTimeoutMs: NETWORK_IDLE_TIMEOUT_MS,
-        ensureDebuggerPermission,
+        ensureDebuggerPermission: sessionTransport.ensureDebuggerPermission,
         stopActiveSession,
         resetSession,
-        buildRecorderWindowLayout,
-        createControlledTab,
-        attachNetwork,
+        buildRecorderWindowLayout: sessionTransport.buildWindowLayout,
+        createControlledTab: sessionTransport.createControlledTab,
+        attachNetwork: sessionTransport.attachNetwork,
         buildComparison,
         scheduleRender,
         setStatus,
@@ -794,7 +681,7 @@
     chrome.debugger.onDetach.addListener((source, reason) => {
         if (source.tabId !== state.tabId) return;
         state.attached = false;
-        postLifecycle({ type: 'unbind' });
+        sessionTransport.postLifecycle({ type: 'unbind' });
         if (state.detaching) return;
         void finalizeUnexpectedSession(`Chrome отключил запись трафика: ${reason}`, { debuggerDetached: true });
     });
@@ -809,7 +696,9 @@
         addRecordedAction(message.action, sender.frameId);
     });
     chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
-        if (tabId === state.tabId && changeInfo.status === 'complete') injectActionRecorder();
+        if (tabId === state.tabId && changeInfo.status === 'complete') {
+            sessionTransport.injectActionRecorder();
+        }
     });
     chrome.tabs.onRemoved.addListener(tabId => {
         if (tabId !== state.tabId) return;
