@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-visual-engine.js'), 'utf8');
+const source = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-report-snapshot.js'), 'utf8');
 const unitSource = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-unit.js'), 'utf8');
 const tableSource = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-table-report.js'), 'utf8');
 
@@ -59,7 +59,7 @@ assert.strictEqual(context.DashBridgeGrafanaTableReport, tableReport, 'reinstall
 assert(source.includes("engine = responseTableRecords.length ? 'table-response' : 'table-dom'")
     && source.includes('records = tableRecords;'),
     'report snapshots must use table rows when neither Flot nor uPlot exists');
-const collectorSource = source.slice(source.indexOf('const collectPanelReportSnapshot'), source.indexOf('const getThresholdDebug'));
+const collectorSource = source.slice(source.indexOf('const collectPanelReportSnapshot'));
 assert(collectorSource.indexOf('records = tableRecords;') < collectorSource.indexOf('const failureKinds = new Set')
     && collectorSource.includes("new Set(['http_error', 'network_error', 'decode_error', 'aborted'])"),
     'a visible Metric/Value table must be evaluated before a stale request failure is reported');

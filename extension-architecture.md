@@ -149,7 +149,8 @@ grafana-panel-tools.js
 | Определение панели и query signatures | `grafana-panel-definition.js` | Visual engine, panel tools, test runner. |
 | Разбор и согласование единиц Grafana | `grafana-unit.js` | Visual engine: axis/panel units, threshold, table report, uPlot/Flot. |
 | Чтение Grafana Table | `grafana-table-report.js` | Response frame shape, Visual engine report snapshot. |
-| uPlot/Flot visuals | `grafana-visual-engine.js` | Direct Grafana, DashBridge. |
+| uPlot/Flot visuals | `grafana-visual-engine.js` | Direct Grafana, DashBridge; стабильный facade и renderer lifecycle. |
+| Снимок данных панели для отчёта | `grafana-report-snapshot.js` | `grafana-visual-engine.js`; чистая агрегация Flot/uPlot/Table без собственного observer lifecycle. |
 | Настройки панели | `grafana-panel-settings-modal.js` | Direct Grafana, DashBridge. |
 | Allowlist легенды | `grafana-legend-selection.js` | Tools, карточки. |
 | Load по vCPU | `grafana-cpu-capacity-filter.js` | Transport pipeline. |

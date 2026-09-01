@@ -9,7 +9,7 @@ const toolsSource = fs.readFileSync(
     'utf8'
 );
 const visualSource = fs.readFileSync(
-    path.join(__dirname, '..', 'js', 'content', 'grafana-visual-engine.js'),
+    path.join(__dirname, '..', 'js', 'content', 'grafana-report-snapshot.js'),
     'utf8'
 );
 

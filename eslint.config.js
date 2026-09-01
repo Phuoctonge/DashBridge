@@ -31,7 +31,7 @@ const extensionRuntimeGlobals = readonly([
     'DashBridgeComparisonXlsx', 'DashBridgeDashflowExport', 'DashBridgeDashflowIo',
     'DashBridgeDataMigration', 'DashBridgeFlowCompare', 'DashBridgeFlowSchema',
     'DashBridgeGrafanaBatchPanelRules', 'DashBridgeGrafanaDashboardApi',
-    'DashBridgeGrafanaPanelIdentity', 'DashBridgeGrafanaRuntimeManifest',
+    'DashBridgeGrafanaPanelIdentity', 'DashBridgeGrafanaReportSnapshot', 'DashBridgeGrafanaRuntimeManifest',
     'DashBridgeGrafanaSettings', 'DashBridgeGrafanaTime', 'DashBridgeLocalStateSchema',
     'DashBridgeOperationProgress', 'DashBridgePanelDefinition', 'DashBridgeProfileStore',
     'DashBridgeReport', 'DashBridgeReportTransport', 'DashBridgeStorageWriter',
