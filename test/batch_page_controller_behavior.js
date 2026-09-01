@@ -15,12 +15,17 @@ class FakeElement {
         this.dataset = {};
         this.style = {};
         this.listeners = {};
+        this.children = [];
+        this.removed = false;
         this.classList = { add() {}, remove() {} };
     }
     addEventListener(type, listener) { this.listeners[type] = listener; }
     emit(type) { return this.listeners[type]?.({ target: this, currentTarget: this }); }
     replaceChildren() { this.replaced = true; }
     closest() { return { id: 'captureThemeMain' }; }
+    append(...children) { this.children.push(...children); }
+    appendChild(child) { this.children.push(child); }
+    remove() { this.removed = true; }
 }
 
 const ids = [
@@ -43,6 +48,8 @@ const themeDark = new FakeElement('themeDark');
 themeDark.value = 'dark';
 
 const documentRef = {
+    createElement: tag => new FakeElement(tag),
+    createTextNode: text => ({ textContent: text }),
     getElementById: id => elements[id] || null,
     querySelector(selector) {
         if (selector === '#captureThemeMain input:checked') {
@@ -58,19 +65,18 @@ const documentRef = {
         return [];
     },
 };
-const notifications = [];
-const logs = [];
 const stateCalls = [];
-const context = { document: documentRef };
+const timers = [];
+const context = {
+    document: documentRef,
+    setTimeout(callback) { timers.push(callback); return timers.length; },
+    Date,
+};
 context.globalThis = context;
 vm.createContext(context);
 vm.runInContext(fs.readFileSync('pages/batch/batch-page-controller.js', 'utf8'), context);
 
 const controller = context.BatchPageController.create({
-    pageUi: {
-        createNotifier: () => (...args) => notifications.push(args),
-        createLogger: () => (...args) => logs.push(args),
-    },
     pageState: {
         bind: () => stateCalls.push('bind'),
         restore: async () => { stateCalls.push('restore'); },
@@ -81,6 +87,21 @@ const controller = context.BatchPageController.create({
         : { ranges: [{ from: 'now-1h', to: 'now' }], errors: [] },
     documentRef,
 });
+
+controller.showToast('<unsafe>', 'unknown');
+assert.strictEqual(elements.toastContainer.children.length, 1);
+assert.strictEqual(elements.toastContainer.children[0].children[1].textContent, '<unsafe>');
+assert.match(elements.toastContainer.children[0].children[0].innerHTML, /toast-icon-info/);
+timers.shift()();
+assert.match(elements.toastContainer.children[0].style.animation, /toastFadeOut/);
+timers.shift()();
+assert.strictEqual(elements.toastContainer.children[0].removed, true);
+
+elements.logContainer.scrollHeight = 42;
+controller.logMessage('<failure>', true);
+assert.match(elements.logContainer.children[0].className, /log-error/);
+assert.strictEqual(elements.logContainer.children[0].children[1].textContent, ' <failure>');
+assert.strictEqual(elements.logContainer.scrollTop, 42);
 
 assert.strictEqual(controller.getCaptureTheme('captureThemeMain'), 'light');
 themeLight.checked = false;

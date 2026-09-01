@@ -2,7 +2,6 @@
 
 document.addEventListener("DOMContentLoaded", () => {
     const batchPageController = BatchPageController.create({
-        pageUi: BatchPageUi,
         pageState: BatchPageState,
         normalizeTimeRanges: normalizeGrafanaTimeRanges,
     });
