@@ -140,6 +140,7 @@ const recorderView = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recor
 const recorderReplay = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recorder-replay.js'), 'utf8');
 const recorderNetwork = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recorder-network-capture.js'), 'utf8');
 const recorderTransport = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recorder-session-transport.js'), 'utf8');
+const recorderSettings = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recorder-settings.js'), 'utf8');
 const recorderSession = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recorder-session-controller.js'), 'utf8');
 const recorderDashflow = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recorder-dashflow-controller.js'), 'utf8');
 const dashflowIo = fs.readFileSync(path.join(root, 'pages', 'recorder', 'recorder-dashflow-io.js'), 'utf8');
@@ -175,8 +176,8 @@ assert(recorderTransport.includes('Network.setBypassServiceWorker'), 'record and
 assert(recorder.includes('isAllowedIncognitoAccess'), 'ephemeral cookies require explicit Chrome incognito access');
 assert(recorder.includes('incognitoSetup.hidden = !ui.disableCookies.checked || state.incognitoAllowed'), 'incognito setup button visibility must follow live permission state');
 assert(recorder.includes('cookies: требуется разрешение incognito'), 'network mode must not claim an incognito session before access is granted');
-assert(recorder.includes('dashbridgeRecorderDraft'), 'Recorder must preserve its draft while Chrome reloads the extension for an incognito permission change');
-assert(recorder.includes('dashbridgeRecorderSettings') && recorder.includes('restoreRecorderSettings') && recorder.includes('scheduleRecorderSettingsSave'),
+assert(recorderSettings.includes('dashbridgeRecorderDraft'), 'Recorder must preserve its draft while Chrome reloads the extension for an incognito permission change');
+assert(recorderSettings.includes('dashbridgeRecorderSettings') && recorder.includes('restoreRecorderSettings') && recorder.includes('scheduleRecorderSettingsSave'),
     'Recorder must persist the site, Disable Cache and Disable Cookies choices between page openings');
 assert(recorderReplay.includes('performDomActionWithWait'), 'replay must wait for asynchronously rendered elements');
 assert(recorderReplay.includes('waitForExpectedNavigation'), 'replay must wait for navigation caused by a recorded click');

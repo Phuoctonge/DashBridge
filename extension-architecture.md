@@ -192,6 +192,7 @@ grafana-panel-tools.js
 | Batch Series run | `batch-series-run-controller.js` | Group/standalone selection, legend filtering, sequential capture, ZIP manifest, partial result и cleanup discovery tab через общий operation lifecycle. |
 | Recorder network capture | `recorder-network-capture.js` | CDP request/response correlation, bounded body/stream/page capture и completeness; session transport передаётся явно. |
 | Recorder session transport | `recorder-session-transport.js` | Lifecycle port/heartbeat, CDP attach/detach/configuration, controlled/incognito window и scoped scenario injection. |
+| Recorder settings | `recorder-settings.js` | Persistent site/network-mode settings, debounced save и one-shot draft восстановления после incognito permission reload. |
 | Recorder session orchestration | `recorder-session-controller.js` | Record Start/Stop, pending body settlement, ephemeral-window cleanup и аварийная финализация без владения CDP transport. |
 | Recorder DashFlow orchestration | `recorder-dashflow-controller.js` | Save preflight, manifest/network/HAR/body assembly, download URL lifecycle и atomic validated import commit. |
 | Recorder replay | `recorder-replay.js` | `recorder.js`; step normalization/execution, navigation and network-idle waits. |

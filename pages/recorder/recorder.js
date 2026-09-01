@@ -21,8 +21,6 @@
     const MAX_ACTION_VALUE = 1024 * 1024;
     const NETWORK_IDLE_MS = 650;
     const NETWORK_IDLE_TIMEOUT_MS = 15_000;
-    const RECORDER_DRAFT_KEY = 'dashbridgeRecorderDraft';
-    const RECORDER_SETTINGS_KEY = 'dashbridgeRecorderSettings';
 
     const ui = {
         startUrl: document.getElementById('startUrl'),
@@ -82,7 +80,6 @@
 
     const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     let operationProgressController = null;
-    let settingsSaveTimer = null;
     let sessionIndicatorTimer = null;
 
     function setStatus(message, error = false) {
@@ -189,47 +186,11 @@
         maxRequestBodyBytes: MAX_REQUEST_BODY_BYTES,
     });
 
-    function recorderSettingsSnapshot() {
-        return {
-            startUrl: String(ui.startUrl.value || '').slice(0, 4096),
-            disableCache: ui.disableCache.checked,
-            disableCookies: ui.disableCookies.checked,
-        };
-    }
-
-    async function saveRecorderSettings({ includeDraft = false } = {}) {
-        const settings = recorderSettingsSnapshot();
-        const values = { [RECORDER_SETTINGS_KEY]: settings };
-        if (includeDraft) values[RECORDER_DRAFT_KEY] = settings;
-        await chrome.storage.local.set(values);
-    }
-
-    function scheduleRecorderSettingsSave() {
-        clearTimeout(settingsSaveTimer);
-        settingsSaveTimer = setTimeout(() => {
-            settingsSaveTimer = null;
-            void saveRecorderSettings().catch(() => undefined);
-        }, 250);
-    }
-
-    async function saveRecorderDraft() {
-        await saveRecorderSettings({ includeDraft: true });
-    }
-
-    async function restoreRecorderSettings() {
-        try {
-            const stored = await chrome.storage.local.get([RECORDER_SETTINGS_KEY, RECORDER_DRAFT_KEY]);
-            const persistent = stored?.[RECORDER_SETTINGS_KEY];
-            const draft = stored?.[RECORDER_DRAFT_KEY];
-            const settings = draft && typeof draft === 'object' ? draft : persistent;
-            if (!settings || typeof settings !== 'object') return;
-            if (typeof settings.startUrl === 'string') ui.startUrl.value = settings.startUrl.slice(0, 4096);
-            if (typeof settings.disableCache === 'boolean') ui.disableCache.checked = settings.disableCache;
-            if (typeof settings.disableCookies === 'boolean') ui.disableCookies.checked = settings.disableCookies;
-            await saveRecorderSettings();
-            if (draft) await chrome.storage.local.remove(RECORDER_DRAFT_KEY);
-        } catch (_) { /* settings restoration is best-effort */ }
-    }
+    const recorderSettings = DashBridgeRecorderSettings.create({ ui });
+    const saveRecorderSettings = recorderSettings.save;
+    const scheduleRecorderSettingsSave = recorderSettings.schedule;
+    const saveRecorderDraft = recorderSettings.saveDraft;
+    const restoreRecorderSettings = recorderSettings.restore;
 
     const recorderView = DashBridgeRecorderView.create({
         ui,
@@ -574,7 +535,7 @@
     document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshIncognitoAccess(); });
     window.addEventListener('beforeunload', () => { if (state.attached && Number.isInteger(state.tabId)) chrome.debugger.detach({ tabId: state.tabId }).catch(() => undefined); });
     window.addEventListener('pagehide', () => {
-        clearTimeout(settingsSaveTimer);
+        recorderSettings.cancelScheduled();
         clearInterval(sessionIndicatorTimer);
         sessionIndicatorTimer = null;
         void saveRecorderSettings().catch(() => undefined);
