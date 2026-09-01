@@ -31,12 +31,6 @@ const {
     getProfilePanelIdentity,
     parseQuickPanelIds,
 } = window.DashBridgePanelUrl;
-const {
-    INVALID_PANELS_CODE,
-    createPanelExportPayload,
-    buildPanelExportFileName,
-    parsePanelImportText,
-} = window.DashBridgePanelTransfer;
 const dashBridgeProfileController = DashBridgeProfileController.create({
     profileStore: DashBridgeProfileStore,
     timeState: DashBridgeTimeState,
@@ -147,6 +141,22 @@ const dashBridgeDragController = DashBridgeDragController.create({
     savePanels,
 });
 const setupDashboardDragAndDrop = dashBridgeDragController.setup;
+const dashBridgePanelTransferController = DashBridgePanelTransferController.create({
+    transfer: window.DashBridgePanelTransfer,
+    showAlert,
+    showConfirm,
+    getPanels: () => panels,
+    setPanels: value => { panels = value; },
+    getProfiles: () => profiles,
+    getActiveProfile,
+    setTabActiveProfileId,
+    savePanels,
+    saveProfiles,
+    loadActiveProfileTimeState,
+    syncTimeControlsFromState,
+    renderProfileSwitcher,
+    renderDashboard,
+});
 
 // --- SVG-иконки ---
 const SVG_GRIP = `<svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" aria-hidden="true">
@@ -808,14 +818,7 @@ function setupEventListeners() {
         }
     });
 
-    document.getElementById('exportPanelsBtn').addEventListener('click', exportPanels);
-    const importInput = document.getElementById('importPanelsInput');
-    document.getElementById('importPanelsBtn').addEventListener('click', () => importInput.click());
-    importInput.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (file) importPanels(file);
-        importInput.value = '';
-    });
+    dashBridgePanelTransferController.setup();
 
     // --- ESC выходит из fullscreen ---
     document.addEventListener('keydown', (e) => {
@@ -910,87 +913,6 @@ function toggleFullscreen(id) {
         forceLoadPanel(id);
     }
     refreshPanelThresholdLayout(id);
-}
-
-async function exportPanels() {
-    if (panels.length === 0) { await showAlert('Нет панелей для экспорта.'); return; }
-    const profile = getActiveProfile();
-    const exportedAt = new Date().toISOString();
-    const data = createPanelExportPayload({ profile, panels, exportedAt });
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = buildPanelExportFileName(profile?.name, exportedAt);
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-}
-
-async function importPanels(file) {
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-        try {
-            const imported = parsePanelImportText(e.target.result, {
-                fallbackProfileName: file.name,
-                randomUUID: () => crypto.randomUUID(),
-            });
-            imported.warnings.forEach(error => {
-                console.warn('Пропущена некорректная импортируемая панель:', error);
-            });
-            const {
-                profileName,
-                timeState: importedTimeState,
-                report: importedReport,
-                panels: importedPanels,
-            } = imported;
-            if (importedPanels.length === 0) { await showAlert('В файле нет панелей с корректными настройками и URL.'); return; }
-
-            const choice = await showConfirm(
-                `Файл содержит ${importedPanels.length} панел(и).\n\n` +
-                `[OK] — Заменить панели текущего профиля\n` +
-                `[Отмена] — Создать новый профиль «${profileName}»`
-            );
-
-            if (choice) {
-                // Заменяем панели активного профиля
-                panels = importedPanels;
-                const activeProfile = getActiveProfile();
-                if (activeProfile && imported.hasTimeState) {
-                    activeProfile.timeState = importedTimeState;
-                    loadActiveProfileTimeState();
-                    syncTimeControlsFromState();
-                }
-                if (activeProfile && imported.hasReport) activeProfile.report = importedReport;
-                savePanels();
-                renderDashboard();
-            } else {
-                // Создаём новый профиль с импортированными панелями
-                const newProfile = {
-                    id: crypto.randomUUID(), name: profileName, panels: importedPanels,
-                    timeState: importedTimeState, report: importedReport
-                };
-                const currentProfile = getActiveProfile();
-                if (currentProfile) currentProfile.panels = panels;
-                profiles.push(newProfile);
-                setTabActiveProfileId(newProfile.id);
-                panels = importedPanels;
-                loadActiveProfileTimeState();
-                await saveProfiles();
-                renderProfileSwitcher();
-                syncTimeControlsFromState();
-                renderDashboard();
-            }
-        } catch (err) {
-            if (err?.code === INVALID_PANELS_CODE) {
-                await showAlert(err.message);
-                return;
-            }
-            await showAlert('Ошибка чтения файла: ' + err.message);
-        }
-    };
-    reader.readAsText(file);
 }
 
 window.deletePanel = deletePanel;

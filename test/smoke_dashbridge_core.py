@@ -39,7 +39,8 @@ def test(name, condition, detail=""):
 def read_file():
     return DASHBRIDGE_JS.read_text(encoding="utf-8") \
         + (ROOT / "pages/dashbridge/dashbridge-profile-controller.js").read_text(encoding="utf-8") \
-        + (ROOT / "pages/dashbridge/dashbridge-drag-controller.js").read_text(encoding="utf-8")
+        + (ROOT / "pages/dashbridge/dashbridge-drag-controller.js").read_text(encoding="utf-8") \
+        + (ROOT / "pages/dashbridge/dashbridge-panel-transfer-controller.js").read_text(encoding="utf-8")
 
 
 print("=" * 70)
@@ -270,7 +271,7 @@ test(
 
 # exportPanels должен быть async
 export_panels_async = re.search(
-    r"async\s+function\s+exportPanels\s*\(",
+    r"const\s+exportPanels\s*=\s*async\s*\(",
     content
 )
 test(
@@ -280,7 +281,7 @@ test(
 
 # importPanels должен быть async
 import_panels_async = re.search(
-    r"async\s+function\s+importPanels\s*\(",
+    r"const\s+importPanels\s*=\s*async\s+file\s*=>",
     content
 )
 test(

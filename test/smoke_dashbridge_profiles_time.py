@@ -8,6 +8,7 @@ PROFILE = (ROOT / "pages/dashbridge/dashbridge-profile-controller.js").read_text
 JS = (ROOT / "pages/dashbridge/dashbridge.js").read_text(encoding="utf-8") + PROFILE
 PANEL_URL = (ROOT / "pages/dashbridge/dashbridge-panel-url.js").read_text(encoding="utf-8")
 PANEL_TRANSFER = (ROOT / "pages/dashbridge/dashbridge-panel-transfer.js").read_text(encoding="utf-8")
+PANEL_TRANSFER_CONTROLLER = (ROOT / "pages/dashbridge/dashbridge-panel-transfer-controller.js").read_text(encoding="utf-8")
 PROFILE_STORE = (ROOT / "js/shared/dashbridge-profile-store.js").read_text(encoding="utf-8")
 TIME_STATE = (ROOT / "pages/dashbridge/dashbridge-time-state.js").read_text(encoding="utf-8")
 TIME_CONTROLLER = (ROOT / "pages/dashbridge/dashbridge-time-controller.js").read_text(encoding="utf-8")
@@ -26,7 +27,8 @@ checks = {
         and "await renderDashboard()" in JS,
     "profile switch saves current panels": "const switchProfile = async" in PROFILE and "currentProfile.panels = getPanels()" in PROFILE,
     "profile CRUD entry points exist": all(token in PROFILE for token in ["const createProfile", "const renameActiveProfile", "const deleteProfile = async"]),
-    "panel export uses a JSON blob": "new Blob([JSON.stringify(data, null, 2)]" in JS,
+    "panel export uses a JSON blob": "blobFactory([JSON.stringify(data, null, 2)]" in PANEL_TRANSFER_CONTROLLER
+        and "new Blob(parts, options)" in PANEL_TRANSFER_CONTROLLER,
     "panel import validates JSON before use": "JSON.parse(text)" in PANEL_TRANSFER and "Array.isArray(data?.panels)" in PANEL_TRANSFER,
     "time range updates unloaded and loaded frames": "iframe.dataset.src" in TIME_CONTROLLER and "postToDashboardFrame(iframe" in TIME_CONTROLLER,
     "time state belongs to each profile": "profile.timeState = getState()" in TIME_CONTROLLER

@@ -102,8 +102,16 @@ const html = fs.readFileSync('pages/dashbridge/dashbridge.html', 'utf8');
 assert(html.indexOf('dashbridge-panel-transfer.js') < html.indexOf('dashbridge.js'),
     'panel transfer owner must load before the DashBridge controller');
 const controller = fs.readFileSync('pages/dashbridge/dashbridge.js', 'utf8');
-assert(controller.includes('} = window.DashBridgePanelTransfer;'));
-assert(!controller.includes('const candidate = {') && !controller.includes('DashBridgeLocalStateSchema.normalizeProfiles'),
-    'controller must retain lifecycle only, not duplicate transfer normalization');
+const transferController = fs.readFileSync(
+    'pages/dashbridge/dashbridge-panel-transfer-controller.js', 'utf8'
+);
+assert(controller.includes('transfer: window.DashBridgePanelTransfer'),
+    'DashBridge must inject the pure transfer API into the lifecycle controller');
+assert(transferController.includes('transfer.createPanelExportPayload')
+    && transferController.includes('transfer.parsePanelImportText'),
+    'lifecycle controller must use the injected transfer API');
+assert(!transferController.includes('const candidate = {')
+    && !transferController.includes('DashBridgeLocalStateSchema.normalizeProfiles'),
+    'lifecycle controller must not duplicate transfer normalization');
 
 console.log('PASS DashBridge panel transfer preserves full round-trip data and rejects invalid or duplicate panels');

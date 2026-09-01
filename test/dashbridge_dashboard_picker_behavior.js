@@ -20,7 +20,7 @@ assert(html.indexOf('js/shared/grafana-url.js') < html.indexOf('js/shared/grafan
     'DashBridge must load the same dashboard inventory API used by Batch before its controller');
 
 const pickerStart = source.indexOf('// Independent dashboard inventory picker.');
-const pickerEnd = source.indexOf("document.getElementById('exportPanelsBtn')", pickerStart);
+const pickerEnd = source.indexOf('dashBridgePanelTransferController.setup()', pickerStart);
 const pickerSource = source.slice(pickerStart, pickerEnd);
 assert(pickerStart >= 0 && pickerEnd > pickerStart
     && pickerSource.includes('fetchGrafanaDashboardPanels(dashboardUrl)')
