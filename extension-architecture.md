@@ -49,7 +49,7 @@ manifest.json
 
 | Контекст | Основные файлы | Ответственность |
 |---|---|---|
-| Service worker | `js/background.js`, `js/background-grafana-infrastructure.js`, `js/background-gui-capture.js` | Единый message dispatcher; изолированные владельцы MAIN-регистрации/tab-scoped DNR и GUI capture lifecycle; downloads и доверенные storage commits. |
+| Service worker | `js/background.js`, `js/background-grafana-infrastructure.js`, `js/background-profile-storage.js`, `js/background-gui-capture.js` | Единый message dispatcher; изолированные владельцы MAIN-регистрации/tab-scoped DNR, сериализованных profile/storage commits и GUI capture lifecycle. |
 | Isolated content world | `content.js`, `grafana-iframe.js` | Мост Chrome API, Confluence, iframe time/crosshair/title и вывод снимка. |
 | Grafana MAIN world | Файлы runtime manifest | fetch/XHR, данные, visual state, меню, легенда, threshold, vCPU и подготовка снимка. |
 | Extension pages | Popup, Options, DashBridge, Batch, Worklog | UI, команды и долговечное состояние. |

@@ -19,7 +19,7 @@ const chrome = {
     storage: {
         sync: { get: async () => ({ grafanaIframeDomains: ['grafana.test', 'strict.test:8443'] }), onChanged: { addListener() {} } },
         session: { remove: async () => {} },
-        local: { set: async () => {} },
+        local: { get: async () => ({}), set: async () => {} },
         onChanged: { addListener() {} }
     },
     declarativeNetRequest: {
@@ -33,11 +33,16 @@ const chrome = {
 };
 const context = {
     chrome, importScripts() {}, console, setTimeout, clearTimeout, URL, Date, Uint8Array,
+    crypto: { randomUUID: () => 'generated-id' },
     fetch: async () => ({ blob: async () => ({ size: 1 }) }),
     DashBridgeGrafanaRuntimeManifest: { files: [], matchesForHostname: () => [] },
     DashBridgeDnrRules: { planSessionRules: () => ({
         rules: [], desiredRuleCount: 0, omittedRuleCount: 0, truncated: false, maxRules: 4000,
     }) },
+    DashBridgeLocalStateSchema: { normalizeProfiles: items => ({
+        items, skippedProfiles: 0, skippedPanels: 0,
+    }) },
+    DashBridgeGrafanaPanelIdentity: { normalizePanelId: value => value, fromUrl: value => value },
     JSZip: function JSZip() {},
     getGrafanaSettingsDefaults: () => ({ grafanaIframeDomains: [] }),
     normalizeHttpHost: value => String(value).toLowerCase(),
@@ -46,6 +51,8 @@ const context = {
 };
 vm.runInNewContext(fs.readFileSync('js/background-grafana-infrastructure.js', 'utf8'), context,
     { filename: 'background-grafana-infrastructure.js' });
+vm.runInNewContext(fs.readFileSync('js/background-profile-storage.js', 'utf8'), context,
+    { filename: 'background-profile-storage.js' });
 vm.runInNewContext(fs.readFileSync('js/background-gui-capture.js', 'utf8'), context, { filename: 'background-gui-capture.js' });
 vm.runInNewContext(fs.readFileSync('js/background.js', 'utf8'), context, { filename: 'background.js' });
 

@@ -5,11 +5,6 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const background = fs.readFileSync(path.join(__dirname, '..', 'js', 'background.js'), 'utf8');
-const commitStart = background.indexOf('async function commitDashBridgeProfilePatch');
-const commitEnd = background.indexOf('function normalizeSavedGrafanaPanelUrl', commitStart);
-assert(commitStart >= 0 && commitEnd > commitStart, 'profile patch broker must remain testable');
-
 const stored = {
     dashbridge_profiles: [
         { id: 'profile-a', name: 'A', panels: [] },
@@ -20,21 +15,29 @@ const stored = {
 const context = {
     URL, console,
     crypto: { randomUUID: () => 'generated-profile' },
-    chrome: { storage: { local: {
-        async get() { return structuredClone(stored); },
-        async set(values) { Object.assign(stored, structuredClone(values)); }
-    } } },
-    isTrustedExtensionPage: () => true,
-    storageCommitQueue: Promise.resolve()
+    chrome: {
+        runtime: { id: 'extension-id', getURL: path => `chrome-extension://extension-id/${path || ''}` },
+        storage: { local: {
+            async get() { return structuredClone(stored); },
+            async set(values) { Object.assign(stored, structuredClone(values)); }
+        } }
+    },
 };
 context.globalThis = context;
 vm.createContext(context);
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'shared', 'local-state-schema.js'), 'utf8'), context);
-vm.runInContext(`${background.slice(commitStart, commitEnd)}
-globalThis.commitProfilePatchForTest = commitDashBridgeProfilePatch;`, context);
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'background-profile-storage.js'), 'utf8'), context);
+context.profileStorage = context.DashBridgeBackgroundProfileStorage.create({
+    chromeRef: context.chrome,
+    localStateSchema: context.DashBridgeLocalStateSchema,
+    panelIdentity: { normalizePanelId: value => value, fromUrl: value => value },
+    grafanaInfrastructure: { getHosts: async () => [] },
+    isTrustedExtensionPage: () => true,
+    cryptoRef: context.crypto,
+});
 
 (async () => {
-    const commit = context.commitProfilePatchForTest;
+    const commit = (message, sender) => context.profileStorage.queueProfilePatch(message, sender);
     const sender = {};
     await commit({
         upserts: [{ id: 'profile-a', name: 'A from tab 1', panels: [] }],

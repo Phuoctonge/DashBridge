@@ -6,6 +6,7 @@ if __name__ == "__main__":
     tools = read("js/content/grafana-panel-tools.js")
     content = read("js/content/content.js")
     background = read("js/background.js")
+    storage = read("js/background-profile-storage.js")
     identity = read("js/shared/grafana-panel-identity.js")
     checks = {
         "native Grafana exposes the save action":
@@ -23,20 +24,20 @@ if __name__ == "__main__":
             "option.textContent = alreadySaved" in content
             and "dashbridge-profile-save-overlay" in content,
         "background serializes profile mutations":
-            "function queueGrafanaPanelSave" in background
-            and "storageCommitQueue = storageCommitQueue.catch" in background,
+            "profileStorage.queuePanelSave" in background
+            and "commitQueue = commitQueue.catch" in storage,
         "background validates the Grafana sender and panel id":
-            "sender.frameId !== 0" in background
-            and "allowedHosts.some" in background
-            and "!/^\\d+$/.test" in background,
+            "sender.frameId !== 0" in storage
+            and "allowedHosts.some" in storage
+            and "!/^\\d+$/.test" in storage,
         "saved panels use DashBridge solo URLs":
-            "normalizeSavedGrafanaPanelUrl" in background
-            and "DashBridgeGrafanaPanelIdentity.normalizePanelId(panelId)" in background
-            and "url.searchParams.set('dashbridge', '1')" in background,
+            "const normalizePanelUrl" in storage
+            and "panelIdentity.normalizePanelId(panelId)" in storage
+            and "url.searchParams.set('dashbridge', '1')" in storage,
         "duplicate panels are not appended twice":
-            "grafanaPanelIdentity" in background
-            and "const duplicate = profile.panels.some" in background
-            and "if (!duplicate) profile.panels.push" in background,
+            "panelIdentity.fromUrl" in storage
+            and "const duplicate = profile.panels.some" in storage
+            and "if (!duplicate) profile.panels.push" in storage,
         "profiles containing the panel are labelled and disabled":
             "grafanaPanelProfileIdentity" in content
             and "(уже есть в этом профиле)" in content
