@@ -6,7 +6,8 @@ from support.smoke import run_checks
 ROOT = Path(__file__).resolve().parent.parent
 HTML = (ROOT / "pages/batch/batch.html").read_text(encoding="utf-8")
 CSS = (ROOT / "pages/batch/batch.css").read_text(encoding="utf-8")
-JS = (ROOT / "pages/batch/batch.js").read_text(encoding="utf-8")
+JS = (ROOT / "pages/batch/batch.js").read_text(encoding="utf-8") \
+    + (ROOT / "pages/batch/batch-series-discovery-controller.js").read_text(encoding="utf-8")
 PICKER = (ROOT / "pages/batch/batch-panel-picker.js").read_text(encoding="utf-8")
 
 

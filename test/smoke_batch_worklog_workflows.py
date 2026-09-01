@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parent.parent
 BATCH = (ROOT / "pages/batch/batch.js").read_text(encoding="utf-8") \
     + (ROOT / "pages/batch/batch-page-controller.js").read_text(encoding="utf-8") \
     + (ROOT / "pages/batch/batch-main-run-controller.js").read_text(encoding="utf-8") \
+    + (ROOT / "pages/batch/batch-series-discovery-controller.js").read_text(encoding="utf-8") \
     + (ROOT / "pages/batch/batch-operation-controller.js").read_text(encoding="utf-8")
 BATCH_PICKER = (ROOT / "pages/batch/batch-panel-picker.js").read_text(encoding="utf-8")
 BATCH_STATE = (ROOT / "pages/batch/batch-state.js").read_text(encoding="utf-8")
@@ -41,7 +42,7 @@ checks = {
     "batch crop stays within the captured image": "image.naturalWidth - x" in (ROOT / "js/shared/grafana-panel-capture.js").read_text(encoding="utf-8")
         and "image.naturalHeight - y" in (ROOT / "js/shared/grafana-panel-capture.js").read_text(encoding="utf-8"),
     "batch Series flow applies its own capture theme": "getCaptureTheme('captureThemeSeries')" in BATCH
-        and "buildGrafanaPanelUrl(dashboardUrl, panelId, { theme: getCaptureTheme('captureThemeSeries') })" in BATCH,
+        and "buildPanelUrl(dashboardUrl, panelId" in BATCH,
     "batch offers synchronized Grafana theme radio controls": 'id="captureThemeMain"' in HTML and 'id="captureThemeSeries"' in HTML and 'type="radio"' in HTML and "const setCaptureTheme" in BATCH,
     "batch offers independent compact capture switches": 'id="compactCaptureMain"' in HTML
         and 'id="compactCaptureSeries"' in HTML
@@ -55,8 +56,8 @@ checks = {
     "batch applies explicit Grafana themes to capture URLs": "theme === 'light' || theme === 'dark'" in URLS,
     "batch builds d-solo URLs for native Series loading": "function buildGrafanaSoloPanelUrl" in URLS
         and "url.searchParams.set('panelId', panelId)" in URLS
-        and "seriesPanelIdFormatCache" in BATCH
-        and "seriesPanelIdCandidates" in BATCH,
+        and "panelIdFormatCache" in BATCH
+        and "panelIdCandidates" in BATCH,
     "full-dashboard action is hidden outside collection settings": "mainActionArea.hidden = !mainTab && !processing" in BATCH,
     "batch captures dynamically rendered series cards": "#seriesPanelsContainer .batch-series-card" in BATCH,
     "grouped Batch installs complete-hide before the first panel render":
@@ -67,21 +68,21 @@ checks = {
     "standalone Batch keeps the occurrence-aware native legend path":
         "selectedKeys: [series.key]" in BATCH
         and "prevSeriesName" in BATCH,
-    "batch Series cards show the selected panel title": "appendSeriesPanelCard(panelId, panel.title, panelUrl, signatures)" in BATCH
+    "batch Series cards show the selected panel title": "appendPanelCard(panelId, panel.title, panelUrl, signatures)" in BATCH
         and "Панель ID: ${escapeHtml(panelId)} — ${escapeHtml(panelTitle)}" in BATCH,
     "batch reads Series legends from Grafana's native response": "waitForCapturedSeries(nextTabId, capture.token, 15000, signal)" in BATCH
-        and "getGrafanaPanelQuerySignatures(panel)" in BATCH
+        and "getPanelQuerySignatures(panel)" in BATCH
         and "triggerGrafanaSeriesRefresh" not in BATCH,
     "batch reports Series success only for loaded legends": "let loadedCards = 0" in BATCH
         and "if (loadedCards)" in BATCH,
-    "batch Series API temporarily foregrounds Grafana for native data": "const navigateGrafanaSeriesCaptureTab" in BATCH
+    "batch Series API temporarily foregrounds Grafana for native data": "const navigateCaptureTab" in BATCH
         and "url: captureUrl" in BATCH and "active: true" in BATCH
         and "chrome.tabs.update(batchTab.id, { active: true })" in BATCH_PICKER
         and "waitForCapturedSeries" in BATCH,
     "batch Series does not wait for Grafana tab completion": "await waitForTabComplete(tabId)" not in BATCH,
     "Grafana captures native Series API responses at document start": "grafana-series-capture.js" in (ROOT / "js/shared/grafana-runtime-manifest.js").read_text(encoding="utf-8")
         and "runAt: 'document_start'" in RUNTIME
-        and "ensureEarlyGrafanaRuntimeForUrl(captureUrl)" in BATCH
+        and "ensureEarlyRuntime(captureUrl)" in BATCH
         and (ROOT / "js/content/grafana-series-capture.js").is_file(),
     "native Series capture reports request and signature diagnostics": "requests: 0" in SERIES_CAPTURE
         and "matched: 0" in SERIES_CAPTURE and "capture?.debug" in BATCH,
