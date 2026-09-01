@@ -6,8 +6,9 @@ const path = require('path');
 const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
 const html = read('pages/dashbridge/dashbridge.html');
 const dashboardPage = read('pages/dashbridge/dashbridge.js');
+const dashboardUi = read('pages/dashbridge/dashbridge-page-ui-controller.js');
 const reportController = read('pages/dashbridge/dashbridge-report-controller.js');
-const dashboard = `${dashboardPage}\n${reportController}`;
+const dashboard = `${dashboardPage}\n${dashboardUi}\n${reportController}`;
 const profileController = read('pages/dashbridge/dashbridge-profile-controller.js');
 const frameController = read('pages/dashbridge/dashbridge-frame-controller.js');
 const reportUi = read('pages/dashbridge/dashbridge-report-ui.js');
@@ -36,7 +37,7 @@ assert(html.indexOf('dashbridge-report-audit.js') < html.indexOf('dashbridge-rep
     && reportController.includes('testRunnerFactory.create({')
     && dashboard.includes('auditEngine: DashBridgeReportAudit')
     && reportController.includes('collect: (signal, onProgress) => collect(signal, onProgress, { requirePanels: false })')
-    && dashboard.includes("document.getElementById('testReportBtn').addEventListener('click'")
+    && dashboard.includes("documentRef.getElementById('testReportBtn').addEventListener('click'")
     && reportAudit.includes('runEngineSelfCheck')
     && reportTestRunner.includes("result(id, name, 'fixture'")
     && reportTestRunner.includes("source: 'live'")

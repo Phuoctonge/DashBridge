@@ -33,6 +33,7 @@ before(dashbridgeHtml, 'dashbridge-panel-transfer-controller.js', 'dashbridge.js
 before(dashbridgeHtml, 'dashbridge-panel-addition-controller.js', 'dashbridge.js');
 before(dashbridgeHtml, 'dashbridge-panel-card-controller.js', 'dashbridge.js');
 before(dashbridgeHtml, 'dashbridge-panel-actions-controller.js', 'dashbridge.js');
+before(dashbridgeHtml, 'dashbridge-page-ui-controller.js', 'dashbridge.js');
 before(recorderHtml, 'recorder-replay.js', 'recorder.js');
 before(batchHtml, 'batch-panel-rules-ui.js', 'batch.js');
 before(batchHtml, 'batch-operation-controller.js', 'batch.js');

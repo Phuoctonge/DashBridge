@@ -5,6 +5,7 @@ let dashBridgeTimeController = null;
 let dashBridgePanelToolsController = null;
 let dashBridgePanelCardController = null;
 let dashBridgePanelActionsController = null;
+let dashBridgePageUiController = null;
 
 function forceLoadPanel(id) {
     return dashBridgePanelCardController.forceLoadPanel(id);
@@ -44,6 +45,14 @@ function reconcileDashboardPanelCards(previousPanels) {
 
 function renderDashboard() {
     return dashBridgePanelCardController.renderDashboard();
+}
+
+function setupEventListeners() {
+    return dashBridgePageUiController.setup();
+}
+
+function updateCrosshairBtn() {
+    return dashBridgePageUiController.updateCrosshairControls();
 }
 
 function loadActiveProfileTimeState() {
@@ -432,17 +441,6 @@ function escapeHtml(str) {
 }
 
 // ════════════════════════════════════════════════════════
-//  Тема
-// ════════════════════════════════════════════════════════
-
-function updateCrosshairBtn() {
-    const toggle = document.getElementById('crosshairToggleCheckbox');
-    if (toggle) toggle.checked = crosshairMode === 'line';
-
-    const valueLabel = document.getElementById('crosshairThicknessValue');
-    if (valueLabel) valueLabel.textContent = crosshairThickness + 'px';
-}
-// ════════════════════════════════════════════════════════
 //  Обработчики событий
 // ════════════════════════════════════════════════════════
 
@@ -452,168 +450,6 @@ async function refreshAllPanels() {
         if (!panel || panel.paused) return;
         if (iframe.src) navigateDashboardFrame(iframe, applyPanelParamsToUrl(panel, iframe.src));
         else if (iframe.dataset.src) iframe.dataset.src = applyPanelParamsToUrl(panel, iframe.dataset.src);
-    });
-}
-
-function setupEventListeners() {
-    // --- Тема (глобальная, синхронизируется через chrome.storage.sync) ---
-    document.getElementById('capturePreparedToggleBtn')?.addEventListener('click', () => {
-        setDashboardCapturePrepared(!defaultCapturePrepared);
-    });
-    document.getElementById('captureAllPanelsBtn')?.addEventListener('click', event => {
-        void captureAllDashboardPanels(event.currentTarget);
-    });
-
-    // --- Режим курсора (меню) ---
-    const crosshairMenuBtn = document.getElementById('crosshairMenuBtn');
-    const crosshairDropdown = document.getElementById('crosshairDropdown');
-    const crosshairToggleCheckbox = document.getElementById('crosshairToggleCheckbox');
-
-    if (crosshairMenuBtn) {
-        crosshairMenuBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const isShowing = crosshairDropdown.style.display === 'flex';
-            closeHeaderMenus(); // Закрываем остальные
-            crosshairDropdown.style.display = isShowing ? 'none' : 'flex';
-            crosshairMenuBtn.setAttribute('aria-expanded', !isShowing);
-        });
-    }
-
-    if (crosshairDropdown) {
-        crosshairDropdown.addEventListener('click', (e) => e.stopPropagation());
-    }
-
-    if (crosshairToggleCheckbox) {
-        crosshairToggleCheckbox.addEventListener('change', (e) => {
-            crosshairMode = e.target.checked ? 'line' : 'off';
-            try {
-                localStorage.setItem('dashbridge_crosshairMode', crosshairMode);
-            } catch (err) { }
-            if (crosshairMode === 'off') hideCrosshair();
-            document.querySelectorAll('iframe[name="dashbridge-iframe"]').forEach(ifr => {
-                postToDashboardFrame(ifr, { action: 'setCrosshairMode', mode: crosshairMode, thickness: crosshairThickness });
-            });
-        });
-    }
-
-    const crosshairSlider = document.getElementById('crosshairThicknessSlider');
-    if (crosshairSlider) {
-        crosshairSlider.addEventListener('input', (e) => {
-            crosshairThickness = parseInt(e.target.value, 10) || 1;
-            const valueLabel = document.getElementById('crosshairThicknessValue');
-            if (valueLabel) valueLabel.textContent = crosshairThickness + 'px';
-
-            try {
-                localStorage.setItem('dashbridge_crosshairThickness', crosshairThickness);
-            } catch (err) { }
-            document.querySelectorAll('iframe[name="dashbridge-iframe"]').forEach(ifr => {
-                postToDashboardFrame(ifr, { action: 'setCrosshairThickness', thickness: crosshairThickness });
-            });
-        });
-    }
-
-    // --- Профили ---
-    const profileDropdown = document.getElementById('profileDropdown');
-    const dataDropdown = document.getElementById('dataDropdown');
-    const addPanelDropdown = document.getElementById('addPanelDropdown');
-    const reportDropdown = document.getElementById('reportDropdown');
-    const closeHeaderMenus = () => {
-        if (dataDropdown) dataDropdown.style.display = 'none';
-        if (addPanelDropdown) addPanelDropdown.style.display = 'none';
-        if (reportDropdown) reportDropdown.style.display = 'none';
-        if (crosshairDropdown) crosshairDropdown.style.display = 'none';
-        document.getElementById('dataMenuBtn')?.setAttribute('aria-expanded', 'false');
-        document.getElementById('addPanelMenuBtn')?.setAttribute('aria-expanded', 'false');
-        document.getElementById('reportMenuBtn')?.setAttribute('aria-expanded', 'false');
-        document.getElementById('crosshairMenuBtn')?.setAttribute('aria-expanded', 'false');
-    };
-    document.getElementById('profilePickerBtn').addEventListener('click', (e) => {
-        e.stopPropagation();
-        const isShowing = profileDropdown.style.display === 'flex';
-        profileDropdown.style.display = isShowing ? 'none' : 'flex';
-        // Закрываем другие поповеры
-        document.getElementById('timePopover').style.display = 'none';
-        document.getElementById('refreshPopover').style.display = 'none';
-        closeHeaderMenus();
-        if (!isShowing) renderProfileSwitcher();
-    });
-    profileDropdown.addEventListener('click', (e) => e.stopPropagation());
-
-    const toggleHeaderMenu = (button, dropdown) => {
-        const isShowing = dropdown.style.display === 'block';
-        closeHeaderMenus();
-        profileDropdown.style.display = 'none';
-        document.getElementById('timePopover').style.display = 'none';
-        document.getElementById('refreshPopover').style.display = 'none';
-        if (!isShowing) {
-            dropdown.style.display = 'block';
-            button.setAttribute('aria-expanded', 'true');
-        }
-    };
-    document.getElementById('dataMenuBtn').addEventListener('click', event => {
-        event.stopPropagation();
-        toggleHeaderMenu(event.currentTarget, dataDropdown);
-    });
-    document.getElementById('addPanelMenuBtn').addEventListener('click', event => {
-        event.stopPropagation();
-        toggleHeaderMenu(event.currentTarget, addPanelDropdown);
-    });
-    document.getElementById('reportMenuBtn').addEventListener('click', event => {
-        event.stopPropagation();
-        toggleHeaderMenu(event.currentTarget, reportDropdown);
-    });
-    dataDropdown.addEventListener('click', event => event.stopPropagation());
-    addPanelDropdown.addEventListener('click', event => event.stopPropagation());
-    reportDropdown.addEventListener('click', event => event.stopPropagation());
-    document.getElementById('configureReportBtn').addEventListener('click', () => {
-        closeHeaderMenus(); openReportSettings();
-    });
-    document.getElementById('generateReportBtn').addEventListener('click', () => {
-        closeHeaderMenus(); openReportPreview();
-    });
-    document.getElementById('testReportBtn').addEventListener('click', () => {
-        closeHeaderMenus(); dashBridgeReportTestRunner.open();
-    });
-
-    document.getElementById('newProfileBtn').addEventListener('click', async () => {
-        const name = await showPrompt('Название нового профиля:');
-        if (name && name.trim()) createProfile(name.trim());
-    });
-
-    document.getElementById('renameProfileBtn').addEventListener('click', async () => {
-        const profile = getActiveProfile();
-        if (!profile) return;
-        const name = await showPrompt('Переименовать профиль:', profile.name);
-        if (name && name.trim() && name.trim() !== profile.name) {
-            renameActiveProfile(name.trim());
-        }
-    });
-
-    document.getElementById('deleteProfileBtn').addEventListener('click', () => {
-        deleteProfile(activeProfileId);
-    });
-
-    dashBridgePanelAdditionController.setup();
-    dashBridgePanelTransferController.setup();
-
-    // --- ESC выходит из fullscreen ---
-    document.addEventListener('keydown', (e) => {
-        if (e.key !== 'Escape') return;
-        dashBridgePanelAdditionController.closeDashboardPickerIfOpen();
-        closeDashboardPanelAnalysis();
-        closePanelExtraActions();
-        dashBridgePanelActionsController.exitFullscreen();
-    });
-
-    // --- Закрыть все поповеры по клику вне ---
-    document.addEventListener('click', () => {
-        profileDropdown.style.display = 'none';
-        closeHeaderMenus();
-        const tp = document.getElementById('timePopover');
-        const rp = document.getElementById('refreshPopover');
-        if (tp) tp.style.display = 'none';
-        if (rp) rp.style.display = 'none';
-        closePanelExtraActions();
     });
 }
 
@@ -706,6 +542,35 @@ dashBridgePanelCardController = DashBridgePanelCardController.create({
         open: SVG_OPEN,
         delete: SVG_DELETE,
     },
+});
+
+dashBridgePageUiController = DashBridgePageUiController.create({
+    getCrosshairMode: () => crosshairMode,
+    setCrosshairMode: value => { crosshairMode = value; },
+    getCrosshairThickness: () => crosshairThickness,
+    setCrosshairThickness: value => { crosshairThickness = value; },
+    hideCrosshair,
+    postToDashboardFrame,
+    getFrames: () => document.querySelectorAll('iframe[name="dashbridge-iframe"]'),
+    getCapturePrepared: () => defaultCapturePrepared,
+    setCapturePrepared: setDashboardCapturePrepared,
+    captureAllPanels: captureAllDashboardPanels,
+    renderProfileSwitcher,
+    showPrompt,
+    createProfile,
+    renameActiveProfile,
+    deleteProfile,
+    getActiveProfile,
+    getActiveProfileId: () => activeProfileId,
+    openReportSettings,
+    openReportPreview,
+    openReportTest: () => dashBridgeReportTestRunner.open(),
+    setupPanelAddition: dashBridgePanelAdditionController.setup,
+    closeDashboardPickerIfOpen: dashBridgePanelAdditionController.closeDashboardPickerIfOpen,
+    setupPanelTransfer: dashBridgePanelTransferController.setup,
+    closePanelAnalysis: closeDashboardPanelAnalysis,
+    closePanelExtraActions,
+    exitFullscreen: dashBridgePanelActionsController.exitFullscreen,
 });
 
 window.deletePanel = dashBridgePanelActionsController.deletePanel;

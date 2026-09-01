@@ -5,6 +5,7 @@ from support.smoke import run_checks
 
 ROOT = Path(__file__).resolve().parent.parent
 DASHBOARD = (ROOT / "pages/dashbridge/dashbridge.js").read_text(encoding="utf-8")
+PAGE_UI = (ROOT / "pages/dashbridge/dashbridge-page-ui-controller.js").read_text(encoding="utf-8")
 CROSSHAIR = (ROOT / "pages/dashbridge/dashbridge-crosshair.js").read_text(encoding="utf-8")
 IFRAME = (ROOT / "js/content/grafana-iframe.js").read_text(encoding="utf-8")
 HTML = (ROOT / "pages/dashbridge/dashbridge.html").read_text(encoding="utf-8")
@@ -20,7 +21,7 @@ checks = {
     "tooltip emulation is removed": "new MouseEvent('mousemove'" not in IFRAME,
     "only smart cursor and off modes remain": "crosshairMode = event.data.mode === 'line' ? 'line' : 'off';" in IFRAME,
     "cursor checkbox exposes its selected state": 'id="crosshairToggleCheckbox"' in HTML
-    and "toggle.checked = crosshairMode === 'line';" in DASHBOARD,
+    and "toggle.checked = getCrosshairMode() === 'line';" in PAGE_UI,
     "cursor button is synchronized on startup": "updateCrosshairBtn();" in DASHBOARD
     and DASHBOARD.index("setupEventListeners();") < DASHBOARD.index("updateCrosshairBtn();"),
     "iframe loads the time helper before its own script": 0 <= MANIFEST.find('"js/shared/grafana-time.js"') < MANIFEST.find('"js/content/grafana-iframe.js"'),

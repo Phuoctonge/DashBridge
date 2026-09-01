@@ -6,6 +6,7 @@ from support.smoke import run_checks
 
 ROOT = Path(__file__).parent.parent
 src = (ROOT / 'pages/dashbridge/dashbridge.js').read_text(encoding='utf-8')
+page_ui = (ROOT / 'pages/dashbridge/dashbridge-page-ui-controller.js').read_text(encoding='utf-8')
 cards = (ROOT / 'pages/dashbridge/dashbridge-panel-card-controller.js').read_text(encoding='utf-8')
 capture = (ROOT / 'pages/dashbridge/dashbridge-capture.js').read_text(encoding='utf-8')
 renderer = (ROOT / 'pages/dashbridge/dashbridge-renderer.js').read_text(encoding='utf-8')
@@ -27,7 +28,7 @@ checks = {
         and 'captureAll' in capture,
     'header compact toggle shares global panel state':
         'id="capturePreparedToggleBtn"' in html and 'btn-capture-toggle' in html
-        and "setDashboardCapturePrepared(!defaultCapturePrepared)" in src,
+        and "setCapturePrepared(!getCapturePrepared())" in page_ui,
     'DashBridge page loads ZIP dependencies before controller':
         html.index('vendor/jszip.min.js') < html.index('js/shared/archive-download.js')
         < html.index('dashbridge-capture.js') < html.index('dashbridge.js'),

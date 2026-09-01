@@ -42,7 +42,8 @@ def read_file():
         + (ROOT / "pages/dashbridge/dashbridge-drag-controller.js").read_text(encoding="utf-8") \
         + (ROOT / "pages/dashbridge/dashbridge-panel-transfer-controller.js").read_text(encoding="utf-8") \
         + (ROOT / "pages/dashbridge/dashbridge-panel-addition-controller.js").read_text(encoding="utf-8") \
-        + (ROOT / "pages/dashbridge/dashbridge-panel-actions-controller.js").read_text(encoding="utf-8")
+        + (ROOT / "pages/dashbridge/dashbridge-panel-actions-controller.js").read_text(encoding="utf-8") \
+        + (ROOT / "pages/dashbridge/dashbridge-page-ui-controller.js").read_text(encoding="utf-8")
 
 
 print("=" * 70)

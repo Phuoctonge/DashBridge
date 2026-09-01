@@ -5,7 +5,8 @@ const fs = require('fs');
 
 const html = fs.readFileSync('pages/dashbridge/dashbridge.html', 'utf8');
 const source = fs.readFileSync('pages/dashbridge/dashbridge-panel-addition-controller.js', 'utf8');
-const coordinator = fs.readFileSync('pages/dashbridge/dashbridge.js', 'utf8');
+const coordinator = fs.readFileSync('pages/dashbridge/dashbridge.js', 'utf8')
+    + fs.readFileSync('pages/dashbridge/dashbridge-page-ui-controller.js', 'utf8');
 const css = fs.readFileSync('pages/dashbridge/dashbridge.css', 'utf8');
 
 assert(html.includes('id="quickAddPanelsBtn"')
@@ -39,8 +40,8 @@ assert(pickerSource.includes('const existingPanelIdentities = getCurrentProfileP
     && pickerSource.includes("title: panel.title, width, height: '350px'"),
     'existing panels must be disabled while selected titles are persisted with new cards');
 assert(coordinator.includes('fetchDashboardPanels: fetchGrafanaDashboardPanels')
-    && coordinator.includes('dashBridgePanelAdditionController.setup()')
-    && coordinator.includes('dashBridgePanelAdditionController.closeDashboardPickerIfOpen()'),
+    && coordinator.includes('setupPanelAddition: dashBridgePanelAdditionController.setup')
+    && coordinator.includes('closeDashboardPickerIfOpen: dashBridgePanelAdditionController.closeDashboardPickerIfOpen'),
     'the coordinator must inject the shared API and retain setup/escape orchestration');
 assert(css.includes('.dashboard-panel-picker-modal')
     && css.includes('.dashboard-panel-picker-list')
