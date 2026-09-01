@@ -6,7 +6,7 @@
         findPanelCard, postToDashboardFrame, removePanelCard, replacePanelCard, updatePanelCard,
         panelAnalysis, closePanelAnalysis, panelTools, isSupportedPanelUrl, normalizePanelUrl,
         escapeHtml, runToolbarCapture, openPanelReportEditor, openPanelTools,
-        syncPanelAnalysisAction, closePanelExtraActions, togglePanelExtraActions,
+        syncPanelAnalysisAction,
         openPanelAnalysis, icons, documentRef = document,
         openWindow = (...args) => window.open(...args), now = () => Date.now(),
         ResizeObserverClass = root.ResizeObserver, requestFrame = root.requestAnimationFrame }) {
@@ -16,7 +16,7 @@
             postToDashboardFrame, removePanelCard, replacePanelCard, updatePanelCard,
             closePanelAnalysis, isSupportedPanelUrl, normalizePanelUrl, escapeHtml,
             runToolbarCapture, openPanelReportEditor, openPanelTools, syncPanelAnalysisAction,
-            closePanelExtraActions, togglePanelExtraActions, openPanelAnalysis,
+            openPanelAnalysis,
         ];
         if (requiredFunctions.some(value => typeof value !== 'function')
             || typeof panelAnalysis?.isPanel !== 'function'
@@ -26,6 +26,25 @@
         }
 
         let fullscreenPanelId = null;
+
+        const closeExtraActions = (except = null) => {
+            documentRef.querySelectorAll('.panel-actions.extra-actions-open').forEach(actions => {
+                if (actions === except) return;
+                actions.classList.remove('extra-actions-open');
+                actions.querySelectorAll('.panel-extra-inline').forEach(button => { button.hidden = true; });
+                actions.querySelector('.btn-more')?.setAttribute('aria-expanded', 'false');
+            });
+        };
+
+        const toggleExtraActions = button => {
+            const actions = button?.closest('.panel-actions');
+            if (!actions) return;
+            const opening = !actions.classList.contains('extra-actions-open');
+            closeExtraActions(opening ? actions : null);
+            actions.classList.toggle('extra-actions-open', opening);
+            actions.querySelectorAll('.panel-extra-inline').forEach(extra => { extra.hidden = !opening; });
+            button.setAttribute('aria-expanded', String(opening));
+        };
 
         const deletePanel = async id => {
             if (!await showConfirm('Удалить панель?')) return;
@@ -196,20 +215,20 @@
             });
             card.querySelector('.btn-iframe-settings')?.addEventListener('click', () => openIframeSettings(panel));
             card.querySelector('.btn-report-settings')?.addEventListener('click', () => {
-                closePanelExtraActions();
+                closeExtraActions();
                 openPanelReportEditor(panel);
             });
             card.querySelector('.btn-panel-tools')?.addEventListener('click', () => openPanelTools(panel, iframe));
             card.querySelector('.btn-more')?.addEventListener('click', event => {
                 event.stopPropagation();
                 syncPanelAnalysisAction(panel, card);
-                togglePanelExtraActions(event.currentTarget);
+                toggleExtraActions(event.currentTarget);
             });
             card.querySelector('.btn-analysis')?.addEventListener('click', event => {
                 const type = event.currentTarget.dataset.analysisType;
                 if (!['cpu', 'ram'].includes(type)) return;
                 openPanelAnalysis(panel, iframe, type);
-                closePanelExtraActions();
+                closeExtraActions();
             });
             card.querySelector('.btn-open')?.addEventListener('click', event => {
                 openWindow(
@@ -236,6 +255,8 @@
             openIframeSettings,
             togglePanelPause,
             handlePanelRemoved,
+            closeExtraActions,
+            toggleExtraActions,
         });
     }
 

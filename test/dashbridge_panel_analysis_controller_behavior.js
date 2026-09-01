@@ -53,15 +53,28 @@ vm.createContext(context);
 vm.runInContext(fs.readFileSync(path.join(root, 'pages', 'dashbridge', 'dashbridge-panel-analysis-controller.js'), 'utf8'), context);
 
 const iframe = { id: 'frame' };
+const analysisAction = {
+    dataset: {}, hidden: true, title: '',
+    setAttribute(name, value) { this[name] = value; },
+};
 const controller = context.DashBridgePanelAnalysisController.create({
     postToDashboardFrame(target, message) { messages.push({ target, message }); return true; },
     normalizePanelMetadataText: value => String(value || '').trim(),
-    analysisApi: { baseTitle: value => String(value || '').replace(/ calculated$/i, '') },
+    analysisApi: {
+        baseTitle: value => String(value || '').replace(/ calculated$/i, ''),
+        classifyTitle: value => String(value || '').startsWith('CPU') ? 'cpu' : null,
+    },
+    getTransformSettings: () => ({}),
+    findPanelCard: () => ({ querySelector: selector => selector === '.btn-analysis' ? analysisAction : null }),
     documentRef,
     navigatorRef: context.navigator,
     now: () => 10,
     random: () => 0.5,
 });
+
+assert.strictEqual(controller.syncAction({ id: 'cpu-1', title: 'CPU Usage calculated' }), 'cpu');
+assert.strictEqual(analysisAction.hidden, false);
+assert.strictEqual(analysisAction.dataset.analysisType, 'cpu');
 
 assert.strictEqual(controller.open({ id: 'cpu-1', title: 'CPU Usage calculated' }, iframe, 'cpu'), true);
 assert.strictEqual(controller.active, true);

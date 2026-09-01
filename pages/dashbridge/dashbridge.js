@@ -131,6 +131,8 @@ const dashBridgePanelAnalysisController = DashBridgePanelAnalysisController.crea
     postToDashboardFrame,
     normalizePanelMetadataText,
     analysisApi: window.DashBridgeGrafanaPanelAnalysis,
+    getTransformSettings: () => grafanaTransformSettings,
+    findPanelCard,
 });
 const openDashboardPanelAnalysis = dashBridgePanelAnalysisController.open;
 const closeDashboardPanelAnalysis = dashBridgePanelAnalysisController.close;
@@ -333,42 +335,8 @@ function getCompactCaptureDimensions() {
     };
 }
 
-function getPanelAnalysisType(panel) {
-    return window.DashBridgeGrafanaPanelAnalysis?.classifyTitle(panel?.title, grafanaTransformSettings) || null;
-}
-
 function findPanelCard(panelId) {
     return document.querySelector(`.panel-card[data-panel-id="${CSS.escape(String(panelId))}"]`);
-}
-
-function syncPanelAnalysisAction(panel, card = findPanelCard(panel?.id)) {
-    const action = card?.querySelector('.btn-analysis');
-    if (!action) return null;
-    const type = getPanelAnalysisType(panel);
-    action.hidden = type !== 'cpu' && type !== 'ram';
-    action.dataset.analysisType = type || '';
-    action.title = type === 'ram' ? 'Анализ RAM' : 'Анализ CPU';
-    action.setAttribute('aria-label', action.title);
-    return type;
-}
-
-function closePanelExtraActions(except = null) {
-    document.querySelectorAll('.panel-actions.extra-actions-open').forEach(actions => {
-        if (actions === except) return;
-        actions.classList.remove('extra-actions-open');
-        actions.querySelectorAll('.panel-extra-inline').forEach(button => { button.hidden = true; });
-        actions.querySelector('.btn-more')?.setAttribute('aria-expanded', 'false');
-    });
-}
-
-function togglePanelExtraActions(button) {
-    const actions = button?.closest('.panel-actions');
-    if (!actions) return;
-    const opening = !actions.classList.contains('extra-actions-open');
-    closePanelExtraActions(opening ? actions : null);
-    actions.classList.toggle('extra-actions-open', opening);
-    actions.querySelectorAll('.panel-extra-inline').forEach(extra => { extra.hidden = !opening; });
-    button.setAttribute('aria-expanded', String(opening));
 }
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
@@ -379,7 +347,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
             if (grafanaTransformSettingKeys.has(key)) nextSettings[key] = change.newValue;
         });
         grafanaTransformSettings = normalizeGrafanaSettings(nextSettings);
-        panels.forEach(panel => syncPanelAnalysisAction(panel));
+        panels.forEach(panel => dashBridgePanelAnalysisController.syncAction(panel));
     }
     if (changes.grafanaCompactScreenshot) {
         const nextPrepared = !!changes.grafanaCompactScreenshot.newValue;
@@ -461,9 +429,7 @@ dashBridgePanelActionsController = DashBridgePanelActionsController.create({
     runToolbarCapture: runDashboardToolbarCapture,
     openPanelReportEditor,
     openPanelTools,
-    syncPanelAnalysisAction,
-    closePanelExtraActions,
-    togglePanelExtraActions,
+    syncPanelAnalysisAction: dashBridgePanelAnalysisController.syncAction,
     openPanelAnalysis: openDashboardPanelAnalysis,
     icons: { expand: SVG_EXPAND, collapse: SVG_COLLAPSE },
 });
@@ -478,8 +444,8 @@ dashBridgePanelCardController = DashBridgePanelCardController.create({
     navigateDashboardFrame,
     bindPanelActions: dashBridgePanelActionsController.bindPanelActions,
     findPanelCard,
-    getPanelAnalysisType,
-    syncPanelAnalysisAction,
+    getPanelAnalysisType: dashBridgePanelAnalysisController.getType,
+    syncPanelAnalysisAction: dashBridgePanelAnalysisController.syncAction,
     closePanelAnalysis: closeDashboardPanelAnalysis,
     isPanelAnalysisOpen: dashBridgePanelAnalysisController.isPanel,
     onPanelRemoved: dashBridgePanelActionsController.handlePanelRemoved,
@@ -528,7 +494,7 @@ dashBridgePageUiController = DashBridgePageUiController.create({
     closeDashboardPickerIfOpen: dashBridgePanelAdditionController.closeDashboardPickerIfOpen,
     setupPanelTransfer: dashBridgePanelTransferController.setup,
     closePanelAnalysis: closeDashboardPanelAnalysis,
-    closePanelExtraActions,
+    closePanelExtraActions: dashBridgePanelActionsController.closeExtraActions,
     exitFullscreen: dashBridgePanelActionsController.exitFullscreen,
 });
 
@@ -543,7 +509,7 @@ DashBridgeIframeMessageController.create({
     capturePanel: captureDashbridgePanel,
     setCapturePrepared: dashBridgeCapture.setPrepared,
     savePanels,
-    syncPanelAnalysisAction,
+    syncPanelAnalysisAction: dashBridgePanelAnalysisController.syncAction,
     acceptTitleResponse: dashBridgePanelToolsController.acceptTitleResponse,
     getCrosshairMode: () => crosshairMode,
     getCrosshairThickness: () => crosshairThickness,

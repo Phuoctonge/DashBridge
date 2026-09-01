@@ -70,8 +70,6 @@ const controller = context.DashBridgePanelActionsController.create({
     openPanelReportEditor: () => undefined,
     openPanelTools: () => undefined,
     syncPanelAnalysisAction: () => undefined,
-    closePanelExtraActions: () => undefined,
-    togglePanelExtraActions: () => undefined,
     openPanelAnalysis: () => undefined,
     icons: { expand: '<expand>', collapse: '<collapse>' },
     documentRef: {

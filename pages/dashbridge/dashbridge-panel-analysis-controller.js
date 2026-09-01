@@ -2,12 +2,27 @@
     'use strict';
 
     function create({ postToDashboardFrame, normalizePanelMetadataText, analysisApi,
+        getTransformSettings, findPanelCard,
         documentRef = document, navigatorRef = navigator, setTimer = setTimeout,
         now = () => Date.now(), random = () => Math.random() }) {
-        if (typeof postToDashboardFrame !== 'function' || typeof normalizePanelMetadataText !== 'function') {
+        if (typeof postToDashboardFrame !== 'function' || typeof normalizePanelMetadataText !== 'function'
+            || typeof getTransformSettings !== 'function' || typeof findPanelCard !== 'function') {
             throw new TypeError('DashBridge panel analysis controller dependencies are incomplete');
         }
         let active = null;
+
+        const getType = panel => analysisApi?.classifyTitle(panel?.title, getTransformSettings()) || null;
+
+        const syncAction = (panel, card = findPanelCard(panel?.id)) => {
+            const action = card?.querySelector('.btn-analysis');
+            if (!action) return null;
+            const type = getType(panel);
+            action.hidden = type !== 'cpu' && type !== 'ram';
+            action.dataset.analysisType = type || '';
+            action.title = type === 'ram' ? 'Анализ RAM' : 'Анализ CPU';
+            action.setAttribute('aria-label', action.title);
+            return type;
+        };
 
         const request = state => {
             if (!state) return false;
@@ -153,7 +168,7 @@
         const retryForFrame = iframe => active?.iframe === iframe ? request(active) : false;
         const isPanel = panelOrId => active?.panel?.id === (typeof panelOrId === 'object' ? panelOrId?.id : panelOrId);
 
-        return Object.freeze({ open, close, accept, retryForFrame, isPanel,
+        return Object.freeze({ open, close, accept, retryForFrame, isPanel, getType, syncAction,
             get active() { return !!active; } });
     }
 

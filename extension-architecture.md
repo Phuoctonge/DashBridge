@@ -167,7 +167,7 @@ grafana-panel-tools.js
 | DashBridge card/iframe lifecycle | `dashbridge-panel-card-controller.js` | Создание и точечная замена карточек, drag/reorder с сохранением порядка, eager iframe navigation активных панелей, layout-only update, reconciliation и cleanup удаления. |
 | Действия карточек DashBridge | `dashbridge-panel-actions-controller.js` | Refresh, pause, fullscreen, удаление, iframe settings и привязка toolbar-кнопок; сохраняет точечный update без общего remount. |
 | Верхний UI DashBridge | `dashbridge-page-ui-controller.js` | Header/dropdown, профильные действия, capture и crosshair controls, делегирование setup добавления/transfer и закрытие transient UI по Escape/outside click. |
-| DashBridge panel analysis UI | `dashbridge-panel-analysis-controller.js` | CPU/RAM modal, exact iframe/request correlation, retry after iframe readiness and cancel cleanup. |
+| DashBridge panel analysis UI | `dashbridge-panel-analysis-controller.js` | Классификация и toolbar-action панели, CPU/RAM modal, exact iframe/request correlation, retry after iframe readiness и cancel cleanup. |
 | Неблокирующие модальные диалоги DashBridge | `dashbridge-modal.js` | Профили, импорт/экспорт, настройки и capture в `dashbridge.js`. |
 | URL и идентичность панелей DashBridge | `dashbridge-panel-url.js`, `grafana-panel-identity.js` | Нормализация URL и поиск дублей для добавления, импорта и iframe-настроек. |
 | Добавление панелей DashBridge | `dashbridge-panel-addition-controller.js` | Одиночный URL, список ID и dashboard picker; безопасный inventory, дедупликация и применение к активному профилю. |
