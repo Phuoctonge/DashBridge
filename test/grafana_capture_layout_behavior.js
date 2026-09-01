@@ -42,7 +42,7 @@ assert(tools.includes('html.dashbridge-panel-capture-mode [data-dashbridge-thres
     'threshold overlay must remain above the prepared capture frame');
 assert(tools.includes('return { ...state, capturePrepared: defaultPanelCapturePrepared() }'), 'per-panel state must not override the global prepared-capture setting');
 assert(tools.includes('syncAllPanelCaptureToggles(value)'), 'one toolbar click must update every visible panel toggle');
-assert(dashboard.includes("chrome.storage.sync.set({ grafanaCompactScreenshot: defaultCapturePrepared })"), 'DashBridge must persist the shared toggle globally');
+assert(dashboardCapture.includes('storage.set({ grafanaCompactScreenshot: prepared })'), 'DashBridge capture owner must persist the shared toggle globally');
 assert(tools.includes('const fitPanelCaptureSize = options =>'), 'native prepared capture must survive a stale hot-injected dependency set');
 assert(tools.includes("captureFrame.className = 'dashbridge-panel-capture-frame'"), 'native prepared capture must escape Grafana grid containment');
 assert(tools.includes('const createCompactCaptureLegendBackgroundController = root =>')

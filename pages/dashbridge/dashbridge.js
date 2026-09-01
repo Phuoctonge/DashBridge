@@ -315,7 +315,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     ]);
     grafanaTransformSettings = normalizeGrafanaSettings(storedSettings);
     defaultCapturePrepared = !!storedSettings.grafanaCompactScreenshot;
-    syncDashboardCaptureToggles(defaultCapturePrepared);
+    dashBridgeCapture.syncToggles(defaultCapturePrepared);
     setupTimeControls();
     setupEventListeners();
     dashBridgePanelCardController.setupDrag();
@@ -331,18 +331,6 @@ function getCompactCaptureDimensions() {
         width: grafanaTransformSettings.grafanaCompactExportWidth,
         height: grafanaTransformSettings.grafanaCompactExportHeight
     };
-}
-
-function syncDashboardCaptureToggles(enabled) {
-    const dimensions = getCompactCaptureDimensions();
-    document.querySelectorAll('.btn-capture-toggle').forEach(button => {
-        button.classList.toggle('capture-toggle-active', enabled);
-        button.setAttribute('aria-pressed', String(enabled));
-        button.title = enabled
-            ? `Компактный снимок ${dimensions.width}×${dimensions.height}: включён`
-            : `Компактный снимок ${dimensions.width}×${dimensions.height}: выключен`;
-        button.setAttribute('aria-label', button.title);
-    });
 }
 
 function getPanelAnalysisType(panel) {
@@ -383,22 +371,6 @@ function togglePanelExtraActions(button) {
     button.setAttribute('aria-expanded', String(opening));
 }
 
-function setDashboardCapturePrepared(enabled, { persist = true } = {}) {
-    defaultCapturePrepared = !!enabled;
-    syncDashboardCaptureToggles(defaultCapturePrepared);
-    const dimensions = getCompactCaptureDimensions();
-    document.querySelectorAll('iframe[name="dashbridge-iframe"]').forEach(iframe => {
-        postToDashboardFrame(iframe, {
-            action: 'dashbridgeCapturePreparedDefaultChanged',
-            enabled: defaultCapturePrepared,
-            outputWidth: dimensions.width,
-            outputHeight: dimensions.height
-        });
-    });
-    if (persist) void chrome.storage.sync.set({ grafanaCompactScreenshot: defaultCapturePrepared });
-    return defaultCapturePrepared;
-}
-
 chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== 'sync') return;
     if (Object.keys(changes).some(key => grafanaTransformSettingKeys.has(key))) {
@@ -414,19 +386,11 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
         // A local click already updated every iframe before persisting. Ignore
         // its storage echo; external-tab changes still propagate normally.
         if (nextPrepared !== defaultCapturePrepared) {
-            setDashboardCapturePrepared(nextPrepared, { persist: false });
+            dashBridgeCapture.setPrepared(nextPrepared, { persist: false });
         }
     } else if (changes.grafanaCompactExportWidth || changes.grafanaCompactExportHeight) {
-        syncDashboardCaptureToggles(defaultCapturePrepared);
-        const dimensions = getCompactCaptureDimensions();
-        document.querySelectorAll('iframe[name="dashbridge-iframe"]').forEach(iframe => {
-            postToDashboardFrame(iframe, {
-                action: 'dashbridgeCapturePreparedDefaultChanged',
-                enabled: defaultCapturePrepared,
-                outputWidth: dimensions.width,
-                outputHeight: dimensions.height
-            });
-        });
+        dashBridgeCapture.syncToggles(defaultCapturePrepared);
+        dashBridgeCapture.broadcastPrepared(defaultCapturePrepared);
     }
 });
 
@@ -463,9 +427,9 @@ const dashBridgeCapture = DashBridgeCapture.create({
     getPanels: () => panels,
     getActiveProfile,
     getDefaultCapturePrepared: () => defaultCapturePrepared,
+    setDefaultCapturePrepared: value => { defaultCapturePrepared = value; },
     getCompactCaptureDimensions,
     forceLoadPanel,
-    syncDashboardCaptureToggles,
     postToDashboardFrame,
     showAlert,
 });
@@ -548,7 +512,7 @@ dashBridgePageUiController = DashBridgePageUiController.create({
     postToDashboardFrame,
     getFrames: () => document.querySelectorAll('iframe[name="dashbridge-iframe"]'),
     getCapturePrepared: () => defaultCapturePrepared,
-    setCapturePrepared: setDashboardCapturePrepared,
+    setCapturePrepared: dashBridgeCapture.setPrepared,
     captureAllPanels: captureAllDashboardPanels,
     renderProfileSwitcher,
     showPrompt,
@@ -577,7 +541,7 @@ DashBridgeIframeMessageController.create({
     acceptReportSnapshot: dashBridgeReportTransport.acceptSnapshot,
     acceptPanelAnalysis: dashBridgePanelAnalysisController.accept,
     capturePanel: captureDashbridgePanel,
-    setCapturePrepared: setDashboardCapturePrepared,
+    setCapturePrepared: dashBridgeCapture.setPrepared,
     savePanels,
     syncPanelAnalysisAction,
     acceptTitleResponse: dashBridgePanelToolsController.acceptTitleResponse,

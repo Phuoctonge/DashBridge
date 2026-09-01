@@ -7,12 +7,21 @@ globalThis.DashBridgeCapture = (() => {
         getPanels,
         getActiveProfile,
         getDefaultCapturePrepared,
+        setDefaultCapturePrepared,
         getCompactCaptureDimensions,
         forceLoadPanel,
-        syncDashboardCaptureToggles,
         postToDashboardFrame,
         showAlert,
+        storage = chrome.storage.sync,
+        documentRef = document,
     }) {
+        if (typeof getDefaultCapturePrepared !== 'function'
+            || typeof setDefaultCapturePrepared !== 'function'
+            || typeof getCompactCaptureDimensions !== 'function'
+            || typeof postToDashboardFrame !== 'function'
+            || typeof storage?.set !== 'function') {
+            throw new TypeError('DashBridge capture dependencies are incomplete');
+        }
         let panelCaptureInProgress = false;
         let archiveCaptureInProgress = false;
         let lastPanelCaptureAt = 0;
@@ -26,6 +35,39 @@ globalThis.DashBridgeCapture = (() => {
                 .trim()
                 .slice(0, 100);
             return cleaned || fallback;
+        };
+
+        const syncToggles = enabled => {
+            const dimensions = getCompactCaptureDimensions();
+            documentRef.querySelectorAll('.btn-capture-toggle').forEach(button => {
+                button.classList.toggle('capture-toggle-active', enabled);
+                button.setAttribute('aria-pressed', String(enabled));
+                button.title = enabled
+                    ? `Компактный снимок ${dimensions.width}×${dimensions.height}: включён`
+                    : `Компактный снимок ${dimensions.width}×${dimensions.height}: выключен`;
+                button.setAttribute('aria-label', button.title);
+            });
+        };
+
+        const broadcastPrepared = enabled => {
+            const dimensions = getCompactCaptureDimensions();
+            documentRef.querySelectorAll('iframe[name="dashbridge-iframe"]').forEach(iframe => {
+                postToDashboardFrame(iframe, {
+                    action: 'dashbridgeCapturePreparedDefaultChanged',
+                    enabled,
+                    outputWidth: dimensions.width,
+                    outputHeight: dimensions.height,
+                });
+            });
+        };
+
+        const setPrepared = (enabled, { persist = true } = {}) => {
+            const prepared = !!enabled;
+            setDefaultCapturePrepared(prepared);
+            syncToggles(prepared);
+            broadcastPrepared(prepared);
+            if (persist) void storage.set({ grafanaCompactScreenshot: prepared });
+            return prepared;
         };
 
         const waitForPanelRendered = (iframe, timeoutMs = 20_000) => {
@@ -228,7 +270,7 @@ globalThis.DashBridgeCapture = (() => {
                 button.innerHTML = originalHtml;
                 button.title = originalTitle;
                 lockedControls.forEach((wasDisabled, control) => { control.disabled = wasDisabled; });
-                syncDashboardCaptureToggles(getDefaultCapturePrepared());
+                syncToggles(getDefaultCapturePrepared());
                 archiveCaptureInProgress = false;
             }
         };
@@ -263,7 +305,14 @@ globalThis.DashBridgeCapture = (() => {
             }
         };
 
-        return Object.freeze({ captureAll, captureFromToolbar, capturePanel });
+        return Object.freeze({
+            captureAll,
+            captureFromToolbar,
+            capturePanel,
+            syncToggles,
+            broadcastPrepared,
+            setPrepared,
+        });
     }
 
     return Object.freeze({ create });
