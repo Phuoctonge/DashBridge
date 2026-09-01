@@ -7,7 +7,8 @@ const html = fs.readFileSync('pages/batch/batch.html', 'utf8');
 const source = fs.readFileSync('pages/batch/batch.js', 'utf8')
     + fs.readFileSync('pages/batch/batch-main-run-controller.js', 'utf8');
 const picker = fs.readFileSync('pages/batch/batch-panel-picker.js', 'utf8');
-const css = fs.readFileSync('pages/batch/batch.css', 'utf8');
+const css = fs.readFileSync('pages/batch/batch.css', 'utf8')
+    + fs.readFileSync('pages/batch/batch-workflow.css', 'utf8');
 
 assert(html.includes('id="getPanelsBtn"')
     && html.includes('id="panelsModal"')

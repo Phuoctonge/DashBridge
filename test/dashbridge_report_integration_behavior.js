@@ -21,7 +21,8 @@ const tools = read('js/content/grafana-panel-tools.js')
 const visual = `${read('js/content/grafana-report-snapshot.js')}\n${read('js/content/grafana-visual-engine.js')}`;
 const tableReport = read('js/content/grafana-table-report.js');
 const schema = read('js/shared/local-state-schema.js');
-const css = read('pages/dashbridge/dashbridge.css');
+const css = ['dashbridge.css', 'dashbridge-dialogs.css', 'dashbridge-interactions.css', 'dashbridge-report.css']
+    .map(file => read(`pages/dashbridge/${file}`)).join('\n');
 
 assert(html.includes('id="generateReportBtn"') && html.includes('id="testReportBtn"')
     && html.includes('id="configureReportBtn"'));

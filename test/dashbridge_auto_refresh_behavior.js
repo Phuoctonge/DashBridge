@@ -14,7 +14,8 @@ const panelActionsSource = fs.readFileSync('pages/dashbridge/dashbridge-panel-ac
 const messageSource = fs.readFileSync('pages/dashbridge/dashbridge-iframe-message-controller.js', 'utf8');
 const iframeSource = fs.readFileSync('js/content/grafana-iframe.js', 'utf8');
 const html = fs.readFileSync('pages/dashbridge/dashbridge.html', 'utf8');
-const css = fs.readFileSync('pages/dashbridge/dashbridge.css', 'utf8');
+const css = ['dashbridge.css', 'dashbridge-dialogs.css', 'dashbridge-interactions.css', 'dashbridge-report.css']
+    .map(file => fs.readFileSync(`pages/dashbridge/${file}`, 'utf8')).join('\n');
 
 const initStart = source.indexOf("document.addEventListener('DOMContentLoaded', async () => {");
 const initEnd = source.indexOf('function getCompactCaptureDimensions', initStart);

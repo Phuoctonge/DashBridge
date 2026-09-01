@@ -23,7 +23,9 @@ check('Batch reloads rules when the dashboard URL changes', 'loadBatchPanelRules
 check('Batch persists rules after editor changes', 'scheduleSave' in JS and 'addEventListener' in JS)
 check('Delayed rule saving keeps the URL that was edited', 'const url = dashboardUrl.value.trim()' in JS)
 check('Changing dashboard cancels an old delayed rules save', "dashboardUrl.addEventListener('change', () => { clearTimeout(saveTimer);" in JS)
-check('Rules reset is hidden when no saved rules exist', '#resetBatchPanelRulesBtn[hidden]' in (ROOT / 'pages/batch/batch.css').read_text(encoding='utf-8'))
+batch_css = ''.join((ROOT / path).read_text(encoding='utf-8') for path in [
+    'pages/batch/batch.css', 'pages/batch/batch-workflow.css'])
+check('Rules reset is hidden when no saved rules exist', '#resetBatchPanelRulesBtn[hidden]' in batch_css)
 check('Batch rule labels match the Grafana panel settings',
       'Убрать заливку графика' in JS
       and 'Утолщить линии графика' in JS

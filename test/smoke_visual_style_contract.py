@@ -5,7 +5,8 @@ import re
 
 ROOT = Path(__file__).resolve().parent.parent
 THEME = (ROOT / "pages" / "shared" / "theme.css").read_text(encoding="utf-8")
-DASHBRIDGE_CSS = (ROOT / "pages" / "dashbridge" / "dashbridge.css").read_text(encoding="utf-8")
+DASHBRIDGE_CSS = ''.join((ROOT / 'pages/dashbridge' / path).read_text(encoding='utf-8') for path in [
+    'dashbridge.css', 'dashbridge-dialogs.css', 'dashbridge-interactions.css', 'dashbridge-report.css'])
 
 for token in (
     "--font-size-page-title: 1.375rem;",
@@ -18,8 +19,9 @@ for token in (
 ):
     assert token in THEME, f"missing shared token {token}"
 
-for stylesheet in ("pages/popup/popup.css", "pages/batch/batch.css"):
-    css = (ROOT / stylesheet).read_text(encoding="utf-8")
+for stylesheets in (("pages/popup/popup.css",), ("pages/batch/batch.css", "pages/batch/batch-workflow.css")):
+    css = ''.join((ROOT / stylesheet).read_text(encoding='utf-8') for stylesheet in stylesheets)
+    stylesheet = ' + '.join(stylesheets)
     assert "var(--tab-hover-bg)" in css, f"{stylesheet} misses tab hover token"
     assert "var(--tab-active-bg)" in css, f"{stylesheet} misses tab active token"
 
@@ -42,7 +44,7 @@ tab_button_rule = re.search(r"\.tab-btn\s*\{(?P<body>.*?)\n\s*\}", popup, re.DOT
 assert tab_button_rule, "Popup must define the main tab button style"
 assert "cursor: pointer" in tab_button_rule.group("body"), "Popup tabs must use a pointer cursor"
 
-dashbridge = (ROOT / "pages" / "dashbridge" / "dashbridge.css").read_text(encoding="utf-8")
+dashbridge = DASHBRIDGE_CSS
 assert ":root" not in dashbridge, "DashBridge retains a page-local token root"
 
 options = (ROOT / "pages/options/options.html").read_text(encoding="utf-8")

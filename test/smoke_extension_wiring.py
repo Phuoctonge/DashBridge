@@ -40,6 +40,7 @@ checks = {
         and 'js/shared/grafana-command.js' not in (ROOT / "pages/popup/popup.html").read_text(encoding="utf-8"),
     "All interactive pages load canonical shared UI theme": all(
         '../shared/theme.css' in (ROOT / page).read_text(encoding="utf-8")
+        and '../shared/theme-compat.css' in (ROOT / page).read_text(encoding="utf-8")
         for page in ("pages/popup/popup.html", "pages/batch/batch.html", "pages/dashbridge/dashbridge.html")
     ),
 }

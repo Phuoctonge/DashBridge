@@ -20,6 +20,8 @@ import sys
 # === Пути ===
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 THEME_CSS = os.path.join(ROOT, 'pages/shared/theme.css')
+THEME_COMPAT_CSS = os.path.join(ROOT, 'pages/shared/theme-compat.css')
+OPTIONS_CSS = os.path.join(ROOT, 'pages/options/options.css')
 HTML_FILES = ['pages/dashbridge/dashbridge.html', 'pages/popup/popup.html', 'pages/options/options.html', 'pages/worklog/worklog.html', 'pages/batch/batch.html']
 CSS_FILES = ['pages/dashbridge/dashbridge.css', 'pages/batch/batch.css']
 JS_FILES = ['pages/shared/theme.js']
@@ -115,6 +117,9 @@ for html_file in HTML_FILES:
         test(f"{html_file} подключает pages/shared/theme.css",
              references_file(html_file, 'href', 'pages/shared/theme.css'),
              f"pages/shared/theme.css не подключён в {html_file}")
+        test(f"{html_file} подключает pages/shared/theme-compat.css",
+             references_file(html_file, 'href', 'pages/shared/theme-compat.css'),
+             f"pages/shared/theme-compat.css не подключён в {html_file}")
 
 
 # ============================================================
@@ -173,7 +178,7 @@ if popup_html:
 print("\n=== 5.1. Стиль btn-theme ===")
 
 # Перечитываем pages/shared/theme.css (в секциях 2-4 переменная content была перезаписана)
-theme_content = read_file(THEME_CSS)
+theme_content = (read_file(THEME_CSS) or '') + '\n' + (read_file(THEME_COMPAT_CSS) or '')
 if theme_content:
     test("pages/shared/theme.css содержит стиль .btn-theme",
          '.btn-theme' in theme_content,
@@ -355,7 +360,7 @@ test("pages/worklog/worklog.html .col-date input text-align: left",
 print("\n=== 10. pages/shared/theme.css: переопределения inline-стилей pages/options/options.html ===")
 
 # Перечитываем pages/shared/theme.css свежим чтением (на случай если content был перезаписан)
-content = read_file(THEME_CSS)
+content = (read_file(THEME_COMPAT_CSS) or '') + '\n' + (read_file(OPTIONS_CSS) or '')
 if content:
     # Все переопределения должны быть с !important (inline-стили имеют специфичность 1,0,0,0)
     required_overrides = [
@@ -462,7 +467,7 @@ if options_content:
 # ============================================================
 print("\n=== 12. pages/shared/theme.css: новые utility-классы ===")
 
-content = read_file(THEME_CSS)
+content = read_file(OPTIONS_CSS)
 if content:
     new_classes = [
         '.header-content', '.interface-section', '.form-row',

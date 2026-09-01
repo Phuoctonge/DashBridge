@@ -7,7 +7,8 @@ ROOT = Path(__file__).resolve().parent.parent
 JS = (ROOT / "pages/dashbridge/dashbridge.js").read_text(encoding="utf-8") \
     + (ROOT / "pages/dashbridge/dashbridge-panel-card-controller.js").read_text(encoding="utf-8")
 RENDERER = (ROOT / "pages/dashbridge/dashbridge-renderer.js").read_text(encoding="utf-8")
-CSS = (ROOT / "pages/dashbridge/dashbridge.css").read_text(encoding="utf-8")
+CSS = ''.join((ROOT / 'pages/dashbridge' / path).read_text(encoding='utf-8') for path in [
+    'dashbridge.css', 'dashbridge-dialogs.css', 'dashbridge-interactions.css', 'dashbridge-report.css'])
 
 
 checks = {

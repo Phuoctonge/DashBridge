@@ -6,7 +6,9 @@ const fs = require('fs');
 const read = path => fs.readFileSync(path, 'utf8');
 const themeCss = read('pages/shared/theme.css');
 const themeJs = read('pages/shared/theme.js');
-const dashboardCss = read('pages/dashbridge/dashbridge.css');
+const dashboardCss = ['dashbridge.css', 'dashbridge-dialogs.css', 'dashbridge-interactions.css', 'dashbridge-report.css']
+    .map(file => read(`pages/dashbridge/${file}`)).join('\n');
+const batchCss = read('pages/batch/batch.css') + read('pages/batch/batch-workflow.css');
 const dashboardJs = read('pages/dashbridge/dashbridge.js');
 const dashboardCards = read('pages/dashbridge/dashbridge-panel-card-controller.js');
 const renderer = read('pages/dashbridge/dashbridge-renderer.js');
@@ -46,7 +48,7 @@ assert(!renderer.includes('card.style.width = width'), 'panel width must no long
 assert(dashboardCards.includes("card.dataset.panelSize = panel.width === '100%'"),
     'editing a panel must refresh its semantic grid size');
 
-assert(read('pages/batch/batch.css').includes('max-width: 80rem'), 'Batch must use the wider responsive workspace');
+assert(batchCss.includes('max-width: 80rem'), 'Batch must use the wider responsive workspace');
 const testRunnerCss = read('pages/test-runner/test-runner.css');
 assert(testRunnerCss.includes('.tr-layout') && testRunnerCss.includes('max-width: none')
     && testRunnerCss.includes('.tr-input-panel') && testRunnerCss.includes('width: 100%')
@@ -87,7 +89,7 @@ assert(panelSettings.includes('const getInterfaceScale = () =>')
     && panelSettings.includes('@media (max-width:480px)'),
     'floating graph settings, threshold fields and Load Average controls must scale independently of their host and stay viewport-bound');
 
-const dashbridgeCss = read('pages/dashbridge/dashbridge.css');
+const dashbridgeCss = dashboardCss;
 const grafanaPanelTools = read('js/content/grafana-panel-tools.js')
     + read('js/content/grafana-panel-menu-runtime.js');
 const grafanaContent = read('js/content/content.js');

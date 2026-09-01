@@ -137,9 +137,12 @@ grafana-panel-tools.js
 потребителем. `pages/shared/theme.js` находится в `<head>` до `<body>`, синхронно читает
 `localStorage`, затем согласует тему с `chrome.storage.sync`, исключая FOWT.
 
-`theme.js` тем же ранним путём применяет `uiScale`. Общие размеры контролов,
-иконок, отступов и читаемых областей принадлежат `pages/shared/theme.css` и задаются в
-`rem`; точные размеры capture остаются независимыми CSS-пикселями. Рабочие
+`theme.js` тем же ранним путём применяет `uiScale`. Общие tokens, размеры
+контролов, иконок, отступов и читаемых областей принадлежат
+`pages/shared/theme.css`; ограниченный слой legacy/dark compatibility находится
+в загружаемом следом `pages/shared/theme-compat.css`. Стили Options принадлежат
+`pages/options/options.css`. Все размеры задаются в `rem`; точные размеры capture
+остаются независимыми CSS-пикселями. Рабочие
 страницы реагируют на доступный viewport/container, а не на `screen.width` или
 физическое разрешение монитора. DashBridge хранит legacy `33%`/`50%`/`100%`,
 но renderer отображает их как семантические spans 12-колоночной CSS Grid.
@@ -224,7 +227,7 @@ grafana-panel-tools.js
 | Анализ CPU/RAM | `grafana-panel-analysis.js` | Расчёт, thresholds и clipboard-формат кнопок CPU Usage/Memory. |
 | Grafana time | `grafana-time.js` | DashBridge, iframe. |
 | Clipboard диапазона | `grafana-time-picker-clipboard.js`, `dashbridge-time-state.js` | Direct Grafana, DashBridge. |
-| Theme и UI scale | `pages/shared/theme.js`, `pages/shared/theme.css` | Все extension pages. |
+| Theme и UI scale | `pages/shared/theme.js`, `pages/shared/theme.css`, `pages/shared/theme-compat.css` | Все extension pages; compatibility CSS загружается между core theme и page stylesheet. |
 | Проверка обновлений | `update-check.js`, `popup-updates.js` | Popup. |
 | Windows install/update | `scripts/Install-DashBridge.ps1` | Отдельный пользовательский процесс, не extension runtime. |
 

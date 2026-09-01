@@ -7,7 +7,8 @@ const html = fs.readFileSync('pages/dashbridge/dashbridge.html', 'utf8');
 const source = fs.readFileSync('pages/dashbridge/dashbridge-panel-addition-controller.js', 'utf8');
 const coordinator = fs.readFileSync('pages/dashbridge/dashbridge.js', 'utf8')
     + fs.readFileSync('pages/dashbridge/dashbridge-page-ui-controller.js', 'utf8');
-const css = fs.readFileSync('pages/dashbridge/dashbridge.css', 'utf8');
+const css = ['dashbridge.css', 'dashbridge-dialogs.css', 'dashbridge-interactions.css', 'dashbridge-report.css']
+    .map(file => fs.readFileSync(`pages/dashbridge/${file}`, 'utf8')).join('\n');
 
 assert(html.includes('id="quickAddPanelsBtn"')
     && html.includes('id="discoverDashboardPanelsBtn"')

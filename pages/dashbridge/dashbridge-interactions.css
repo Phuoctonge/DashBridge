@@ -1,0 +1,420 @@
+/* Grafana Time Picker Style */
+.grafana-time-picker {
+    display: flex;
+    flex-direction: row;
+    width: min(38rem, calc(100vw - (2 * var(--page-gutter))));
+    overflow: hidden;
+    border-radius: var(--radius);
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+}
+
+.gtp-left {
+    flex: 1 1 22rem;
+    min-width: 0;
+    padding: 1.5rem;
+    border-right: 1px solid var(--border-color);
+}
+
+.gtp-left h4 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+.gtp-input-wrapper {
+    display: flex;
+    border: 1px solid var(--border-color);
+    border-radius: 2px;
+    background: var(--bg-color);
+}
+
+.gtp-input-wrapper input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text-main);
+    padding: 0.5rem;
+    outline: none;
+}
+
+.gtp-icon-btn {
+    background: transparent;
+    border: none;
+    border-left: 1px solid var(--border-color);
+    color: var(--text-muted);
+    padding: 0 0.75rem;
+    cursor: pointer;
+}
+
+.gtp-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1.5rem;
+}
+
+.gtp-clipboard-btn {
+    flex: 0 0 2.25rem;
+    width: 2.25rem;
+    min-width: 2.25rem;
+    height: 2.25rem;
+    padding: 0.5rem;
+}
+
+.gtp-clipboard-btn svg {
+    flex: 0 0 1rem;
+    width: 1rem;
+    height: 1rem;
+}
+
+.gtp-apply-btn {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+}
+
+.gtp-right {
+    width: 250px;
+    display: flex;
+    flex-direction: column;
+}
+
+.gtp-search {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.gtp-search input {
+    width: 100%;
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    outline: none;
+    font-family: inherit;
+}
+
+.quick-ranges-list {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    max-height: 400px;
+}
+
+.quick-range-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-main);
+    text-align: left;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+}
+
+.quick-range-btn:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.quick-ranges {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+
+.quick-ranges .btn {
+    justify-content: center;
+}
+
+.modal-actions .btn {
+    flex: 1;
+    justify-content: center;
+}
+
+.empty-state {
+    grid-column: 1 / -1;
+    width: 100%;
+    text-align: center;
+    padding: 4rem;
+    color: var(--text-muted);
+}
+
+@container dashboard (max-width: 70rem) {
+    .panel-card[data-panel-size="third"],
+    .panel-card[data-panel-size="half"] {
+        grid-column: span 6;
+    }
+}
+
+@container dashboard (max-width: 48rem) {
+    .panel-card {
+        grid-column: 1 / -1 !important;
+    }
+}
+
+@media (max-width: 90rem) {
+    header > .controls {
+        flex: 1 0 100%;
+        justify-content: flex-end;
+    }
+}
+
+@media (max-width: 64rem) {
+    header {
+        align-items: flex-start;
+    }
+
+    .time-controls {
+        flex: 1 1 30rem;
+        flex-wrap: wrap;
+    }
+
+    header > .controls {
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 48rem) {
+    header {
+        position: relative;
+    }
+
+    .logo {
+        flex: 0 0 auto;
+    }
+
+    .profile-controls,
+    .time-controls {
+        margin-left: 0;
+    }
+
+    .profile-controls {
+        flex: 1 1 12rem;
+    }
+
+    .profile-picker-btn {
+        width: 100%;
+        max-width: none;
+    }
+
+    .time-controls {
+        flex: 1 1 100%;
+    }
+
+    .grafana-time-picker {
+        position: fixed !important;
+        inset: var(--page-gutter) !important;
+        width: auto;
+        max-height: calc(100dvh - (2 * var(--page-gutter)));
+        flex-direction: column;
+        overflow: auto;
+    }
+
+    .gtp-left {
+        border-right: 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .gtp-right {
+        width: 100%;
+    }
+
+    .quick-ranges-list {
+        max-height: 14rem;
+    }
+
+    .controls > *,
+    .dashboard-capture-controls {
+        max-width: 100%;
+    }
+
+    .empty-state {
+        padding: 2rem 1rem;
+    }
+}
+
+@media (max-width: 30rem) {
+    header .btn {
+        padding-inline: 0.625rem;
+    }
+
+    .dashboard-capture-all span,
+    #crosshairMenuBtn > span:first-of-type {
+        display: none;
+    }
+}
+
+@media (hover: none) {
+    .panel-actions {
+        opacity: 1;
+    }
+}
+
+.dropdown-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: none;
+    padding: 0.5rem 1rem;
+    color: var(--text-main);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.dropdown-item:hover {
+    background: var(--btn-hover);
+}
+
+/* в”Ђв”Ђ Drag & Drop в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+
+.drag-handle {
+    cursor: grab;
+    padding: 2px 4px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    user-select: none;
+    border-radius: 3px;
+    transition: color 0.15s, background 0.15s;
+    flex-shrink: 0;
+}
+
+.drag-handle:hover {
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.07);
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+}
+
+/* РљР°СЂС‚РѕС‡РєР° РІ РїСЂРѕС†РµСЃСЃРµ РїРµСЂРµС‚Р°СЃРєРёРІР°РЅРёСЏ */
+.panel-card.dragging {
+    opacity: 0.45;
+    border-style: dashed;
+    border-color: var(--primary);
+    box-shadow: none;
+}
+
+/* Grafana iframe is cross-origin and would otherwise swallow drop events. */
+.dashboard-container.is-dragging iframe {
+    pointer-events: none;
+}
+
+.panel-card.drag-over-left,
+.panel-card.drag-over-right {
+    position: relative;
+}
+
+.panel-card.drag-over-left::before,
+.panel-card.drag-over-right::after {
+    content: '';
+    position: absolute;
+    top: 12px;
+    bottom: 12px;
+    width: 5px;
+    border-radius: 999px;
+    background: var(--primary);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--primary) 75%, transparent);
+    z-index: 10;
+    pointer-events: none;
+}
+
+.panel-card.drag-over-left::before {
+    left: 12px;
+}
+
+.panel-card.drag-over-right::after {
+    right: 12px;
+}
+
+/* в”Ђв”Ђ Fullscreen в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+
+.panel-card.fullscreen {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    z-index: 500;
+    border-radius: 0 !important;
+    border: none !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    /* РџРµСЂРµРѕРїСЂРµРґРµР»СЏРµРј inline height, Р·Р°РґР°РЅРЅС‹Р№ С‡РµСЂРµР· style */
+    min-height: unset;
+}
+
+/* Р’ fullscreen РєРЅРѕРїРєРё СѓРїСЂР°РІР»РµРЅРёСЏ РІСЃРµРіРґР° РІРёРґРЅС‹ */
+.panel-card.fullscreen .panel-actions {
+    opacity: 1 !important;
+    background-color: var(--bg-color);
+    border-radius: 0 0 6px 6px;
+    border: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.panel-card.dashbridge-panel-capture-active .panel-actions {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    transition: none !important;
+}
+
+/* РљРЅРѕРїРєР° РІС‹С…РѕРґР° РёР· fullscreen вЂ” РІС‹РґРµР»СЏРµС‚СЃСЏ */
+.panel-card.fullscreen .btn-fullscreen {
+    font-weight: 700;
+    color: var(--primary) !important;
+}
+
+.panel-card.threshold-exceeded {
+    border-color: #e24d42 !important;
+    box-shadow: 0 0 0 1px color-mix(in srgb, #e24d42 55%, transparent), var(--shadow-sm);
+}
+
+#dashbridgeThresholdNotifications {
+    position: fixed;
+    right: 1.125rem;
+    bottom: 1.125rem;
+    z-index: 1000;
+    width: min(22.5rem, calc(100vw - 2.25rem));
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    pointer-events: none;
+}
+
+.threshold-notification {
+    position: relative;
+    display: grid;
+    gap: 0.3125rem;
+    padding: 0.75rem 2.375rem 0.75rem 0.875rem;
+    border: 1px solid #e24d42;
+    border-radius: 0.5rem;
+    background: var(--card-bg);
+    color: var(--text-main);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
+    pointer-events: auto;
+    font-size: 0.84rem;
+}
+
+.threshold-notification button {
+    position: absolute;
+    top: 0.375rem;
+    right: 0.5rem;
+    border: 0;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 1.25rem;
+    line-height: 1;
+}
+
+.threshold-notification-status {
+    color: #e24d42;
+    font-weight: 700;
+}
+

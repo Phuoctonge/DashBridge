@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Визуальный аудит: находит все захардкоженные цвета в HTML-файлах
-и проверяет, что для каждого проблемного селектора есть переопределение в pages/shared/theme.css.
+и проверяет, что для каждого проблемного селектора есть переопределение в слоях общей темы.
 """
 import re
 import os
@@ -12,6 +12,7 @@ sys.stdout.reconfigure(encoding='utf-8')
 WORKSPACE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HTML_FILES = ['pages/dashbridge/dashbridge.html', 'pages/popup/popup.html', 'pages/options/options.html', 'pages/worklog/worklog.html', 'pages/batch/batch.html']
 THEME_CSS = os.path.join(WORKSPACE, 'pages/shared/theme.css')
+THEME_COMPAT_CSS = os.path.join(WORKSPACE, 'pages/shared/theme-compat.css')
 
 # Цвета, которые точно нужно переопределять в тёмной теме
 NEEDS_OVERRIDE = {
@@ -80,6 +81,8 @@ def main():
 
     with open(THEME_CSS, 'r', encoding='utf-8') as f:
         theme_content = f.read()
+    with open(THEME_COMPAT_CSS, 'r', encoding='utf-8') as f:
+        theme_content += '\n' + f.read()
 
     dark_selectors = get_dark_selectors(theme_content)
     print(f"\n[*] Найдено селекторов в [data-theme=\"dark\"]: {len(dark_selectors)}")

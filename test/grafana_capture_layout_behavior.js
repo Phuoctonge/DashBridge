@@ -36,7 +36,8 @@ const dashboard = fs.readFileSync('pages/dashbridge/dashbridge.js', 'utf8')
     + fs.readFileSync('pages/dashbridge/dashbridge-page-ui-controller.js', 'utf8')
     + fs.readFileSync('pages/dashbridge/dashbridge-iframe-message-controller.js', 'utf8');
 const dashboardCapture = fs.readFileSync('pages/dashbridge/dashbridge-capture.js', 'utf8');
-const dashboardCss = fs.readFileSync('pages/dashbridge/dashbridge.css', 'utf8');
+const dashboardCss = ['dashbridge.css', 'dashbridge-dialogs.css', 'dashbridge-interactions.css', 'dashbridge-report.css']
+    .map(file => fs.readFileSync(`pages/dashbridge/${file}`, 'utf8')).join('\n');
 const dashboardHtml = fs.readFileSync('pages/dashbridge/dashbridge.html', 'utf8');
 assert(tools.includes("await session?.restore?.()"), 'native capture must restore its temporary layout');
 assert(tools.includes("classList.remove('dashbridge-panel-capture-mode')"), 'capture-only tooltip suppression must always be removed');

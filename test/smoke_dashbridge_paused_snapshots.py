@@ -24,7 +24,8 @@ check('global refresh does not process paused panels', 'refreshPausedPanels' not
 check('ordinary rendering eagerly loads only active panels', 'if (!panel.paused)' in CARD and 'navigateDashboardFrame(iframe, iframe.dataset.src)' in CARD)
 
 IFRAME = (ROOT / 'js/content/grafana-iframe.js').read_text(encoding='utf-8')
-CSS = (ROOT / 'pages/dashbridge/dashbridge.css').read_text(encoding='utf-8')
+CSS = ''.join((ROOT / 'pages/dashbridge' / path).read_text(encoding='utf-8') for path in [
+    'dashbridge.css', 'dashbridge-dialogs.css', 'dashbridge-interactions.css', 'dashbridge-report.css'])
 check('iframe reports Grafana panel title', "action: 'dashbridgePanelTitle'" in IFRAME)
 check('iframe waits for Grafana React title after page load',
       'readinessTimer = setTimeout(inspectReadiness, delay)' in IFRAME

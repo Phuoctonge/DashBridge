@@ -17,6 +17,7 @@ sys.stdout.reconfigure(encoding='utf-8')
 
 WORKSPACE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 THEME_CSS = os.path.join(WORKSPACE, 'pages/shared/theme.css')
+THEME_COMPAT_CSS = os.path.join(WORKSPACE, 'pages/shared/theme-compat.css')
 
 
 def hex_to_rgb(hex_color):
@@ -81,6 +82,8 @@ def main():
 
     with open(THEME_CSS, 'r', encoding='utf-8') as f:
         theme_content = f.read()
+    with open(THEME_COMPAT_CSS, 'r', encoding='utf-8') as f:
+        theme_content += '\n' + f.read()
 
     light_vars, dark_vars = parse_theme_colors(theme_content)
 
