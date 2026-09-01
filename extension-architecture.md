@@ -2,7 +2,7 @@
 
 > Сверено с версией 2.4.1, исходным кодом и тестами 2026-08-29. Здесь описан
 > фактически работающий код; структура и dependency graph повторно проверены
-> 2026-08-30. Незавершённые
+> 2026-09-01. Незавершённые
 > направления вынесены в `docs/roadmap.md`, ключевые прежние решения — в
 > `docs/history/architecture-decisions.md`.
 
@@ -101,6 +101,10 @@ grafana-series-capture.js
 grafana-panel-definition.js
 grafana-unit.js
 grafana-table-report.js
+grafana-legend-visuals.js
+grafana-threshold-visuals.js
+grafana-report-snapshot.js
+grafana-series-styles.js
 grafana-visual-engine.js
 grafana-compact-layout.js
 grafana-panel-settings-modal.js

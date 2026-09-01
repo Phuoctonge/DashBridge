@@ -1453,6 +1453,7 @@
     // Batch identifies duplicate legend labels by occurrence key. The Popup
     // painter intentionally uses names, so keep this narrow key-aware path
     // only for Batch requests.
+    const escapeKeywordRegExp = value => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const resolveLegendVisibilityDesired = (visibility, key) => {
         const hasOwn = candidate => Object.prototype.hasOwnProperty.call(visibility, candidate);
         if (hasOwn(key)) return visibility[key] !== false;
@@ -2353,6 +2354,19 @@
         if (!refreshButton) return 'flot-runner-unavailable';
         refreshButton.click();
         return 'dashboard-compatibility';
+    };
+    const getPanelAnalysisTitle = panel => {
+        const selector = '[data-testid="panel title"], .panel-title-text, [class*="panel-title" i], h6[title], h2[title], h6, h2';
+        const title = panel?.querySelector?.(selector);
+        return title?.getAttribute?.('title') || title?.textContent?.trim() || '';
+    };
+    const readPanelAnalysisSettings = () => {
+        try {
+            const parsed = JSON.parse(document.documentElement.dataset.dashbridgeGrafanaAnalysisSettings || '{}');
+            return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+        } catch {
+            return {};
+        }
     };
     const openPanelSettings = panel => {
         const panelKey = getPanelStateKey(panel);
