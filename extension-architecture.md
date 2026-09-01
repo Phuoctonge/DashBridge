@@ -167,7 +167,8 @@ grafana-panel-tools.js
 | DashBridge card drag lifecycle | `dashbridge-drag-controller.js` | Drag enable/reset, drop markers, DOM reorder and persisted panel order. |
 | DashBridge panel analysis UI | `dashbridge-panel-analysis-controller.js` | CPU/RAM modal, exact iframe/request correlation, retry after iframe readiness and cancel cleanup. |
 | Неблокирующие модальные диалоги DashBridge | `dashbridge-modal.js` | Профили, импорт/экспорт, настройки и capture в `dashbridge.js`. |
-| URL и идентичность панелей DashBridge | `dashbridge-panel-url.js`, `grafana-panel-identity.js` | Добавление, поиск дублей, импорт и iframe-настройки в `dashbridge.js`. |
+| URL и идентичность панелей DashBridge | `dashbridge-panel-url.js`, `grafana-panel-identity.js` | Нормализация URL и поиск дублей для добавления, импорта и iframe-настроек. |
+| Добавление панелей DashBridge | `dashbridge-panel-addition-controller.js` | Одиночный URL, список ID и dashboard picker; безопасный inventory, дедупликация и применение к активному профилю. |
 | JSON transfer панелей DashBridge | `dashbridge-panel-transfer.js`, `dashbridge-panel-transfer-controller.js` | Полный export payload, строгая нормализация import, новые ID, FileReader/download lifecycle и применение результата к профилю. |
 | UI сводного отчёта и SLA | `dashbridge-report-ui.js` | Настройка профиля, редактор фраз панели, валидация warning/critical и modal cleanup; состояние передаётся через явные callbacks `dashbridge.js`. |
 | Transport сводного отчёта | `dashbridge-report-transport.js` | Ожидание iframe, request ID, timeout/abort и точная корреляция ответа. |

@@ -9,6 +9,7 @@ JS = (ROOT / "pages/dashbridge/dashbridge.js").read_text(encoding="utf-8") + PRO
 PANEL_URL = (ROOT / "pages/dashbridge/dashbridge-panel-url.js").read_text(encoding="utf-8")
 PANEL_TRANSFER = (ROOT / "pages/dashbridge/dashbridge-panel-transfer.js").read_text(encoding="utf-8")
 PANEL_TRANSFER_CONTROLLER = (ROOT / "pages/dashbridge/dashbridge-panel-transfer-controller.js").read_text(encoding="utf-8")
+PANEL_ADDITION_CONTROLLER = (ROOT / "pages/dashbridge/dashbridge-panel-addition-controller.js").read_text(encoding="utf-8")
 PROFILE_STORE = (ROOT / "js/shared/dashbridge-profile-store.js").read_text(encoding="utf-8")
 TIME_STATE = (ROOT / "pages/dashbridge/dashbridge-time-state.js").read_text(encoding="utf-8")
 TIME_CONTROLLER = (ROOT / "pages/dashbridge/dashbridge-time-controller.js").read_text(encoding="utf-8")
@@ -47,13 +48,15 @@ checks = {
     "quick panel addition builds d-solo URLs": "function buildDashBridgeSoloPanelUrl" in PANEL_URL and "url.searchParams.set('panelId', panelId)" in PANEL_URL,
     "quick panel addition validates and deduplicates IDs": "function parseQuickPanelIds" in PANEL_URL and "new Set(tokens)" in PANEL_URL,
     "all panel addition paths use canonical duplicate checks": "const getCurrentProfilePanelIdentities" in PROFILE
-        and "currentProfileHasPanel(url)" in JS
-        and JS.count("getCurrentProfilePanelIdentities()") >= 4
+        and "currentProfileHasPanel(url)" in PANEL_ADDITION_CONTROLLER
+        and PANEL_ADDITION_CONTROLLER.count("getCurrentProfilePanelIdentities()") >= 3
+        and "getCurrentProfilePanelIdentities," in JS
         and 'src="../../js/shared/grafana-panel-identity.js"' in HTML,
     "dashboard panel picker reuses Batch inventory without replacing quick add": all(token in HTML for token in [
         'id="quickAddPanelsBtn"', 'id="discoverDashboardPanelsBtn"', 'id="dashboardPanelPickerOverlay"',
         'src="../../js/shared/grafana-dashboard-api.js"'
-    ]) and "fetchGrafanaDashboardPanels(dashboardUrl)" in JS,
+    ]) and "fetchDashboardPanels(dashboardUrl)" in PANEL_ADDITION_CONTROLLER
+        and "fetchDashboardPanels: fetchGrafanaDashboardPanels" in JS,
 }
 
 run_checks(checks)

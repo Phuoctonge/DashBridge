@@ -4,7 +4,8 @@ const assert = require('assert');
 const fs = require('fs');
 
 const html = fs.readFileSync('pages/dashbridge/dashbridge.html', 'utf8');
-const source = fs.readFileSync('pages/dashbridge/dashbridge.js', 'utf8');
+const source = fs.readFileSync('pages/dashbridge/dashbridge-panel-addition-controller.js', 'utf8');
+const coordinator = fs.readFileSync('pages/dashbridge/dashbridge.js', 'utf8');
 const css = fs.readFileSync('pages/dashbridge/dashbridge.css', 'utf8');
 
 assert(html.includes('id="quickAddPanelsBtn"')
@@ -16,14 +17,12 @@ assert(html.includes('Добавить панели')
     && html.includes('Выбрать из дашборда'),
     'panel addition actions must use distinct user-facing names');
 assert(html.indexOf('js/shared/grafana-url.js') < html.indexOf('js/shared/grafana-dashboard-api.js')
-    && html.indexOf('js/shared/grafana-dashboard-api.js') < html.indexOf('dashbridge.js'),
+    && html.indexOf('js/shared/grafana-dashboard-api.js') < html.indexOf('dashbridge-panel-addition-controller.js')
+    && html.indexOf('dashbridge-panel-addition-controller.js') < html.indexOf('dashbridge.js'),
     'DashBridge must load the same dashboard inventory API used by Batch before its controller');
 
-const pickerStart = source.indexOf('// Independent dashboard inventory picker.');
-const pickerEnd = source.indexOf('dashBridgePanelTransferController.setup()', pickerStart);
-const pickerSource = source.slice(pickerStart, pickerEnd);
-assert(pickerStart >= 0 && pickerEnd > pickerStart
-    && pickerSource.includes('fetchGrafanaDashboardPanels(dashboardUrl)')
+const pickerSource = source;
+assert(pickerSource.includes('fetchDashboardPanels(dashboardUrl)')
     && pickerSource.includes('result.panelList'),
     'the picker must use the shared Batch dashboard inventory function');
 assert(pickerSource.includes('title.textContent = panel.title')
@@ -39,6 +38,10 @@ assert(pickerSource.includes('const existingPanelIdentities = getCurrentProfileP
     && pickerSource.includes('checkbox.disabled = existing')
     && pickerSource.includes("title: panel.title, width, height: '350px'"),
     'existing panels must be disabled while selected titles are persisted with new cards');
+assert(coordinator.includes('fetchDashboardPanels: fetchGrafanaDashboardPanels')
+    && coordinator.includes('dashBridgePanelAdditionController.setup()')
+    && coordinator.includes('dashBridgePanelAdditionController.closeDashboardPickerIfOpen()'),
+    'the coordinator must inject the shared API and retain setup/escape orchestration');
 assert(css.includes('.dashboard-panel-picker-modal')
     && css.includes('.dashboard-panel-picker-list')
     && css.includes('.dashboard-panel-picker-item.is-existing'),

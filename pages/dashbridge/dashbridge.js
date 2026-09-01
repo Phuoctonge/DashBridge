@@ -157,6 +157,21 @@ const dashBridgePanelTransferController = DashBridgePanelTransferController.crea
     renderProfileSwitcher,
     renderDashboard,
 });
+const dashBridgePanelAdditionController = DashBridgePanelAdditionController.create({
+    normalizePanelUrl: normalizeGrafanaPanelUrl,
+    buildSoloPanelUrl: buildDashBridgeSoloPanelUrl,
+    getPanelIdentity: getProfilePanelIdentity,
+    parsePanelIds: parseQuickPanelIds,
+    parseDashboardUrl: parseGrafanaDashboardUrl,
+    fetchDashboardPanels: fetchGrafanaDashboardPanels,
+    normalizePanelMetadataText,
+    showAlert,
+    currentProfileHasPanel,
+    getCurrentProfilePanelIdentities,
+    getPanels: () => panels,
+    savePanels,
+    appendPanelCards: appendDashboardPanelCards,
+});
 
 // --- SVG-иконки ---
 const SVG_GRIP = `<svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" aria-hidden="true">
@@ -538,292 +553,13 @@ function setupEventListeners() {
         deleteProfile(activeProfileId);
     });
 
-    // --- Модал добавления панели ---
-    const modal = document.getElementById('modalOverlay');
-    document.getElementById('addPanelBtn').addEventListener('click', () => {
-        modal.style.display = 'flex';
-        document.getElementById('newPanelUrl').focus();
-    });
-    document.getElementById('closeModalBtn').addEventListener('click', () => {
-        modal.style.display = 'none';
-        document.getElementById('newPanelUrl').value = '';
-    });
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            modal.style.display = 'none';
-            document.getElementById('newPanelUrl').value = '';
-        }
-    });
-
-    document.getElementById('savePanelBtn').addEventListener('click', async () => {
-        let url = document.getElementById('newPanelUrl').value.trim();
-        const width = document.getElementById('newPanelWidth').value;
-        if (!url) { await showAlert('Укажите URL!'); return; }
-
-        try {
-            url = normalizeGrafanaPanelUrl(url);
-        } catch (e) {
-            console.error('Invalid URL format', e);
-            await showAlert('Укажите корректный URL с протоколом http или https.');
-            return;
-        }
-
-        if (currentProfileHasPanel(url)) {
-            await showAlert('Эта панель уже есть в текущем профиле.');
-            return;
-        }
-
-        const addedPanel = { id: crypto.randomUUID(), src: url, width, height: '350px' };
-        panels.push(addedPanel);
-        savePanels();
-        appendDashboardPanelCards([addedPanel]);
-        modal.style.display = 'none';
-        document.getElementById('newPanelUrl').value = '';
-    });
-
-    // --- Экспорт / Импорт ---
-    // Quick addition of several panels from one dashboard URL.
-    const quickAddModal = document.getElementById('quickAddModalOverlay');
-    const clearQuickAddForm = () => {
-        document.getElementById('quickAddDashboardUrl').value = '';
-        document.getElementById('quickAddPanelIds').value = '';
-    };
-    const closeQuickAddModal = () => {
-        quickAddModal.style.display = 'none';
-        clearQuickAddForm();
-    };
-
-    document.getElementById('quickAddPanelsBtn').addEventListener('click', () => {
-        quickAddModal.style.display = 'flex';
-        document.getElementById('quickAddDashboardUrl').focus();
-    });
-    document.getElementById('closeQuickAddModalBtn').addEventListener('click', closeQuickAddModal);
-    quickAddModal.addEventListener('click', event => {
-        if (event.target === quickAddModal) closeQuickAddModal();
-    });
-    document.getElementById('saveQuickPanelsBtn').addEventListener('click', async () => {
-        const dashboardUrl = document.getElementById('quickAddDashboardUrl').value.trim();
-        const width = document.getElementById('quickAddPanelWidth').value;
-        if (!dashboardUrl) {
-            await showAlert('Укажите URL дашборда Grafana.');
-            return;
-        }
-
-        let panelIds;
-        try {
-            panelIds = parseQuickPanelIds(document.getElementById('quickAddPanelIds').value);
-            if (!panelIds.length) throw new Error('Укажите хотя бы один ID панели.');
-        } catch (error) {
-            await showAlert(error.message);
-            return;
-        }
-
-        let panelUrls;
-        try {
-            panelUrls = panelIds.map(panelId => buildDashBridgeSoloPanelUrl(dashboardUrl, panelId));
-        } catch (error) {
-            await showAlert(error.message || 'Не удалось подготовить URL панелей.');
-            return;
-        }
-
-        const existingPanelIdentities = getCurrentProfilePanelIdentities();
-        const newPanels = panelUrls
-            .filter(url => {
-                const identity = getProfilePanelIdentity(url);
-                if (!identity || existingPanelIdentities.has(identity)) return false;
-                existingPanelIdentities.add(identity);
-                return true;
-            })
-            .map(url => ({ id: crypto.randomUUID(), src: url, width, height: '350px' }));
-
-        if (!newPanels.length) {
-            await showAlert('Все указанные панели уже есть в текущем профиле.');
-            return;
-        }
-
-        panels.push(...newPanels);
-        savePanels();
-        appendDashboardPanelCards(newPanels);
-        closeQuickAddModal();
-        if (newPanels.length !== panelIds.length) {
-            await showAlert(`Добавлено панелей: ${newPanels.length}. Уже существующие панели пропущены.`);
-        }
-    });
-
-    // Independent dashboard inventory picker. The existing ID-based flow above
-    // remains available for users who already know the panel IDs.
-    const dashboardPicker = document.getElementById('dashboardPanelPickerOverlay');
-    const dashboardPickerUrl = document.getElementById('dashboardPanelPickerUrl');
-    const dashboardPickerStatus = document.getElementById('dashboardPanelPickerStatus');
-    const dashboardPickerSelection = document.getElementById('dashboardPanelPickerSelection');
-    const dashboardPickerList = document.getElementById('dashboardPanelPickerList');
-    const dashboardPickerAdd = document.getElementById('addSelectedDashboardPanelsBtn');
-    const dashboardPickerLoad = document.getElementById('loadDashboardPanelsBtn');
-    let dashboardPickerState = null;
-    let dashboardPickerLoadVersion = 0;
-
-    const updateDashboardPickerSelection = () => {
-        const selected = dashboardPickerList.querySelectorAll('input[type="checkbox"]:checked').length;
-        dashboardPickerAdd.disabled = selected === 0;
-        if (dashboardPickerState) {
-            const available = dashboardPickerList.querySelectorAll('input[type="checkbox"]:not(:disabled)').length;
-            dashboardPickerStatus.textContent = available
-                ? `Выбрано панелей: ${selected} из ${available}.`
-                : 'Все найденные панели уже добавлены в текущий профиль.';
-        }
-    };
-    const resetDashboardPicker = () => {
-        dashboardPickerLoadVersion += 1;
-        dashboardPickerState = null;
-        dashboardPickerUrl.value = '';
-        dashboardPickerStatus.textContent = '';
-        dashboardPickerList.replaceChildren();
-        dashboardPickerSelection.hidden = true;
-        dashboardPickerAdd.disabled = true;
-        dashboardPickerLoad.disabled = false;
-        dashboardPickerLoad.textContent = 'Получить панели';
-    };
-    const closeDashboardPicker = () => {
-        dashboardPicker.style.display = 'none';
-        resetDashboardPicker();
-    };
-    const renderDashboardPickerPanels = (dashboardUrl, panelList) => {
-        const existingPanelIdentities = getCurrentProfilePanelIdentities();
-        const safePanels = (Array.isArray(panelList) ? panelList : [])
-            .filter(panel => /^\d+$/.test(String(panel?.id || '')) && Number(panel.id) > 0)
-            .slice(0, 2000)
-            .map(panel => ({
-                id: String(panel.id),
-                title: normalizePanelMetadataText(panel.title || `Panel_${panel.id}`, 240),
-                type: normalizePanelMetadataText(panel.type || '', 80),
-                url: buildDashBridgeSoloPanelUrl(dashboardUrl, String(panel.id))
-            }));
-        dashboardPickerList.replaceChildren();
-        safePanels.forEach((panel, index) => {
-            const existing = existingPanelIdentities.has(getProfilePanelIdentity(panel.url));
-            const item = document.createElement('label');
-            item.className = `dashboard-panel-picker-item${existing ? ' is-existing' : ''}`;
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.dataset.panelIndex = String(index);
-            checkbox.checked = !existing;
-            checkbox.disabled = existing;
-            checkbox.addEventListener('change', updateDashboardPickerSelection);
-            const title = document.createElement('span');
-            title.className = 'dashboard-panel-picker-item-title';
-            title.textContent = panel.title;
-            const meta = document.createElement('span');
-            meta.className = 'dashboard-panel-picker-item-meta';
-            meta.textContent = existing
-                ? `ID ${panel.id} · уже добавлена`
-                : `ID ${panel.id}${panel.type ? ` · ${panel.type}` : ''}`;
-            item.append(checkbox, title, meta);
-            dashboardPickerList.appendChild(item);
-        });
-        dashboardPickerState = { dashboardUrl, panels: safePanels };
-        dashboardPickerSelection.hidden = false;
-        if (!safePanels.length) {
-            dashboardPickerStatus.textContent = 'В дашборде не найдены панели с числовыми ID.';
-            dashboardPickerAdd.disabled = true;
-            return;
-        }
-        updateDashboardPickerSelection();
-    };
-
-    document.getElementById('discoverDashboardPanelsBtn').addEventListener('click', () => {
-        dashboardPicker.style.display = 'flex';
-        dashboardPickerUrl.focus();
-    });
-    document.getElementById('closeDashboardPanelPickerBtn').addEventListener('click', closeDashboardPicker);
-    document.getElementById('cancelDashboardPanelPickerBtn').addEventListener('click', closeDashboardPicker);
-    dashboardPicker.addEventListener('click', event => {
-        if (event.target === dashboardPicker) closeDashboardPicker();
-    });
-    dashboardPickerLoad.addEventListener('click', async () => {
-        const dashboardUrl = dashboardPickerUrl.value.trim();
-        let dashboardLocation = null;
-        try { dashboardLocation = new URL(dashboardUrl); } catch { dashboardLocation = null; }
-        if (!parseGrafanaDashboardUrl(dashboardUrl)
-            || !['http:', 'https:'].includes(dashboardLocation?.protocol)
-            || dashboardLocation.username || dashboardLocation.password) {
-            dashboardPickerStatus.textContent = 'Укажите корректный URL дашборда Grafana вида /d/...';
-            return;
-        }
-        const loadVersion = ++dashboardPickerLoadVersion;
-        dashboardPickerState = null;
-        dashboardPickerSelection.hidden = true;
-        dashboardPickerList.replaceChildren();
-        dashboardPickerAdd.disabled = true;
-        dashboardPickerLoad.disabled = true;
-        dashboardPickerLoad.textContent = 'Загрузка…';
-        dashboardPickerStatus.textContent = 'Получаем список панелей Grafana…';
-        try {
-            const result = await fetchGrafanaDashboardPanels(dashboardUrl);
-            if (loadVersion !== dashboardPickerLoadVersion || dashboardPicker.style.display !== 'flex') return;
-            renderDashboardPickerPanels(dashboardUrl, result.panelList);
-        } catch (error) {
-            if (loadVersion !== dashboardPickerLoadVersion) return;
-            const unauthorized = [401, 403].includes(Number(error?.status))
-                || error?.code === 'GRAFANA_AUTH_REQUIRED';
-            dashboardPickerStatus.textContent = unauthorized
-                ? 'Требуется авторизация Grafana. Откройте дашборд в обычной вкладке, войдите и повторите запрос.'
-                : `Не удалось получить панели: ${String(error?.message || error).slice(0, 300)}`;
-        } finally {
-            if (loadVersion === dashboardPickerLoadVersion) {
-                dashboardPickerLoad.disabled = false;
-                dashboardPickerLoad.textContent = 'Получить панели';
-            }
-        }
-    });
-    document.getElementById('selectAllDashboardPanelsBtn').addEventListener('click', () => {
-        dashboardPickerList.querySelectorAll('input[type="checkbox"]:not(:disabled)')
-            .forEach(input => { input.checked = true; });
-        updateDashboardPickerSelection();
-    });
-    document.getElementById('clearDashboardPanelsBtn').addEventListener('click', () => {
-        dashboardPickerList.querySelectorAll('input[type="checkbox"]:not(:disabled)')
-            .forEach(input => { input.checked = false; });
-        updateDashboardPickerSelection();
-    });
-    dashboardPickerAdd.addEventListener('click', async () => {
-        if (!dashboardPickerState) return;
-        const selectedIndexes = [...dashboardPickerList.querySelectorAll('input[type="checkbox"]:checked')]
-            .map(input => Number(input.dataset.panelIndex))
-            .filter(Number.isInteger);
-        const width = document.getElementById('dashboardPanelPickerWidth').value;
-        const existingPanelIdentities = getCurrentProfilePanelIdentities();
-        const selectedPanels = selectedIndexes
-            .map(index => dashboardPickerState.panels[index])
-            .filter(panel => {
-                if (!panel) return false;
-                const identity = getProfilePanelIdentity(panel.url);
-                if (!identity || existingPanelIdentities.has(identity)) return false;
-                existingPanelIdentities.add(identity);
-                return true;
-            });
-        if (!selectedPanels.length) {
-            dashboardPickerStatus.textContent = 'Выберите хотя бы одну панель, которой ещё нет в профиле.';
-            updateDashboardPickerSelection();
-            return;
-        }
-        const addedPanels = selectedPanels.map(panel => ({
-            id: crypto.randomUUID(), src: panel.url, title: panel.title, width, height: '350px'
-        }));
-        panels.push(...addedPanels);
-        await savePanels();
-        appendDashboardPanelCards(addedPanels);
-        closeDashboardPicker();
-        if (selectedPanels.length !== selectedIndexes.length) {
-            await showAlert(`Добавлено панелей: ${selectedPanels.length}. Уже существующие панели пропущены.`);
-        }
-    });
-
+    dashBridgePanelAdditionController.setup();
     dashBridgePanelTransferController.setup();
 
     // --- ESC выходит из fullscreen ---
     document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
-        if (dashboardPicker.style.display === 'flex') closeDashboardPicker();
+        dashBridgePanelAdditionController.closeDashboardPickerIfOpen();
         closeDashboardPanelAnalysis();
         closePanelExtraActions();
         if (fullscreenPanelId) toggleFullscreen(fullscreenPanelId);

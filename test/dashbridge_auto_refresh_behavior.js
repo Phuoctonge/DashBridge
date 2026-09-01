@@ -9,6 +9,7 @@ const profileSource = fs.readFileSync('pages/dashbridge/dashbridge-profile-contr
 const frameSource = fs.readFileSync('pages/dashbridge/dashbridge-frame-controller.js', 'utf8');
 const analysisSource = fs.readFileSync('pages/dashbridge/dashbridge-panel-analysis-controller.js', 'utf8');
 const panelToolsSource = fs.readFileSync('pages/dashbridge/dashbridge-panel-tools-controller.js', 'utf8');
+const panelAdditionSource = fs.readFileSync('pages/dashbridge/dashbridge-panel-addition-controller.js', 'utf8');
 const iframeSource = fs.readFileSync('js/content/grafana-iframe.js', 'utf8');
 const html = fs.readFileSync('pages/dashbridge/dashbridge.html', 'utf8');
 const css = fs.readFileSync('pages/dashbridge/dashbridge.css', 'utf8');
@@ -100,8 +101,9 @@ assert(iframeSettingsStart >= 0 && iframeSettingsEnd > iframeSettingsStart
 
 assert(profileSource.includes('else reconcileDashboardPanelCards(previousPanelStates);')
     && source.includes('updatePanelCard(panel.id, { reloadFrame: false });')
-    && source.includes('appendDashboardPanelCards([addedPanel]);')
-    && source.includes('appendDashboardPanelCards(newPanels);')
+    && panelAdditionSource.includes('appendPanelCards([addedPanel]);')
+    && panelAdditionSource.includes('appendPanelCards(newPanels);')
+    && source.includes('appendPanelCards: appendDashboardPanelCards')
     && profileSource.includes('adoptPanelState(previous, panel)'),
     'panel-only storage sync and additions must preserve unchanged iframe elements');
 

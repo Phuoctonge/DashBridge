@@ -40,7 +40,8 @@ def read_file():
     return DASHBRIDGE_JS.read_text(encoding="utf-8") \
         + (ROOT / "pages/dashbridge/dashbridge-profile-controller.js").read_text(encoding="utf-8") \
         + (ROOT / "pages/dashbridge/dashbridge-drag-controller.js").read_text(encoding="utf-8") \
-        + (ROOT / "pages/dashbridge/dashbridge-panel-transfer-controller.js").read_text(encoding="utf-8")
+        + (ROOT / "pages/dashbridge/dashbridge-panel-transfer-controller.js").read_text(encoding="utf-8") \
+        + (ROOT / "pages/dashbridge/dashbridge-panel-addition-controller.js").read_text(encoding="utf-8")
 
 
 print("=" * 70)
@@ -52,6 +53,7 @@ renderer = (ROOT / "pages/dashbridge/dashbridge-renderer.js").read_text(encoding
 modal_content = DASHBRIDGE_MODAL_JS.read_text(encoding="utf-8")
 panel_url_content = DASHBRIDGE_PANEL_URL_JS.read_text(encoding="utf-8")
 panel_transfer_content = DASHBRIDGE_PANEL_TRANSFER_JS.read_text(encoding="utf-8")
+panel_addition_content = (ROOT / "pages/dashbridge/dashbridge-panel-addition-controller.js").read_text(encoding="utf-8")
 dashbridge_html = DASHBRIDGE_HTML.read_text(encoding="utf-8")
 
 # ════════════════════════════════════════════════════════
@@ -385,19 +387,22 @@ test(
     "searchParams.set('dashbridge', '1')" in normalize_src
 )
 
-# Нормализация должна вызываться ровно в двух местах: добавление и правка URL
+# Нормализация должна оставаться в двух потоках: через инъекцию контроллеру
+# добавления и напрямую при правке URL iframe.
 normalize_calls = re.findall(r"(?<!function )normalizeGrafanaPanelUrl\(", content)
 test(
-    "normalizeGrafanaPanelUrl вызывается 2 раза (добавление + правка)",
-    len(normalize_calls) == 2,
-    f"найдено {len(normalize_calls)} вызовов"
+    "normalizeGrafanaPanelUrl обслуживает добавление и правку URL",
+    len(normalize_calls) == 1
+    and "normalizePanelUrl: normalizeGrafanaPanelUrl" in content
+    and "url = normalizePanelUrl(url)" in panel_addition_content,
+    f"прямых вызовов найдено {len(normalize_calls)}"
 )
 
 # Обработчик savePanelBtn обязан использовать общий нормализатор,
 # а не собственную копию логики
 save_panel_handler = re.search(
-    r"getElementById\(['\"]savePanelBtn['\"]\)\.addEventListener\(['\"]click['\"],\s*async.*?\n    \}\);",
-    content,
+    r"getElementById\(['\"]savePanelBtn['\"]\)\.addEventListener\(['\"]click['\"],\s*async.*?\n\s*\}\);",
+    panel_addition_content,
     re.S
 )
 test(
@@ -408,7 +413,7 @@ save_panel_src = save_panel_handler.group(0) if save_panel_handler else ""
 
 test(
     "savePanelBtn нормализует URL через normalizeGrafanaPanelUrl",
-    "normalizeGrafanaPanelUrl(" in save_panel_src
+    "normalizePanelUrl(" in save_panel_src
 )
 test(
     "savePanelBtn не дублирует нормализацию вручную",

@@ -75,13 +75,17 @@ const html = fs.readFileSync('pages/dashbridge/dashbridge.html', 'utf8');
 assert(html.indexOf('dashbridge-panel-url.js') < html.indexOf('dashbridge.js'),
     'panel URL owner must load before the DashBridge controller');
 const controller = fs.readFileSync('pages/dashbridge/dashbridge.js', 'utf8');
+const additionController = fs.readFileSync(
+    'pages/dashbridge/dashbridge-panel-addition-controller.js', 'utf8'
+);
 assert(controller.includes('} = window.DashBridgePanelUrl;'));
 assert(controller.includes('buildDashBridgeSoloPanelUrl,'),
     'the page-local helper must have a unique name beside the classic shared Grafana URL global');
 assert(!controller.includes('buildGrafanaSoloPanelUrl'),
     'the DashBridge controller must not reference the ambiguous shared helper name');
-assert.strictEqual((controller.match(/buildDashBridgeSoloPanelUrl\(/g) || []).length, 2,
-    'both DashBridge callers must use the page-local URL contract');
+assert(controller.includes('buildSoloPanelUrl: buildDashBridgeSoloPanelUrl'));
+assert.strictEqual((additionController.match(/buildSoloPanelUrl\(/g) || []).length, 2,
+    'both panel-addition callers must use the injected page-local URL contract');
 for (const name of ['isSupportedPanelUrl', 'normalizeGrafanaPanelUrl', 'buildDashBridgeSoloPanelUrl',
     'getProfilePanelIdentity', 'parseQuickPanelIds']) {
     assert(!controller.includes(`function ${name}(`), `${name} must have one owner`);
