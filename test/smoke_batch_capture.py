@@ -20,8 +20,8 @@ if __name__ == "__main__":
                 "BatchSeriesSelection.resolvePatterns",
                 "includePattern",
                 "ignorePattern",
-                "copyMainSettingsToSeriesBtn",
             ],
+            "pages/batch/batch-page-controller.js": ["copyMainSettingsToSeriesBtn", "normalizeTimeRangesField", "getCaptureTheme"],
             "pages/batch/batch-operation-controller.js": ["captureWindowRunner.acquire", "captureWindowRunner.release", "BatchCaptureUtils.base64ToUint8Array"],
             "pages/batch/batch-panel-picker.js": [
                 "Открываю Grafana для авторизации. После входа список панелей загрузится автоматически.",

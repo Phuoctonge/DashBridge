@@ -1,88 +1,16 @@
 // Batch page controller.
 
 document.addEventListener("DOMContentLoaded", () => {
-    // --- UI Logic: Tabs ---
-    const tabBtns = document.querySelectorAll('.tab-btn');
-    const tabContents = document.querySelectorAll('.tab-content');
-    const mainActionArea = document.getElementById('mainActionArea');
-    tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            tabBtns.forEach(b => b.classList.remove('active'));
-            tabContents.forEach(c => c.classList.remove('active'));
-            btn.classList.add('active');
-            document.getElementById(btn.dataset.tab).classList.add('active');
-            // Full-dashboard capture belongs to collection settings.  Series
-            // capture has its own action and must not offer the unrelated one.
-            updateActionVisibility();
-        });
+    const batchPageController = BatchPageController.create({
+        pageUi: BatchPageUi,
+        pageState: BatchPageState,
+        normalizeTimeRanges: normalizeGrafanaTimeRanges,
     });
-
-    // --- UI Logic: Panels Mode ---
-    const panelsMode = document.getElementById('panelsMode');
-    const userPanelsGroup = document.getElementById('userPanelsGroup');
-    panelsMode.addEventListener('change', () => {
-        if (panelsMode.value === 'whitelist' || panelsMode.value === 'blacklist') {
-            userPanelsGroup.style.display = 'block';
-        } else {
-            userPanelsGroup.style.display = 'none';
-        }
-    });
-
-    // --- Toast & Logs ---
-    const showToast = BatchPageUi.createNotifier(document.getElementById('toastContainer'));
-    const logContainer = document.getElementById('logContainer');
-    const logMessage = BatchPageUi.createLogger(logContainer);
-    const batchProgress = document.getElementById('batchProgress');
-    const batchProgressText = document.getElementById('batchProgressText');
-    const batchProgressStats = document.getElementById('batchProgressStats');
-    const batchProgressBar = document.getElementById('batchProgressBar');
-    const updateBatchProgress = ({ done, total, success, failed, phase }) => {
-        batchProgress.hidden = false;
-        const safeTotal = Math.max(1, Number(total) || 1);
-        batchProgressBar.max = safeTotal;
-        batchProgressBar.value = Math.min(safeTotal, Math.max(0, done));
-        batchProgressText.textContent = `${phase}: ${Math.min(done, safeTotal)} / ${total}`;
-        batchProgressStats.textContent = `Успешно: ${success} · Ошибки: ${failed}`;
-        operationProgressController?.update({ done, total, success, failed, phase });
-    };
-    const normalizeTimeRangesField = ({ fieldId, notify = true } = {}) => {
-        const field = document.getElementById(fieldId);
-        const result = normalizeGrafanaTimeRanges(field.value);
-        if (!result.ranges.length) {
-            if (notify) showToast('Не удалось распознать временные диапазоны', 'error');
-            return result;
-        }
-        // Preserve the original input when even one line is invalid, so the
-        // user can correct it after the launch-time validation message.
-        if (result.errors.length) {
-            if (notify) showToast(`Не удалось распознать диапазоны в строках: ${result.errors.join(', ')}`, 'error');
-            return result;
-        }
-        field.value = result.ranges.map(({ from, to }) => `${from}, ${to}`).join('\n');
-        BatchPageState.save();
-        if (notify) showToast(`Преобразовано диапазонов: ${result.ranges.length}.`, 'success');
-        return result;
-    };
-    document.getElementById('clearLogs').addEventListener('click', () => {
-        logContainer.innerHTML = '';
-    });
-
+    const {
+        mainActionArea, panelsMode, showToast, logMessage, updateBatchProgress,
+        normalizeTimeRangesField, getCaptureTheme,
+    } = batchPageController;
     const panelPicker = BatchPanelPicker.create({ showToast, logMessage, panelsMode });
-
-    // --- State Persistence ---
-    const captureThemeInputs = Array.from(document.querySelectorAll('.batch-capture-theme'));
-
-    function getCaptureTheme(groupId = 'captureThemeMain') {
-        const value = document.querySelector(`#${groupId} input:checked`)?.value;
-        return value === 'current' || value === 'dark' ? value : 'light';
-    }
-
-    function setCaptureTheme(value, groupId) {
-        const normalized = value === 'current' || value === 'dark' ? value : 'light';
-        document.querySelectorAll(`#${groupId} .batch-capture-theme`).forEach(input => {
-            input.checked = input.value === normalized;
-        });
-    }
 
     // --- Per-panel transformation rules ---
     const dashUrl = document.getElementById('dashUrl');
@@ -94,36 +22,6 @@ document.addEventListener("DOMContentLoaded", () => {
         parseUrl: parseGrafanaUrl,
     });
     const loadBatchPanelRules = batchPanelRulesUi.load;
-
-    BatchPageState.bind();
-    BatchPageState.restore().then(loadBatchPanelRules);
-    document.getElementById('copyMainSettingsToSeriesBtn').addEventListener('click', () => {
-        const mainUrl = dashUrl.value.trim();
-        const mainSlices = document.getElementById('timestamps').value.trim();
-        if (!mainUrl && !mainSlices) return showToast('В настройках сбора нет URL и временных срезов для копирования', 'info');
-        document.getElementById('seriesDashUrl').value = mainUrl;
-        document.getElementById('seriesTimestamps').value = mainSlices;
-        resetSeriesDashboardSelection();
-        BatchPageState.save();
-        showToast('URL и временные срезы скопированы в Series', 'success');
-    });
-    let previousSeriesDashboardUrl = document.getElementById('seriesDashUrl').value.trim();
-    const resetSeriesDashboardSelection = () => {
-        const currentUrl = document.getElementById('seriesDashUrl').value.trim();
-        if (currentUrl === previousSeriesDashboardUrl) return;
-        previousSeriesDashboardUrl = currentUrl;
-        panelPicker.clearSeriesSelection();
-        document.getElementById('seriesPanelsContainer').replaceChildren();
-        document.getElementById('seriesPanelSelectionStatus').textContent = 'Панели ещё не выбраны';
-        document.getElementById('loadSelectedSeriesBtn').hidden = true;
-    };
-    document.getElementById('seriesDashUrl').addEventListener('input', resetSeriesDashboardSelection);
-    document.getElementById('seriesDashUrl').addEventListener('change', resetSeriesDashboardSelection);
-    captureThemeInputs.forEach(input => {
-        input.addEventListener('change', () => {
-            if (input.checked) setCaptureTheme(input.value, input.closest('fieldset')?.id);
-        });
-    });
 
     // --- Helper API: Parse Grafana URL ---
     function parseGrafanaUrl(url) {
@@ -138,11 +36,6 @@ document.addEventListener("DOMContentLoaded", () => {
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
     }
-
-    // --- Get Panels Action ---
-    document.getElementById('getPanelsBtn').addEventListener('click', () => {
-        void panelPicker.open({ dashboardUrl: document.getElementById('dashUrl').value.trim(), context: 'main' });
-    });
 
     // --- Engine State ---
     const startBtn = document.getElementById('startBtn');
@@ -169,6 +62,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const beginBatchRun = batchOperation.begin;
     const isBatchRunActive = batchOperation.isActive;
     const finishBatchRun = batchOperation.finish;
+    batchPageController.setOperationProgressController(operationProgressController);
+    batchPageController.setup({ updateActionVisibility, loadBatchPanelRules, panelPicker });
 
     // --- Main Capture Action ---
     startBtn.addEventListener('click', async () => {

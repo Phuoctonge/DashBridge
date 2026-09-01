@@ -8,7 +8,9 @@ state = (ROOT / "js/content/grafana-panel-state.js").read_text(encoding="utf-8")
 dashboard = (ROOT / "pages/dashbridge/dashbridge.js").read_text(encoding="utf-8") + (ROOT / "pages/dashbridge/dashbridge-profile-controller.js").read_text(encoding="utf-8")
 dashboard_capture = (ROOT / "pages/dashbridge/dashbridge-capture.js").read_text(encoding="utf-8")
 renderer = (ROOT / "pages/dashbridge/dashbridge-renderer.js").read_text(encoding="utf-8")
-batch = (ROOT / "pages/batch/batch.js").read_text(encoding="utf-8") + (ROOT / "pages/batch/batch-operation-controller.js").read_text(encoding="utf-8")
+batch = (ROOT / "pages/batch/batch.js").read_text(encoding="utf-8") \
+    + (ROOT / "pages/batch/batch-page-controller.js").read_text(encoding="utf-8") \
+    + (ROOT / "pages/batch/batch-operation-controller.js").read_text(encoding="utf-8")
 runner = (ROOT / "pages/batch/batch-capture-runner.js").read_text(encoding="utf-8")
 layout = (ROOT / "js/content/grafana-compact-layout.js").read_text(encoding="utf-8")
 visual_engine = (ROOT / "js/content/grafana-visual-engine.js").read_text(encoding="utf-8")
@@ -27,7 +29,8 @@ checks = {
         and "rememberUPlotSize" in layout and "layout?.redrawFlot" in tools and "layout?.resizeUPlot" in tools,
     "Batch page has no unreachable capture-window fallback": "captureWindowId" not in batch,
     "Batch page has no local legacy panel loader": "async function loadUrlAndWaitForPanel" not in batch,
-    "Batch state persistence has a dedicated module": (ROOT / "pages/batch/batch-state.js").exists() and "BatchPageState.restore" in batch,
+    "Batch state persistence has a dedicated module": (ROOT / "pages/batch/batch-state.js").exists()
+        and "pageState: BatchPageState" in batch and "pageState.restore()" in batch,
     "Visual toggles always run restoration after a fast legend update": "if (result && !removeFill && !thickenLines && !invertLegend) return result;" not in visual_engine,
     "Legend position restores after the toggle is disabled": "hasSavedLegendLayout" in visual_engine
         and "delete element[legendLayoutSnapshotKey];" in visual_engine,

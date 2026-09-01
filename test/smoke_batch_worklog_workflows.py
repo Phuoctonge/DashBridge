@@ -4,7 +4,9 @@ from support.smoke import run_checks
 
 
 ROOT = Path(__file__).resolve().parent.parent
-BATCH = (ROOT / "pages/batch/batch.js").read_text(encoding="utf-8") + (ROOT / "pages/batch/batch-operation-controller.js").read_text(encoding="utf-8")
+BATCH = (ROOT / "pages/batch/batch.js").read_text(encoding="utf-8") \
+    + (ROOT / "pages/batch/batch-page-controller.js").read_text(encoding="utf-8") \
+    + (ROOT / "pages/batch/batch-operation-controller.js").read_text(encoding="utf-8")
 BATCH_PICKER = (ROOT / "pages/batch/batch-panel-picker.js").read_text(encoding="utf-8")
 BATCH_STATE = (ROOT / "pages/batch/batch-state.js").read_text(encoding="utf-8")
 BATCH_UTILS = (ROOT / "pages/batch/batch-capture-utils.js").read_text(encoding="utf-8")
@@ -20,7 +22,7 @@ RUNTIME = (ROOT / "js/shared/grafana-runtime.js").read_text(encoding="utf-8")
 
 
 checks = {
-    "batch saves and restores its form state": "BatchPageState.restore" in BATCH and "async restore()" in BATCH_STATE and "batchState" in BATCH_STATE,
+    "batch saves and restores its form state": "pageState: BatchPageState" in BATCH and "pageState.restore()" in BATCH and "async restore()" in BATCH_STATE and "batchState" in BATCH_STATE,
     "batch validates Grafana URLs": "function parseGrafanaUrl(url)" in BATCH,
     "batch dashboard API requests include the Grafana session": "credentials: 'include'" in DASHBOARD_API,
     "batch API can retrieve a dashboard definition": "async function fetchGrafanaDashboardDefinition(dashboardUrl)" in DASHBOARD_API,
@@ -39,7 +41,7 @@ checks = {
         and "image.naturalHeight - y" in (ROOT / "js/shared/grafana-panel-capture.js").read_text(encoding="utf-8"),
     "batch Series flow applies its own capture theme": "getCaptureTheme('captureThemeSeries')" in BATCH
         and "buildGrafanaPanelUrl(dashboardUrl, panelId, { theme: getCaptureTheme('captureThemeSeries') })" in BATCH,
-    "batch offers synchronized Grafana theme radio controls": 'id="captureThemeMain"' in HTML and 'id="captureThemeSeries"' in HTML and 'type="radio"' in HTML and "function setCaptureTheme" in BATCH,
+    "batch offers synchronized Grafana theme radio controls": 'id="captureThemeMain"' in HTML and 'id="captureThemeSeries"' in HTML and 'type="radio"' in HTML and "const setCaptureTheme" in BATCH,
     "batch offers independent compact capture switches": 'id="compactCaptureMain"' in HTML
         and 'id="compactCaptureSeries"' in HTML
         and "getBatchCaptureOptions('compactCaptureMain')" in BATCH

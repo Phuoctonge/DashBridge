@@ -188,6 +188,7 @@ grafana-panel-tools.js
 | ZIP/лимиты | `archive-download.js`, `archive-budget.js` | Batch, exports. |
 | Batch panel-rules UI | `batch-panel-rules-ui.js` | `batch.js`; editor, validation, delayed persistence and stale-load guard. |
 | Batch operation lifecycle | `batch-operation-controller.js` | `batch.js`; cancellation, progress, capture-window ownership and archive helpers. |
+| Batch page UI/state | `batch-page-controller.js` | Вкладки, режим панелей, progress UI, темы снимков, нормализация диапазонов и синхронизация полей Main/Series. |
 | Recorder replay | `recorder-replay.js` | `recorder.js`; step normalization/execution, navigation and network-idle waits. |
 | Анализ CPU/RAM | `grafana-panel-analysis.js` | Расчёт, thresholds и clipboard-формат кнопок CPU Usage/Memory. |
 | Grafana time | `grafana-time.js` | DashBridge, iframe. |

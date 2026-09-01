@@ -6,7 +6,8 @@ from support.smoke import CheckCollector
 ROOT = Path(__file__).resolve().parents[1]
 HTML = (ROOT / 'pages/batch/batch.html').read_text(encoding='utf-8')
 JS = ''.join((ROOT / path).read_text(encoding='utf-8') for path in [
-    'pages/batch/batch.js', 'pages/batch/batch-panel-rules-ui.js', 'pages/batch/batch-operation-controller.js'])
+    'pages/batch/batch.js', 'pages/batch/batch-page-controller.js',
+    'pages/batch/batch-panel-rules-ui.js', 'pages/batch/batch-operation-controller.js'])
 PICKER = (ROOT / 'pages/batch/batch-panel-picker.js').read_text(encoding='utf-8')
 CAPTURE_UTILS = (ROOT / 'pages/batch/batch-capture-utils.js').read_text(encoding='utf-8')
 CSS = (ROOT / 'pages/batch/batch.css').read_text(encoding='utf-8')

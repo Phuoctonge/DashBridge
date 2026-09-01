@@ -40,7 +40,7 @@ const extensionRuntimeGlobals = readonly([
     'DashBridgeTestReport', 'DashBridgeTestRunner', 'DashBridgeUpdateCheck',
     'DashBridgeWorklogMetrics', 'BatchCaptureUtils', 'BatchPageState',
     'BatchPageUi', 'BatchPanelRules', 'BatchRunLifecycle', 'BatchSeriesSelection',
-    'BatchOperationController', 'BatchPanelPicker', 'BatchPanelRulesUi',
+    'BatchOperationController', 'BatchPageController', 'BatchPanelPicker', 'BatchPanelRulesUi',
     'DashBridgeCapture', 'DashBridgeDragController', 'DashBridgeFrameController',
     'DashBridgeIframeMessageController',
     'DashBridgePanelActionsController', 'DashBridgePanelAdditionController',
