@@ -161,8 +161,7 @@ grafana-panel-tools.js
 | Batch presets | `grafana-batch-panel-rules.js` | Batch. |
 | Profiles storage | `dashbridge-profile-store.js` | `dashbridge-profile-controller.js`. |
 | Profiles UI/lifecycle | `dashbridge-profile-controller.js` | `dashbridge.js`; tab-local selection, cross-tab sync, panel-state checkpoint. |
-| DashBridge iframe transport | `dashbridge-frame-controller.js` | `dashbridge.js`; trusted origin, ready state and navigation reset. |
-| Входящие сообщения iframe DashBridge | `dashbridge-iframe-message-controller.js` | Проверка source + exact origin, dispatch report/analysis/capture/tools/crosshair и iframe ready/rendered lifecycle. |
+| DashBridge iframe transport | `dashbridge-iframe-message-controller.js` | Двусторонняя trust boundary: guarded post/navigation reset, проверка source + exact origin, dispatch report/analysis/capture/tools/crosshair и iframe ready/rendered lifecycle. |
 | DashBridge time/URL lifecycle | `dashbridge-time-controller.js` | Profile-owned range/refresh, controls, clipboard, theme-aware panel URL, iframe time broadcast and Refresh Off transition. |
 | DashBridge panel tools/status | `dashbridge-panel-tools-controller.js` | Нормализация tools, settings modal, correlated title/legend/threshold requests, threshold state and notifications. |
 | DashBridge card drag lifecycle | `dashbridge-drag-controller.js` | Drag enable/reset, drop markers, DOM reorder and persisted panel order. |
@@ -257,8 +256,8 @@ dashbridge-profile-store.js
      ├── dashbridge-time-state.js
      ├── dashbridge-time-controller.js
      └── dashbridge-crosshair.js
-dashbridge-frame-controller.js
-  → dashbridge.js ↔ postMessage конкретного iframe
+dashbridge-iframe-message-controller.js
+  → dashbridge.js ↔ двусторонний postMessage конкретного iframe
 dashbridge-panel-analysis-controller.js
   → dashbridge.js ↔ выбранный iframe CPU/RAM analysis
 dashbridge-panel-tools-controller.js

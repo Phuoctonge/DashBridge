@@ -11,7 +11,6 @@ const dashboardMessages = read('pages/dashbridge/dashbridge-iframe-message-contr
 const reportController = read('pages/dashbridge/dashbridge-report-controller.js');
 const dashboard = `${dashboardPage}\n${dashboardUi}\n${dashboardMessages}\n${reportController}`;
 const profileController = read('pages/dashbridge/dashbridge-profile-controller.js');
-const frameController = read('pages/dashbridge/dashbridge-frame-controller.js');
 const reportUi = read('pages/dashbridge/dashbridge-report-ui.js');
 const reportAudit = read('pages/dashbridge/dashbridge-report-audit.js');
 const reportTestRunner = read('pages/dashbridge/dashbridge-report-test-runner.js');
@@ -197,10 +196,10 @@ assert(reportUi.includes('Автоматически по порогу граф�
 assert(profileController.includes('dashboardLayoutSignature')
     && profileController.includes("previousDashboardLayoutSignature === dashboardLayoutSignature(getActiveProfile())"),
     'report-only saves must not reconcile or move live Grafana iframe cards');
-assert(frameController.includes('!iframe?.isConnected')
-    && frameController.includes('iframe.dataset.dashbridgeOrigin !== targetOrigin')
+assert(dashboardMessages.includes('!iframe?.isConnected')
+    && dashboardMessages.includes('iframe.dataset.dashbridgeOrigin !== targetOrigin')
     && dashboard.includes('sourceIframe.dataset.dashbridgeOrigin = event.origin;')
-    && frameController.includes("iframe.dataset.dashbridgeLoaded = 'false';"),
+    && dashboardMessages.includes("iframe.dataset.dashbridgeLoaded = 'false';"),
     'postMessage must reject detached or unverified iframe windows before using a Grafana target origin');
 assert(!reportUi.includes('Единица измерения\n')
     && visual.includes('const resolvedUnit = String(sla.unit || unit ||'),

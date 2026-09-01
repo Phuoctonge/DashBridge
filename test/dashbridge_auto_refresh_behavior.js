@@ -6,7 +6,6 @@ const fs = require('fs');
 const source = fs.readFileSync('pages/dashbridge/dashbridge.js', 'utf8');
 const timeSource = fs.readFileSync('pages/dashbridge/dashbridge-time-controller.js', 'utf8');
 const profileSource = fs.readFileSync('pages/dashbridge/dashbridge-profile-controller.js', 'utf8');
-const frameSource = fs.readFileSync('pages/dashbridge/dashbridge-frame-controller.js', 'utf8');
 const analysisSource = fs.readFileSync('pages/dashbridge/dashbridge-panel-analysis-controller.js', 'utf8');
 const panelToolsSource = fs.readFileSync('pages/dashbridge/dashbridge-panel-tools-controller.js', 'utf8');
 const panelAdditionSource = fs.readFileSync('pages/dashbridge/dashbridge-panel-addition-controller.js', 'utf8');
@@ -35,9 +34,9 @@ assert(applyToolsStart >= 0 && applyToolsEnd > applyToolsStart
     && !applyToolsSource.includes('settingsStorage.get'),
     'every ready iframe must reuse the settings cache instead of repeating sync-storage IPC');
 
-assert(frameSource.includes('iframe.dataset.dashbridgeOrigin !== targetOrigin')
-    && frameSource.includes("delete iframe.dataset.dashbridgeOrigin;")
-    && !frameSource.includes('iframe.contentWindow.location.origin'),
+assert(messageSource.includes('iframe.dataset.dashbridgeOrigin !== targetOrigin')
+    && messageSource.includes("delete iframe.dataset.dashbridgeOrigin;")
+    && !messageSource.includes('iframe.contentWindow.location.origin'),
     'the hot postMessage path must use a verified origin cache without normal cross-origin exceptions');
 
 const forceStart = timeSource.indexOf("documentRef.getElementById('forceRefreshBtn').addEventListener");

@@ -22,7 +22,6 @@ const before = (source, dependency, owner) => {
     assert(source.indexOf(dependency) >= 0, `${dependency} must be loaded`);
     assert(source.indexOf(owner) > source.indexOf(dependency), `${dependency} must load before ${owner}`);
 };
-before(dashbridgeHtml, 'dashbridge-frame-controller.js', 'dashbridge.js');
 before(dashbridgeHtml, 'dashbridge-profile-controller.js', 'dashbridge.js');
 before(dashbridgeHtml, 'dashbridge-time-state.js', 'dashbridge-time-controller.js');
 before(dashbridgeHtml, 'dashbridge-time-controller.js', 'dashbridge.js');
@@ -47,8 +46,8 @@ before(batchHtml, 'batch-main-run-controller.js', 'batch.js');
 before(batchHtml, 'batch-series-discovery-controller.js', 'batch.js');
 before(batchHtml, 'batch-series-run-controller.js', 'batch.js');
 
-const frameContext = runModule(['pages', 'dashbridge', 'dashbridge-frame-controller.js']);
-const frameController = frameContext.DashBridgeFrameController;
+const frameContext = runModule(['pages', 'dashbridge', 'dashbridge-iframe-message-controller.js']);
+const frameController = frameContext.DashBridgeIframeMessageController;
 const sent = [];
 const iframe = {
     isConnected: true,

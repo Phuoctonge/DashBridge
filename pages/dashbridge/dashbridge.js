@@ -126,7 +126,7 @@ const {
     getFrameOrigin,
     post: postToDashboardFrame,
     navigate: navigateDashboardFrame,
-} = DashBridgeFrameController;
+} = DashBridgeIframeMessageController;
 const dashBridgePanelAnalysisController = DashBridgePanelAnalysisController.create({
     postToDashboardFrame,
     normalizePanelMetadataText,
@@ -577,7 +577,6 @@ window.deletePanel = dashBridgePanelActionsController.deletePanel;
 window.refreshPanel = dashBridgePanelActionsController.refreshPanel;
 
 DashBridgeIframeMessageController.create({
-    getFrameOrigin,
     getPanelForIframe,
     getPanels: () => panels,
     acceptReportSnapshot: dashBridgeReportTransport.acceptSnapshot,
@@ -587,7 +586,6 @@ DashBridgeIframeMessageController.create({
     savePanels,
     syncPanelAnalysisAction,
     acceptTitleResponse: dashBridgePanelToolsController.acceptTitleResponse,
-    postToDashboardFrame,
     getCrosshairMode: () => crosshairMode,
     getCrosshairThickness: () => crosshairThickness,
     sendTimeUpdate: dashBridgeTimeController.sendTimeUpdate,
