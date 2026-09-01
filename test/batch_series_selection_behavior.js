@@ -54,10 +54,14 @@ assert.deepStrictEqual(JSON.parse(JSON.stringify(context.BatchSeriesSelection.re
 });
 
 const batchHtml = fs.readFileSync(path.join(__dirname, '..', 'pages/batch/batch.html'), 'utf8');
-const batchSource = fs.readFileSync(path.join(__dirname, '..', 'pages/batch/batch.js'), 'utf8');
+const batchSource = fs.readFileSync(
+    path.join(__dirname, '..', 'pages/batch/batch-series-run-controller.js'),
+    'utf8',
+);
 assert(batchHtml.includes('id="seriesIncludeFilter"') && batchHtml.includes('id="seriesIgnoreFilter"'),
     'Batch must expose include and ignore Series pattern fields');
-assert(batchSource.includes('BatchSeriesSelection.resolvePatterns(discovery.names, includePattern, ignorePattern)'),
+assert(batchSource.includes('seriesSelection.resolvePatterns(')
+    && batchSource.includes('discoveryResult.names, includePattern, ignorePattern'),
     'Batch must apply patterns to the actual Series discovered for every time slice');
 assert(!batchSource.includes('series-checkbox'),
     'Batch must not depend on a concrete Series checkbox list');

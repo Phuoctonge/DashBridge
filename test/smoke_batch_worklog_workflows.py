@@ -8,6 +8,7 @@ BATCH = (ROOT / "pages/batch/batch.js").read_text(encoding="utf-8") \
     + (ROOT / "pages/batch/batch-page-controller.js").read_text(encoding="utf-8") \
     + (ROOT / "pages/batch/batch-main-run-controller.js").read_text(encoding="utf-8") \
     + (ROOT / "pages/batch/batch-series-discovery-controller.js").read_text(encoding="utf-8") \
+    + (ROOT / "pages/batch/batch-series-run-controller.js").read_text(encoding="utf-8") \
     + (ROOT / "pages/batch/batch-operation-controller.js").read_text(encoding="utf-8")
 BATCH_PICKER = (ROOT / "pages/batch/batch-panel-picker.js").read_text(encoding="utf-8")
 BATCH_STATE = (ROOT / "pages/batch/batch-state.js").read_text(encoding="utf-8")
@@ -47,7 +48,7 @@ checks = {
     "batch offers independent compact capture switches": 'id="compactCaptureMain"' in HTML
         and 'id="compactCaptureSeries"' in HTML
         and "operation.getCaptureOptions('compactCaptureMain')" in BATCH
-        and "getBatchCaptureOptions('compactCaptureSeries')" in BATCH,
+        and "operation.getCaptureOptions('compactCaptureSeries')" in BATCH,
     "batch compact capture uses the shared prepared panel layout": "DashBridgeGrafanaBatchCapture?.prepare" in (ROOT / "js/shared/grafana-panel-capture.js").read_text(encoding="utf-8")
         and "const batchCaptureApi = Object.freeze" in (ROOT / "js/content/grafana-panel-tools.js").read_text(encoding="utf-8")
         and "window.DashBridgeGrafanaBatchCapture = batchCaptureApi" in (ROOT / "js/content/grafana-panel-tools.js").read_text(encoding="utf-8"),
@@ -61,13 +62,13 @@ checks = {
     "full-dashboard action is hidden outside collection settings": "mainActionArea.hidden = !mainTab && !processing" in BATCH,
     "batch captures dynamically rendered series cards": "#seriesPanelsContainer .batch-series-card" in BATCH,
     "grouped Batch installs complete-hide before the first panel render":
-        "applyGrafanaCompleteHideSelection(" in BATCH
+        "applyCompleteHideSelection(" in BATCH
         and "selection.matches.map(series => series.name)" in BATCH
         and "dashbridgeTargetQuerySignatures" in URLS
         and "ensureEarlyGrafanaRuntimeForUrl(targetUrl.toString())" in BATCH_LOADER,
     "standalone Batch keeps the occurrence-aware native legend path":
         "selectedKeys: [series.key]" in BATCH
-        and "prevSeriesName" in BATCH,
+        and "previousSeriesName" in BATCH,
     "batch Series cards show the selected panel title": "appendPanelCard(panelId, panel.title, panelUrl, signatures)" in BATCH
         and "Панель ID: ${escapeHtml(panelId)} — ${escapeHtml(panelTitle)}" in BATCH,
     "batch reads Series legends from Grafana's native response": "waitForCapturedSeries(nextTabId, capture.token, 15000, signal)" in BATCH

@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 HTML = (ROOT / 'pages/batch/batch.html').read_text(encoding='utf-8')
 JS = ''.join((ROOT / path).read_text(encoding='utf-8') for path in [
     'pages/batch/batch.js', 'pages/batch/batch-page-controller.js', 'pages/batch/batch-main-run-controller.js',
-    'pages/batch/batch-series-discovery-controller.js',
+    'pages/batch/batch-series-discovery-controller.js', 'pages/batch/batch-series-run-controller.js',
     'pages/batch/batch-panel-rules-ui.js', 'pages/batch/batch-operation-controller.js'])
 PICKER = (ROOT / 'pages/batch/batch-panel-picker.js').read_text(encoding='utf-8')
 CAPTURE_UTILS = (ROOT / 'pages/batch/batch-capture-utils.js').read_text(encoding='utf-8')
@@ -24,7 +24,7 @@ check('Series cancellation remains visible while Series runs', 'cancelButton.hid
 check('Authorization recovery has a finite timeout', 'AUTH_RECOVERY_TIMEOUT_MS' in PICKER and 'setTimeout' in PICKER)
 check('Standalone Series filenames include a stable occurrence suffix', 'seriesIndex' in JS and 'occurrence' in JS)
 check('Batch filenames are unique and Confluence-safe', 'buildCaptureFilename' in CAPTURE_UTILS
-      and 'BatchCaptureUtils.createFilenameFactory' in JS and '`[${pid}]_' not in JS
+      and 'captureUtils.createFilenameFactory' in JS and '`[${pid}]_' not in JS
       and r'\[\]' in CAPTURE_UTILS)
 check('Multiple time ranges use separate ZIP folders', 'buildArchivePath' in CAPTURE_UTILS
       and 'rangeCount: timestamps.length' in JS and 'rangeIndex' in JS)
@@ -63,10 +63,10 @@ check('Batch waits for aggregated Series responses to settle',
       and "window.addEventListener('dashbridgeSeriesCaptureUpdated', onUpdate)" in JS
       and 'state.batches' in (ROOT / 'js/content/grafana-series-capture.js').read_text(encoding='utf-8'))
 check('Batch filters actual Series names by include and ignore patterns',
-      'BatchSeriesSelection.resolvePatterns(discovery.names, includePattern, ignorePattern)' in JS
+      'seriesSelection.resolvePatterns(' in JS and 'discoveryResult.names, includePattern, ignorePattern' in JS
       and 'id="seriesIncludeFilter"' in HTML and 'id="seriesIgnoreFilter"' in HTML)
 check('Batch writes a result manifest and handles an empty collection', 'manifest.json' in JS and 'if (!successfulJobs)' in JS)
-check('Panel loader receives the active cancellation signal', 'BatchRunLifecycle.signal(runId)' in JS and "signal?.addEventListener('abort'" in (ROOT / 'pages/batch/batch-panel-loader.js').read_text(encoding='utf-8'))
+check('Panel loader receives the active cancellation signal', 'lifecycle.signal(runId)' in JS and "signal?.addEventListener('abort'" in (ROOT / 'pages/batch/batch-panel-loader.js').read_text(encoding='utf-8'))
 check('Batch exposes an always-on-top cancellable PiP panel',
       '../shared/operation-progress-window.js' in HTML
       and 'openPictureInPicture' in JS
