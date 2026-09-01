@@ -10,6 +10,7 @@ dashboard_capture = (ROOT / "pages/dashbridge/dashbridge-capture.js").read_text(
 renderer = (ROOT / "pages/dashbridge/dashbridge-renderer.js").read_text(encoding="utf-8")
 batch = (ROOT / "pages/batch/batch.js").read_text(encoding="utf-8") \
     + (ROOT / "pages/batch/batch-page-controller.js").read_text(encoding="utf-8") \
+    + (ROOT / "pages/batch/batch-main-run-controller.js").read_text(encoding="utf-8") \
     + (ROOT / "pages/batch/batch-operation-controller.js").read_text(encoding="utf-8")
 runner = (ROOT / "pages/batch/batch-capture-runner.js").read_text(encoding="utf-8")
 layout = (ROOT / "js/content/grafana-compact-layout.js").read_text(encoding="utf-8")

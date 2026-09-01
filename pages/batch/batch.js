@@ -65,150 +65,22 @@ document.addEventListener("DOMContentLoaded", () => {
     batchPageController.setOperationProgressController(operationProgressController);
     batchPageController.setup({ updateActionVisibility, loadBatchPanelRules, panelPicker });
 
-    // --- Main Capture Action ---
-    startBtn.addEventListener('click', async () => {
-        if (batchOperation.processing) return showToast('Процесс уже запущен!', 'error');
-
-        const urlStr = document.getElementById('dashUrl').value.trim();
-        const timestampsText = document.getElementById('timestamps').value.trim();
-
-        if (!urlStr || !timestampsText) return showToast('Заполните URL и диапазоны дат', 'error');
-
-        const info = parseGrafanaUrl(urlStr);
-        if (!info) return showToast('Неверный формат URL', 'error');
-
-        const normalizedRanges = normalizeTimeRangesField({ fieldId: 'timestamps', notify: false });
-        if (normalizedRanges.errors.length) {
-            return showToast(`Не удалось распознать диапазоны в строках: ${normalizedRanges.errors.join(', ')}`, 'error');
-        }
-        const timestamps = normalizedRanges.ranges;
-        // Баг исправлен: использовать тему из вкладки «Настройки сбора», а не Series
-        const captureTheme = getCaptureTheme('captureThemeMain');
-        const captureOptions = await getBatchCaptureOptions('compactCaptureMain');
-
-        if (timestamps.length === 0) return showToast('Не удалось разобрать диапазоны дат', 'error');
-
-        const runId = await beginBatchRun({ title: 'Массовый сбор скриншотов', phase: 'Получение списка панелей' });
-        const captureFilename = BatchCaptureUtils.createFilenameFactory();
-        logMessage('🚀 Начало работы массового сбора...');
-
-        try {
-            // Используем recovery для обработки ошибки 401 (истёкшая сессия)
-            const dashboardResult = await panelPicker.getDashboardPanelsWithRecovery(urlStr);
-            if (!isBatchRunActive(runId)) return;
-            const panels = { ...dashboardResult.panels };
-            const mainPanelRules = await BatchPanelRules.load(urlStr);
-            if (!isBatchRunActive(runId)) return;
-
-            // Применяем whitelist/blacklist
-            const mode = document.getElementById('panelsMode').value;
-            const uPanels = document.getElementById('userPanels').value.split(',').map(s => s.trim()).filter(s => s);
-            if (mode === 'whitelist' && uPanels.length === 0) {
-                throw new Error('Для белого списка укажите хотя бы один ID панели');
-            }
-            const orderedPanelIds = dashboardResult.panelList?.length
-                ? dashboardResult.panelList.map(panel => String(panel.id))
-                : Object.keys(panels);
-            const pids = orderedPanelIds.filter(panelId => {
-                if (mode === 'whitelist' && uPanels.length > 0) return uPanels.includes(panelId);
-                if (mode === 'blacklist' && uPanels.length > 0) return !uPanels.includes(panelId);
-                return true;
-            });
-            if (pids.length === 0) throw new Error('Нет панелей для сбора после фильтрации');
-            const totalJobs = pids.length * timestamps.length;
-            let completedJobs = 0;
-            let successfulJobs = 0;
-            let failedJobs = 0;
-            const captureErrors = [];
-            updateBatchProgress({ done: 0, total: totalJobs, success: 0, failed: 0, phase: 'Сбор панелей' });
-
-            const archiveName = `grafana_batch_${new Date().toISOString().slice(0, 10)}.zip`;
-            const archive = createRollingZipArchive({ filename: archiveName, maxBytes: 300 * 1024 * 1024 });
-            const win = await getOrCreateCaptureWindow();
-            if (!isBatchRunActive(runId)) {
-                await closeCaptureWindow();
-                return;
-            }
-            const tabId = win.tabs[0].id;
-            for (const pid of pids) {
-                for (let rangeIndex = 0; rangeIndex < timestamps.length; rangeIndex++) {
-                    const ts = timestamps[rangeIndex];
-                    if (!isBatchRunActive(runId)) break;
-
-                    const fullUrl = buildGrafanaPanelUrl(urlStr, pid, { ...ts, theme: captureTheme });
-                    const filename = captureFilename({
-                        panelId: pid,
-                        label: panels[pid],
-                        from: ts.from,
-                        to: ts.to,
-                        identity: fullUrl
-                    });
-                    const archivePath = BatchCaptureUtils.buildArchivePath({
-                        filename, rangeIndex, rangeCount: timestamps.length, from: ts.from, to: ts.to
-                    });
-                    operationProgressController.update({
-                        done: completedJobs,
-                        total: totalJobs,
-                        success: successfulJobs,
-                        failed: failedJobs,
-                        phase: `Панель ${pid}`,
-                        message: `${ts.from} → ${ts.to}`
-                    });
-
-                    const rect = await loadBatchPanel(tabId, fullUrl, pid, null, null, BatchPanelRules.forPanel(mainPanelRules, pid), BatchRunLifecycle.signal(runId));
-                    if (rect && rect.w > 5 && rect.h > 5) {
-                        if (await capturePanelToZip(win, tabId, pid, archivePath, archive, captureOptions)) {
-                            successfulJobs++;
-                        } else {
-                            failedJobs++;
-                            captureErrors.push({ file: archivePath, reason: 'Не удалось захватить изображение панели' });
-                            logMessage(`❌ Не удалось захватить панель: ${archivePath}`, true);
-                        }
-                    } else {
-                        failedJobs++;
-                        captureErrors.push({ file: archivePath, reason: 'Панель не найдена, не отрисована или имеет пустой размер' });
-                        logMessage(`❌ Панель не найдена или пустая (w/h < 5): ${archivePath}`, true);
-                    }
-                    completedJobs++;
-                    updateBatchProgress({ done: completedJobs, total: totalJobs, success: successfulJobs, failed: failedJobs, phase: 'Сбор панелей' });
-                }
-            }
-
-            if (isBatchRunActive(runId)) {
-                if (!successfulJobs) {
-                    logMessage('Сбор завершён без снимков. Архив не создан.', true);
-                    showToast('Не удалось сохранить ни одной панели', 'error');
-                } else {
-                    logMessage('📦 Формирование ZIP архива...');
-                    operationProgressController.update({ done: completedJobs, total: totalJobs, success: successfulJobs, failed: failedJobs, phase: 'Формирование ZIP', message: 'Подготовка архива к скачиванию…' });
-                    await addBatchArchiveReport(archive, {
-                        kind: 'panels',
-                        dashboard: info,
-                        totalJobs,
-                        successfulJobs,
-                        failedJobs,
-                        errors: captureErrors
-                    });
-                    await archive.finalize();
-                    if (failedJobs) {
-                        logMessage(`Сбор завершён частично: сохранено ${successfulJobs}, ошибок ${failedJobs}.`);
-                        showToast(`Архив скачан: ${successfulJobs} успешно, ${failedJobs} с ошибкой`, 'info');
-                    } else {
-                        logMessage('🎉 Сбор успешно завершен!');
-                        showToast('Архив скачан!', 'success');
-                    }
-                }
-            }
-
-        } catch (e) {
-            if (isBatchRunActive(runId)) {
-                logMessage(`💥 Ошибка сбора: ${e.message}`, true);
-                showToast('Критическая ошибка', 'error');
-            }
-        } finally {
-            await finishBatchRun(runId);
-        }
-    });
+    BatchMainRunController.create({
+        startButton: startBtn,
+        operation: batchOperation,
+        lifecycle: BatchRunLifecycle,
+        panelPicker,
+        panelRules: BatchPanelRules,
+        captureUtils: BatchCaptureUtils,
+        parseUrl: parseGrafanaUrl,
+        normalizeRangesField: normalizeTimeRangesField,
+        getCaptureTheme,
+        updateProgress: updateBatchProgress,
+        showToast,
+        logMessage,
+        buildPanelUrl: buildGrafanaPanelUrl,
+        createArchive: createRollingZipArchive,
+    }).setup();
 
     // --- Independent Series Discovery Logic ---
     const seriesPanelIdFormatCache = new Map();

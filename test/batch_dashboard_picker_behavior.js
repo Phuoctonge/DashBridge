@@ -4,7 +4,8 @@ const assert = require('assert');
 const fs = require('fs');
 
 const html = fs.readFileSync('pages/batch/batch.html', 'utf8');
-const source = fs.readFileSync('pages/batch/batch.js', 'utf8');
+const source = fs.readFileSync('pages/batch/batch.js', 'utf8')
+    + fs.readFileSync('pages/batch/batch-main-run-controller.js', 'utf8');
 const picker = fs.readFileSync('pages/batch/batch-panel-picker.js', 'utf8');
 const css = fs.readFileSync('pages/batch/batch.css', 'utf8');
 
@@ -23,7 +24,7 @@ assert(picker.includes("panelsMode.value = 'whitelist'")
     && picker.includes("document.getElementById('userPanels').value = selectedIds.join(', ')")
     && picker.includes('seriesSelectedPanelIds = selectedIds'),
     'the redesigned picker must preserve main whitelist and Series selection behavior');
-assert(source.includes("mode === 'whitelist' && uPanels.length === 0")
+assert(source.includes("mode === 'whitelist' && !userPanels.length")
     && source.includes('Для белого списка укажите хотя бы один ID панели'),
     'an empty whitelist must stop the run instead of silently capturing every dashboard panel');
 assert(picker.includes('title.textContent = String(panel.title')

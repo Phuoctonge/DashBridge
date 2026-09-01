@@ -5,7 +5,9 @@ from support.smoke import CheckCollector
 
 ROOT = Path(__file__).resolve().parents[1]
 HTML = (ROOT / 'pages/batch/batch.html').read_text(encoding='utf-8')
-JS = (ROOT / 'pages/batch/batch.js').read_text(encoding='utf-8') + (ROOT / 'pages/batch/batch-panel-rules-ui.js').read_text(encoding='utf-8')
+JS = (ROOT / 'pages/batch/batch.js').read_text(encoding='utf-8') \
+    + (ROOT / 'pages/batch/batch-main-run-controller.js').read_text(encoding='utf-8') \
+    + (ROOT / 'pages/batch/batch-panel-rules-ui.js').read_text(encoding='utf-8')
 LOADER = (ROOT / 'pages/batch/batch-panel-loader.js').read_text(encoding='utf-8')
 
 
@@ -29,7 +31,7 @@ check('Batch rule labels match the Grafana panel settings',
       and 'Конвертировать RAM-график в % Used' in JS
       and 'Толщина ' in JS)
 check('Thickness value is enabled only with its checkbox', 'width.hidden = !enabled' in JS and 'widthInput.disabled = !enabled' in JS)
-check('Main capture resolves a rule by panel ID', 'BatchPanelRules.forPanel(mainPanelRules, pid)' in JS)
+check('Main capture resolves a rule by panel ID', 'panelRules.forPanel(mainPanelRules, panelId)' in JS)
 check('Series capture resolves a rule by panel ID', 'BatchPanelRules.forPanel(seriesPanelRules, pid)' in JS)
 check('Loader applies tools before waiting for the capture rectangle', 'await applySharedGrafanaPanelTools' in LOADER and LOADER.index('await applySharedGrafanaPanelTools') < LOADER.rindex('waitForPanelInMainWorld'))
 check.finish()

@@ -6,6 +6,7 @@ from support.smoke import run_checks
 ROOT = Path(__file__).resolve().parent.parent
 BATCH = (ROOT / "pages/batch/batch.js").read_text(encoding="utf-8") \
     + (ROOT / "pages/batch/batch-page-controller.js").read_text(encoding="utf-8") \
+    + (ROOT / "pages/batch/batch-main-run-controller.js").read_text(encoding="utf-8") \
     + (ROOT / "pages/batch/batch-operation-controller.js").read_text(encoding="utf-8")
 BATCH_PICKER = (ROOT / "pages/batch/batch-panel-picker.js").read_text(encoding="utf-8")
 BATCH_STATE = (ROOT / "pages/batch/batch-state.js").read_text(encoding="utf-8")
@@ -44,7 +45,7 @@ checks = {
     "batch offers synchronized Grafana theme radio controls": 'id="captureThemeMain"' in HTML and 'id="captureThemeSeries"' in HTML and 'type="radio"' in HTML and "const setCaptureTheme" in BATCH,
     "batch offers independent compact capture switches": 'id="compactCaptureMain"' in HTML
         and 'id="compactCaptureSeries"' in HTML
-        and "getBatchCaptureOptions('compactCaptureMain')" in BATCH
+        and "operation.getCaptureOptions('compactCaptureMain')" in BATCH
         and "getBatchCaptureOptions('compactCaptureSeries')" in BATCH,
     "batch compact capture uses the shared prepared panel layout": "DashBridgeGrafanaBatchCapture?.prepare" in (ROOT / "js/shared/grafana-panel-capture.js").read_text(encoding="utf-8")
         and "const batchCaptureApi = Object.freeze" in (ROOT / "js/content/grafana-panel-tools.js").read_text(encoding="utf-8")

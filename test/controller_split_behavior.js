@@ -39,6 +39,7 @@ before(recorderHtml, 'recorder-replay.js', 'recorder.js');
 before(batchHtml, 'batch-panel-rules-ui.js', 'batch.js');
 before(batchHtml, 'batch-operation-controller.js', 'batch.js');
 before(batchHtml, 'batch-page-controller.js', 'batch.js');
+before(batchHtml, 'batch-main-run-controller.js', 'batch.js');
 
 const frameContext = runModule(['pages', 'dashbridge', 'dashbridge-frame-controller.js']);
 const frameController = frameContext.DashBridgeFrameController;
