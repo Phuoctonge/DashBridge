@@ -9,9 +9,11 @@ const builder = fs.readFileSync('scripts/build-release.ps1', 'utf8');
 
 assert.strictEqual(manifest.version, '2.4.2');
 assert(workflow.includes("- 'v*'")
+    && workflow.includes('run: npm ci')
+    && workflow.indexOf('run: npm ci') < workflow.indexOf('node test/run-all-tests.js')
     && workflow.includes('node test/run-all-tests.js')
     && workflow.indexOf('node test/run-all-tests.js') < workflow.indexOf('gh release create'),
-    'tag workflow must run the full suite before publishing a release');
+    'tag workflow must install locked dependencies and run the full suite before publishing a release');
 assert(workflow.includes('permissions:') && workflow.includes('contents: write'),
     'release job must declare only the GitHub permission it uses');
 assert(builder.includes('$ExpectedTag -ne "v$version"'),
