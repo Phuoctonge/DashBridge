@@ -69,6 +69,9 @@ try {
     foreach ($property in $manifest.action.default_icon.PSObject.Properties) {
         Assert-ArchiveEntry -Path ([string]$property.Value) -Source "manifest action.default_icon.$($property.Name)"
     }
+    foreach ($size in 16, 48, 128) {
+        Assert-ArchiveEntry -Path "icons/icon$size-update.png" -Source 'the update action indicator'
+    }
     foreach ($contentScript in $manifest.content_scripts) {
         foreach ($path in @($contentScript.js) + @($contentScript.css)) {
             if ($path) {

@@ -358,12 +358,6 @@ header .grafana-dropdown {
     container: dashboard / inline-size;
 }
 
-.time-picker-timezone {
-    margin-left: 4px;
-    color: var(--warning, #e07a10);
-    font-weight: 500;
-}
-
 .panel-card {
     background-color: var(--card-bg);
     border: 1px solid var(--border-color);

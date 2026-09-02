@@ -5,7 +5,7 @@ ROOT = Path(__file__).resolve().parents[1]
 HTML = (ROOT / 'pages/dashbridge/dashbridge.html').read_text(encoding='utf-8')
 PAGE = (ROOT / 'pages/dashbridge/dashbridge.js').read_text(encoding='utf-8')
 CARD = (ROOT / 'pages/dashbridge/dashbridge-panel-card-controller.js').read_text(encoding='utf-8')
-ACTIONS = (ROOT / 'pages/dashbridge/dashbridge-panel-actions-controller.js').read_text(encoding='utf-8')
+ACTIONS = CARD
 RENDERER = (ROOT / 'pages/dashbridge/dashbridge-renderer.js').read_text(encoding='utf-8')
 
 

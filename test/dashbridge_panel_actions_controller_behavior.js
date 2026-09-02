@@ -8,7 +8,7 @@ const context = { URL, console };
 context.globalThis = context;
 vm.createContext(context);
 vm.runInContext(
-    fs.readFileSync('pages/dashbridge/dashbridge-panel-actions-controller.js', 'utf8'),
+    fs.readFileSync('pages/dashbridge/dashbridge-panel-card-controller.js', 'utf8'),
     context
 );
 
@@ -21,15 +21,23 @@ const calls = {
     save: 0, remove: 0, replace: 0, force: 0, navigate: [], status: 0,
     closeAnalysis: 0, removeTools: 0, captures: [], opened: [],
 };
-const iframe = { src: panel.src };
-const fullscreenButton = { innerHTML: '', title: '' };
+const iframe = { src: panel.src, dataset: {}, removeAttribute() {} };
+const fullscreenButton = { innerHTML: '', title: '', addEventListener() {} };
+const dragHandle = { addEventListener() {} };
 const cardClasses = new Set();
 const card = {
+    dataset: {}, style: {},
+    addEventListener() {},
     classList: {
         add: value => cardClasses.add(value),
         remove: value => cardClasses.delete(value),
+        contains: value => cardClasses.has(value),
     },
-    querySelector: selector => selector === '.btn-fullscreen' ? fullscreenButton : null,
+    querySelector: selector => selector === '.btn-fullscreen' ? fullscreenButton
+        : selector === 'iframe' ? iframe
+            : selector === '.drag-handle' ? dragHandle : null,
+    replaceWith() { calls.replace += 1; },
+    remove() { calls.remove += 1; },
 };
 const actionElements = new Map();
 for (const selector of [
@@ -44,47 +52,51 @@ for (const selector of [
     });
 }
 const actionCard = { querySelector: selector => actionElements.get(selector) || null };
+const dashboard = { innerHTML: '', appendChild() {}, querySelectorAll: () => [] };
 
-const controller = context.DashBridgePanelActionsController.create({
+const controller = context.DashBridgePanelCardController.create({
+    renderer: { createPanelCard: () => card },
     getPanels: () => panels,
     setPanels: value => { panels = value; },
     savePanels: () => { calls.save += 1; },
-    showAlert: async () => undefined,
-    showConfirm: async () => true,
-    setPanelDataStatus: () => { calls.status += 1; },
-    forceLoadPanel: () => { calls.force += 1; return iframe; },
+    getActiveProfile: () => ({ name: 'Test' }),
     applyPanelParamsToUrl: (_panel, value) => value || panel.src,
     navigateDashboardFrame: (_iframe, value) => calls.navigate.push(value),
     findPanelCard: id => id === panel.id ? card : null,
-    postToDashboardFrame: () => undefined,
-    removePanelCard: () => { calls.remove += 1; },
-    replacePanelCard: () => { calls.replace += 1; },
-    updatePanelCard: () => undefined,
-    panelAnalysis: { isPanel: value => value === panel || value === panel.id },
-    closePanelAnalysis: () => { calls.closeAnalysis += 1; },
-    panelTools: { removePanel: () => { calls.removeTools += 1; } },
-    isSupportedPanelUrl: () => true,
-    normalizePanelUrl: value => value,
-    escapeHtml: value => value,
-    runToolbarCapture: (...args) => calls.captures.push(args),
-    openPanelReportEditor: () => undefined,
-    openPanelTools: () => undefined,
+    getPanelAnalysisType: () => null,
     syncPanelAnalysisAction: () => undefined,
-    openPanelAnalysis: () => undefined,
+    closePanelAnalysis: () => { calls.closeAnalysis += 1; },
+    isPanelAnalysisOpen: () => false,
+    escapeHtml: value => value,
     icons: { expand: '<expand>', collapse: '<collapse>' },
+    runtimeScopeId: 'scope-1',
+    actionDependencies: {
+        showAlert: async () => undefined,
+        showConfirm: async () => true,
+        setPanelDataStatus: () => { calls.status += 1; },
+        postToDashboardFrame: () => undefined,
+        panelAnalysis: { isPanel: value => value === panel || value === panel.id },
+        panelTools: { removePanel: () => { calls.removeTools += 1; } },
+        isSupportedPanelUrl: () => true,
+        normalizePanelUrl: value => value,
+        runToolbarCapture: (...args) => calls.captures.push(args),
+        openPanelReportEditor: () => undefined,
+        openPanelTools: () => undefined,
+        openPanelAnalysis: () => undefined,
+        openWindow: (...args) => calls.opened.push(args),
+        now: () => 12345,
+        requestFrame: callback => callback(),
+    },
     documentRef: {
-        getElementById: id => id === 'iframe-panel-1' ? iframe : null,
+        getElementById: id => id === 'iframe-panel-1' ? iframe
+            : id === 'dashboard' ? dashboard : null,
         createElement: () => { throw new Error('settings modal is covered by its contract tests'); },
     },
-    openWindow: (...args) => calls.opened.push(args),
-    now: () => 12345,
-    requestFrame: callback => callback(),
 });
 
 (async () => {
     controller.refreshPanel(panel.id);
     assert.strictEqual(calls.status, 1);
-    assert.strictEqual(calls.force, 1);
     assert(new URL(calls.navigate[0]).searchParams.get('_t') === '12345');
 
     await controller.togglePanelPause(panel.id);
@@ -121,10 +133,10 @@ const controller = context.DashBridgePanelActionsController.create({
     assert.strictEqual(calls.save, 2);
 
     assert.throws(
-        () => context.DashBridgePanelActionsController.create({ documentRef: {} }),
+        () => context.DashBridgePanelCardController.create({ documentRef: {} }),
         error => error?.name === 'TypeError'
     );
-    console.log('PASS DashBridge panel actions controller preserves refresh, pause, fullscreen and cleanup');
+    console.log('PASS DashBridge panel card controller preserves actions, fullscreen and cleanup');
 })().catch(error => {
     console.error(error);
     process.exitCode = 1;

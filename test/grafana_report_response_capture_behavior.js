@@ -33,7 +33,7 @@ assert(toolsSource.includes('visualMetadata.responseTableRecords = collectRespon
 assert(visualSource.includes('const collectPanelReportSnapshot')
     && visualSource.includes("engine = 'flot'")
     && visualSource.includes("engine = 'uplot'")
-    && visualSource.includes("engine = responseTableRecords.length ? 'table-response' : 'table-dom'")
+    && visualSource.includes("engine = table && responseTableRecords.length ? 'table-response' : 'table-dom'")
     && visualSource.includes('const summarizeValues = values =>')
     && !visualSource.includes('responseReportSeriesStats')
     && !visualSource.includes('responseReportTruncated'),

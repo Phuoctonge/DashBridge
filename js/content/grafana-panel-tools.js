@@ -422,8 +422,23 @@
     visualMetadata.responseFilterReady ||= false;
     visualMetadata.responseTableRecords ||= [];
     visualMetadata.responseSeriesNames ||= [];
+    visualMetadata.responseUnitCodes ||= [];
     visualMetadata.responseDataStatus ||= { kind: 'unknown', text: '' };
     if (typeof visualMetadata.memoryConversionApplied !== 'boolean') visualMetadata.memoryConversionApplied = null;
+    const enrichThresholdUnitFromDataFrame = status => {
+        const unitCodes = visualMetadata.responseUnitCodes || [];
+        if (unitCodes.length !== 1) return status;
+        const unitApi = window.DashBridgeGrafanaUnit;
+        const panel = { fieldConfig: { defaults: { unit: unitCodes[0] } } };
+        const configured = unitApi?.unitFromPanelDefinition?.(panel);
+        if (!configured?.unit) return status;
+        const merged = status?.unit ? unitApi.mergeAxisAndPanelUnit(status, panel) : configured;
+        return { ...status, ...merged, semanticUnit: configured.unit, source: 'dataframe' };
+    };
+    const getThresholdUnitStatus = async ({ root, panelId }) => {
+        const status = await (window.DashBridgeGrafanaVisualEngine?.getThresholdUnitAsync?.({ root, panelId }) || window.DashBridgeGrafanaVisualEngine?.getThresholdUnit?.(root));
+        return enrichThresholdUnitFromDataFrame(status || { unit: '', factor: 1, engine: 'unknown' });
+    };
     const PANEL_DATA_STATUS_TEXT = Object.freeze({
         filtered_empty: 'Нет превышений по заданному фильтру',
         empty_source: 'Источник вернул пустой набор данных',
@@ -1083,7 +1098,7 @@
             && (!tools.convertMemToUsed || visualMetadata.memoryConversionApplied === true);
         let unitDetails = null;
         if (thresholdCanApply) {
-            unitDetails = await window.DashBridgeGrafanaVisualEngine?.getThresholdUnitAsync?.({ root: thresholdRoot, panelId }) || null;
+            unitDetails = await getThresholdUnitStatus({ root: thresholdRoot, panelId });
         }
         const status = window.DashBridgeGrafanaVisualEngine?.setThreshold?.({
             root: thresholdRoot,
@@ -1582,9 +1597,7 @@
             const targetPanel = getTargetPanel();
             const thresholdRoot = window.DashBridgeGrafanaDom?.outerPanel(targetPanel) || targetPanel || document;
             const panelId = getPanelStateKey(targetPanel) || tools.targetPanelId || '';
-            const status = await (window.DashBridgeGrafanaVisualEngine?.getThresholdUnitAsync?.({ root: thresholdRoot, panelId })
-                || window.DashBridgeGrafanaVisualEngine?.getThresholdUnit?.(thresholdRoot))
-                || { unit: '', engine: 'unknown' };
+            const status = await getThresholdUnitStatus({ root: thresholdRoot, panelId });
             // В iframe ответ идёт родительскому окну (extension page).
             // В обычном Grafana-табе (вызов через runGrafanaCommand/__dashbridgePanelToolsAllowTop)
             // ответ нужно отправить в то же окно, где слушает временный MAIN-world listener.
@@ -2120,8 +2133,7 @@
             advanced: {
                 cpuCapacityFilterCoefficientDefault: defaultCpuCapacityCoefficient,
                 getLegendSeries: () => getPanelLegendSeries(panel),
-                getThresholdStatus: () => window.DashBridgeGrafanaVisualEngine?.getThresholdUnitAsync?.({ root: thresholdRoot, panelId: panelKey })
-                    || window.DashBridgeGrafanaVisualEngine?.getThresholdUnit?.(thresholdRoot),
+                getThresholdStatus: () => getThresholdUnitStatus({ root: thresholdRoot, panelId: panelKey }),
                 formatThresholdUnit: status => status?.unit
                     ? `Единица: ${status.unit}`
                     : (status?.engine && status.engine !== 'unknown' ? 'Без единицы' : 'Единица определяется по графику')

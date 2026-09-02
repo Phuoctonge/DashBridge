@@ -6,7 +6,7 @@
 //     chrome.windows.create({ url: "pages/popup/popup.html", type: "popup", width: 300, height: 400 });
 // });
 
-importScripts('../vendor/jszip.min.js', 'shared/grafana-settings.js', 'shared/url-validation.js', 'shared/dnr-rules.js', 'shared/grafana-runtime-manifest.js', 'shared/local-state-schema.js', 'shared/grafana-panel-identity.js', 'background-grafana-infrastructure.js', 'background-profile-storage.js', 'background-gui-capture.js');
+importScripts('../vendor/jszip.min.js', 'shared/grafana-settings.js', 'shared/url-validation.js', 'shared/dnr-rules.js', 'shared/grafana-runtime-manifest.js', 'shared/local-state-schema.js', 'shared/grafana-panel-identity.js', 'background-grafana-infrastructure.js', 'background-profile-storage.js', 'background-gui-capture.js', 'background-update-indicator.js');
 
 const GRAFANA_TAB_VISUAL_STATE_PREFIX = 'grafanaVisualState:';
 
@@ -22,6 +22,8 @@ const grafanaInfrastructure = DashBridgeBackgroundGrafanaInfrastructure.create()
 const profileStorage = DashBridgeBackgroundProfileStorage.create({
     grafanaInfrastructure, isTrustedExtensionPage,
 });
+const updateIndicator = DashBridgeBackgroundUpdateIndicator.create();
+void updateIndicator.restore().catch(error => console.warn('Failed to restore update indicator:', error));
 
 // Recorder owns the normal detach path. This port is the crash/close fallback:
 // MV3 debugger attachment belongs to the extension and can otherwise survive
@@ -50,16 +52,20 @@ chrome.tabs.onRemoved.addListener(tabId => {
 });
 
 chrome.runtime.onInstalled.addListener(() => {
+    void updateIndicator.restore().catch(error => console.warn('Failed to restore update indicator:', error));
     grafanaInfrastructure.sync({ backfillOpenFrames: true })
         .catch(error => console.error('Не удалось подготовить инфраструктуру Grafana:', error));
 });
 
 chrome.runtime.onStartup.addListener(() => {
+    void updateIndicator.restore().catch(error => console.warn('Failed to restore update indicator:', error));
     grafanaInfrastructure.sync({ backfillOpenFrames: true })
         .catch(error => console.error('Не удалось подготовить инфраструктуру Grafana:', error));
 });
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
+    void updateIndicator.handleStorageChange(changes, areaName)
+        .catch(error => console.warn('Failed to update extension indicator:', error));
     if (areaName === 'sync' && changes.grafanaIframeDomains) {
         grafanaInfrastructure.sync({ backfillOpenFrames: true })
             .catch(error => console.error('Не удалось подготовить инфраструктуру Grafana:', error));

@@ -18,10 +18,10 @@ assert(audit.runEngineSelfCheck(report).ok, 'synthetic check must resolve every 
 
 const makeCollected = ({ profileTemplate = '{{profileName}}\n{{panels}}', panelTemplate = '{{panelTitle}}: {{aggregateValue}}{{unit}}',
     listTemplate = '- {{name}}: {{value}}{{unit}}', key = 'cpu', secondKey = null, state = 'ok',
-    output = null, contextPatch = {}, snapshotPatch = {} } = {}) => {
+    includeMode = 'always', output = null, contextPatch = {}, snapshotPatch = {} } = {}) => {
     const panel = {
         id: 'panel-1', title: 'CPU', tools: { thresholdEnabled: true },
-        report: { enabled: true, key, sla: { source: 'graph', value: 80 },
+        report: { enabled: true, key, includeMode, sla: { source: 'graph', value: 80 },
             templates: { normal: panelTemplate, listItem: listTemplate } }
     };
     const snapshot = {
@@ -67,7 +67,24 @@ assert(audit.audit(report, { profile: { name: 'Empty', report: {} }, reportPanel
     context: {}, output: '' }).issues.some(item => item.code === 'no_panels'),
     'audit must diagnose a profile with no enabled report panels');
 assert(issueCodes({ panelTemplate: '{{allSeriesList}}', listTemplate: '{{name}} {{vCpu}}', snapshotPatch: {
-    series: [{ name: 'srv-1', value: 42, level: 'normal' }]
+    source: 'cpu_capacity', series: [{ name: 'srv-1', value: 42, level: 'normal' }]
 } }).includes('empty_live_value'), 'an active series list must report missing row values');
+const unitlessIssues = audit.audit(report, makeCollected({ panelTemplate: '{{unit}} {{threshold}} {{criticalList}}', snapshotPatch: {
+    source: 'none', unit: '', threshold: null, criticalThreshold: null,
+    series: [{ name: 'srv-1', value: 42, level: 'normal' }]
+} })).issues;
+assert(!unitlessIssues.some(item => item.code === 'empty_live_value'
+    && /\{\{(?:unit|threshold|criticalList)\}\}/u.test(item.message)),
+    `unitless informational panels must allow inapplicable SLA values to stay empty: ${unitlessIssues.map(item => item.message).join('; ')}`);
+const excludedIssues = audit.audit(report, makeCollected({ panelTemplate: '{{tableMarkdown}}',
+    includeMode: 'critical_only', state: 'ok' })).issues;
+assert(!excludedIssues.some(item => item.code === 'empty_live_value' && /\{\{tableMarkdown\}\}/u.test(item.message)),
+    'panels excluded by their current include mode must not emit live-value warnings');
+
+const perPanel = audit.audit(report, makeCollected({ secondKey: 'memory' }));
+const aggregateRows = perPanel.variables.filter(item => item.scope === 'panel'
+    && item.name === 'aggregateValue' && item.used);
+assert.deepStrictEqual(Array.from(aggregateRows, item => item.panelTitle), ['CPU', 'Memory'],
+    'live variable rows must preserve values separately for each panel');
 
 console.log('PASS report audit checks variable contracts, live values, panel references and output');

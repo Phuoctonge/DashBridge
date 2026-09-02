@@ -79,10 +79,14 @@ const uiCode = [
     assert(uiCode.includes(fragment), `Отсутствует UI-диагностика: ${fragment}`);
 });
 
-const reportCode = fs.readFileSync(
-    path.join(__dirname, '..', 'pages/test-runner/test-runner-report.js'),
+const reportCode = [
+    'test-runner-visual-audit.js',
+    'test-runner-report-analysis.js',
+    'test-runner-report.js',
+].map(file => fs.readFileSync(
+    path.join(__dirname, '..', 'pages/test-runner', file),
     'utf8'
-);
+)).join('\n');
 [
     "dashbridge-e2e-diagnostics/v4",
     'adaptive-visual-evidence/v1',

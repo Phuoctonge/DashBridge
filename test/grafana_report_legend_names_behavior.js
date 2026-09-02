@@ -46,8 +46,10 @@ assert(visualSource.includes('const isGenericSeriesName = value =>')
 assert(visualSource.includes('positional legend names must never replace native series labels'),
     'real native series names must still remain protected from sorted legend rows');
 assert(visualSource.includes('const legendMaxByName = () =>')
-    && visualSource.includes('legendMaximums.get(reportSeriesName(item.label, legendNames[offset], offset))'),
-    'period Max values must be matched by the final resolved series name');
+    && visualSource.includes('const legendMaximumFor = name => legendMaximums.get(name);')
+    && visualSource.includes("evaluation === 'period_max' && legendMaximums.size")
+    && visualSource.includes('Array.from(legendMaximums, ([name, value]) =>'),
+    'period Max values must use named visible legend rows and exclude hidden helper series');
 assert(toolsSource.includes('legendSeriesNames?.(getTargetPanel())')
     && toolsSource.includes('legendSeriesNames?.(panel)')
     && toolsSource.includes('visualMetadata.responseSeriesNames = collectResponseSeriesNames(scopedData);')

@@ -21,7 +21,8 @@
         'panelTitle', 'threshold', 'criticalThreshold', 'warningThreshold', 'unit',
         'servers', 'serverCount', 'criticalServers', 'criticalCount', 'warningServers',
         'warningCount', 'criticalList', 'warningList', 'breachesList', 'allSeriesList',
-        'top3List', 'stateList', 'stateQuote', 'maxValue', 'minValue', 'lastValue',
+        'top3List', 'stateList', 'stateQuote', 'tableMarkdown', 'tableRowCount', 'tableColumnCount',
+        'maxValue', 'minValue', 'lastValue',
         'averageValue', 'sumValue', 'aggregateValue', 'cpuCapacityCoefficient',
         'dataStatus', 'period', 'generatedAt'
     ]);
@@ -41,9 +42,13 @@
     };
 
     function normalizeProfile(value = {}) {
+        const panelOrder = Array.isArray(value.panelOrder)
+            ? [...new Set(value.panelOrder.filter(id => typeof id === 'string' && id.length <= 128))].slice(0, 1000)
+            : [];
         return {
             enabled: value.enabled !== false,
             template: text(value.template, 20_000, DEFAULT_PROFILE_TEMPLATE) || DEFAULT_PROFILE_TEMPLATE,
+            panelOrder,
             context: {
                 testName: text(value?.context?.testName, 500, ''),
                 environment: text(value?.context?.environment, 500, ''),
@@ -51,6 +56,19 @@
                 stableLoadStartedAt: text(value?.context?.stableLoadStartedAt, 64, '')
             }
         };
+    }
+
+    function orderPanels(panels, panelOrder) {
+        const source = Array.isArray(panels) ? panels : [];
+        const ranks = new Map((Array.isArray(panelOrder) ? panelOrder : [])
+            .map((id, index) => [id, index]));
+        return source.map((panel, index) => ({ panel, index }))
+            .sort((left, right) => {
+                const leftRank = ranks.has(left.panel?.id) ? ranks.get(left.panel.id) : Number.MAX_SAFE_INTEGER;
+                const rightRank = ranks.has(right.panel?.id) ? ranks.get(right.panel.id) : Number.MAX_SAFE_INTEGER;
+                return leftRank - rightRank || left.index - right.index;
+            })
+            .map(item => item.panel);
     }
 
     function normalizePanel(value = {}, panel = {}) {
@@ -88,6 +106,25 @@
         if (number === null) return '';
         return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(number);
     };
+
+    const markdownCell = value => String(value ?? '').slice(0, 500)
+        .replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\r?\n/g, '<br>');
+    function formatMarkdownTable(value) {
+        const columns = Array.isArray(value?.columns) ? value.columns.slice(0, 20).map(markdownCell) : [];
+        const rows = Array.isArray(value?.rows) ? value.rows.slice(0, 100)
+            .filter(row => Array.isArray(row))
+            .map(row => columns.map((_column, index) => markdownCell(row[index]))) : [];
+        if (!columns.length || !rows.length) return '';
+        const numericColumns = Array.isArray(value?.numericColumns) ? value.numericColumns : [];
+        const line = cells => `| ${cells.join(' | ')} |`;
+        const output = [line(columns), line(columns.map((_column, index) => numericColumns[index] ? '---:' : '---')),
+            ...rows.map(line)];
+        if (value?.truncated) {
+            const totalRows = finiteOrNull(value?.totalRows);
+            output.push('', `_Таблица сокращена: показано ${rows.length}${totalRows === null ? '' : ` из ${totalRows}`} строк._`);
+        }
+        return output.join('\n');
+    }
 
     function renderTemplate(template, variables = {}) {
         return String(template || '').replace(/\{\{\s*([a-zA-Zа-яА-ЯёЁ0-9_.:-]+)\s*\}\}/gu,
@@ -138,6 +175,7 @@
         const stateList = state === 'critical' ? criticalList : state === 'warning' ? warningList : allSeriesList;
         const dynamicThreshold = snapshot?.source === 'cpu_capacity'
             ? `vCPU × ${formatNumber(snapshot?.cpuCapacityCoefficient)}` : '';
+        const tableMarkdown = formatMarkdownTable(snapshot?.table);
         return {
             panelTitle: panel?.title || 'Панель Grafana',
             threshold: dynamicThreshold || formatNumber(snapshot?.threshold),
@@ -153,6 +191,9 @@
             criticalList, warningList, breachesList: [criticalList, warningList].filter(Boolean).join('\n'),
             allSeriesList, top3List: list(ranked.slice(0, 3)),
             stateList, stateQuote: quote(stateList),
+            tableMarkdown,
+            tableRowCount: snapshot?.table?.totalRows ?? snapshot?.table?.rows?.length ?? 0,
+            tableColumnCount: snapshot?.table?.columns?.length ?? 0,
             maxValue: formatNumber(snapshot?.maxValue),
             minValue: formatNumber(snapshot?.minValue),
             lastValue: formatNumber(snapshot?.lastValue),
@@ -234,7 +275,7 @@
         DEFAULT_PROFILE_TEMPLATE, DEFAULT_NORMAL_TEMPLATE, DEFAULT_WARNING_TEMPLATE, DEFAULT_BREACH_TEMPLATE,
         DEFAULT_NEUTRAL_TEMPLATE, DEFAULT_UNAVAILABLE_TEMPLATE, DEFAULT_LIST_ITEM_TEMPLATE, DEFAULT_DETAILS_TEMPLATE,
         PROFILE_VARIABLES, PANEL_VARIABLES, LIST_VARIABLES,
-        normalizeProfile, normalizePanel, renderTemplate, extractTemplateVariables, panelVariables,
-        renderPanel, compose, formatNumber, formatDuration, slug
+        normalizeProfile, normalizePanel, orderPanels, renderTemplate, extractTemplateVariables, panelVariables,
+        renderPanel, compose, formatNumber, formatMarkdownTable, formatDuration, slug
     });
 })(globalThis);

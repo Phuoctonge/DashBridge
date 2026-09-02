@@ -184,6 +184,112 @@ async function inspectTestSelectionWorkflow(context, extensionId) {
     return result;
 }
 
+async function inspectPanelUnitWorkflow(context) {
+    const result = { name: 'panel threshold unit radios', status: 'passed', checks: [] };
+    const page = await context.newPage();
+    try {
+        await page.setContent('<!doctype html><html><head></head><body></body></html>');
+        await page.addScriptTag({ path: path.join(projectRoot, 'js/shared/grafana-panel-settings-modal.js') });
+        await page.evaluate(() => {
+            const modal = globalThis.DashBridgePanelSettingsModal;
+            const state = {
+                thresholdEnabled: true,
+                thresholdValue: 0,
+                seriesQueryFilterEnabled: true,
+                seriesQueryFilterValue: 0
+            };
+            modal.open({
+                state,
+                content: `${modal.transformFields(state)}${modal.thresholdFields(state)}${modal.legendFields('', state)}`,
+                advanced: {
+                    getLegendSeries: async () => [],
+                    getThresholdStatus: async () => ({ unit: 'mins', factor: 60_000, engine: 'uplot' })
+                },
+                onSave: saved => { globalThis.__savedPanelTools = saved; }
+            });
+        });
+        const seriesUnits = page.locator('[data-unit-control="seriesQueryFilterInputUnit"] input');
+        await seriesUnits.first().waitFor({ state: 'attached' });
+        const labels = await seriesUnits.evaluateAll(inputs => inputs.map(input => input.value));
+        if (JSON.stringify(labels) !== JSON.stringify(['ms', 's', 'min'])) {
+            throw new Error(`Unexpected duration radios: ${labels.join(', ')}`);
+        }
+        result.checks.push({ check: 'duration-radio-set', labels });
+        if (!await page.locator('[name="seriesQueryFilterInputUnit"][value="s"]').isChecked()
+            || !await page.locator('[name="thresholdInputUnit"][value="s"]').isChecked()) {
+            throw new Error('The middle duration unit was not selected by default');
+        }
+        await page.locator('.panel-series-filter-unit .panel-tools-unit-choice', { hasText: /^min$/ }).click();
+        await page.locator('.panel-tools-reset-all').click();
+        if (!await page.locator('[name="seriesQueryFilterInputUnit"][value="s"]').isChecked()
+            || !await page.locator('[name="thresholdInputUnit"][value="s"]').isChecked()) {
+            throw new Error('Reset All did not restore the recommended middle unit');
+        }
+        result.checks.push({ check: 'middle-default-and-reset' });
+        await page.locator('[name="seriesQueryFilterEnabled"]').evaluate(input => input.click());
+        await page.locator('[name="thresholdEnabled"]').evaluate(input => input.click());
+
+        const filterLayout = await page.locator('[data-threshold="seriesQueryFilter"] .panel-tools-threshold-value')
+            .evaluate(root => {
+                const prompt = root.querySelector('.panel-tools-series-filter-prompt').getBoundingClientRect();
+                const input = root.querySelector('[name="seriesQueryFilterValue"]').getBoundingClientRect();
+                const thresholdInput = root.ownerDocument.querySelector('[name="thresholdValue"]').getBoundingClientRect();
+                return { promptBottom: prompt.bottom, inputTop: input.top, inputWidth: input.width, thresholdWidth: thresholdInput.width };
+            });
+        if (filterLayout.inputTop < filterLayout.promptBottom) {
+            throw new Error(`Series filter input was not moved below its prompt: ${JSON.stringify(filterLayout)}`);
+        }
+        if (Math.abs(filterLayout.inputWidth - filterLayout.thresholdWidth) > 0.5) {
+            throw new Error(`Series and threshold fields have different widths: ${JSON.stringify(filterLayout)}`);
+        }
+        result.checks.push({ check: 'filter-value-on-second-row' });
+
+        const seriesValue = page.locator('[name="seriesQueryFilterValue"]');
+        await seriesValue.fill('2,5');
+        await page.locator('.panel-series-filter-unit .panel-tools-unit-choice', { hasText: /^s$/ }).click();
+        if (await seriesValue.inputValue() !== '2,5') throw new Error('Changing the series unit rewrote the entered number');
+
+        const thresholdValue = page.locator('[name="thresholdValue"]');
+        await thresholdValue.fill('3');
+        await page.locator('.panel-threshold-unit .panel-tools-unit-choice', { hasText: /^min$/ }).click();
+        if (await thresholdValue.inputValue() !== '3') throw new Error('Changing the threshold unit rewrote the entered number');
+        await page.locator('.panel-tools-save').click();
+        const saved = await page.evaluate(() => globalThis.__savedPanelTools);
+        if (saved.seriesQueryFilterRawValue !== 2500 || saved.seriesQueryFilterInputUnit !== 's') {
+            throw new Error(`Series value was saved incorrectly: ${JSON.stringify(saved)}`);
+        }
+        if (saved.thresholdRawValue !== 180_000 || saved.thresholdInputUnit !== 'min') {
+            throw new Error(`Threshold value was saved incorrectly: ${JSON.stringify(saved)}`);
+        }
+        result.checks.push({ check: 'decimal-comma-kept-and-raw-converted', seriesRaw: 2500, thresholdRaw: 180_000 });
+
+        await page.evaluate(() => {
+            const modal = globalThis.DashBridgePanelSettingsModal;
+            const state = { thresholdEnabled: true, seriesQueryFilterEnabled: true };
+            modal.open({
+                state,
+                content: `${modal.transformFields(state)}${modal.thresholdFields(state)}${modal.legendFields('', state)}`,
+                advanced: {
+                    getLegendSeries: async () => [],
+                    getThresholdStatus: async () => ({ unit: 'req/s', factor: 1, engine: 'uplot' })
+                },
+                onSave: () => {}
+            });
+        });
+        await page.locator('.panel-tools-unit-static').first().waitFor({ state: 'visible' });
+        if (await page.locator('.panel-tools-unit-options input').count() !== 0) {
+            throw new Error('A fixed unknown unit was rendered as a non-actionable radio');
+        }
+        result.checks.push({ check: 'unknown-unit-is-static' });
+    } catch (error) {
+        result.status = 'failed';
+        result.error = serializeError(error);
+    } finally {
+        if (!page.isClosed()) await page.close();
+    }
+    return result;
+}
+
 async function main() {
     if (!fs.existsSync(chromeExecutable)) {
         throw new Error(`Chrome executable not found: ${chromeExecutable}`);
@@ -218,7 +324,10 @@ async function main() {
         for (const htmlPath of findHtmlFiles(path.join(projectRoot, 'pages'))) {
             pages.push(await inspectPage(context, extensionId, htmlPath));
         }
-        const workflows = [await inspectTestSelectionWorkflow(context, extensionId)];
+        const workflows = [
+            await inspectTestSelectionWorkflow(context, extensionId),
+            await inspectPanelUnitWorkflow(context)
+        ];
 
         report = {
             startedAt,

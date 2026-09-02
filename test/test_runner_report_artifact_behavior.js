@@ -7,12 +7,18 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const code = fs.readFileSync(
-    path.join(__dirname, '..', 'pages', 'test-runner', 'test-runner-report.js'),
+const code = [
+    'test-runner-visual-audit.js',
+    'test-runner-report-analysis.js',
+    'test-runner-report.js',
+].map(file => fs.readFileSync(
+    path.join(__dirname, '..', 'pages', 'test-runner', file),
     'utf8'
-);
+)).join('\n');
 const context = vm.createContext({ console, Date });
 vm.runInContext(`${code}\nthis.__report = DashBridgeTestReport;`, context);
+assert(Object.isFrozen(context.DashBridgeTestVisualAudit), 'visual audit must expose a frozen pure facade');
+assert(Object.isFrozen(context.DashBridgeTestReportAnalysis), 'report analysis must expose a frozen pure facade');
 
 const image = `data:image/png;base64,${'A'.repeat(2048)}`;
 const skipImage = `data:image/png;base64,${'B'.repeat(1024)}`;

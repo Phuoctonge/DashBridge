@@ -10,7 +10,6 @@ const analysisSource = fs.readFileSync('pages/dashbridge/dashbridge-panel-analys
 const panelToolsSource = fs.readFileSync('pages/dashbridge/dashbridge-panel-tools-controller.js', 'utf8');
 const panelAdditionSource = fs.readFileSync('pages/dashbridge/dashbridge-panel-addition-controller.js', 'utf8');
 const panelCardSource = fs.readFileSync('pages/dashbridge/dashbridge-panel-card-controller.js', 'utf8');
-const panelActionsSource = fs.readFileSync('pages/dashbridge/dashbridge-panel-actions-controller.js', 'utf8');
 const messageSource = fs.readFileSync('pages/dashbridge/dashbridge-iframe-message-controller.js', 'utf8');
 const iframeSource = fs.readFileSync('js/content/grafana-iframe.js', 'utf8');
 const html = fs.readFileSync('pages/dashbridge/dashbridge.html', 'utf8');
@@ -79,25 +78,25 @@ assert(storageSyncStart >= 0 && storageSyncEnd > storageSyncStart
         < storageSyncSource.indexOf('await profileStore.load();'),
     'profile storage events must wait for the newest local snapshot before deciding to rebuild iframes');
 
-const pauseStart = panelActionsSource.indexOf('const togglePanelPause = async id =>');
-const pauseEnd = panelActionsSource.indexOf('const bindPanelActions =', pauseStart);
-const pauseSource = panelActionsSource.slice(pauseStart, pauseEnd);
+const pauseStart = panelCardSource.indexOf('const togglePanelPause = async id =>');
+const pauseEnd = panelCardSource.indexOf('const bindPanelActions =', pauseStart);
+const pauseSource = panelCardSource.slice(pauseStart, pauseEnd);
 assert(pauseStart >= 0 && pauseEnd > pauseStart
     && pauseSource.includes('replacePanelCard(panel.id);')
     && !pauseSource.includes('renderDashboard();'),
     'pausing one panel must replace only that card instead of reloading every Grafana iframe');
 
-const deleteStart = panelActionsSource.indexOf('const deletePanel = async id =>');
-const deleteEnd = panelActionsSource.indexOf('const refreshPanel =', deleteStart);
-const deleteSource = panelActionsSource.slice(deleteStart, deleteEnd);
+const deleteStart = panelCardSource.indexOf('const deletePanel = async id =>');
+const deleteEnd = panelCardSource.indexOf('const refreshPanel =', deleteStart);
+const deleteSource = panelCardSource.slice(deleteStart, deleteEnd);
 assert(deleteStart >= 0 && deleteEnd > deleteStart
     && deleteSource.includes('removePanelCard(id);')
     && !deleteSource.includes('renderDashboard();'),
     'deleting one panel must remove only its card');
 
-const iframeSettingsStart = panelActionsSource.indexOf('const openIframeSettings = panel =>');
-const iframeSettingsEnd = panelActionsSource.indexOf('const togglePanelPause =', iframeSettingsStart);
-const iframeSettingsSource = panelActionsSource.slice(iframeSettingsStart, iframeSettingsEnd);
+const iframeSettingsStart = panelCardSource.indexOf('const openIframeSettings = panel =>');
+const iframeSettingsEnd = panelCardSource.indexOf('const togglePanelPause =', iframeSettingsStart);
+const iframeSettingsSource = panelCardSource.slice(iframeSettingsStart, iframeSettingsEnd);
 assert(iframeSettingsStart >= 0 && iframeSettingsEnd > iframeSettingsStart
     && iframeSettingsSource.includes('reloadFrame: previousSrc !== panel.src')
     && iframeSettingsSource.includes('|| previousGrafanaTheme !== panel.grafanaTheme'),
@@ -122,10 +121,11 @@ assert(switchSource.includes('currentProfile.panels = getPanels();')
 const timeLabelStart = timeSource.indexOf('const updateLabels = () => {');
 const timeLabelEnd = timeSource.indexOf('const syncControls', timeLabelStart);
 const timeLabelSource = timeSource.slice(timeLabelStart, timeLabelEnd);
-assert(timeLabelSource.includes('timeLabel.replaceChildren(')
-    && timeLabelSource.includes('timezone.textContent = timezoneName;')
+assert(timeLabelSource.includes('timeLabel.textContent = timeState.formatForLabel(state.from, state.to);')
+    && timeLabelSource.includes('timeState.formatForInput(state.from)')
+    && !timeLabelSource.includes('timeZoneName')
     && !timeLabelSource.includes('innerHTML'),
-    'absolute time labels must render as text without parsing user-controlled markup');
+    'absolute time labels must be compact while the editor tooltip retains seconds');
 
 assert(iframeSource.includes('applyRefreshPolicyToUrl?.(url.toString(), event.data.refresh || \'\')')
     && !iframeSource.includes("url.searchParams.set('refresh', '1y')")
@@ -136,10 +136,10 @@ const refreshChoiceEnd = timeSource.indexOf("documentRef.getElementById('forceRe
 const refreshChoiceSource = timeSource.slice(refreshChoiceStart, refreshChoiceEnd);
 assert(refreshChoiceStart >= 0 && refreshChoiceEnd > refreshChoiceStart
     && refreshChoiceSource.includes('const previousRefresh = state.refresh;')
-    && refreshChoiceSource.includes('if (!state.refresh && previousRefresh)')
+    && refreshChoiceSource.includes('if (state.refresh !== previousRefresh)')
     && refreshChoiceSource.includes('void refreshAllPanels();')
     && refreshChoiceSource.includes('else {\n                        broadcast();'),
-    'switching a live profile to Off must navigate once to destroy the existing Grafana scheduler');
+    'every refresh-mode change must navigate once so all Grafana versions recreate or destroy their scheduler');
 assert(iframeSource.includes("window.history.replaceState(null, '', url.toString())")
     && !iframeSource.includes("window.history.pushState(null, '', url.toString())"),
     'seamless time updates must replace the iframe URL instead of growing browser history');

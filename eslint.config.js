@@ -26,6 +26,7 @@ const webGlobals = readonly([
 
 const extensionRuntimeGlobals = readonly([
     'Chart', 'JSZip', 'DashBridgeArchiveBudget', 'DashBridgeBackgroundGrafanaInfrastructure',
+    'DashBridgeBackgroundUpdateIndicator',
     'DashBridgeBackgroundGuiCapture', 'DashBridgeBackgroundProfileStorage', 'DashBridgeBatchCaptureWindowRunner',
     'DashBridgeBatchPageState', 'DashBridgeBatchPanelRules', 'DashBridgeCaptureOutput',
     'DashBridgeComparisonXlsx', 'DashBridgeDashflowExport', 'DashBridgeDashflowIo',
@@ -48,7 +49,7 @@ const extensionRuntimeGlobals = readonly([
     'BatchPanelPicker', 'BatchPanelRulesUi', 'BatchSeriesDiscoveryController',
     'BatchSeriesRunController',
     'DashBridgeCapture', 'DashBridgeIframeMessageController',
-    'DashBridgePanelActionsController', 'DashBridgePanelAdditionController',
+    'DashBridgePanelAdditionController',
     'DashBridgePanelAnalysisController',
     'DashBridgePageUiController', 'DashBridgePanelCardController', 'DashBridgePanelToolsController',
     'DashBridgePanelTransferController', 'DashBridgeProfileController',

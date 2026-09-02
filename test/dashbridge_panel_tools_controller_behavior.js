@@ -31,8 +31,8 @@ const panel = {
     tools: {
         legendMode: 'fast_complete_hide', legendFilter: ['idle'],
         seriesFilterSettingsVersion: 2, seriesQueryFilterEnabled: true,
-        seriesQueryFilterValue: 80, seriesQueryFilterMode: 'last',
-        thresholdEnabled: true, thresholdValue: 90, thresholdNotifyEnabled: true,
+        seriesQueryFilterValue: 80, seriesQueryFilterInputUnit: 's', seriesQueryFilterMode: 'last',
+        thresholdEnabled: true, thresholdValue: 90, thresholdInputUnit: 'ms', thresholdNotifyEnabled: true,
         convertMemToUsed: false
     }
 };
@@ -70,6 +70,8 @@ assert.strictEqual(tools.capturePrepared, true);
 assert.strictEqual(tools.forceMemByteUnit, true, 'legacy memory panel restores byte unit');
 assert.strictEqual(tools.seriesQueryFilterEnabled, true);
 assert.strictEqual(tools.seriesQueryFilterMode, 'last');
+assert.strictEqual(tools.seriesQueryFilterInputUnit, 's');
+assert.strictEqual(tools.thresholdInputUnit, 'ms');
 assert.strictEqual(tools.cpuCapacityFilterCoefficient, 0.8);
 controller.apply(panel, iframe);
 assert.strictEqual(messages.at(-1).action, 'applyPanelTools');

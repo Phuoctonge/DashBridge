@@ -25,6 +25,10 @@ assert(source.includes('text.textContent =') && !source.includes('innerHTML'),
     'release metadata must be rendered as text');
 assert(source.includes('chrome.tabs.create({ url: release.installerUrl })'),
     'the explicit user action must open the validated installer asset');
+assert(source.includes("const INDICATOR_KEY = 'dashbridgeUpdateIndicator'")
+    && source.includes('[INDICATOR_KEY]: { version }')
+    && source.includes('chrome.storage.local.remove(INDICATOR_KEY)'),
+'popup must persist only the trusted update version and clear a stale update indicator');
 assert(source.includes("chrome.runtime.getURL('manifest.json')")
     && source.includes("cache: 'no-store'")
     && source.includes('localReloadRequired')

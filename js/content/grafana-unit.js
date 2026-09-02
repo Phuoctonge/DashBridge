@@ -74,9 +74,9 @@
         ).trim();
         if (!code || /^(none|short)$/i.test(code)) return { unit: '', factor: 1, source: 'panel' };
 
+        if (/^percentunit$/i.test(code)) return { unit: '%', factor: 0.01, source: 'panel', code };
         const known = {
             percent: '%',
-            percentunit: '%',
             bytes: 'B',
             Bps: 'B/s',
             ms: 'ms',
@@ -91,14 +91,51 @@
         return { unit: custom ? custom[1] : (known[code] || code), factor: 1, source: 'panel', code };
     };
 
+    const durationScaleMs = unit => {
+        const token = String(unit || '').trim().replace(/μ/g, 'µ').toLowerCase();
+        if (['µs', 'us', 'usec'].includes(token)) return 0.001;
+        if (['ms', 'msec'].includes(token)) return 1;
+        if (['s', 'sec', 'secs'].includes(token)) return 1000;
+        if (['min', 'mins', 'minute', 'minutes'].includes(token)) return 60_000;
+        if (['h', 'hr', 'hrs', 'hour', 'hours'].includes(token)) return 3_600_000;
+        if (['d', 'day', 'days'].includes(token)) return 86_400_000;
+        return null;
+    };
+
+    const configuredDurationScaleMs = code => {
+        const token = String(code || '').trim().toLowerCase();
+        if (['ms', 'dtdurationms', 'durationms'].includes(token)) return 1;
+        if (['s', 'dtdurations', 'durations'].includes(token)) return 1000;
+        return null;
+    };
+
     const mergeAxisAndPanelUnit = (axisUnit, panel) => {
         // Prefer visible axis scale whenever it exists: it converts a user
         // threshold in GiB/TiB or MB/s/GB/s to Grafana's raw value exactly.
         if (axisUnit && Number.isFinite(axisUnit.factor)) {
             const configured = unitFromPanelDefinition(panel);
-            return { ...axisUnit, unit: axisUnit.unit || configured.unit, source: 'axis' };
+            const displayScale = durationScaleMs(axisUnit.unit);
+            const rawScale = configuredDurationScaleMs(configured.code);
+            const exactFactor = displayScale !== null && rawScale !== null
+                ? displayScale / rawScale : axisUnit.factor;
+            return { ...axisUnit, factor: exactFactor, unit: axisUnit.unit || configured.unit, source: 'axis' };
         }
         return unitFromPanelDefinition(panel);
+    };
+
+    const collectDataFrameUnitCodes = data => {
+        const units = new Set();
+        for (const result of Object.values(data?.results || {})) {
+            for (const frame of result?.frames || []) {
+                for (const field of frame?.schema?.fields || []) {
+                    if (field?.type === 'time') continue;
+                    const unit = String(field?.config?.unit || '').trim();
+                    if (unit) units.add(unit);
+                    if (units.size >= 8) return [...units];
+                }
+            }
+        }
+        return [...units];
     };
 
     globalThis.DashBridgeGrafanaUnit = Object.freeze({
@@ -106,6 +143,7 @@
         inferUnitFromAxisLabels,
         inferUnitFromAxisTicks,
         unitFromPanelDefinition,
-        mergeAxisAndPanelUnit
+        mergeAxisAndPanelUnit,
+        collectDataFrameUnitCodes
     });
 })(globalThis);

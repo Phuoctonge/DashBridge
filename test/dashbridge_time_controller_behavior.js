@@ -22,11 +22,15 @@ const elements = Object.fromEntries([
 ].map(id => [id, makeElement()]));
 const refreshOff = makeElement({ dataset: { refresh: '' } });
 const loadedFrame = makeElement({
-    src: 'https://grafana.example/d-solo/x/y?panelId=2', dataset: {}, contentWindow: {},
+    src: 'https://grafana.example/d-solo/x/y?panelId=2',
+    dataset: { dashbridgeProfileId: 'profile-1', dashbridgeScopeId: 'scope-1' }, contentWindow: {},
     closest: () => ({ dataset: { panelId: 'panel-1' } })
 });
 const deferredFrame = makeElement({
-    src: '', dataset: { src: 'https://grafana.example/d-solo/x/y?panelId=3' }, contentWindow: null,
+    src: '', dataset: {
+        src: 'https://grafana.example/d-solo/x/y?panelId=3',
+        dashbridgeProfileId: 'profile-1', dashbridgeScopeId: 'scope-1'
+    }, contentWindow: null,
     closest: () => ({ dataset: { panelId: 'panel-2' } })
 });
 let frames = [loadedFrame, deferredFrame];
@@ -66,6 +70,7 @@ const timeState = {
     defaults: () => ({ from: 'now-1h', to: 'now', refresh: '' }),
     normalize: value => ({ from: value?.from || 'now-1h', to: value?.to || 'now', refresh: value?.refresh || '' }),
     formatForInput: value => value,
+    formatForLabel: (from, to) => `${from}–${to}`,
     formatForUrl: (_url, value) => value,
     applyToUrl(urlValue, state) {
         const url = new URL(urlValue);
@@ -95,6 +100,7 @@ const controller = context.DashBridgeTimeController.create({
     postToDashboardFrame: (iframe, message) => { sent.push({ iframe, message }); return true; },
     navigateDashboardFrame: (iframe, url) => { navigated.push({ iframe, url }); },
     refreshAllPanels: async () => { refreshCount += 1; },
+    runtimeScopeId: 'scope-1',
     documentRef,
     windowRef,
     navigatorRef: { clipboard: { writeText: async () => {}, readText: async () => '{}' } },
@@ -115,6 +121,14 @@ assert.strictEqual(JSON.parse(url.searchParams.get('dashbridgeSeriesQueryFilter'
 controller.broadcast();
 assert.strictEqual(sent.length, 1, 'loaded iframe receives one time message');
 assert.strictEqual(sent[0].message.refresh, '10s');
+loadedFrame.dataset.dashbridgeProfileId = 'profile-other';
+assert.strictEqual(controller.getPanelForIframe(loadedFrame), null,
+    'a frame created for another profile must not resolve against the active panel list');
+loadedFrame.dataset.dashbridgeProfileId = 'profile-1';
+loadedFrame.dataset.dashbridgeScopeId = 'scope-other';
+assert.strictEqual(controller.getPanelForIframe(loadedFrame), null,
+    'an iframe from another DashBridge tab runtime must not resolve in this tab');
+loadedFrame.dataset.dashbridgeScopeId = 'scope-1';
 const deferredUrl = new URL(deferredFrame.dataset.src);
 assert.strictEqual(deferredUrl.searchParams.get('from'), 'now-6h', 'deferred iframe URL receives current time');
 assert.strictEqual(deferredUrl.searchParams.get('theme'), 'light');
@@ -122,6 +136,8 @@ assert.strictEqual(JSON.parse(deferredUrl.searchParams.get('dashbridgeCpuCapacit
 
 controller.setupControls();
 assert.strictEqual(elements.absTimeFrom.value, 'now-6h');
+assert.strictEqual(elements.timePickerLabel.textContent, 'Last 6h');
+assert.strictEqual(elements.timePickerBtn.title, 'Выбрать время: Last 6h');
 refreshOff.click();
 assert.strictEqual(controller.getState().refresh, '');
 assert.strictEqual(profile.timeState.refresh, '');
@@ -132,6 +148,9 @@ elements.absTimeFrom.value = '2025-04-25 10:48:00';
 elements.absTimeTo.value = '2025-04-25 12:49:00';
 elements.applyAbsoluteTime.click();
 assert(Number(controller.getState().from) > 1_000_000_000_000, 'absolute input remains normalized to milliseconds');
+assert.strictEqual(elements.timePickerLabel.textContent,
+    `${controller.getState().from}–${controller.getState().to}`,
+    'absolute header labels must use the compact time-state formatter');
 assert.strictEqual(navigated.length, 2, 'absolute range navigates each known iframe once');
 
 frames = [loadedFrame];

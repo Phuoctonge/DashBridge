@@ -32,7 +32,8 @@
     ]);
     const STRING_TOOL_KEYS = new Set([
         'legendSelectFilter', 'legendIgnoreFilter', 'legendMode',
-        'seriesQueryFilterMode', 'cpuCapacityFilterMode', 'thresholdUnit'
+        'seriesQueryFilterMode', 'seriesQueryFilterInputUnit', 'cpuCapacityFilterMode',
+        'thresholdInputUnit', 'thresholdUnit'
     ]);
 
     const isPlainObject = value => typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -131,8 +132,16 @@
         if (!isPlainObject(value)) fail(`${label}: ожидается объект.`);
         if (value.enabled !== undefined && typeof value.enabled !== 'boolean') fail(`${label}.enabled: ожидается boolean.`);
         if (value.context !== undefined && !isPlainObject(value.context)) fail(`${label}.context: ожидается объект.`);
+        if (value.panelOrder !== undefined && (!Array.isArray(value.panelOrder) || value.panelOrder.length > 1000)) {
+            fail(`${label}.panelOrder: ожидается массив не более 1000 идентификаторов.`);
+        }
+        const panelOrder = value.panelOrder?.map((id, index) => idField(id, `${label}.panelOrder[${index}]`));
+        if (panelOrder && new Set(panelOrder).size !== panelOrder.length) {
+            fail(`${label}.panelOrder: идентификаторы не должны повторяться.`);
+        }
         return { ...value, enabled: value.enabled !== false,
             template: optionalString(value.template, `${label}.template`, 20_000),
+            ...(panelOrder ? { panelOrder } : {}),
             context: value.context ? {
                 ...value.context,
                 testName: optionalString(value.context.testName, `${label}.context.testName`, 500),

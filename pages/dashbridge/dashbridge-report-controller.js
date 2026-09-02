@@ -7,13 +7,15 @@
     function create({ reportEngine, transportFactory, testRunnerFactory, auditEngine,
         forceLoadPanel, postToDashboardFrame, getPanels, getActiveProfile, getTimeContext,
         documentRef = document, navigatorRef = navigator, setTimer = setTimeout }) {
-        if (!reportEngine?.normalizePanel || !transportFactory?.create || !testRunnerFactory?.create
+        if (!reportEngine?.normalizePanel || !reportEngine?.orderPanels
+            || !transportFactory?.create || !testRunnerFactory?.create
             || typeof forceLoadPanel !== 'function' || typeof postToDashboardFrame !== 'function'
             || typeof getPanels !== 'function' || typeof getActiveProfile !== 'function'
             || typeof getTimeContext !== 'function') {
             throw new TypeError('DashBridge report controller dependencies are incomplete');
         }
         let activePreview = null;
+        let closeActivePreview = null;
 
         const getEffectivePanelSla = panel => {
             const config = reportEngine.normalizePanel(panel.report, panel);
@@ -61,7 +63,9 @@
         const collect = async (signal = null, onProgress = () => {}, { requirePanels = true } = {}) => {
             transport.throwIfAborted(signal);
             const profile = getActiveProfile();
-            const reportPanels = getPanels().filter(panel => reportEngine.normalizePanel(panel.report, panel).enabled);
+            const reportPanels = reportEngine.orderPanels(
+                getPanels(), reportEngine.normalizeProfile(profile?.report).panelOrder
+            ).filter(panel => reportEngine.normalizePanel(panel.report, panel).enabled);
             if (requirePanels && !reportPanels.length) throw new Error('В настройках сообщения не выбрана ни одна панель.');
             onProgress(`Получаем данные панелей: ${reportPanels.length}…`);
             reportPanels.forEach(panel => setPanelDataStatus(panel, null));
@@ -155,9 +159,13 @@
             };
             const close = () => {
                 runController?.abort();
-                if (activePreview === overlay) activePreview = null;
+                if (activePreview === overlay) {
+                    activePreview = null;
+                    closeActivePreview = null;
+                }
                 overlay.remove();
             };
+            closeActivePreview = close;
             overlay.querySelector('.report-close').addEventListener('click', close);
             overlay.addEventListener('click', event => { if (event.target === overlay) close(); });
             regenerate.addEventListener('click', run);
@@ -169,7 +177,10 @@
             void run();
         };
 
-        return Object.freeze({ transport, testRunner, collect, generate, openPreview, getEffectivePanelSla, setPanelDataStatus });
+        const invalidateProfileContext = () => closeActivePreview?.();
+
+        return Object.freeze({ transport, testRunner, collect, generate, openPreview,
+            invalidateProfileContext, getEffectivePanelSla, setPanelDataStatus });
     }
 
     root.DashBridgeReportController = Object.freeze({ create });

@@ -30,7 +30,9 @@ before(dashbridgeHtml, 'dashbridge-panel-transfer.js', 'dashbridge-panel-transfe
 before(dashbridgeHtml, 'dashbridge-panel-transfer-controller.js', 'dashbridge.js');
 before(dashbridgeHtml, 'dashbridge-panel-addition-controller.js', 'dashbridge.js');
 before(dashbridgeHtml, 'dashbridge-panel-card-controller.js', 'dashbridge.js');
-before(dashbridgeHtml, 'dashbridge-panel-actions-controller.js', 'dashbridge.js');
+assert(!dashbridgeHtml.includes('dashbridge-panel-actions-controller.js')
+    && !fs.existsSync(path.join(root, 'pages', 'dashbridge', 'dashbridge-panel-actions-controller.js')),
+    'panel card actions must stay inside the unified card lifecycle owner');
 before(dashbridgeHtml, 'dashbridge-page-ui-controller.js', 'dashbridge.js');
 before(dashbridgeHtml, 'dashbridge-iframe-message-controller.js', 'dashbridge.js');
 before(recorderHtml, 'recorder-replay.js', 'recorder.js');
@@ -140,6 +142,7 @@ const profileContext = runModule(['pages', 'dashbridge', 'dashbridge-profile-con
 let profiles = [];
 let activeProfileId = null;
 let panels = [];
+let invalidatedProfileRuntimes = 0;
 const renders = [];
 const storedProfiles = [
     { id: 'one', name: 'One', panels: [{ id: 'p1', src: 'https://grafana.example/?viewPanel=1' }], timeState: {} },
@@ -167,6 +170,7 @@ const profileController = profileContext.DashBridgeProfileController.create({
     panelFrameSignature: panel => panel.src,
     adoptPanelState: (_previous, next) => next,
     reconcileDashboardPanelCards: () => undefined,
+    invalidateActiveProfileRuntime: () => { invalidatedProfileRuntimes += 1; },
 });
 
 (async () => {
@@ -196,6 +200,8 @@ const profileController = profileContext.DashBridgeProfileController.create({
     assert.deepStrictEqual(JSON.parse(JSON.stringify(storedProfiles[0].panels.map(panel => panel.id))), ['p1', 'local'],
         'switching profiles must preserve the outgoing panel state');
     assert.strictEqual(activeProfileId, 'two');
+    assert.strictEqual(invalidatedProfileRuntimes, 1,
+        'switching profiles must invalidate notifications and report UI owned by the outgoing profile');
     assert.deepStrictEqual(JSON.parse(JSON.stringify(panels.map(panel => panel.id))), ['p2']);
     assert.strictEqual(tabState.get('dashbridge_tab_activeProfileId'), 'two');
     assert(profileListeners.storage && profileListeners.visibilitychange && profileListeners.pagehide,

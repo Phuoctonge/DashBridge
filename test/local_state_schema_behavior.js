@@ -14,10 +14,11 @@ const validPanel = {
     id: '123e4567-e89b-42d3-a456-426614174000',
     src: 'https://grafana.example/d-solo/uid/name?panelId=1',
     width: '50%', height: '350px', tools: {
-        thresholdEnabled: true, thresholdValue: 80, thresholdIncludeHidden: true,
+        thresholdEnabled: true, thresholdValue: 80, thresholdInputUnit: 's', thresholdIncludeHidden: true,
         legendSelectionVersion: 2, legendVisibleSeries: ['wanted-1', 'wanted-2'],
         cpuCapacityFilterEnabled: true, cpuCapacityFilterHighlightEnabled: false,
-        seriesQueryFilterHighlightEnabled: true, cpuCapacityFilterCoefficient: 0.8, cpuCapacityFilterMode: 'max',
+        seriesQueryFilterHighlightEnabled: true, seriesQueryFilterInputUnit: 'ms',
+        cpuCapacityFilterCoefficient: 0.8, cpuCapacityFilterMode: 'max',
         cpuCapacityFilterLoad1: true, cpuCapacityFilterLoad5: false, cpuCapacityFilterLoad15: false,
         capturePrepared: true
     }
@@ -31,6 +32,8 @@ assert.deepStrictEqual(
 assert.strictEqual(schema.normalizeProfiles([validProfile]).items[0].panels[0].tools.capturePrepared, true);
 assert.strictEqual(schema.normalizeProfiles([validProfile]).items[0].panels[0].tools.cpuCapacityFilterCoefficient, 0.8);
 assert.strictEqual(schema.normalizeProfiles([validProfile]).items[0].panels[0].tools.cpuCapacityFilterHighlightEnabled, false);
+assert.strictEqual(schema.normalizeProfiles([validProfile]).items[0].panels[0].tools.thresholdInputUnit, 's');
+assert.strictEqual(schema.normalizeProfiles([validProfile]).items[0].panels[0].tools.seriesQueryFilterInputUnit, 'ms');
 assert.strictEqual(schema.normalizeProfiles([{ ...validProfile, panels: [{ ...validPanel, tools: {
     ...validPanel.tools, forceMemByteUnit: true
 } }] }]).items[0].panels[0].tools.forceMemByteUnit, true);

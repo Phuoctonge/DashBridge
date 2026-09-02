@@ -7,7 +7,7 @@ const manifest = JSON.parse(fs.readFileSync('manifest.json', 'utf8'));
 const workflow = fs.readFileSync('.github/workflows/release.yml', 'utf8');
 const builder = fs.readFileSync('scripts/build-release.ps1', 'utf8');
 
-assert.strictEqual(manifest.version, '2.4.1');
+assert.strictEqual(manifest.version, '2.4.2');
 assert(workflow.includes("- 'v*'")
     && workflow.includes('node test/run-all-tests.js')
     && workflow.indexOf('node test/run-all-tests.js') < workflow.indexOf('gh release create'),
@@ -48,6 +48,8 @@ assert(builder.includes('Assert-ArchiveEntry')
     && builder.includes("EndsWith('.html'")
     && builder.includes('$htmlReferencePattern'),
     'release builder must verify packaged manifest paths and local HTML dependencies');
+assert(builder.includes('icons/icon$size-update.png') && builder.includes("Source 'the update action indicator'"),
+    'release builder must verify all dynamically selected update action icons');
 const singleBackslashNormalization = ".Replace('" + '\\' + "', '/')";
 assert(builder.includes(singleBackslashNormalization),
     'release verification must normalize Windows ZIP entry separators');

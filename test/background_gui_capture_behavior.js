@@ -19,7 +19,7 @@ const chrome = {
     storage: {
         sync: { get: async () => ({ grafanaIframeDomains: ['grafana.test', 'strict.test:8443'] }), onChanged: { addListener() {} } },
         session: { remove: async () => {} },
-        local: { get: async () => ({}), set: async () => {} },
+        local: { get: async () => ({}), set: async () => {}, remove: async () => {} },
         onChanged: { addListener() {} }
     },
     declarativeNetRequest: {
@@ -28,8 +28,13 @@ const chrome = {
     },
     runtime: {
         id: 'extension-id', getURL: path => `chrome-extension://extension-id/${path || ''}`,
+        getManifest: () => ({ version: '2.4.2' }),
         onInstalled: { addListener() {} }, onStartup: { addListener() {} }, onMessage: { addListener(listener) { messageListener = listener; } }
-    }
+    },
+    action: {
+        setIcon: async () => {}, setBadgeText: async () => {},
+        setBadgeBackgroundColor: async () => {}, setTitle: async () => {},
+    },
 };
 const context = {
     chrome, importScripts() {}, console, setTimeout, clearTimeout, URL, Date, Uint8Array,
@@ -54,6 +59,8 @@ vm.runInNewContext(fs.readFileSync('js/background-grafana-infrastructure.js', 'u
 vm.runInNewContext(fs.readFileSync('js/background-profile-storage.js', 'utf8'), context,
     { filename: 'background-profile-storage.js' });
 vm.runInNewContext(fs.readFileSync('js/background-gui-capture.js', 'utf8'), context, { filename: 'background-gui-capture.js' });
+vm.runInNewContext(fs.readFileSync('js/background-update-indicator.js', 'utf8'), context,
+    { filename: 'background-update-indicator.js' });
 vm.runInNewContext(fs.readFileSync('js/background.js', 'utf8'), context, { filename: 'background.js' });
 
 const guiCaptureController = vm.runInContext('guiCaptureController', context);

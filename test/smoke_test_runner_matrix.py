@@ -20,7 +20,14 @@ UI = "\n".join((ROOT / f"pages/test-runner/{name}").read_text(encoding="utf-8") 
     "test-runner-artifact-serialization.js", "test-runner-spool.js",
     "test-runner-export-controller.js", "test-runner-diagnostic-viewer.js", "test-runner-ui.js"
 ])
-REPORT = (ROOT / "pages/test-runner/test-runner-report.js").read_text(encoding="utf-8")
+REPORT = "\n".join(
+    (ROOT / f"pages/test-runner/{name}").read_text(encoding="utf-8")
+    for name in (
+        "test-runner-visual-audit.js",
+        "test-runner-report-analysis.js",
+        "test-runner-report.js",
+    )
+)
 PANEL_TOOLS = (ROOT / "js/content/grafana-panel-tools.js").read_text(encoding="utf-8") \
     + (ROOT / "js/content/grafana-panel-data-transforms.js").read_text(encoding="utf-8") \
     + (ROOT / "js/content/grafana-panel-data-runtime.js").read_text(encoding="utf-8")

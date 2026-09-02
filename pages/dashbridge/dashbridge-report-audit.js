@@ -15,6 +15,28 @@
         level: series?.level || (series?.exceeded ? 'critical' : 'normal'),
         panelTitle: item.panel?.title || item.panel?.id || 'Панель Grafana'
     })[name];
+    const panelVariableApplies = (name, item, variables, config) => {
+        const source = item.snapshot?.source || config.sla.source;
+        const criticalCount = Number(variables?.criticalCount) || 0;
+        const warningCount = Number(variables?.warningCount) || 0;
+        if (name === 'unit') return hasValue(item.snapshot?.unit);
+        if (['threshold', 'criticalThreshold'].includes(name)) return source !== 'none';
+        if (name === 'warningThreshold') return source !== 'none' && item.snapshot?.warningThreshold != null;
+        if (['servers', 'criticalServers', 'criticalList'].includes(name)) return criticalCount > 0;
+        if (['warningServers', 'warningList'].includes(name)) return warningCount > 0;
+        if (name === 'breachesList') return criticalCount + warningCount > 0;
+        if (['allSeriesList', 'top3List', 'stateList', 'stateQuote'].includes(name)) {
+            return Array.isArray(item.snapshot?.series) && item.snapshot.series.length > 0;
+        }
+        return true;
+    };
+    const listVariableApplies = (name, item) => {
+        if (name === 'unit') return hasValue(item.snapshot?.unit);
+        if (['vCpu', 'cpuCapacity', 'seriesThreshold'].includes(name)) {
+            return item.snapshot?.source === 'cpu_capacity';
+        }
+        return true;
+    };
 
     function runEngineSelfCheck(reportEngine) {
         const panelTemplate = reportEngine.PANEL_VARIABLES.map(name => `${name}={{${name}}}`).join('\n');
@@ -37,6 +59,10 @@
             warningThreshold: 70, unit: '%', aggregateValue: 91, maxValue: 96,
             minValue: 55, lastValue: 88, averageValue: 76, sumValue: 304,
             cpuCapacityCoefficient: 0.8, dataStatusText: 'Данные получены',
+            table: {
+                columns: ['Metric', 'Value'], rows: [['srv-critical', '96%']],
+                numericColumns: [false, true], totalRows: 1, truncated: false
+            },
             series: [
                 { name: 'srv-critical', value: 96, level: 'critical', cpuCapacity: 8, threshold: 6.4 },
                 { name: 'srv-warning', value: 75, level: 'warning', cpuCapacity: 4, threshold: 3.2 }
@@ -117,7 +143,7 @@
             period: context.period || '', generatedAt: context.generatedAt || '',
             panels: includedTexts.join('\n')
         };
-        const activePanelVariables = new Map();
+        const activePanelVariables = [];
         panelResults.forEach(item => {
             const panel = item.panel || {};
             const config = reportEngine.normalizePanel(panel.report, panel);
@@ -130,21 +156,30 @@
                 reportEngine.extractTemplateVariables(config.templates.details).forEach(name => activeNames.add(name));
             }
             const variables = item.variables || reportEngine.panelVariables(panel, item.snapshot, context);
-            activePanelVariables.set(panel.id, { names: activeNames, variables });
-            activeNames.forEach(name => {
-                if (usage.panel.has(name) && !hasValue(variables?.[name])) {
-                    issues.push({ level: 'warning', code: 'empty_live_value',
-                        message: `Панель «${panel.title || panel.id}»: используемая переменная {{${name}}} сейчас пустая.` });
-                }
-            });
             const listOutputVariables = new Set([
                 'criticalList', 'warningList', 'breachesList', 'allSeriesList',
                 'top3List', 'stateList', 'stateQuote'
             ]);
-            if ([...activeNames].some(name => listOutputVariables.has(name))) {
+            const usesList = [...activeNames].some(name => listOutputVariables.has(name));
+            const listNames = new Set(usesList
+                ? reportEngine.extractTemplateVariables(config.templates.listItem) : []);
+            if (item.included) {
+                activePanelVariables.push({
+                    item, panel, config, names: activeNames, listNames, variables, activeTemplateName
+                });
+                activeNames.forEach(name => {
+                    if (usage.panel.has(name) && panelVariableApplies(name, item, variables, config)
+                        && !hasValue(variables?.[name])) {
+                        issues.push({ level: 'warning', code: 'empty_live_value',
+                            message: `Панель «${panel.title || panel.id}»: используемая переменная {{${name}}} сейчас пустая.` });
+                    }
+                });
+            }
+            if (item.included && usesList) {
                 const series = Array.isArray(item.snapshot?.series) ? item.snapshot.series : [];
-                for (const name of reportEngine.extractTemplateVariables(config.templates.listItem)) {
-                    if (usage.list.has(name) && !series.some(entry => hasValue(listVariableValue(item, entry, name)))) {
+                for (const name of listNames) {
+                    if (usage.list.has(name) && listVariableApplies(name, item)
+                        && !series.some(entry => hasValue(listVariableValue(item, entry, name)))) {
                         issues.push({ level: 'warning', code: 'empty_live_value',
                             message: `Панель «${panel.title || panel.id}»: переменная строки списка {{${name}}} сейчас пустая.` });
                     }
@@ -176,21 +211,30 @@
             message: 'Общий шаблон не использует {{panels}} и не содержит ссылок {{panel:ключ}}.' });
 
         const variables = [];
-        const addVariableRows = (scope, names) => names.forEach(name => {
-            const locations = usage[scope].get(name) || [];
-            let values = [];
-            if (scope === 'profile') values = [profileValues[name]];
-            else if (scope === 'panel') values = [...activePanelVariables.values()].map(item => item.variables?.[name]);
-            else {
-                values = panelResults.flatMap(item => (Array.isArray(item.snapshot?.series)
-                    ? item.snapshot.series : []).map(series => listVariableValue(item, series, name)));
-            }
-            variables.push({ scope, name, used: locations.length > 0, locations,
-                hasData: values.some(hasValue), value: previewValue(values.find(hasValue)) });
+        reportEngine.PROFILE_VARIABLES.forEach(name => {
+            const locations = usage.profile.get(name) || [];
+            variables.push({ scope: 'profile', name, used: locations.length > 0, locations,
+                applicable: true, hasData: hasValue(profileValues[name]), value: previewValue(profileValues[name]) });
         });
-        addVariableRows('profile', reportEngine.PROFILE_VARIABLES);
-        addVariableRows('panel', reportEngine.PANEL_VARIABLES);
-        addVariableRows('list', reportEngine.LIST_VARIABLES);
+        activePanelVariables.forEach(entry => {
+            const title = entry.panel.title || entry.panel.id || 'Панель';
+            reportEngine.PANEL_VARIABLES.forEach(name => {
+                const used = entry.names.has(name);
+                const applicable = panelVariableApplies(name, entry.item, entry.variables, entry.config);
+                variables.push({ scope: 'panel', name, panelTitle: title, used,
+                    locations: used ? [`${title}: ${entry.activeTemplateName}`] : [], applicable,
+                    hasData: hasValue(entry.variables?.[name]), value: previewValue(entry.variables?.[name]) });
+            });
+            const series = Array.isArray(entry.item.snapshot?.series) ? entry.item.snapshot.series : [];
+            reportEngine.LIST_VARIABLES.forEach(name => {
+                const values = series.map(item => listVariableValue(entry.item, item, name));
+                const used = entry.listNames.has(name);
+                const applicable = listVariableApplies(name, entry.item);
+                variables.push({ scope: 'list', name, panelTitle: title, used,
+                    locations: used ? [`${title}: listItem`] : [], applicable,
+                    hasData: values.some(hasValue), value: previewValue(values.find(hasValue)) });
+            });
+        });
 
         const selfCheck = runEngineSelfCheck(reportEngine);
         if (!selfCheck.ok) issues.unshift({ level: 'error', code: 'engine_contract',

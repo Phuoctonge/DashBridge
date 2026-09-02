@@ -1,7 +1,7 @@
 # DashBridge permission map
 
-Сверено с `manifest.json` версии 2.4.1 и действующими runtime-потоками
-2026-08-29.
+Сверено с `manifest.json` версии 2.4.2 и действующими runtime-потоками
+2026-09-02.
 
 | Permission | Функция |
 |---|---|

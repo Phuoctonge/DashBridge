@@ -29,8 +29,8 @@
             .dashbridge-panel-settings .switch,.panel-tools-modal .switch { position:relative; display:inline-block; width:38px; height:22px; }.dashbridge-panel-settings .switch input,.panel-tools-modal .switch input { width:0; height:0; opacity:0; }.dashbridge-panel-settings .slider,.panel-tools-modal .slider { position:absolute; inset:0; border-radius:999px; background:#cbd5e1; transition:.2s; cursor:pointer; }.dashbridge-panel-settings .slider::before,.panel-tools-modal .slider::before { content:''; position:absolute; width:14px; height:14px; left:4px; bottom:4px; border-radius:50%; background:#fff; transition:.2s; }.dashbridge-panel-settings .switch input:checked + .slider,.panel-tools-modal .switch input:checked + .slider { background:var(--primary,#4361e8); }.dashbridge-panel-settings .switch input:checked + .slider::before,.panel-tools-modal .switch input:checked + .slider::before { transform:translateX(16px); }.dashbridge-panel-settings .switch input:disabled + .slider,.panel-tools-modal .switch input:disabled + .slider { background:#cbd5e1 !important; opacity:.72; cursor:not-allowed; }
             .panel-tools-modal { max-width:520px; max-height:calc(100vh - 32px); display:flex; flex-direction:column; overflow:hidden; }.panel-tools-scroll { min-height:0; overflow-y:auto; padding-right:16px; scrollbar-gutter:stable; }.panel-tools-modal-header { min-height:34px; display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:4px; }.panel-tools-modal-header h3,.panel-tools-modal-header h4 { margin:0; }.panel-tools-reset-all { min-height:34px; margin:0; white-space:nowrap; }.panel-tools-modal .modal-actions { flex:0 0 auto; margin:16px 0 0; padding-top:16px; background:transparent; border-top:1px solid var(--border-color,rgba(127,127,127,.35)); }
             .panel-tools-hint { margin:0 0 4px; color:var(--text-muted,currentColor); opacity:.72; font:400 13px/1.35 system-ui; }.panel-tools-option { display:flex !important; align-items:center; justify-content:space-between; gap:10px; padding:10px 0; margin:0 !important; color:var(--text-main,inherit) !important; font:400 13px/1.35 system-ui !important; cursor:pointer; border-bottom:1px solid var(--border-color,rgba(127,127,127,.35)); }.panel-tools-option .switch,.panel-tools-legend-row .switch { flex:0 0 auto; }.panel-tools-option small { color:var(--text-muted,currentColor); }
-            .panel-tools-transform { border-bottom:1px solid var(--border-color,rgba(127,127,127,.35)); }.panel-tools-transform > .panel-tools-option { border-bottom:0; }.panel-tools-threshold { margin:0 0 7px 16px; padding-left:12px; border-left:2px solid var(--border-color,rgba(127,127,127,.35)); }.panel-tools-threshold .panel-tools-option { border-bottom:0; padding:7px 0; font-size:12px !important; }.panel-tools-threshold-value { display:block; padding:3px 0 7px; color:var(--text-muted,currentColor); font:400 12px/1.35 system-ui; }.panel-tools-threshold-value input { width:53px; margin:0 3px; padding:3px 6px; border:1px solid var(--border-color,rgba(127,127,127,.35)); border-radius:4px; color:var(--text-main,inherit); background:var(--card-bg,transparent); }
-            .panel-tools-option-copy { display:grid; gap:2px; min-width:0; }.panel-tools-option-copy small { color:var(--text-muted,currentColor); opacity:.78; font:400 11.5px/1.3 system-ui; }.panel-tools-capacity-filter .panel-tools-threshold-value input { width:64px; }.panel-tools-capacity-hint { display:block; margin-top:9px; padding-bottom:3px; color:var(--text-muted,currentColor); opacity:.78; font:400 11.5px/1.35 system-ui; }
+            .panel-tools-transform { border-bottom:1px solid var(--border-color,rgba(127,127,127,.35)); }.panel-tools-transform > .panel-tools-option { border-bottom:0; }.panel-tools-threshold { margin:0 0 7px 16px; padding-left:12px; border-left:2px solid var(--border-color,rgba(127,127,127,.35)); }.panel-tools-threshold .panel-tools-option { border-bottom:0; padding:7px 0; font-size:12px !important; }.panel-tools-threshold-value { display:flex; align-items:center; flex-wrap:wrap; gap:5px; padding:3px 0 7px; color:var(--text-muted,currentColor); font:400 12px/1.35 system-ui; }.panel-tools-series-filter-prompt { flex:0 0 100%; }.panel-tools-threshold-value input { width:53px; margin:0; padding:3px 6px; border:1px solid var(--border-color,rgba(127,127,127,.35)); border-radius:4px; color:var(--text-main,inherit); background:var(--card-bg,transparent); }.panel-tools-unit-options { display:inline-flex; align-items:center; overflow:hidden; border:1px solid var(--border-color,rgba(127,127,127,.35)); border-radius:4px; }.panel-tools-unit-options > span { padding:3px 7px; color:var(--text-muted,currentColor); }.panel-tools-unit-choice { position:relative; margin:0; cursor:pointer; }.panel-tools-unit-choice + .panel-tools-unit-choice { border-left:1px solid var(--border-color,rgba(127,127,127,.35)); }.panel-tools-unit-choice input { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }.panel-tools-unit-choice span { display:block; min-width:33px; padding:3px 7px; text-align:center; color:var(--text-main,inherit); background:var(--card-bg,#fff); }.panel-tools-unit-choice input:checked + span { color:#fff; background:var(--primary,#4361e8); }.panel-tools-unit-choice input:focus-visible + span { outline:2px solid var(--primary,#4361e8); outline-offset:-2px; }
+            .panel-tools-option-copy { display:grid; gap:2px; min-width:0; }.panel-tools-option-copy small { color:var(--text-muted,currentColor); opacity:.78; font:400 11.5px/1.3 system-ui; }[data-threshold="seriesQueryFilter"] .panel-tools-threshold-value > input { width:88px; }.panel-tools-capacity-filter .panel-tools-threshold-value input { width:64px; }.panel-tools-capacity-hint { display:block; margin-top:9px; padding-bottom:3px; color:var(--text-muted,currentColor); opacity:.78; font:400 11.5px/1.35 system-ui; }
             .panel-tools-toggle-hint { display:block; margin:-2px 46px 9px 0; color:var(--text-muted,currentColor); opacity:.78; font:400 11.5px/1.35 system-ui; }.panel-tools-toggle-hint[hidden] { display:none !important; }
             .panel-tools-capacity-types { display:grid; gap:0; margin:2px 0 10px; padding:8px 0; border-top:1px solid var(--border-color,rgba(127,127,127,.25)); border-bottom:1px solid var(--border-color,rgba(127,127,127,.25)); }.panel-tools-capacity-types > span { margin-bottom:3px; color:var(--text-muted,currentColor); font:600 11.5px/1.3 system-ui; }.panel-tools-capacity-types > label { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:32px; color:var(--text-main,inherit); font:400 12px/1.3 system-ui; cursor:pointer; }.panel-tools-capacity-types .switch { transform:scale(.82); transform-origin:right center; }
             .panel-alert-threshold { margin:0 !important; padding:0 !important; border:0 !important; border-bottom:1px solid var(--border-color,rgba(127,127,127,.35)) !important; border-radius:0; background:transparent; }.panel-alert-threshold > .panel-tools-option { margin:0 !important; border-bottom:0; }.panel-alert-threshold-details { margin:0 0 9px 16px; padding-left:12px; border-left:2px solid var(--border-color,rgba(127,127,127,.35)); }.panel-alert-threshold-details[hidden] { display:none !important; }.panel-alert-threshold .panel-tools-threshold-value { display:flex; align-items:center; flex-wrap:wrap; gap:6px; padding:9px 0; }.panel-alert-threshold .panel-tools-threshold-value input { width:88px; margin:0; }.panel-threshold-unit { color:var(--text-muted,currentColor); }.panel-alert-notify-option { border-top:1px solid var(--border-color,rgba(127,127,127,.25)); border-bottom:0; }.panel-alert-notify-copy { display:grid; gap:2px; }
@@ -67,8 +67,10 @@
             .panel-tools-threshold .panel-tools-option { padding:.5833em 0; font-size:.9231em !important; }
             .panel-tools-threshold-value { padding:.25em 0 .5833em; font-size:.9231em; }
             .panel-tools-threshold-value input { width:4.4167em; margin:0 .25em; padding:.25em .5em; border-radius:.3333em; }
+            .panel-tools-unit-options { border-radius:.3333em; }.panel-tools-unit-options > span,.panel-tools-unit-choice span { padding:.25em .5833em; }.panel-tools-unit-choice span { min-width:2.75em; }
             .panel-tools-option-copy { gap:.1538em; }
             .panel-tools-option-copy small,.panel-tools-capacity-hint,.panel-tools-toggle-hint { font-size:.8846em; }
+            [data-threshold="seriesQueryFilter"] .panel-tools-threshold-value > input { width:7.3333em; }
             .panel-tools-capacity-filter .panel-tools-threshold-value input { width:5.3333em; }
             .panel-tools-capacity-hint { margin-top:.7826em; padding-bottom:.2609em; }
             .panel-tools-toggle-hint { margin:-.1739em 4em .7826em 0; }
@@ -121,6 +123,85 @@
         .slice(0, maxLength);
     const escapeHtmlAttribute = value => normalizeExternalText(value, 512).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const escapeHtmlText = value => normalizeExternalText(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    const SCALABLE_UNIT_FAMILIES = Object.freeze([
+        Object.freeze([
+            Object.freeze({ unit: 'µs', scale: 0.001, aliases: ['µs', 'μs', 'us', 'usec'] }),
+            Object.freeze({ unit: 'ms', scale: 1, aliases: ['ms', 'msec'] }),
+            Object.freeze({ unit: 's', scale: 1000, aliases: ['s', 'sec', 'secs'] }),
+            Object.freeze({ unit: 'min', scale: 60_000, aliases: ['min', 'mins'] }),
+            Object.freeze({ unit: 'h', scale: 3_600_000, aliases: ['h', 'hr', 'hrs'] }),
+            Object.freeze({ unit: 'd', scale: 86_400_000, aliases: ['d', 'days'] })
+        ]),
+        Object.freeze([
+            Object.freeze({ unit: 'B', scale: 1, aliases: ['b', 'byte', 'bytes'] }),
+            Object.freeze({ unit: 'KiB', scale: 1024, aliases: ['kib'] }),
+            Object.freeze({ unit: 'MiB', scale: 1024 ** 2, aliases: ['mib'] }),
+            Object.freeze({ unit: 'GiB', scale: 1024 ** 3, aliases: ['gib'] }),
+            Object.freeze({ unit: 'TiB', scale: 1024 ** 4, aliases: ['tib'] })
+        ]),
+        Object.freeze([
+            Object.freeze({ unit: 'B', scale: 1, aliases: ['b', 'byte', 'bytes'] }),
+            Object.freeze({ unit: 'kB', scale: 1e3, aliases: ['kb'] }),
+            Object.freeze({ unit: 'MB', scale: 1e6, aliases: ['mb'] }),
+            Object.freeze({ unit: 'GB', scale: 1e9, aliases: ['gb'] }),
+            Object.freeze({ unit: 'TB', scale: 1e12, aliases: ['tb'] })
+        ])
+    ]);
+    const normalizeUnitToken = value => normalizeExternalText(value, 32).replace(/μ/g, 'µ').toLowerCase();
+    const resolveUnitOptions = (status = {}, preferredUnit = '') => {
+        const detectedUnit = normalizeExternalText(status.unit, 32);
+        const detectedFactor = Number(status.factor);
+        const rawFactor = Number.isFinite(detectedFactor) && detectedFactor > 0 ? detectedFactor : 1;
+        const rateSuffix = /\/s$/i.test(detectedUnit) ? '/s' : '';
+        const baseUnit = rateSuffix ? detectedUnit.slice(0, -2) : detectedUnit;
+        const token = normalizeUnitToken(baseUnit);
+        let family = null;
+        let current = null;
+        for (const candidate of SCALABLE_UNIT_FAMILIES) {
+            const match = candidate.find(option => option.aliases.includes(token));
+            if (!match) continue;
+            family = candidate;
+            current = match;
+            break;
+        }
+        if (!family || !current) {
+            const unit = detectedUnit || '';
+            return { options: [{ unit, factor: rawFactor }], selectedUnit: unit, scalable: false };
+        }
+        const rawPerScale = rawFactor / current.scale;
+        const configuredUnits = Array.isArray(status.inputUnits)
+            ? status.inputUnits.map(unit => normalizeUnitToken(String(unit).replace(/\/s$/i, ''))).filter(Boolean) : [];
+        const binaryFamily = family === SCALABLE_UNIT_FAMILIES[1];
+        const decimalFamily = family === SCALABLE_UNIT_FAMILIES[2];
+        const durationWindows = {
+            'µs': ['µs', 'ms', 's'],
+            ms: ['ms', 's', 'min'],
+            s: ['ms', 's', 'min'],
+            min: ['ms', 's', 'min'],
+            h: ['s', 'min', 'h'],
+            d: ['min', 'h', 'd']
+        };
+        const unitWindows = binaryFamily ? {
+            B: ['B', 'KiB', 'MiB'], KiB: ['B', 'KiB', 'MiB'], MiB: ['KiB', 'MiB', 'GiB'],
+            GiB: ['MiB', 'GiB', 'TiB'], TiB: ['MiB', 'GiB', 'TiB']
+        } : decimalFamily ? {
+            B: ['B', 'kB', 'MB'], kB: ['B', 'kB', 'MB'], MB: ['kB', 'MB', 'GB'],
+            GB: ['MB', 'GB', 'TB'], TB: ['MB', 'GB', 'TB']
+        } : durationWindows;
+        const defaultUnits = new Set((unitWindows[current.unit] || family.map(option => option.unit)).map(normalizeUnitToken));
+        const allowedUnits = configuredUnits.length ? new Set(configuredUnits) : defaultUnits;
+        let options = family
+            .filter(option => allowedUnits.has(normalizeUnitToken(option.unit)))
+            .map(option => ({ unit: `${option.unit}${rateSuffix}`, factor: rawPerScale * option.scale }));
+        if (!options.length) options = [{ unit: detectedUnit, factor: rawFactor }];
+        const preferredToken = normalizeUnitToken(preferredUnit);
+        const preferredFamilyUnit = family.find(option => option.aliases.includes(normalizeUnitToken(String(preferredUnit).replace(/\/s$/i, ''))));
+        const selected = options.find(option => normalizeUnitToken(option.unit) === preferredToken)
+            || options.find(option => preferredFamilyUnit && normalizeUnitToken(option.unit)
+                === normalizeUnitToken(`${preferredFamilyUnit.unit}${rateSuffix}`))
+            || options[Math.floor(options.length / 2)];
+        return { options, selectedUnit: selected.unit, scalable: options.length > 1 };
+    };
     const legendFields = (_mode = 'fast_complete_hide', state = {}) => `<div class="form-group panel-tools-filter">
         <div class="panel-tools-legend-header"><label>Серии легенды</label><button type="button" class="btn btn-primary panel-tools-refresh">Обновить список</button></div>
         <div class="panel-tools-legend-actions"><button type="button" class="btn btn-outline panel-tools-reset">Показать все</button><label class="panel-tools-legend-active-only"><span>Только включённые</span><span class="switch"><input type="checkbox" name="legendShowActiveOnly"><span class="slider"></span></span></label></div>
@@ -147,9 +228,9 @@
         const cpuCapacityFilterLoad15 = state.cpuCapacityFilterLoad15 === true;
         const seriesQueryFilterHighlightEnabled = state.seriesQueryFilterHighlightEnabled !== false;
         const cpuCapacityFilterHighlightEnabled = state.cpuCapacityFilterHighlightEnabled !== false;
-        const safeThresholdUnit = escapeHtmlText(state.thresholdUnit);
-        const seriesFilterUnit = panelKind === 'ram' && state.convertMemToUsed ? 'Единица: %' : (safeThresholdUnit ? `Единица: ${safeThresholdUnit}` : 'Единица определяется по графику');
-        const filterBlock = ({ title, key, enabled, value, mode, highlightEnabled }) => `<div class="panel-tools-transform"><label class="panel-tools-option"><span>${title}</span><span class="switch"><input type="checkbox" name="${key}Enabled" ${enabled ? 'checked' : ''}><span class="slider"></span></span></label><div class="panel-tools-threshold" data-threshold="${key}"><label class="panel-tools-threshold-value">Показывать только серии со значением больше <input type="number" name="${key}Value" step="any" value="${value}"> <span class="panel-series-filter-unit">${seriesFilterUnit}</span></label><div class="panel-tools-legend-mode"><label><input type="radio" name="${key}Mode" value="max" ${mode === 'max' ? 'checked' : ''}> Максимум за период</label><label><input type="radio" name="${key}Mode" value="last" ${mode === 'last' ? 'checked' : ''}> Последнее значение</label></div><label class="panel-tools-option panel-tools-highlight-option"><span>Утолщать участки превышения</span><span class="switch"><input type="checkbox" name="${key}HighlightEnabled" ${highlightEnabled ? 'checked' : ''}><span class="slider"></span></span></label><small class="panel-tools-capacity-hint">Участки выше порога утолщаются, сохраняя цвет серии. Если порог не прошла ни одна серия, остаётся одна с наибольшим значением в выбранном режиме.</small></div></div>`;
+        const safeThresholdUnit = escapeHtmlText(panelKind === 'ram' && state.convertMemToUsed ? '%' : state.thresholdUnit);
+        const initialUnit = safeThresholdUnit || 'Определяется…';
+        const filterBlock = ({ title, key, enabled, value, mode, highlightEnabled }) => `<div class="panel-tools-transform"><label class="panel-tools-option"><span>${title}</span><span class="switch"><input type="checkbox" name="${key}Enabled" ${enabled ? 'checked' : ''}><span class="slider"></span></span></label><div class="panel-tools-threshold" data-threshold="${key}"><div class="panel-tools-threshold-value"><span class="panel-tools-series-filter-prompt">Показывать только серии со значением больше:</span> <input type="text" inputmode="decimal" name="${key}Value" value="${value}" aria-label="Значение фильтра"> <span class="panel-tools-unit-options panel-series-filter-unit" data-unit-control="${key}InputUnit" role="radiogroup" aria-label="Единица фильтра"><span>${initialUnit}</span></span></div><div class="panel-tools-legend-mode"><label><input type="radio" name="${key}Mode" value="max" ${mode === 'max' ? 'checked' : ''}> Максимум за период</label><label><input type="radio" name="${key}Mode" value="last" ${mode === 'last' ? 'checked' : ''}> Последнее значение</label></div><label class="panel-tools-option panel-tools-highlight-option"><span>Утолщать участки превышения</span><span class="switch"><input type="checkbox" name="${key}HighlightEnabled" ${highlightEnabled ? 'checked' : ''}><span class="slider"></span></span></label><small class="panel-tools-capacity-hint">Участки выше порога утолщаются, сохраняя цвет серии. Если порог не прошла ни одна серия, остаётся одна с наибольшим значением в выбранном режиме.</small></div></div>`;
         const cpuCapacityBlock = panelKind === 'load' ? `<div class="panel-tools-transform panel-tools-capacity-filter"><label class="panel-tools-option"><span>Фильтр Load Average по vCPU</span><span class="switch"><input type="checkbox" name="cpuCapacityFilterEnabled" ${state.cpuCapacityFilterEnabled ? 'checked' : ''}><span class="slider"></span></span></label><div class="panel-tools-threshold" data-threshold="cpuCapacityFilter"><label class="panel-tools-threshold-value">Порог: количество vCPU × <input type="number" name="cpuCapacityFilterCoefficient" min="0.01" max="10" step="0.05" value="${cpuCapacityFilterCoefficient}"></label><div class="panel-tools-capacity-types"><span>Показывать серии</span><label><span>Load 1m</span><span class="switch"><input type="checkbox" name="cpuCapacityFilterLoad1" ${cpuCapacityFilterLoad1 ? 'checked' : ''}><span class="slider"></span></span></label><label><span>Load 5m</span><span class="switch"><input type="checkbox" name="cpuCapacityFilterLoad5" ${cpuCapacityFilterLoad5 ? 'checked' : ''}><span class="slider"></span></span></label><small data-capacity-type-hint="5m" ${cpuCapacityFilterLoad5 ? '' : 'hidden'}>Сглаживает короткие скачки нагрузки.</small><label><span>Load 15m</span><span class="switch"><input type="checkbox" name="cpuCapacityFilterLoad15" ${cpuCapacityFilterLoad15 ? 'checked' : ''}><span class="slider"></span></span></label><small data-capacity-type-hint="15m" ${cpuCapacityFilterLoad15 ? '' : 'hidden'}>Показывает длительную устойчивую нагрузку.</small><small class="panel-tools-capacity-empty" ${cpuCapacityFilterLoad1 || cpuCapacityFilterLoad5 || cpuCapacityFilterLoad15 ? 'hidden' : ''}>Ни один тип не выбран — Load-серии будут скрыты.</small></div><div class="panel-tools-legend-mode"><label><input type="radio" name="cpuCapacityFilterMode" value="max" ${cpuCapacityFilterMode === 'max' ? 'checked' : ''}> Максимум за период</label><label><input type="radio" name="cpuCapacityFilterMode" value="last" ${cpuCapacityFilterMode === 'last' ? 'checked' : ''}> Последнее значение</label></div><label class="panel-tools-option panel-tools-highlight-option"><span>Утолщать участки превышения</span><span class="switch"><input type="checkbox" name="cpuCapacityFilterHighlightEnabled" ${cpuCapacityFilterHighlightEnabled ? 'checked' : ''}><span class="slider"></span></span></label><small class="panel-tools-capacity-hint">Порог для каждой VM рассчитывается как vCPU × коэффициент. Участки выше порога утолщаются в цвете серии. Если количество CPU не определено, серия остаётся видимой.</small></div></div>` : '';
         const cpuBlock = panelKind === 'cpu' ? `<div class="panel-tools-transform"><label class="panel-tools-option"><span>Инвертировать CPU-график: Idle → Load</span><span class="switch"><input type="checkbox" name="invertIdle" ${state.invertIdle ? 'checked' : ''}><span class="slider"></span></span></label><small class="panel-tools-toggle-hint" data-toggle-hint="invertIdle" ${state.invertIdle ? '' : 'hidden'}>Показывает загрузку CPU как 100% − Idle.</small></div>` : '';
         const memBlock = panelKind === 'ram' ? `<div class="panel-tools-transform"><label class="panel-tools-option"><span>Конвертировать RAM-график в % Used</span><span class="switch"><input type="checkbox" name="convertMemToUsed" ${state.convertMemToUsed ? 'checked' : ''}><span class="slider"></span></span></label><small class="panel-tools-toggle-hint" data-toggle-hint="convertMemToUsed" ${state.convertMemToUsed ? '' : 'hidden'}>Рассчитывает занятую память в процентах из выбранной пары RAM-метрик.</small></div>` : '';
@@ -158,7 +239,7 @@
     };
     const thresholdFields = (state = {}) => {
         const safeThresholdUnit = escapeHtmlText(state.thresholdUnit);
-        return `<div class="panel-tools-transform panel-alert-threshold"><label class="panel-tools-option"><span>Порог на графике</span><span class="switch"><input type="checkbox" name="thresholdEnabled" ${state.thresholdEnabled ? 'checked' : ''}><span class="slider"></span></span></label><div class="panel-alert-threshold-details" ${state.thresholdEnabled ? '' : 'hidden'}><div class="panel-alert-threshold-config"><label class="panel-tools-threshold-value">Значение порога <input type="number" name="thresholdValue" step="any" value="${state.thresholdValue || 0}"> <span class="panel-threshold-unit">${safeThresholdUnit ? `Единица: ${safeThresholdUnit}` : 'Единица определяется по графику'}</span></label></div><label class="panel-tools-option panel-alert-notify-option"><span class="panel-alert-notify-copy"><span>Уведомлять о превышении</span></span><span class="switch"><input type="checkbox" name="thresholdNotifyEnabled" ${state.thresholdNotifyEnabled !== false ? 'checked' : ''}><span class="slider"></span></span></label></div></div>`;
+        return `<div class="panel-tools-transform panel-alert-threshold"><label class="panel-tools-option"><span>Порог на графике</span><span class="switch"><input type="checkbox" name="thresholdEnabled" ${state.thresholdEnabled ? 'checked' : ''}><span class="slider"></span></span></label><div class="panel-alert-threshold-details" ${state.thresholdEnabled ? '' : 'hidden'}><div class="panel-alert-threshold-config"><div class="panel-tools-threshold-value"><span>Значение порога</span> <input type="text" inputmode="decimal" name="thresholdValue" value="${state.thresholdValue || 0}" aria-label="Значение порога"> <span class="panel-tools-unit-options panel-threshold-unit" data-unit-control="thresholdInputUnit" role="radiogroup" aria-label="Единица порога"><span>${safeThresholdUnit || 'Определяется…'}</span></span></div></div><label class="panel-tools-option panel-alert-notify-option"><span class="panel-alert-notify-copy"><span>Уведомлять о превышении</span></span><span class="switch"><input type="checkbox" name="thresholdNotifyEnabled" ${state.thresholdNotifyEnabled !== false ? 'checked' : ''}><span class="slider"></span></span></label></div></div>`;
     };
 
     const selectLegendSeriesByPatterns = (names, include, ignore) => {
@@ -172,7 +253,7 @@
         });
     };
 
-    const bindAdvancedControls = ({ overlay, state, getLegendSeries, getThresholdStatus, formatThresholdUnit, onSave, cpuCapacityFilterCoefficientDefault = 0.8 }) => {
+    const bindAdvancedControls = ({ overlay, state, getLegendSeries, getThresholdStatus, onSave, cpuCapacityFilterCoefficientDefault = 0.8 }) => {
         const defaultCpuCapacityCoefficient = Number.isFinite(Number(cpuCapacityFilterCoefficientDefault))
             && Number(cpuCapacityFilterCoefficientDefault) >= 0.01 && Number(cpuCapacityFilterCoefficientDefault) <= 10
             ? Number(cpuCapacityFilterCoefficientDefault) : 0.8;
@@ -190,17 +271,126 @@
         let legendRenderedOnce = false;
         let legendSelectionTouched = false;
         let legendResetRequested = false;
-        const thresholdUnit = overlay.querySelector('.panel-threshold-unit');
-        const seriesFilterUnits = overlay.querySelectorAll('.panel-series-filter-unit');
+        const thresholdUnitGroup = overlay.querySelector('[data-unit-control="thresholdInputUnit"]');
+        const seriesFilterUnitGroup = overlay.querySelector('[data-unit-control="seriesQueryFilterInputUnit"]');
         const thresholdValueInput = field('thresholdValue');
-        let thresholdRawValueDraft = state.thresholdRawValue;
+        const seriesFilterValueInput = field('seriesQueryFilterValue');
         let thresholdStatus = null;
-        const getSeriesFilterUnitText = () => field('convertMemToUsed')?.checked
-            ? 'Единица: %'
-            : (formatThresholdUnit?.(thresholdStatus) || 'Единица определяется по графику');
+        const finiteOrNull = value => {
+            const normalized = typeof value === 'string' ? value.trim().replace(',', '.') : value;
+            return normalized !== null && normalized !== '' && Number.isFinite(Number(normalized))
+                ? Number(normalized) : null;
+        };
+        const formatDraftValue = value => Number.isFinite(value)
+            ? String(Number(value.toPrecision(12))) : '';
+        const createUnitControl = ({ group, input, rawValue, displayValue, preferredUnit }) => {
+            let rawDraft = finiteOrNull(rawValue);
+            let selectedFactor = null;
+            let detectedFactor = null;
+            let selectedUnit = normalizeExternalText(preferredUnit, 32);
+            let lastStatus = null;
+            const readInput = () => finiteOrNull(input?.value);
+            const syncRawFromInput = () => {
+                const value = readInput();
+                if (value !== null && Number.isFinite(selectedFactor) && selectedFactor > 0) rawDraft = value * selectedFactor;
+                return rawDraft;
+            };
+            let currentOptions = [];
+            let applied = false;
+            const apply = (status, nextPreferredUnit = selectedUnit, resetDimension = false) => {
+                lastStatus = status || lastStatus;
+                if (applied && !resetDimension) syncRawFromInput();
+                const nextDetectedFactor = Number(status?.factor);
+                detectedFactor = Number.isFinite(nextDetectedFactor) && nextDetectedFactor > 0 ? nextDetectedFactor : 1;
+                const resetValue = resetDimension ? readInput() : null;
+                if (rawDraft === null && resetValue === null) {
+                    const storedDisplay = finiteOrNull(displayValue);
+                    const currentInput = readInput();
+                    const initialValue = storedDisplay ?? currentInput;
+                    rawDraft = initialValue === null ? null : initialValue * detectedFactor;
+                }
+                const resolved = resolveUnitOptions(status, nextPreferredUnit);
+                const doc = overlay.ownerDocument || document;
+                currentOptions = resolved.options;
+                if (group) {
+                    group.replaceChildren();
+                    if (!resolved.scalable) {
+                        const text = doc.createElement('span');
+                        text.className = 'panel-tools-unit-static';
+                        text.textContent = resolved.selectedUnit
+                            || (status?.engine && status.engine !== 'unknown' ? 'Без единицы' : 'Определяется…');
+                        group.appendChild(text);
+                    } else resolved.options.forEach(option => {
+                        const label = doc.createElement('label');
+                        label.className = 'panel-tools-unit-choice';
+                        const radio = doc.createElement('input');
+                        radio.type = 'radio';
+                        radio.name = group.dataset.unitControl;
+                        radio.value = option.unit;
+                        radio.checked = option.unit === resolved.selectedUnit;
+                        const text = doc.createElement('span');
+                        text.textContent = option.unit || (status?.engine && status.engine !== 'unknown' ? 'Без единицы' : 'Определяется…');
+                        label.append(radio, text);
+                        group.appendChild(label);
+                    });
+                }
+                selectedUnit = resolved.selectedUnit;
+                selectedFactor = resolved.options.find(option => option.unit === selectedUnit)?.factor || detectedFactor;
+                if (resetValue !== null) rawDraft = resetValue * selectedFactor;
+                if (input && rawDraft !== null && Number.isFinite(selectedFactor) && selectedFactor > 0) {
+                    input.value = formatDraftValue(rawDraft / selectedFactor);
+                }
+                applied = true;
+            };
+            group?.addEventListener('change', event => {
+                const radio = event.target?.closest?.('input[type="radio"]');
+                if (!radio || radio.name !== group.dataset.unitControl) return;
+                selectedUnit = radio.value;
+                selectedFactor = currentOptions.find(option => option.unit === selectedUnit)?.factor || detectedFactor;
+                const value = readInput();
+                rawDraft = value === null ? null : value * selectedFactor;
+            });
+            input?.addEventListener('input', syncRawFromInput);
+            return {
+                apply,
+                rawValue: () => syncRawFromInput() ?? readInput(),
+                displayValue: () => {
+                    const raw = syncRawFromInput();
+                    return raw !== null && Number.isFinite(detectedFactor) && detectedFactor > 0
+                        ? raw / detectedFactor : (readInput() ?? 0);
+                },
+                unit: () => normalizeExternalText(selectedUnit, 32),
+            reset: () => {
+                    if (input) input.value = '0';
+                    rawDraft = 0;
+                    selectedUnit = '';
+                    apply(lastStatus || { unit: '', factor: 1, engine: 'unknown' }, '', true);
+                }
+            };
+        };
+        const thresholdUnitControl = createUnitControl({
+            group: thresholdUnitGroup,
+            input: thresholdValueInput,
+            rawValue: state.thresholdRawValue,
+            displayValue: state.thresholdValue,
+            preferredUnit: state.thresholdInputUnit
+        });
+        const seriesFilterUnitControl = createUnitControl({
+            group: seriesFilterUnitGroup,
+            input: seriesFilterValueInput,
+            rawValue: state.seriesQueryFilterRawValue,
+            displayValue: state.seriesQueryFilterValue,
+            preferredUnit: state.seriesQueryFilterInputUnit
+        });
+        let seriesUsesPercent = !!state.convertMemToUsed;
+        let lastSeriesGraphUnit = state.seriesQueryFilterInputUnit || '';
         const updateSeriesFilterUnits = () => {
-            const text = getSeriesFilterUnitText();
-            seriesFilterUnits.forEach(unit => { unit.textContent = text; });
+            const asPercent = !!field('convertMemToUsed')?.checked;
+            if (!seriesUsesPercent) lastSeriesGraphUnit = seriesFilterUnitControl.unit() || lastSeriesGraphUnit;
+            const status = asPercent ? { unit: '%', factor: 1, engine: 'derived' } : thresholdStatus;
+            seriesFilterUnitControl.apply(status || { unit: state.thresholdUnit, factor: 1, engine: 'unknown' },
+                asPercent ? '%' : lastSeriesGraphUnit, asPercent !== seriesUsesPercent);
+            seriesUsesPercent = asPercent;
         };
         const updateLegendVisibility = () => {
             list?.querySelectorAll('.panel-tools-legend-row').forEach(row => {
@@ -265,11 +455,9 @@
         };
         const applyThresholdStatus = status => {
             thresholdStatus = status || thresholdStatus;
-            const unitText = formatThresholdUnit?.(status) || 'Единица определяется по графику';
-            if (thresholdUnit) thresholdUnit.textContent = unitText;
+            const currentStatus = thresholdStatus || { unit: state.thresholdUnit, factor: 1, engine: 'unknown' };
+            thresholdUnitControl.apply(currentStatus, thresholdUnitControl.unit() || state.thresholdInputUnit);
             updateSeriesFilterUnits();
-            const factor = Number(status?.factor);
-            if (thresholdValueInput && Number.isFinite(thresholdRawValueDraft) && Number.isFinite(factor) && factor > 0) thresholdValueInput.value = thresholdRawValueDraft / factor;
         };
         const updateThresholdVisibility = () => {
             const queryEnabled = !!field('seriesQueryFilterEnabled')?.checked;
@@ -349,7 +537,7 @@
             [['thickenLinesValue', 1.5], ['seriesQueryFilterValue', 0], ['cpuCapacityFilterCoefficient', defaultCpuCapacityCoefficient], ['thresholdValue', 0]].forEach(([name, value]) => { if (field(name)) field(name).value = value; });
             overlay.querySelector('[name="seriesQueryFilterMode"][value="max"]')?.click();
             overlay.querySelector('[name="cpuCapacityFilterMode"][value="max"]')?.click();
-            hiddenLegend.clear(); legendSelectionTouched = false; legendResetRequested = true; thresholdRawValueDraft = null; if (selectFilter) selectFilter.value = ''; if (ignoreFilter) ignoreFilter.value = ''; list?.querySelectorAll('.panel-tools-legend-row').forEach(row => { row.querySelector('input').checked = true; }); updateThresholdVisibility(); updateCapacityTypeHints(); updateSimpleToggleHints(); updateThicknessControls(); updateSeriesFilterUnits();
+            thresholdUnitControl.reset(); seriesFilterUnitControl.reset(); lastSeriesGraphUnit = ''; hiddenLegend.clear(); legendSelectionTouched = false; legendResetRequested = true; if (selectFilter) selectFilter.value = ''; if (ignoreFilter) ignoreFilter.value = ''; list?.querySelectorAll('.panel-tools-legend-row').forEach(row => { row.querySelector('input').checked = true; }); updateThresholdVisibility(); updateCapacityTypeHints(); updateSimpleToggleHints(); updateThicknessControls(); updateSeriesFilterUnits();
         });
         overlay.querySelector('.panel-tools-cancel')?.addEventListener('click', () => overlay.remove());
         overlay.querySelector('.panel-tools-save')?.addEventListener('click', async () => {
@@ -360,14 +548,13 @@
                 : [...savedVisibleLegend];
             const keepAllowlist = !legendResetRequested && (hasSavedAllowlist || legendSelectionTouched) && (legendLoaded || hasSavedAllowlist);
             const keepLegacyFilter = !legendResetRequested && !keepAllowlist && hiddenLegend.size > 0;
-            const thresholdValue = Number(thresholdValueInput?.value) || 0; const factor = Number(thresholdStatus?.factor);
-            const seriesQueryFilterValue = Number(field('seriesQueryFilterValue')?.value);
+            const thresholdValue = thresholdUnitControl.displayValue();
+            const thresholdRawValue = thresholdUnitControl.rawValue();
+            const seriesQueryFilterValue = seriesFilterUnitControl.displayValue();
+            const seriesQueryFilterRawValue = seriesFilterUnitControl.rawValue();
             const cpuCapacityFilterCoefficient = Number(field('cpuCapacityFilterCoefficient')?.value);
             const convertMemToUsed = !!field('convertMemToUsed')?.checked;
-            const seriesQueryFilterRawValue = Number.isFinite(seriesQueryFilterValue)
-                ? (convertMemToUsed ? seriesQueryFilterValue : (Number.isFinite(factor) && factor > 0 ? seriesQueryFilterValue * factor : seriesQueryFilterValue))
-                : null;
-            await onSave?.({ ...readVisualState(overlay), invertIdle: !!field('invertIdle')?.checked, convertMemToUsed, seriesFilterSettingsVersion: 2, seriesQueryFilterEnabled: !!field('seriesQueryFilterEnabled')?.checked, seriesQueryFilterHighlightEnabled: field('seriesQueryFilterHighlightEnabled')?.checked !== false, seriesQueryFilterValue: Number.isFinite(seriesQueryFilterValue) ? seriesQueryFilterValue : 0, seriesQueryFilterRawValue, seriesQueryFilterMode: overlay.querySelector('[name="seriesQueryFilterMode"]:checked')?.value === 'last' ? 'last' : 'max', cpuCapacityFilterEnabled: !!field('cpuCapacityFilterEnabled')?.checked, cpuCapacityFilterHighlightEnabled: field('cpuCapacityFilterHighlightEnabled')?.checked !== false, cpuCapacityFilterCoefficient: Number.isFinite(cpuCapacityFilterCoefficient) && cpuCapacityFilterCoefficient > 0 ? cpuCapacityFilterCoefficient : defaultCpuCapacityCoefficient, cpuCapacityFilterMode: overlay.querySelector('[name="cpuCapacityFilterMode"]:checked')?.value === 'last' ? 'last' : 'max', cpuCapacityFilterLoad1: !!field('cpuCapacityFilterLoad1')?.checked, cpuCapacityFilterLoad5: !!field('cpuCapacityFilterLoad5')?.checked, cpuCapacityFilterLoad15: !!field('cpuCapacityFilterLoad15')?.checked, thresholdEnabled: !!field('thresholdEnabled')?.checked, thresholdNotifyEnabled: field('thresholdNotifyEnabled')?.checked !== false, thresholdValue, thresholdRawValue: Number.isFinite(factor) && factor > 0 ? thresholdValue * factor : thresholdRawValueDraft, thresholdUnit: normalizeExternalText(thresholdStatus?.unit || state.thresholdUnit), legendMode, legendFilter: keepLegacyFilter ? [...hiddenLegend] : [], legendSelectionVersion: keepAllowlist ? (legendSelection?.VERSION || 2) : null, legendVisibleSeries: keepAllowlist ? visibleLegend : [], legendSearch: '', legendSelectFilter: selectFilter?.value || '', legendIgnoreFilter: ignoreFilter?.value || '' });
+            await onSave?.({ ...readVisualState(overlay), invertIdle: !!field('invertIdle')?.checked, convertMemToUsed, seriesFilterSettingsVersion: 2, seriesQueryFilterEnabled: !!field('seriesQueryFilterEnabled')?.checked, seriesQueryFilterHighlightEnabled: field('seriesQueryFilterHighlightEnabled')?.checked !== false, seriesQueryFilterValue: Number.isFinite(seriesQueryFilterValue) ? seriesQueryFilterValue : 0, seriesQueryFilterRawValue: Number.isFinite(seriesQueryFilterRawValue) ? seriesQueryFilterRawValue : null, seriesQueryFilterInputUnit: seriesFilterUnitControl.unit(), seriesQueryFilterMode: overlay.querySelector('[name="seriesQueryFilterMode"]:checked')?.value === 'last' ? 'last' : 'max', cpuCapacityFilterEnabled: !!field('cpuCapacityFilterEnabled')?.checked, cpuCapacityFilterHighlightEnabled: field('cpuCapacityFilterHighlightEnabled')?.checked !== false, cpuCapacityFilterCoefficient: Number.isFinite(cpuCapacityFilterCoefficient) && cpuCapacityFilterCoefficient > 0 ? cpuCapacityFilterCoefficient : defaultCpuCapacityCoefficient, cpuCapacityFilterMode: overlay.querySelector('[name="cpuCapacityFilterMode"]:checked')?.value === 'last' ? 'last' : 'max', cpuCapacityFilterLoad1: !!field('cpuCapacityFilterLoad1')?.checked, cpuCapacityFilterLoad5: !!field('cpuCapacityFilterLoad5')?.checked, cpuCapacityFilterLoad15: !!field('cpuCapacityFilterLoad15')?.checked, thresholdEnabled: !!field('thresholdEnabled')?.checked, thresholdNotifyEnabled: field('thresholdNotifyEnabled')?.checked !== false, thresholdValue, thresholdRawValue: Number.isFinite(thresholdRawValue) ? thresholdRawValue : null, thresholdInputUnit: thresholdUnitControl.unit(), thresholdUnit: normalizeExternalText(thresholdStatus?.unit || state.thresholdUnit), legendMode, legendFilter: keepLegacyFilter ? [...hiddenLegend] : [], legendSelectionVersion: keepAllowlist ? (legendSelection?.VERSION || 2) : null, legendVisibleSeries: keepAllowlist ? visibleLegend : [], legendSearch: '', legendSelectFilter: selectFilter?.value || '', legendIgnoreFilter: ignoreFilter?.value || '' });
             overlay.remove();
         });
         updateThresholdVisibility(); updateCapacityTypeHints(); updateSimpleToggleHints(); if (getThresholdStatus) getThresholdStatus().then(applyThresholdStatus); void refreshLegend();
@@ -407,5 +594,5 @@
     };
     const create = ({ html }) => { ensureStyles(); document.querySelector('.dashbridge-panel-settings-overlay')?.remove(); const overlay = createOverlay(); overlay.innerHTML = html; document.body.appendChild(overlay); return overlay; };
     const readVisualState = root => ({ removeFill: root.querySelector('[name="removeFill"], [data-key="removeFill"]')?.checked || false, thickenLines: root.querySelector('[name="thickenLines"], [data-key="thickenLines"]')?.checked || false, thickenLinesValue: Number(root.querySelector('[name="thickenLinesValue"], [data-key="thickenLinesValue"]')?.value || 1.5), invertLegend: root.querySelector('[name="invertLegend"], [data-key="invertLegend"]')?.checked || false });
-    window.DashBridgePanelSettingsModal = { open, create, readVisualState, visualFields, legendFields, transformFields, thresholdFields, bindAdvancedControls, selectLegendSeriesByPatterns, normalizeExternalText };
+    window.DashBridgePanelSettingsModal = { open, create, readVisualState, visualFields, legendFields, transformFields, thresholdFields, bindAdvancedControls, selectLegendSeriesByPatterns, resolveUnitOptions, normalizeExternalText };
 })();

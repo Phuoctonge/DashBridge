@@ -37,7 +37,12 @@ const transport = {
 };
 const reportEngine = {
     normalizePanel: report => ({ enabled: report?.enabled !== false, key: report?.key || 'panel', sla: report?.sla || {} }),
-    normalizeProfile: report => ({ context: report?.context || {} }),
+    normalizeProfile: report => ({ context: report?.context || {}, panelOrder: report?.panelOrder || [] }),
+    orderPanels: (items, order) => [...items].sort((left, right) => {
+        const leftIndex = order.indexOf(left.id); const rightIndex = order.indexOf(right.id);
+        return (leftIndex < 0 ? Number.MAX_SAFE_INTEGER : leftIndex)
+            - (rightIndex < 0 ? Number.MAX_SAFE_INTEGER : rightIndex);
+    }),
     formatDuration: value => value ? `duration:${value}` : '',
     renderPanel: (panel, snapshot) => ({ text: `${panel.id}:${snapshot.state}` }),
     compose: (_profile, results, reportContext) => `${reportContext.period}|${results.map(item => item.text).join(',')}`,
@@ -47,7 +52,9 @@ const panels = [
         tools: { thresholdEnabled: true, thresholdValue: 80, thresholdRawValue: 80, thresholdUnit: '%' } },
     { id: 'ram', title: 'RAM', report: { key: 'ram', sla: { source: 'none' } }, tools: {} },
 ];
-const profile = { name: 'Prod', report: { context: { testStartedAt: '2026-01-01' } } };
+const profile = { name: 'Prod', report: {
+    panelOrder: ['ram', 'cpu'], context: { testStartedAt: '2026-01-01' }
+} };
 const controller = context.DashBridgeReportController.create({
     reportEngine,
     transportFactory: { create(options) { transportOptions = options; return transport; } },
@@ -71,7 +78,8 @@ const controller = context.DashBridgeReportController.create({
     const progress = [];
     const result = await controller.collect(null, message => progress.push(message));
     assert.deepStrictEqual(calls.sort(), ['cpu', 'ram'], 'all enabled panels must share one parallel collection pass');
-    assert.strictEqual(result.output, 'Последние 15 минут|cpu:ok,ram:timeout');
+    assert.strictEqual(result.output, 'Последние 15 минут|ram:timeout,cpu:ok',
+        'the saved message order must control collection and composition without changing dashboard layout');
     assert.deepStrictEqual(result.problems.map(item => item.panel.id), ['ram']);
     assert.strictEqual(result.context.testDuration, 'duration:2026-01-01');
     assert(progress.includes('Получаем данные панелей: 2 из 2…'));

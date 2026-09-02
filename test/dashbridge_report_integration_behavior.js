@@ -47,6 +47,7 @@ assert(html.indexOf('dashbridge-report-audit.js') < html.indexOf('dashbridge-rep
     && reportTestRunner.includes("'Большая таблица: 2500 серий'")
     && reportTestRunner.includes("scenarios.filter(item => item.status === 'fail' || item.status === 'warning')")
     && reportTestRunner.includes("audit.variables.filter(variable => variable.used)")
+    && reportTestRunner.includes("['Переменная', 'Панель', 'Где используется', 'Данные', 'Значение']")
     && reportTestRunner.includes("'report-runner-technical'"),
     'Message Test Runner must separate fixture and live suites while reusing one report collector');
 assert(html.indexOf('dashbridge-report-ui.js') < html.indexOf('dashbridge.js')
@@ -170,9 +171,10 @@ assert(reportUi.includes('{{testDuration}} = время от этой даты')
     && reportUi.includes('{{stableLoadDuration}} = время от этой даты'),
     'the report header must explain that duration variables are calculated from manually entered start times');
 assert(visual.includes('const legendMaxByName = () =>')
-    && visual.includes('legendMaximums.get(reportSeriesName(item.label')
+    && visual.includes("evaluation === 'period_max' && legendMaximums.size")
+    && visual.includes('Array.from(legendMaximums, ([name, value]) =>')
     && visual.includes("evaluation === 'period_max' && Number.isFinite(record.legendMaximum)"),
-    'period maximum reports must prefer the displayed legend Max matched by the resolved series name');
+    'period maximum reports must treat the displayed legend Max rows as the authoritative report series');
 assert(tools.includes('sourceFilterRemovedEverything')
     && tools.includes('cpuFilterRemovedEverything')
     && tools.includes('responseFilterEmptyIsNormal')

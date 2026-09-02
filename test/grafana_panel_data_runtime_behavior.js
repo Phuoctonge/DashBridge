@@ -49,4 +49,12 @@ assert.equal(runtime.hasDataTransform(), true, 'runtime must read the current sh
 assert.equal(typeof runtime.installDataInterceptor, 'function');
 assert.equal(typeof runtime.markCalculatedTitle, 'function');
 assert.equal(typeof runtime.observeCalculatedTitle, 'function');
+
+const runtimeSource = fs.readFileSync('js/content/grafana-panel-data-runtime.js', 'utf8');
+assert(runtimeSource.includes('const isDashboardVariableQuery = requestBody => {')
+    && runtimeSource.includes("queries.every(query => String(query.refId || '') === 'metricFindQuery')")
+    && runtimeSource.includes("reason: 'dashboard-variable-query'")
+    && runtimeSource.includes("String(query.refId || '') !== 'metricFindQuery'")
+    && runtimeSource.includes('if (targetRefIds !== null && !targetRefIds.size)'),
+'DashBridge iframe variable queries must not enter the selected-panel request lifecycle, transform or data status');
 console.log('PASS Grafana panel data runtime exposes live transform and interceptor ownership');

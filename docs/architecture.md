@@ -1,8 +1,7 @@
 # Архитектура DashBridge
 
-> Сверено с версией 2.4.1, исходным кодом и тестами 2026-08-29. Здесь описан
-> фактически работающий код; структура и dependency graph повторно проверены
-> 2026-09-01. Незавершённые
+> Сверено с версией 2.4.2, исходным кодом, тестами и dependency graph
+> 2026-09-02. Здесь описан фактически работающий код. Незавершённые
 > направления вынесены в `docs/roadmap.md`, ключевые прежние решения — в
 > `docs/history/architecture-decisions.md`.
 
@@ -50,7 +49,7 @@ manifest.json
 
 | Контекст | Основные файлы | Ответственность |
 |---|---|---|
-| Service worker | `js/background.js`, `js/background-grafana-infrastructure.js`, `js/background-profile-storage.js`, `js/background-gui-capture.js` | Единый message dispatcher; изолированные владельцы MAIN-регистрации/tab-scoped DNR, сериализованных profile/storage commits и GUI capture lifecycle. |
+| Service worker | `js/background.js`, `js/background-grafana-infrastructure.js`, `js/background-profile-storage.js`, `js/background-gui-capture.js`, `js/background-update-indicator.js` | Единый message dispatcher; изолированные владельцы MAIN-регистрации/tab-scoped DNR, сериализованных profile/storage commits, GUI capture lifecycle и постоянного action-индикатора обновления. |
 | Isolated content world | `content.js`, `grafana-iframe.js` | Мост Chrome API, Confluence, iframe time/crosshair/title и вывод снимка. |
 | Grafana MAIN world | Файлы runtime manifest | fetch/XHR, данные, visual state, меню, легенда, threshold, vCPU и подготовка снимка. |
 | Extension pages | Popup, Options, DashBridge, Batch, Worklog | UI, команды и долговечное состояние. |
@@ -162,7 +161,7 @@ grafana-panel-tools.js
 | Ответ до renderer | `grafana-series-capture.js` | Batch series mode. |
 | Определение панели и query signatures | `grafana-panel-definition.js` | Visual engine, panel tools, test runner. |
 | Разбор и согласование единиц Grafana | `grafana-unit.js` | Visual engine: axis/panel units, threshold, table report, uPlot/Flot. |
-| Чтение Grafana Table | `grafana-table-report.js` | Response frame shape, Visual engine report snapshot. |
+| Чтение Grafana Table | `grafana-table-report.js` | Ограниченный DOM-снимок заголовков/отображаемых ячеек и shape response frames для Visual engine report snapshot. |
 | uPlot/Flot visuals | `grafana-visual-engine.js` | Direct Grafana, DashBridge; стабильный facade и renderer lifecycle. |
 | Снимок данных панели для отчёта | `grafana-report-snapshot.js` | `grafana-visual-engine.js`; чистая агрегация Flot/uPlot/Table без собственного observer lifecycle. |
 | Локальные стили серий | `grafana-series-styles.js` | `grafana-visual-engine.js`; fill/line-width, panel-scoped reapply observer, renderer reflow и диагностика с единым cleanup. |
@@ -188,8 +187,7 @@ grafana-panel-tools.js
 | DashBridge iframe transport | `dashbridge-iframe-message-controller.js` | Двусторонняя trust boundary: guarded post/navigation reset, проверка source + exact origin, dispatch report/analysis/capture/tools/crosshair и iframe ready/rendered lifecycle. |
 | DashBridge time/URL lifecycle | `dashbridge-time-controller.js` | Profile-owned range/refresh, controls, clipboard, theme-aware panel URL, iframe time broadcast and Refresh Off transition. |
 | DashBridge panel tools/status | `dashbridge-panel-tools-controller.js` | Нормализация tools, settings modal, correlated title/legend/threshold requests, threshold state and notifications. |
-| DashBridge card/iframe lifecycle | `dashbridge-panel-card-controller.js` | Создание и точечная замена карточек, drag/reorder с сохранением порядка, eager iframe navigation активных панелей, layout-only update, reconciliation и cleanup удаления. |
-| Действия карточек DashBridge | `dashbridge-panel-actions-controller.js` | Refresh, pause, fullscreen, удаление, iframe settings и привязка toolbar-кнопок; сохраняет точечный update без общего remount. |
+| DashBridge card/iframe/action lifecycle | `dashbridge-panel-card-controller.js` | Создание и точечная замена карточек, drag/reorder, eager iframe navigation, refresh/pause/fullscreen/delete/settings actions, reconciliation и единый cleanup удаления. |
 | Верхний UI DashBridge | `dashbridge-page-ui-controller.js` | Header/dropdown, профильные действия, capture и crosshair controls, делегирование setup добавления/transfer и закрытие transient UI по Escape/outside click. |
 | DashBridge panel analysis UI | `dashbridge-panel-analysis-controller.js` | Классификация и toolbar-action панели, CPU/RAM modal, exact iframe/request correlation, retry after iframe readiness и cancel cleanup. |
 | Неблокирующие модальные диалоги DashBridge | `dashbridge-modal.js` | Профили, импорт/экспорт, настройки и capture в `dashbridge.js`. |
@@ -199,7 +197,7 @@ grafana-panel-tools.js
 | UI сводного отчёта и SLA | `dashbridge-report-ui.js` | Настройка профиля, редактор фраз панели, валидация warning/critical и modal cleanup; состояние передаётся через явные callbacks `dashbridge.js`. |
 | Transport сводного отчёта | `dashbridge-report-transport.js` | Ожидание iframe, request ID, timeout/abort и точная корреляция ответа. |
 | Orchestration сводного отчёта | `dashbridge-report-controller.js` | SLA панели, параллельный сбор, карточки ошибок, preview и общий live collector Message Test Runner. |
-| Аудит сводного отчёта | `dashbridge-report-audit.js` | Чистый анализ переменных, `panel:key`, живых значений и итогового текста без UI и записей. |
+| Аудит сводного отчёта | `dashbridge-report-audit.js` | Чистый анализ переменных, `panel:key`, семантической применимости живых значений по каждой включённой панели и итогового текста без UI и записей. |
 | Message Test Runner | `dashbridge-report-test-runner.js` | Детерминированные сценарии всех ветвей рендера и один живой интеграционный прогон активного профиля через общий collector `dashbridge.js`. |
 | TDM export | `popup-tdm.js`, `popup-tdm-page-export.js` | Popup владеет пользовательским действием, настройками и download lifecycle; отдельная самодостаточная функция исполняется через `chrome.scripting.executeScript` внутри активной TDM-страницы. |
 | Снимки DashBridge | `dashbridge-capture.js` | Общий prepared-toggle, broadcast размеров, одиночный save/copy, последовательный ZIP, throttling и восстановление карточки. |
@@ -228,7 +226,7 @@ grafana-panel-tools.js
 | Grafana time | `grafana-time.js` | DashBridge, iframe. |
 | Clipboard диапазона | `grafana-time-picker-clipboard.js`, `dashbridge-time-state.js` | Direct Grafana, DashBridge. |
 | Theme и UI scale | `pages/shared/theme.js`, `pages/shared/theme.css`, `pages/shared/theme-compat.css` | Все extension pages; compatibility CSS загружается между core theme и page stylesheet. |
-| Проверка обновлений | `update-check.js`, `popup-updates.js` | Popup. |
+| Проверка обновлений | `update-check.js`, `popup-updates.js`, `background-update-indicator.js` | Popup проверяет доверенные release metadata; service worker владеет action icon/title и их восстановлением. |
 | Windows install/update | `scripts/Install-DashBridge.ps1` | Отдельный пользовательский процесс, не extension runtime. |
 
 Похожий код остаётся раздельным при разном lifecycle. Например, Batch работает
@@ -297,28 +295,65 @@ grafana-iframe.js (isolated) ↔ grafana-panel-tools.js (MAIN)
 тема iframe `follow`/light/dark, пауза, общий период/refresh, копирование и
 вставка диапазона, курсор `line`/`off`, настройки, одиночные снимки и ZIP всех
 активных панелей текущего профиля.
+Абсолютный диапазон в header отображается компактно до минут; редактор и tooltip
+сохраняют секунды. DashBridge не вводит собственный timezone профиля и не
+удаляет существующий параметр `timezone` из URL панелей.
+Набор профилей и их сохранённые настройки синхронизируются между вкладками
+через `chrome.storage.local`, но выбор активного профиля принадлежит вкладке и
+восстанавливается из `sessionStorage`. Live threshold-состояния, уведомления,
+report waiters и итоговый текст существуют только в JS/DOM runtime своей
+вкладки и через storage не передаются. Смена активного профиля отменяет
+незавершённый сбор и закрывает preview сообщения прежнего профиля.
+Каждый iframe помечается ID активного профиля и уникальным ID runtime конкретной
+вкладки DashBridge. Сообщение принимается только при совпадении обоих значений;
+после переключения старый iframe отклоняется до dispatch, даже если другой
+профиль повторно использует UUID панели. Полный render выполняет cleanup
+threshold-состояния и уведомлений каждой прежней карточки до удаления DOM.
 Правая легенда адаптивна и не резервирует половину ширины графика.
 
 `Refresh Off` не может быть выражен простым отсутствием query-параметра:
 Grafana тогда восстанавливает refresh, сохранённый в dashboard model. Поэтому
 DashBridge передаёт намерение `off` во fragment, который не уходит в HTTP, а
-ранний `grafana-refresh-policy.js` только в именованном DashBridge iframe
-одноразово перехватывает первый same-origin GET определения dashboard и меняет
-только `dashboard.refresh`. Остальные запросы, direct Grafana и интервалы,
-отличные от Off, проходят без изменений.
+ранний самодостаточный `grafana-refresh-policy.js` читает fragment напрямую и
+только в именованном DashBridge iframe одноразово перехватывает первый
+same-origin GET определения dashboard, меняя только `dashboard.refresh`. Он не
+зависит от загрузки общего bootstrap helper и не использует несовместимый между
+версиями Grafana query-параметр `refresh=off`. В SoloPanel-сборках, где
+dashboard definition вообще не запрашивается, тот же ранний guard подавляет
+только interval с сигнатурой `SoloPanelPage → setupIntervalTimer`; остальные
+таймеры, запросы, direct Grafana и интервалы, отличные от Off, проходят без
+изменений.
 
 Профиль также хранит шаблон сводного сообщения и контекст теста, а панель —
 SLA-карточку с источником `graph`/`custom`/`none`, режимом агрегации,
 предупредительным и критическим уровнями, шаблоном строки списка и
-формулировками. По
+формулировками. `profile.report.panelOrder` независимо задаёт порядок фраз в
+сводке: drag-and-drop в настройках сообщения не переставляет карточки основного
+дашборда, неизвестные или удалённые ID игнорируются, а новые панели добавляются
+в конец в порядке дашборда. По
 команде пользователя `dashbridge.js` параллельно отправляет каждому активному
 iframe запрос `collectPanelReportSnapshot`. MAIN-runtime читает видимые серии
-uPlot/Flot, а для table-panel — уже отрисованные строки таблицы, и возвращает
-коррелированный `panelReportSnapshot`; родитель
+uPlot/Flot. Для видимой table-panel он сохраняет ограниченный DOM-снимок с
+исходными отображаемыми строками и предпочитает точные числовые значения из
+перехваченного DataFrame response; наличие DOM-таблицы служит guard, чтобы
+однозначные Stat/графики не классифицировались как Table. Если response shape
+не распознан, числовая агрегация безопасно откатывается к DOM. Снимок таблицы
+доступен шаблону как `{{tableMarkdown}}`, а размеры — как
+`{{tableRowCount}}` и `{{tableColumnCount}}`; Markdown сохраняет подписи Grafana,
+экранирует управляющие символы и ограничен 20 колонками и 100 строками.
+MAIN возвращает коррелированный `panelReportSnapshot`; родитель
 проверяет точные `origin`, `source` и iframe до принятия ответа. Timeout,
 отсутствие данных, пауза и ошибка конфигурации являются неизвестным результатом,
 а не успешным прохождением SLA. Шаблоны обрабатываются как простой текст без
 `eval` и HTML-рендеринга.
+
+Для `period_max` отчёт считает отображаемую колонку Max из легенды каноническим
+набором отчётных рядов. Это исключает служебные uPlot-ряды, которые остаются на
+графике, но скрыты из легенды, и не требует позиционного сопоставления: легенда
+может быть отсортирована, а несколько внутренних рядов могут называться
+одинаково (`Value`). При отсутствии Max в легенде используется renderer data.
+Единица `percent` означает сырые `0…100`, а `percentunit` —
+сырые `0…1`; оба варианта возвращаются в отчёт как отображаемые проценты.
 
 Message Test Runner сначала прогоняет детерминированные fixtures для полного
 каталога переменных, normal/warning/critical/no-threshold, недоступности,
@@ -327,7 +362,12 @@ Message Test Runner сначала прогоняет детерминирова
 каждый snapshot, фразу панели, живые значения и итоговый `compose`. UI явно
 показывает краткий пользовательский итог и найденные ошибки; полный список
 PASS/FAIL/WARN/SKIP, длительность, evidence и таблица только используемых
-переменных доступны в сворачиваемой технической диагностике. Runner ничего
+переменных доступны в сворачиваемой технической диагностике. Живые переменные
+показываются отдельно по включённым панелям. Пустое значение не считается
+потерей данных, если переменная семантически неприменима: например, unit у
+безразмерной метрики, SLA-поля при `source: none` или списки отсутствующих
+warning/critical рядов. Исключённые текущим include mode панели не создают
+предупреждений о live-значениях. Runner ничего
 не записывает в storage, а закрытие окна отменяет только принадлежащие ему запросы.
 
 Профильный JSON экспортирует полные объекты панелей, включая `tools`, тему и
@@ -397,6 +437,18 @@ Batch различает дубли occurrence-ключом `name\x00N`. Direct/
 plot area и получает указатель направления. Direct Grafana показывает toast;
 DashBridge получает status конкретной карточки.
 
+Порог и числовой фильтр серий имеют независимые группы единиц ввода. Каждая
+группа показывает до трёх соседних единиц, а без сохранённого выбора включает
+среднюю; смена radio не переписывает число, а меняет его интерпретацию. Runtime всегда
+сравнивает `thresholdRawValue`/`seriesQueryFilterRawValue`. Совместимые
+`thresholdValue`/`seriesQueryFilterValue` остаются выражены в текущей единице
+графика, а выбранное представление хранится отдельно в `thresholdInputUnit` и
+`seriesQueryFilterInputUnit`. Семантическая единица сначала берётся из
+`DataFrame field.config.unit`, если scoped response содержит одно семейство,
+затем из `fieldConfig`/legacy panel definition; подпись оси используется для
+текущего масштаба и как последний fallback. Неизвестные семейства единиц не
+расширяются эвристически.
+
 Превышение рассчитывается только по видимым сериям. Исторический ключ
 `thresholdIncludeHidden` может оставаться в старом профиле, но runtime его
 игнорирует; отдельная storage-миграция ради него намеренно не выполняется.
@@ -413,6 +465,11 @@ DashBridge получает status конкретной карточки.
 полного ответа даже после очистки флага `filtered_empty`; отсутствие легенды до
 этого ответа не является ошибкой команды, но следующий renderer обязан
 подтвердить восстановление.
+В `d-solo` Grafana параллельно с panel query выполняет `metricFindQuery` для
+dashboard variables. Эти запросы проходят нативно и не входят даже в panel
+loading/settlement cycle, поэтому запоздавшая переменная не может оставить
+панель в `loading`, задержать Table report или перезаписать `data` ложным
+`filtered_empty`/`empty_source`.
 
 ### Снимок панели
 
@@ -553,7 +610,7 @@ password values и auth/cookie headers открыто и исключён из G
 | Область | Данные | Контракт |
 |---|---|---|
 | `storage.sync` | Grafana/Options, домены, compact capture, Popup, тема | Небольшие настройки; частые inputs debounce + flush. |
-| `storage.local` | Profiles, backups, Worklog/cache, Batch, diagnostics/status | Долговечные/объёмные данные. |
+| `storage.local` | Profiles, backups, Worklog/cache, Batch, diagnostics/status, `dashbridgeUpdateIndicator` | Долговечные/объёмные данные и служебная версия доступного обновления. |
 | `storage.session` | `grafanaVisualState:<tabId>` | Служебное состояние вкладки, удаляется при закрытии. |
 | `localStorage` | Тема page | Синхронно до paint, затем sync reconciliation. |
 | MAIN `Map` | Live state по `panelKey` | Только document, переживает React DOM repair. |
@@ -599,7 +656,7 @@ Fallback нельзя удалять по результату одной Grafan
 | Механизм | Почему это функция | Ограничения и проверяемый контракт |
 |---|---|---|
 | MAIN fetch/XHR adapters | Преобразование ответа должно произойти до Grafana renderer. | Только настроенные Grafana hosts/routes; panel/request scope; generation cleanup; собственный wrapper не оборачивается повторно; helper-данные удаляются до renderer. |
-| `grafana-refresh-policy.js` меняет dashboard response | Иначе сохранённый Grafana refresh отменяет выбранный в DashBridge `Off`. | Только `dashbridge-iframe`, fragment policy `off`, same-origin GET `/api/dashboards/uid|db/...`, одно успешное применение; direct Grafana и datasource responses не затрагиваются. |
+| `grafana-refresh-policy.js` меняет dashboard response | Иначе сохранённый Grafana refresh отменяет выбранный в DashBridge `Off`. | Самодостаточное чтение только fragment policy `off`; только `dashbridge-iframe`, same-origin GET `/api/dashboards/uid|db/...` либо узкая сигнатура scheduler `SoloPanelPage → setupIntervalTimer`; direct Grafana, datasource responses и прочие timers не затрагиваются. |
 | DNR снимает XFO/CSP | Иначе разрешённые Grafana dashboards нельзя встроить в DashBridge. | Только session rules, конкретный tab DashBridge и allowlisted Grafana host; закрытие вкладки удаляет rules; глобальное правило запрещено. |
 | `debugger`/CDP | Нужен Traffic Recorder для network bodies, streams и replay. | Attach только по Record/Replay к созданной Recorder вкладке; явные caps; detach при Stop, закрытии и lifecycle-разрыве; `.dashflow` предупреждает о секретах. |
 | Clipboard read/write | Перенос диапазона времени между Grafana 10/12 и DashBridge, копирование текста/PNG. | Только пользовательское действие и сфокусированный документ; time payload нормализуется и валидируется; ошибка не меняет диапазон. |
@@ -667,6 +724,10 @@ UI Test Runner координирует запуск и таблицу в `test-
 `test-runner-diagnostic-viewer.js` владеет отдельными окнами описания/diagnostics,
 theme listener и Blob URL одного теста; `test-runner-export-controller.js` владеет
 Markdown/clipboard и потоковой записью полного OPFS diagnostic export.
+`test-runner-visual-audit.js` владеет чистой классификацией outcome/reason и
+проверкой полноты visual/semantic evidence; `test-runner-report-analysis.js`
+агрегирует health, failure clusters и рекомендации; `test-runner-report.js`
+остаётся стабильным facade compaction и artifact composition.
 
 `pages/test-runner/test-runner-suite.js` также является единым каталогом
 стабильных ID, человекочитаемых названий, описаний, шагов и владельцев кода для
@@ -775,7 +836,11 @@ Popup при открытии запрашивает только `releases/late
 `Phuoctonge/DashBridge`; успешный результат кэшируется в `storage.local` на один
 час. Draft/prerelease, неожиданный тег, GitHub URL и отсутствие точных
 ZIP/installer assets отклоняются. При более новой версии показывается ссылка на
-installer. Его запуск остаётся явным действием пользователя.
+installer. Popup сохраняет в `dashbridgeUpdateIndicator` только проверенную
+семантическую версию. Service worker меняет action icon и title, следит
+за этим ключом и восстанавливает индикатор после своего или браузерного
+перезапуска. Установка остаётся явным действием пользователя; после установки
+актуальной версии устаревшее состояние и индикатор удаляются автоматически.
 
 `scripts/Install-DashBridge.ps1` работает вне extension trust boundary: выбирает
 установленный Chrome/Edge/Яндекс Браузер, best-effort ищет прежний unpacked path

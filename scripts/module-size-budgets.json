@@ -34,11 +34,6 @@
       "maxBytes": 61440,
       "reason": "Single bounded evidence capture owner across supported renderer diagnostics; pure snapshot diffing is extracted."
     },
-    "pages/test-runner/test-runner-report.js": {
-      "maxLines": 1175,
-      "maxBytes": 75776,
-      "reason": "Single interactive diagnostic report renderer and evidence navigation owner."
-    },
     "pages/test-runner/test-runner-suite.js": {
       "maxLines": 950,
       "maxBytes": 59392,

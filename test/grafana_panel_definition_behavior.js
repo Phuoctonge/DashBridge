@@ -49,6 +49,11 @@ const createContext = ({ pathname = '/d/dashboard-uid/name', search = '?viewPane
     assert.deepStrictEqual(plain(api.getPanelLocation()), { uid: 'dashboard-uid', panelId: '2' },
         'viewPanel must win over a stale panelId');
 
+    const prefixedContext = createContext({ search: '?viewPanel=panel-2' });
+    assert.deepStrictEqual(plain(prefixedContext.DashBridgeGrafanaPanelDefinition.getPanelLocation()),
+        { uid: 'dashboard-uid', panelId: '2' },
+        'Grafana viewPanel values with the panel- prefix must use the same cache key as numeric ids');
+
     const firstPromise = api.getPanelDefinition();
     const secondPromise = api.getPanelDefinition();
     const [first, second] = await Promise.all([firstPromise, secondPromise]);

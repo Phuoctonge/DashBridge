@@ -37,6 +37,20 @@
   данных. Его удаление возможно только после измерения пользовательского
   storage и проверки миграции.
 
+## Границы модулей
+
+- DOM-карточка DashBridge и её actions принадлежат одному lifecycle-владельцу:
+  прежний отдельный actions controller создавал встречные callbacks и был
+  объединён с `dashbridge-panel-card-controller.js`.
+- `test-runner-report.js` сохранён как стабильный facade сборки и compaction
+  артефакта. Чистый visual audit и агрегация health/failure вынесены в
+  `test-runner-visual-audit.js` и `test-runner-report-analysis.js`, поскольку
+  имеют самостоятельные входы, выходы и тесты без владения UI/OPFS lifecycle.
+- Полный статический список размеров файлов не хранится в документации:
+  актуальные пределы и исключения принадлежат `check-module-boundaries.js` и
+  `module-size-budgets.json`. Документируется причина границы, а не снимок
+  быстро меняющихся строк и байтов.
+
 ## Тестирование
 
 - Локальная точка входа — `node test/run-all-tests.js`; отдельный npm/pytest

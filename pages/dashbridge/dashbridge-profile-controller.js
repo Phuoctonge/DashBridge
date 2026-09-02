@@ -8,11 +8,13 @@
             profileStore, timeState, renderer, getProfilePanelIdentity, showAlert, showConfirm,
             getProfiles, setProfiles, getActiveProfileId, setActiveProfileId, getPanels, setPanels,
             loadActiveProfileTimeState, syncTimeControlsFromState, renderDashboard,
-            panelFrameSignature, adoptPanelState, reconcileDashboardPanelCards
+            panelFrameSignature, adoptPanelState, reconcileDashboardPanelCards,
+            invalidateActiveProfileRuntime
         } = deps;
         if (!profileStore?.load || !timeState?.normalize || !renderer?.renderProfileList
             || typeof getProfiles !== 'function' || typeof setProfiles !== 'function'
-            || typeof getPanels !== 'function' || typeof setPanels !== 'function') {
+            || typeof getPanels !== 'function' || typeof setPanels !== 'function'
+            || typeof invalidateActiveProfileRuntime !== 'function') {
             throw new TypeError('DashBridge profile controller dependencies are incomplete');
         }
         let profilesLoaded = false;
@@ -133,6 +135,7 @@
             const activeProfileChanged = previousActiveProfileId !== getActiveProfileId()
                 || previousActiveProfileSignature !== profileStorageSignature([getActiveProfile()], getActiveProfileId());
             if (!activeProfileChanged) return;
+            invalidateActiveProfileRuntime();
             if (previousDashboardLayoutSignature === dashboardLayoutSignature(getActiveProfile())) return;
             loadActiveProfileTimeState(); syncTimeControlsFromState();
             const activeProfileSwitched = previousActiveProfileId !== getActiveProfileId();
@@ -145,6 +148,7 @@
             if (id === getActiveProfileId()) return;
             const currentProfile = getActiveProfile();
             if (currentProfile) currentProfile.panels = getPanels();
+            invalidateActiveProfileRuntime();
             setTabActiveProfileId(id);
             const profile = getActiveProfile();
             setPanels(profile ? [...(profile.panels || [])] : []);
@@ -154,6 +158,7 @@
         const createProfile = async name => {
             const currentProfile = getActiveProfile();
             if (currentProfile) currentProfile.panels = getPanels();
+            invalidateActiveProfileRuntime();
             const newProfile = { id: crypto.randomUUID(), name: name.trim().slice(0, 120), panels: [], timeState: timeState.defaults() };
             const profiles = getProfiles(); profiles.push(newProfile);
             setTabActiveProfileId(newProfile.id); setPanels([]); loadActiveProfileTimeState();
@@ -171,6 +176,7 @@
             if (!profile || !await showConfirm(`Удалить профиль «${profile.name}»?\nВсе панели этого профиля будут потеряны.`)) return;
             const index = profiles.findIndex(item => item.id === id); profiles.splice(index, 1);
             if (getActiveProfileId() === id) {
+                invalidateActiveProfileRuntime();
                 const next = profiles[Math.max(0, index - 1)]; setTabActiveProfileId(next.id);
                 setPanels([...(next.panels || [])]); loadActiveProfileTimeState(); syncTimeControlsFromState(); await renderDashboard();
             }

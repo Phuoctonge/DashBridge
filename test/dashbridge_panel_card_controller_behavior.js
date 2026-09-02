@@ -36,7 +36,8 @@ const makeIframe = src => ({
 });
 const makeCard = panel => {
     const iframe = makeIframe(`prepared:${panel.src}`);
-    const openButton = { dataset: {} };
+    const actionButton = { dataset: {}, addEventListener() { calls.actions += 1; } };
+    const openButton = { dataset: {}, addEventListener() { calls.actions += 1; } };
     const dragHandle = { listeners: {}, addEventListener(type, listener) { this.listeners[type] = listener; } };
     const card = {
         dataset: { panelId: panel.id }, style: {}, iframe, openButton, dragHandle,
@@ -48,16 +49,25 @@ const makeCard = panel => {
             if (selector === 'iframe') return iframe;
             if (selector === '.btn-open') return openButton;
             if (selector === '.drag-handle') return dragHandle;
+            if (selector.startsWith('.btn-')) return actionButton;
             return null;
         },
-        remove() { cards.delete(panel.id); },
+        remove() {
+            cards.delete(panel.id);
+            dashboard.children = dashboard.children.filter(child => child !== card);
+        },
         replaceWith(replacement) { cards.set(panel.id, replacement); },
     };
     cards.set(panel.id, card);
     return card;
 };
 const dashboard = {
-    innerHTML: '', children: [], listeners: {}, classList: makeClassList(),
+    _innerHTML: '', children: [], listeners: {}, classList: makeClassList(),
+    get innerHTML() { return this._innerHTML; },
+    set innerHTML(value) {
+        this._innerHTML = value;
+        if (value === '') { this.children = []; cards.clear(); }
+    },
     addEventListener(type, listener) { this.listeners[type] = listener; },
     contains: node => dashboard.children.includes(node),
     querySelector: () => null,
@@ -89,18 +99,32 @@ const controller = context.DashBridgePanelCardController.create({
     getPanels: () => panels,
     setPanels: value => { panels = value; },
     savePanels: () => { saveCount += 1; },
-    getActiveProfile: () => ({ name: 'Test' }),
+    getActiveProfile: () => ({ id: 'profile-1', name: 'Test' }),
     applyPanelParamsToUrl: panel => `prepared:${panel.src}`,
     navigateDashboardFrame: (iframe, src) => { iframe.src = src; navigations.push(src); },
-    bindPanelActions: () => { calls.actions += 1; },
     findPanelCard: id => cards.get(id) || null,
     getPanelAnalysisType: () => null,
     syncPanelAnalysisAction: () => { calls.sync += 1; },
     closePanelAnalysis: () => { calls.close += 1; },
     isPanelAnalysisOpen: () => false,
-    onPanelRemoved: () => { calls.removed += 1; },
     escapeHtml: value => value,
-    icons: { collapse: '<collapse>' },
+    icons: { expand: '<expand>', collapse: '<collapse>' },
+    runtimeScopeId: 'scope-1',
+    actionDependencies: {
+        showAlert: async () => undefined,
+        showConfirm: async () => true,
+        setPanelDataStatus: () => undefined,
+        postToDashboardFrame: () => true,
+        panelAnalysis: { isPanel: () => false },
+        panelTools: { removePanel: () => { calls.removed += 1; } },
+        isSupportedPanelUrl: () => true,
+        normalizePanelUrl: value => value,
+        runToolbarCapture: () => undefined,
+        openPanelReportEditor: () => undefined,
+        openPanelTools: () => undefined,
+        openPanelAnalysis: () => undefined,
+        requestFrame: callback => callback(),
+    },
     documentRef,
 });
 
@@ -108,7 +132,11 @@ const controller = context.DashBridgePanelCardController.create({
     await controller.renderDashboard();
     assert.strictEqual(cards.size, 2);
     assert.strictEqual(navigations.length, 2, 'active cards must navigate exactly once during creation');
-    assert.strictEqual(calls.actions, 2);
+    assert(calls.actions > 2, 'each created card must bind its action controls');
+    assert.strictEqual(cards.get('panel-1').iframe.dataset.dashbridgeProfileId, 'profile-1',
+        'every iframe must be bound to the profile that created it');
+    assert.strictEqual(cards.get('panel-1').iframe.dataset.dashbridgeScopeId, 'scope-1',
+        'every iframe must be bound to the DashBridge tab runtime that created it');
 
     panels[0].height = '420px';
     panels[0].width = '33%';
@@ -141,7 +169,8 @@ const controller = context.DashBridgePanelCardController.create({
 
     panels.length = 0;
     controller.removePanelCard('panel-1');
-    assert.strictEqual(calls.removed, 1);
+    assert.strictEqual(calls.removed, 2,
+        'empty-state render must clean up every remaining card instead of orphaning its notifications');
     assert(dashboard.innerHTML.includes('Профиль «Test» пуст'));
 
     assert.throws(

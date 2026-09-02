@@ -7,7 +7,11 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const reportSource = fs.readFileSync(path.join(__dirname, '..', 'pages', 'test-runner', 'test-runner-report.js'), 'utf8');
+const reportSource = [
+    'test-runner-visual-audit.js',
+    'test-runner-report-analysis.js',
+    'test-runner-report.js',
+].map(file => fs.readFileSync(path.join(__dirname, '..', 'pages', 'test-runner', file), 'utf8')).join('\n');
 const uiSource = ['test-runner-artifact-serialization.js', 'test-runner-spool.js', 'test-runner-ui.js']
     .map(name => fs.readFileSync(path.join(__dirname, '..', 'pages', 'test-runner', name), 'utf8'))
     .join('\n');

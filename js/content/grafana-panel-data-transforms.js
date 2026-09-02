@@ -263,15 +263,36 @@
         const collectResponseTableRecords = data => {
             const records = [];
             const MAX_TABLE_RECORDS = 5000;
+            const reducedSeriesRecord = frame => {
+                const fields = frame?.schema?.fields || [];
+                const columns = frame?.data?.values || [];
+                const numericIndexes = fields.map((field, index) => field?.type === 'number' ? index : -1)
+                    .filter(index => index >= 0);
+                const hasTime = fields.some(field => field?.type === 'time' || field?.name === 'Time');
+                if (!hasTime || numericIndexes.length !== 1) return null;
+                const valueIndex = numericIndexes[0];
+                const values = Array.from(columns[valueIndex] || []).map(Number).filter(Number.isFinite);
+                if (values.length !== 1) return null;
+                const valueField = fields[valueIndex] || {};
+                const name = String(valueField?.config?.displayNameFromDS || frame?.schema?.name
+                    || Object.values(valueField?.labels || {})[0] || '').trim();
+                return name ? { name: name.substring(0, 500), value: values[0] } : null;
+            };
             outer: for (const result of Object.values(data?.results || {})) {
                 for (const frame of result.frames || []) {
                     const shape = getResponseTableFrameShape(frame);
-                    if (!shape || (shape.timeIndexes.length && !targetPanelUsesTable())) continue;
+                    if (!shape) {
+                        const reduced = reducedSeriesRecord(frame);
+                        if (reduced) records.push(reduced);
+                        if (records.length >= MAX_TABLE_RECORDS) break outer;
+                        continue;
+                    }
+                    if (shape.timeIndexes.length && !targetPanelUsesTable()) continue;
                     for (let index = 0; index < shape.rowCount; index++) {
                         if (records.length >= MAX_TABLE_RECORDS) break outer;
-                    const name = String(shape.columns[shape.nameIndex]?.[index] ?? '').trim();
-                    const value = Number(shape.columns[shape.valueIndex]?.[index]);
-                    if (name && Number.isFinite(value)) records.push({ name: name.substring(0, 500), value });
+                        const name = String(shape.columns[shape.nameIndex]?.[index] ?? '').trim();
+                        const value = Number(shape.columns[shape.valueIndex]?.[index]);
+                        if (name && Number.isFinite(value)) records.push({ name: name.substring(0, 500), value });
                     }
                 }
             }

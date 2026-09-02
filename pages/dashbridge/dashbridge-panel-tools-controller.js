@@ -46,6 +46,7 @@
                 seriesQueryFilterRawValue: Number.isFinite(Number(saved.seriesQueryFilterRawValue))
                     && saved.seriesQueryFilterRawValue !== null && saved.seriesQueryFilterRawValue !== ''
                     ? Number(saved.seriesQueryFilterRawValue) : null,
+                seriesQueryFilterInputUnit: normalizePanelMetadataText(saved.seriesQueryFilterInputUnit, 32),
                 seriesQueryFilterMode: saved.seriesQueryFilterMode === 'last' ? 'last' : 'max',
                 cpuCapacityFilterEnabled: !!saved.cpuCapacityFilterEnabled,
                 cpuCapacityFilterHighlightEnabled: saved.cpuCapacityFilterHighlightEnabled !== false,
@@ -62,6 +63,7 @@
                 thresholdRawValue: Number.isFinite(Number(saved.thresholdRawValue))
                     && saved.thresholdRawValue !== null && saved.thresholdRawValue !== ''
                     ? Number(saved.thresholdRawValue) : null,
+                thresholdInputUnit: normalizePanelMetadataText(saved.thresholdInputUnit, 32),
                 thresholdUnit: normalizePanelMetadataText(saved.thresholdUnit)
             };
         };
@@ -210,7 +212,7 @@
                         ? false : (previousTools.convertMemToUsed || previousTools.forceMemByteUnit);
                     panel.tools = nextTools;
                     savePanels();
-                    const liveApplyKeys = ['thresholdEnabled', 'thresholdNotifyEnabled', 'thresholdValue', 'thresholdRawValue', 'thresholdUnit'];
+                    const liveApplyKeys = ['thresholdEnabled', 'thresholdNotifyEnabled', 'thresholdValue', 'thresholdRawValue', 'thresholdInputUnit', 'thresholdUnit'];
                     const liveApplyOnlyChange = liveApplyKeys.some(key => previousTools[key] !== nextTools[key])
                         && Object.keys(nextTools).filter(key => !liveApplyKeys.includes(key))
                             .every(key => JSON.stringify(previousTools[key]) === JSON.stringify(nextTools[key]));

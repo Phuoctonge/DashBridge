@@ -32,7 +32,7 @@ const tools = fs.readFileSync('js/content/grafana-panel-tools.js', 'utf8')
     + fs.readFileSync('js/content/grafana-panel-capture-runtime.js', 'utf8')
     + fs.readFileSync('js/content/grafana-panel-menu-runtime.js', 'utf8');
 const dashboard = fs.readFileSync('pages/dashbridge/dashbridge.js', 'utf8')
-    + fs.readFileSync('pages/dashbridge/dashbridge-panel-actions-controller.js', 'utf8')
+    + fs.readFileSync('pages/dashbridge/dashbridge-panel-card-controller.js', 'utf8')
     + fs.readFileSync('pages/dashbridge/dashbridge-page-ui-controller.js', 'utf8')
     + fs.readFileSync('pages/dashbridge/dashbridge-iframe-message-controller.js', 'utf8');
 const dashboardCapture = fs.readFileSync('pages/dashbridge/dashbridge-capture.js', 'utf8');

@@ -1,18 +1,23 @@
 let profiles = [];
 let activeProfileId = null;
 let panels = []; // Всегда синхронизирован с активным профилем
+const dashBridgeRuntimeScopeId = crypto.randomUUID();
 let dashBridgeTimeController = null;
 let dashBridgePanelToolsController = null;
 let dashBridgePanelCardController = null;
-let dashBridgePanelActionsController = null;
 let dashBridgePageUiController = null;
+let dashBridgeReportController = null;
+
+function invalidateActiveProfileRuntime() {
+    dashBridgeReportController?.invalidateProfileContext();
+}
 
 function forceLoadPanel(id) {
     return dashBridgePanelCardController.forceLoadPanel(id);
 }
 
 function refreshPanel(id) {
-    return dashBridgePanelActionsController.refreshPanel(id);
+    return dashBridgePanelCardController.refreshPanel(id);
 }
 
 function updatePanelCard(panelId, options) {
@@ -101,6 +106,7 @@ const dashBridgeProfileController = DashBridgeProfileController.create({
     panelFrameSignature,
     adoptPanelState,
     reconcileDashboardPanelCards,
+    invalidateActiveProfileRuntime,
 });
 const {
     getActiveProfile, loadProfiles, saveProfiles, savePanels, switchProfile, createProfile,
@@ -162,6 +168,7 @@ dashBridgeTimeController = DashBridgeTimeController.create({
     postToDashboardFrame,
     navigateDashboardFrame,
     refreshAllPanels,
+    runtimeScopeId: dashBridgeRuntimeScopeId,
 });
 const applyPanelParamsToUrl = dashBridgeTimeController.applyPanelParamsToUrl;
 const getPanelForIframe = dashBridgeTimeController.getPanelForIframe;
@@ -273,7 +280,7 @@ const SVG_MORE = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentC
 const SVG_ANALYSIS = `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V9M10 19V5M16 19v-7M3 19h18"/><circle cx="19" cy="6" r="2.5"/></svg>`;
 const SVG_REPORT = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v14H4z"/><path d="m4 7 8 6 8-6"/></svg>`;
 
-const dashBridgeReportController = DashBridgeReportController.create({
+dashBridgeReportController = DashBridgeReportController.create({
     reportEngine: DashBridgeReport,
     transportFactory: DashBridgeReportTransport,
     testRunnerFactory: DashBridgeReportTestRunner,
@@ -405,35 +412,6 @@ const captureAllDashboardPanels = dashBridgeCapture.captureAll;
 const runDashboardToolbarCapture = dashBridgeCapture.captureFromToolbar;
 const captureDashbridgePanel = dashBridgeCapture.capturePanel;
 
-dashBridgePanelActionsController = DashBridgePanelActionsController.create({
-    getPanels: () => panels,
-    setPanels: value => { panels = value; },
-    savePanels,
-    showAlert,
-    showConfirm,
-    setPanelDataStatus: setDashboardPanelDataStatus,
-    forceLoadPanel,
-    applyPanelParamsToUrl,
-    navigateDashboardFrame,
-    findPanelCard,
-    postToDashboardFrame,
-    removePanelCard: removeDashboardPanelCard,
-    replacePanelCard: replaceDashboardPanelCard,
-    updatePanelCard,
-    panelAnalysis: dashBridgePanelAnalysisController,
-    closePanelAnalysis: closeDashboardPanelAnalysis,
-    panelTools: dashBridgePanelToolsController,
-    isSupportedPanelUrl,
-    normalizePanelUrl: normalizeGrafanaPanelUrl,
-    escapeHtml,
-    runToolbarCapture: runDashboardToolbarCapture,
-    openPanelReportEditor,
-    openPanelTools,
-    syncPanelAnalysisAction: dashBridgePanelAnalysisController.syncAction,
-    openPanelAnalysis: openDashboardPanelAnalysis,
-    icons: { expand: SVG_EXPAND, collapse: SVG_COLLAPSE },
-});
-
 dashBridgePanelCardController = DashBridgePanelCardController.create({
     renderer: DashBridgeRenderer,
     getPanels: () => panels,
@@ -442,14 +420,27 @@ dashBridgePanelCardController = DashBridgePanelCardController.create({
     getActiveProfile,
     applyPanelParamsToUrl,
     navigateDashboardFrame,
-    bindPanelActions: dashBridgePanelActionsController.bindPanelActions,
     findPanelCard,
     getPanelAnalysisType: dashBridgePanelAnalysisController.getType,
     syncPanelAnalysisAction: dashBridgePanelAnalysisController.syncAction,
     closePanelAnalysis: closeDashboardPanelAnalysis,
     isPanelAnalysisOpen: dashBridgePanelAnalysisController.isPanel,
-    onPanelRemoved: dashBridgePanelActionsController.handlePanelRemoved,
     escapeHtml,
+    actionDependencies: {
+        showAlert,
+        showConfirm,
+        setPanelDataStatus: setDashboardPanelDataStatus,
+        postToDashboardFrame,
+        panelAnalysis: dashBridgePanelAnalysisController,
+        panelTools: dashBridgePanelToolsController,
+        isSupportedPanelUrl,
+        normalizePanelUrl: normalizeGrafanaPanelUrl,
+        runToolbarCapture: runDashboardToolbarCapture,
+        openPanelReportEditor,
+        openPanelTools,
+        openPanelAnalysis: openDashboardPanelAnalysis,
+    },
+    runtimeScopeId: dashBridgeRuntimeScopeId,
     icons: {
         grip: SVG_GRIP,
         expand: SVG_EXPAND,
@@ -494,12 +485,12 @@ dashBridgePageUiController = DashBridgePageUiController.create({
     closeDashboardPickerIfOpen: dashBridgePanelAdditionController.closeDashboardPickerIfOpen,
     setupPanelTransfer: dashBridgePanelTransferController.setup,
     closePanelAnalysis: closeDashboardPanelAnalysis,
-    closePanelExtraActions: dashBridgePanelActionsController.closeExtraActions,
-    exitFullscreen: dashBridgePanelActionsController.exitFullscreen,
+    closePanelExtraActions: dashBridgePanelCardController.closeExtraActions,
+    exitFullscreen: dashBridgePanelCardController.exitFullscreen,
 });
 
-window.deletePanel = dashBridgePanelActionsController.deletePanel;
-window.refreshPanel = dashBridgePanelActionsController.refreshPanel;
+window.deletePanel = dashBridgePanelCardController.deletePanel;
+window.refreshPanel = dashBridgePanelCardController.refreshPanel;
 
 DashBridgeIframeMessageController.create({
     getPanelForIframe,

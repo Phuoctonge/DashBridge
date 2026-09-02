@@ -57,6 +57,11 @@
             if (!event.data || !event.data.action) return;
             const sourceIframe = findSourceIframe(event);
             if (!sourceIframe || resolveFrameOrigin(sourceIframe) !== event.origin) return;
+            const sourcePanel = getPanelForIframe(sourceIframe);
+            // A profile switch updates the active panel collection before the
+            // old cards are unmounted. Reject every message from those stale
+            // frames, even when another profile reused the same panel UUID.
+            if (!sourcePanel) return;
 
             if (event.data.action === 'panelReportSnapshot' && typeof event.data.requestId === 'string') {
                 acceptReportSnapshot(event.data.requestId, sourceIframe, event.data.snapshot);
@@ -70,7 +75,7 @@
             if (event.data.action === 'dashbridgePanelCaptureRequest'
                 && typeof event.data.requestId === 'string'
                 && ['download', 'copy'].includes(event.data.outputAction)) {
-                void capturePanel(sourceIframe, getPanelForIframe(sourceIframe), event.data);
+                void capturePanel(sourceIframe, sourcePanel, event.data);
                 return;
             }
             if (event.data.action === 'dashbridgeCapturePreparedChanged'
@@ -79,7 +84,7 @@
                 return;
             }
             if (event.data.action === 'dashbridgePanelTitle') {
-                const panel = getPanelForIframe(sourceIframe);
+                const panel = sourcePanel;
                 const title = typeof event.data.title === 'string'
                     ? event.data.title.trim().slice(0, 240)
                     : '';
@@ -103,7 +108,7 @@
                     mode: getCrosshairMode(),
                     thickness: getCrosshairThickness(),
                 });
-                const panel = getPanelForIframe(sourceIframe);
+                const panel = sourcePanel;
                 sendTimeUpdate(sourceIframe);
                 if (panel) applyPanelTools(panel, sourceIframe);
                 retryPanelAnalysis(sourceIframe);
@@ -120,13 +125,11 @@
             }
             if (event.data.action === 'panelLegendSeries'
                 && typeof event.data.requestId === 'string') {
-                const panelId = sourceIframe.closest('.panel-card')?.dataset.panelId;
-                const panel = getPanels().find(item => item.id === panelId);
-                acceptLegendSeries(event.data, panel);
+                acceptLegendSeries(event.data, sourcePanel);
                 return;
             }
             if (event.data.action === 'panelThresholdStatus') {
-                acceptThresholdStatus(event.data, getPanelForIframe(sourceIframe));
+                acceptThresholdStatus(event.data, sourcePanel);
                 return;
             }
             if (event.data.action === 'broadcastCrosshair' && event.data.percentX !== undefined) {

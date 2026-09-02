@@ -20,10 +20,11 @@ const frame = {
     closest: selector => selector === '.panel-card' ? card : null,
 };
 const panel = { id: 'panel-1', title: 'Old' };
+let currentPanel = panel;
 let messageListener = null;
 const controller = context.DashBridgeIframeMessageController.create({
     getFrameOrigin: () => 'https://grafana.example',
-    getPanelForIframe: () => panel,
+    getPanelForIframe: () => currentPanel,
     getPanels: () => [panel],
     acceptReportSnapshot: (...args) => calls.push(['report', ...args]),
     acceptPanelAnalysis: (...args) => calls.push(['analysis', ...args]),
@@ -63,6 +64,11 @@ const guardedCount = calls.length;
 emit({ action: 'panelReportSnapshot', requestId: 'bad' }, { origin: 'https://evil.example' });
 emit({ action: 'panelReportSnapshot', requestId: 'bad' }, { source: {} });
 assert.strictEqual(calls.length, guardedCount, 'wrong source or origin must be ignored');
+currentPanel = null;
+emit({ action: 'panelThresholdStatus', status: { enabled: true, exceeded: true } });
+assert.strictEqual(calls.length, guardedCount,
+    'messages from an iframe outside the active profile must be ignored');
+currentPanel = panel;
 
 emit({ action: 'dashbridgePanelAnalysisUpdate', requestId: 'analysis-1' });
 emit({ action: 'dashbridgePanelCaptureRequest', requestId: 'capture-1', outputAction: 'copy' });

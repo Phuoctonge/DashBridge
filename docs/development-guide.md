@@ -1,6 +1,6 @@
 # DashBridge: ориентир для дальнейшей разработки
 
-> Сверено с версией 2.4.1, исходным кодом и тестами 2026-08-30. Архитектурный источник
+> Сверено с версией 2.4.2, исходным кодом и тестами 2026-09-02. Архитектурный источник
 > истины — [`architecture.md`](architecture.md), карта
 > разрешений — [`permission-map.md`](permission-map.md), незавершённые
 > направления — [`roadmap.md`](roadmap.md). История не описывает
@@ -51,9 +51,16 @@ Browser smoke не требует пользователя и ловит оши�
     canvas/capture. Геометрия контролов масштабируется через общие `rem`-токены
     и `uiScale`, а широкие data-workspace не получают произвольный desktop cap.
 12. Намерение DashBridge `Refresh Off` передаётся только во fragment и
-    применяется ранним one-shot MAIN wrapper к same-origin dashboard-definition
-    response. Query omission недостаточен: Grafana восстановит сохранённый
-    dashboard refresh.
+    самостоятельно читается ранним one-shot MAIN wrapper для same-origin
+    dashboard-definition response. Он не должен зависеть от более позднего
+    bootstrap helper или использовать несовместимый `refresh=off`; простое
+    отсутствие query-параметра позволяет Grafana восстановить сохранённый
+    dashboard refresh. Если SoloPanel не запрашивает dashboard definition,
+    допустим только узкий fallback для стека `SoloPanelPage → setupIntervalTimer`;
+    остальные timers обязаны сохранить native semantics.
+    Любое изменение выбранного режима refresh пересоздаёт iframe один раз:
+    разные SoloPanel router не гарантируют создание или удаление scheduler после
+    одного `history.replaceState`/`popstate`.
 13. Versioned storage migration создаёт backup до изменения и пишет schema
     marker последним. Удалять временный migration-модуль можно только вместе с
     его script tag, startup call, backup/marker policy и legacy load fallback.
@@ -259,7 +266,7 @@ foreach ($file in $files) { node --check $file }
 в extension ZIP:
 
 ```powershell
-./scripts/build-release.ps1 -ExpectedTag 'v2.4.1'
+./scripts/build-release.ps1 -ExpectedTag 'v2.4.2'
 ```
 
 Push тега `vX.Y.Z` запускает `.github/workflows/release.yml`: полный набор

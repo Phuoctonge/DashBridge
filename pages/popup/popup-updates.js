@@ -3,16 +3,20 @@
 
     const API_URL = 'https://api.github.com/repos/Phuoctonge/DashBridge/releases/latest';
     const CACHE_KEY = 'dashbridgeUpdateCheck';
+    const INDICATOR_KEY = 'dashbridgeUpdateIndicator';
     const CACHE_TTL_MS = 60 * 60 * 1000;
     const REQUEST_TIMEOUT_MS = 6000;
     let localReloadRequired = false;
+    const rememberUpdate = version => chrome.storage.local.set({ [INDICATOR_KEY]: { version } }).catch(() => undefined);
+    const forgetUpdate = () => chrome.storage.local.remove(INDICATOR_KEY).catch(() => undefined);
 
     function showLocalReloadNotice(diskVersion, currentVersion) {
+        localReloadRequired = true;
+        void rememberUpdate(diskVersion);
         const notice = document.getElementById('updateNotice');
         const text = document.getElementById('updateNoticeText');
         const button = document.getElementById('downloadUpdateBtn');
         if (!notice || !text || !button) return;
-        localReloadRequired = true;
         text.textContent = `Файлы версии ${diskVersion} готовы (запущена ${currentVersion})`;
         button.textContent = 'Перезагрузить расширение';
         button.onclick = () => chrome.runtime.reload();
@@ -37,6 +41,7 @@
 
     function showUpdateNotice(release) {
         if (localReloadRequired) return;
+        void rememberUpdate(release.version);
         const notice = document.getElementById('updateNotice');
         const text = document.getElementById('updateNoticeText');
         const button = document.getElementById('downloadUpdateBtn');
@@ -51,6 +56,8 @@
         const currentVersion = chrome.runtime.getManifest().version;
         if (DashBridgeUpdateCheck.compareVersions(release?.version, currentVersion) === 1) {
             showUpdateNotice(release);
+        } else if (!localReloadRequired) {
+            void forgetUpdate();
         }
     }
 

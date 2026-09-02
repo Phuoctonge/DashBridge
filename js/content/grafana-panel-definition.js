@@ -21,13 +21,14 @@
         }
     };
 
+    const normalizePanelId = value => String(value || '').replace(/^panel-/, '');
     const getPanelLocation = () => {
         const uid = location.pathname.match(/\/d(?:-solo)?\/([^/]+)/)?.[1] || '';
         const params = new URLSearchParams(location.search);
         // In a regular Grafana URL viewPanel is the panel actually open on
         // screen; panelId can be left over from the original copied link.
         const panelId = params.get('viewPanel') || params.get('panelId') || '';
-        return { uid, panelId: String(panelId) };
+        return { uid, panelId: normalizePanelId(panelId) };
     };
 
     const flattenPanels = panels => (panels || []).flatMap(panel => [
@@ -56,12 +57,12 @@
     // для разных панелей больше не перезаписывают кеш друг друга.
     const getPanelDefinition = async ({ root = document, panelId: requestedPanelId = '' } = {}) => {
         const { uid, panelId: locationPanelId } = getPanelLocation();
-        const panelId = String(
+        const panelId = normalizePanelId(
             requestedPanelId
             || window.DashBridgeGrafanaDom?.panelKey?.(root)
             || locationPanelId
             || ''
-        ).replace(/^panel-/, '');
+        );
         // Public d-solo embeds can render a panel without granting access to
         // the dashboard-definition API.  Avoid a guaranteed 404 there; the
         // chart axis remains the source for threshold units in this mode.

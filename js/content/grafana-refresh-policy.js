@@ -5,15 +5,37 @@
     'use strict';
 
     const isDashboardIframe = window.name === 'dashbridge-iframe';
-    const bootstrap = window.DashBridgeGrafanaPanelBootstrap;
-    const policy = bootstrap?.readRefreshPolicyFromUrl?.(location.href);
-    if (!isDashboardIframe || policy !== 'off' || typeof window.fetch !== 'function') return;
+    // Keep this document_start guard self-contained. Shared MAIN helpers may be
+    // unavailable in older persisted registrations, while the fragment is the
+    // actual cross-version contract and never reaches Grafana over HTTP.
+    let policy = null;
+    try {
+        policy = new URLSearchParams(new URL(location.href).hash.slice(1))
+            .get('dashbridgeRefresh') === 'off' ? 'off' : null;
+    } catch { /* Invalid locations cannot opt into the policy. */ }
+    if (!isDashboardIframe || policy !== 'off') return;
     if (window.__dashbridgeRefreshPolicyInstalled) return;
     window.__dashbridgeRefreshPolicyInstalled = true;
 
     const diagnostic = window.__dashbridgeRefreshPolicyDiagnostic = {
-        policy: 'off', matched: 0, applied: 0, failed: 0
+        policy: 'off', matched: 0, applied: 0, failed: 0, blockedTimers: 0
     };
+    // Some SoloPanel builds restore the saved dashboard interval without
+    // requesting the dashboard definition. Block only that dedicated scheduler;
+    // every unrelated Grafana/application interval keeps native semantics.
+    if (typeof window.setInterval === 'function') {
+        const originalSetInterval = window.setInterval;
+        window.setInterval = function (callback, delay, ...args) {
+            const stack = String(new Error().stack || '');
+            if (stack.includes('setupIntervalTimer') && /SoloPanelPage[^\n]*\.js/iu.test(stack)) {
+                diagnostic.blockedTimers += 1;
+                return 0;
+            }
+            return originalSetInterval.call(this, callback, delay, ...args);
+        };
+    }
+
+    if (typeof window.fetch !== 'function') return;
     const originalFetch = window.fetch;
     let pending = true;
 

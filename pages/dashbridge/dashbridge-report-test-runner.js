@@ -209,7 +209,7 @@
         const renderAudit = (host, audit) => {
             host.textContent = '';
             const usedVariables = audit.variables.filter(variable => variable.used);
-            const missingVariables = usedVariables.filter(variable => !variable.hasData);
+            const missingVariables = usedVariables.filter(variable => variable.applicable !== false && !variable.hasData);
             const disclosure = document.createElement('details');
             disclosure.className = 'report-runner-audit-details';
             host.appendChild(disclosure);
@@ -225,15 +225,19 @@
             const tableWrap = appendText(disclosure, 'div', 'report-audit-table-wrap', '');
             const table = document.createElement('table'); table.className = 'report-audit-table'; tableWrap.appendChild(table);
             const head = document.createElement('thead'); const row = document.createElement('tr'); head.appendChild(row);
-            ['Переменная', 'Где используется', 'Данные', 'Значение'].forEach(value => appendText(row, 'th', '', value));
+            ['Переменная', 'Панель', 'Где используется', 'Данные', 'Значение'].forEach(value => appendText(row, 'th', '', value));
             table.appendChild(head); const body = document.createElement('tbody'); table.appendChild(body);
             const scopeLabels = { profile: 'Общий шаблон', panel: 'Фраза панели', list: 'Строка списка' };
             usedVariables.forEach(variable => {
                 const current = document.createElement('tr'); body.appendChild(current);
                 appendText(current, 'td', 'report-audit-variable', `{{${variable.name}}}`);
+                appendText(current, 'td', '', variable.panelTitle || 'Все панели');
                 appendText(current, 'td', '', scopeLabels[variable.scope] || variable.scope);
-                appendText(current, 'td', variable.hasData ? 'report-audit-pass' : 'report-audit-warning', variable.hasData ? 'Да' : 'Нет');
-                appendText(current, 'td', '', variable.value || '—');
+                const notApplicable = variable.applicable === false;
+                appendText(current, 'td', notApplicable ? 'report-audit-muted'
+                    : variable.hasData ? 'report-audit-pass' : 'report-audit-warning',
+                notApplicable ? 'Не требуется' : variable.hasData ? 'Да' : 'Нет');
+                appendText(current, 'td', '', variable.value || (notApplicable ? 'Ожидаемо пусто' : '—'));
             });
         };
         const open = () => {

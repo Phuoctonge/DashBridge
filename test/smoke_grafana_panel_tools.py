@@ -18,7 +18,7 @@ PANEL_DEFINITION = (ROOT / "js/content/grafana-panel-definition.js").read_text(e
 CPU_CAPACITY_FILTER = (ROOT / "js/content/grafana-cpu-capacity-filter.js").read_text(encoding="utf-8")
 DASHBOARD = (ROOT / "pages/dashbridge/dashbridge.js").read_text(encoding="utf-8") \
     + (ROOT / "pages/dashbridge/dashbridge-panel-tools-controller.js").read_text(encoding="utf-8") \
-    + (ROOT / "pages/dashbridge/dashbridge-panel-actions-controller.js").read_text(encoding="utf-8")
+    + (ROOT / "pages/dashbridge/dashbridge-panel-card-controller.js").read_text(encoding="utf-8")
 TIME_CONTROLLER = (ROOT / "pages/dashbridge/dashbridge-time-controller.js").read_text(encoding="utf-8")
 IFRAME = (ROOT / "js/content/grafana-iframe.js").read_text(encoding="utf-8")
 POPUP = (ROOT / "pages/popup/popup.html").read_text(encoding="utf-8")
@@ -156,8 +156,9 @@ checks = {
     "temporary datasource debug globals are not shipped": "__dashbridgeLegendFilterDebug" not in COMMON
         and "__dashbridgeQueryScopeDebug" not in COMMON and "__dashbridgeLegendScopeDebug" not in COMMON,
     "universal series threshold is strictly greater than the entered value": "return value > threshold;" in SERIES_THRESHOLD_FILTER,
-    "series filter converts its displayed unit to Grafana raw values": "seriesQueryFilterRawValue" in PANEL_SETTINGS
-        and "seriesQueryFilterValue * factor" in PANEL_SETTINGS,
+    "series filter converts its selected unit to Grafana raw values": "seriesQueryFilterRawValue" in PANEL_SETTINGS
+        and "seriesFilterUnitControl.rawValue()" in PANEL_SETTINGS
+        and "resolveUnitOptions" in PANEL_SETTINGS,
     "domain toggle is applied": "trimDomainEnabled" in COMMON,
     "calculated title covers CPU, RAM and Load Average and is restored":
         "tools.invertIdle || tools.convertMemToUsed || tools.cpuCapacityFilterEnabled" in COMMON
@@ -192,8 +193,8 @@ checks = {
     "Dashboard exposes maximum and last-value series filter modes": "name=\"${key}Mode\" value=\"max\"" in PANEL_SETTINGS
         and "name=\"${key}Mode\" value=\"last\"" in PANEL_SETTINGS,
     "series threshold filter displays the detected unit": "panel-series-filter-unit" in PANEL_SETTINGS,
-    "RAM percent conversion overrides the series filter unit": "const getSeriesFilterUnitText" in PANEL_SETTINGS
-        and "'Единица: %'" in PANEL_SETTINGS,
+    "RAM percent conversion overrides the series filter unit": "const asPercent" in PANEL_SETTINGS
+        and "{ unit: '%', factor: 1, engine: 'derived' }" in PANEL_SETTINGS,
     "Dashboard serializes the response-level series filter before iframe navigation": "dashbridgeSeriesQueryFilter" in TIME_CONTROLLER
         and "const bootstrapSeriesQueryFilter = readBootstrapSeriesFilter();" in COMMON
         and "dashbridgeSeriesFilter'" not in TIME_CONTROLLER,
@@ -359,7 +360,8 @@ checks = {
     "Flot threshold follows View layout changes": "const watchThresholdLayoutChanges" in VISUAL_ENGINE and "watchThresholdLayoutChanges(plotHost)" in VISUAL_ENGINE,
     "Flot threshold keeps line-only series eligible": "item.lines?.show !== false || item.points?.show !== false" in VISUAL_ENGINE,
     "Panel tools pass the selected panel root to threshold work": "root: thresholdRoot" in COMMON,
-    "Grafana panel menu requests the selected panel threshold unit": "getThresholdStatus: () => window.DashBridgeGrafanaVisualEngine?.getThresholdUnitAsync?.({ root: thresholdRoot, panelId: panelKey })" in COMMON,
+    "Grafana panel menu requests the selected panel threshold unit": "getThresholdStatus: () => getThresholdUnitStatus({ root: thresholdRoot, panelId: panelKey })" in COMMON
+        and "collectDataFrameUnitCodes?.(scopedData)" in COMMON,
     "Native Grafana threshold feedback tracks a panel transition": "const nativeThresholdAlerts = new Map()" in COMMON and "previous?.wasExceeded" in COMMON,
     "Native Grafana threshold feedback has no redundant panel status": "data-dashbridge-threshold-status" not in COMMON,
     "Native Grafana threshold feedback renders a page toast": "dashbridge-threshold-toast" in COMMON,

@@ -40,45 +40,65 @@
         return { fields, columns, nameIndex, valueIndex, rowCount, timeIndexes };
     };
 
-    const collectGrafanaTableRecords = (root = document) => {
-        const textOf = element => String(element?.innerText ?? element?.textContent ?? '').trim();
-        const cellsOf = row => {
-            if (row?.cells?.length) return Array.from(row.cells);
-            return Array.from(row?.querySelectorAll?.(':scope > [role="cell"], :scope > [role="gridcell"], :scope > [role="columnheader"], :scope > td, :scope > th') || []);
-        };
+    const TABLE_ROW_LIMIT = 100;
+    const textOf = element => String(element?.innerText ?? element?.textContent ?? '').trim();
+    const cellsOf = row => {
+        if (row?.cells?.length) return Array.from(row.cells);
+        return Array.from(row?.querySelectorAll?.(':scope > [role="cell"], :scope > [role="gridcell"], :scope > [role="columnheader"], :scope > td, :scope > th') || []);
+    };
+
+    const collectGrafanaTableData = (root = document) => {
         const candidates = [];
         if (root?.matches?.('table, [role="table"], [role="grid"]')) candidates.push(root);
         candidates.push(...Array.from(root?.querySelectorAll?.('table, [role="table"], [role="grid"]') || []));
-        let best = [];
+        let best = null;
         for (const table of [...new Set(candidates)]) {
             const headerRow = table.querySelector?.('thead tr')
                 || Array.from(table.querySelectorAll?.('[role="row"], tr') || [])
                     .find(row => row.querySelector?.('[role="columnheader"], th'));
-            const headers = cellsOf(headerRow).map(cell => textOf(cell).replace(/\s+/g, ' '));
-            let nameIndex = headers.findIndex(header => /^(?:metric|name|series|метрика|имя|серия|запрос)$/iu.test(header));
-            const valueIndex = headers.findIndex(header => /^(?:value|current|last|значение|текущее(?: значение)?|количество|count)$/iu.test(header));
-            if (nameIndex < 0 && valueIndex >= 0 && headers.length === 2) nameIndex = valueIndex === 0 ? 1 : 0;
-            if (nameIndex < 0 || valueIndex < 0 || nameIndex === valueIndex) continue;
+            const columns = cellsOf(headerRow).map(cell => textOf(cell).replace(/\s+/g, ' '));
+            if (columns.length < 2) continue;
             const semanticRows = Array.from(table.querySelectorAll?.('tbody tr, [role="row"]') || []);
             const rows = semanticRows.length ? semanticRows : Array.from(table.querySelectorAll?.('tr') || []);
-            const records = [];
+            const displayRows = [];
             for (const row of [...new Set(rows)]) {
                 if (row === headerRow || row.querySelector?.('[role="columnheader"], th')) continue;
-                const cells = cellsOf(row);
-                if (cells.length <= Math.max(nameIndex, valueIndex)) continue;
-                const name = textOf(cells[nameIndex]);
-                const numeric = parseGrafanaTableDisplayValue(textOf(cells[valueIndex]));
-                if (!name || numeric === null) continue;
-                records.push({ name, visible: true, values: [numeric] });
+                const values = cellsOf(row).slice(0, columns.length).map(textOf);
+                if (values.length === columns.length && values.some(Boolean)) displayRows.push(values);
             }
-            if (records.length > best.length) best = records;
+            if (!displayRows.length || best && displayRows.length <= best.totalRows) continue;
+            const visibleRows = displayRows.slice(0, TABLE_ROW_LIMIT);
+            const numericColumns = columns.map((_column, index) => visibleRows.some(row => row[index])
+                && visibleRows.every(row => !row[index] || parseGrafanaTableDisplayValue(row[index]) !== null));
+            best = {
+                columns: columns.slice(0, 20),
+                rows: visibleRows.map(row => row.slice(0, 20)),
+                numericColumns: numericColumns.slice(0, 20),
+                totalRows: displayRows.length,
+                truncated: displayRows.length > TABLE_ROW_LIMIT || columns.length > 20,
+                source: 'dom'
+            };
         }
         return best;
+    };
+
+    const collectGrafanaTableRecords = (root = document) => {
+        const table = collectGrafanaTableData(root);
+        if (!table) return [];
+        let nameIndex = table.columns.findIndex(header => /^(?:metric|name|series|метрика|имя|серия|запрос)$/iu.test(header));
+        const valueIndex = table.columns.findIndex(header => /^(?:value|current|last|значение|текущее(?: значение)?|количество|count)$/iu.test(header));
+        if (nameIndex < 0 && valueIndex >= 0 && table.columns.length === 2) nameIndex = valueIndex === 0 ? 1 : 0;
+        if (nameIndex < 0 || valueIndex < 0 || nameIndex === valueIndex) return [];
+        return table.rows.map(row => ({
+            name: String(row[nameIndex] || '').trim(), visible: true,
+            values: [parseGrafanaTableDisplayValue(row[valueIndex])].filter(Number.isFinite)
+        })).filter(record => record.name && record.values.length);
     };
 
     globalThis.DashBridgeGrafanaTableReport = Object.freeze({
         parseGrafanaTableDisplayValue,
         getResponseTableFrameShape,
+        collectGrafanaTableData,
         collectGrafanaTableRecords
     });
 })(globalThis);

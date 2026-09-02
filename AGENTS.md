@@ -60,6 +60,7 @@ clipboard или временно перестраивает панель. Сн�
 - Node.js: `C:\Program Files\nodejs\node.exe`;
 - npm: `C:\Program Files\nodejs\npm.cmd`;
 - Python: `C:\Users\Vanya\AppData\Local\Programs\Python\Python314\python.exe`.
+- GitNexus: `C:\Users\Vanya\AppData\Roaming\npm\gitnexus.cmd`.
 
 `C:\Windows\py.exe` на этой машине является только launcher без
 зарегистрированного интерпретатора. Его наличие не подтверждает доступность
@@ -80,6 +81,11 @@ Node.js или Python отсутствует, только на основани
 `where.exe`, `py.exe` либо sandbox-проверки. После обновления runtime сначала
 проверь указанный путь; если версия была установлена в новый каталог, найди
 фактический executable и обнови этот раздел в том же изменении.
+
+GitNexus на этой рабочей станции установлен глобально в пользовательском npm-
+каталоге, который недоступен sandbox-процессу. Запускай GitNexus вне sandbox по
+указанному абсолютному пути. Ошибка поиска команды или доступа внутри sandbox
+не означает, что GitNexus отсутствует.
 
 ### Перед удалением или переносом кода
 

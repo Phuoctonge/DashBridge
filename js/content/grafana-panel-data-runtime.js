@@ -1,6 +1,5 @@
 (() => {
     'use strict';
-
     const create = context => {
         const {
             tools, isDashboardIframe, visualMetadata, legendSelection, getTargetPanel,
@@ -10,7 +9,6 @@
             reapplyVisualStylesAfterDataTransform, consumeVisualStylesAfterQuery,
             registerRuntimeCleanup, isThresholdRestorePending
         } = context;
-
         const transforms = window.DashBridgeGrafanaPanelDataTransforms?.create(context);
         if (!transforms) throw new Error('DashBridge Grafana panel data transforms are unavailable');
         const {
@@ -29,6 +27,10 @@
                 return [];
             }
         };
+        const isDashboardVariableQuery = requestBody => {
+            const queries = isDashboardIframe ? getRequestQueries(requestBody) : [];
+            return queries.length > 0 && queries.every(query => String(query.refId || '') === 'metricFindQuery');
+        };
         const isTargetPanelView = () => {
             const viewPanel = new URL(location.href).searchParams.get('viewPanel');
             if (!viewPanel) return false;
@@ -40,9 +42,15 @@
                 === `panel-${String(tools.targetPanelId).replace(/^panel-/, '')}`;
         };
         const getTargetQueryRefIds = requestBody => {
-            if (isDashboardIframe) return null;
-            const signatures = new Set(tools.targetQuerySignatures || []);
             const queries = getRequestQueries(requestBody);
+            if (isDashboardIframe) {
+                // d-solo variable queries must never overwrite the panel status.
+                if (!queries.length) return null;
+                return new Set(queries
+                    .filter(query => String(query.refId || '') !== 'metricFindQuery')
+                    .map(query => String(query.refId || '')).filter(Boolean));
+            }
+            const signatures = new Set(tools.targetQuerySignatures || []);
             // Grafana's View route renders only the requested panel. It may start
             // the first datasource request before the dashboard definition has
             // been read, so the route's panel id is the strongest available scope.
@@ -144,7 +152,6 @@
             Object.assign(target.results, workspace.data.results);
             return target;
         };
-    
         const prepareCpuCapacityRequestBody = requestBody => {
             const capacityFilter = window.DashBridgeGrafanaCpuCapacityFilter;
             if (!capacityFilter || !tools.cpuCapacityFilterEnabled) return { body: requestBody, changed: false };
@@ -152,7 +159,6 @@
             if (!isDashboardIframe && !allowedRefIds.size) return { body: requestBody, changed: false };
             return capacityFilter.prepareRequestBody(requestBody, { enabled: true, allowedRefIds });
         };
-    
         const replaceFetchBody = (args, body) => {
             const [input, init] = args;
             if (typeof Request !== 'undefined' && input instanceof Request) {
@@ -160,7 +166,6 @@
             }
             return [input, { ...(init || {}), body }];
         };
-    
         const getTargetLegendRefIds = data => {
             const targetNames = new Set((tools.targetLegendSeries || []).map(name => String(name).trim()).filter(Boolean));
             if (!targetNames.size) return new Set();
@@ -175,7 +180,6 @@
             ));
             return new Set(matched.map(result => result.refId));
         };
-    
         const calculatedTitleOriginalText = new WeakMap();
         const markCalculatedTitle = () => {
             const suffix = ' calculated';
@@ -199,7 +203,6 @@
                 title.textContent = text.slice(0, -suffix.length);
             }
         };
-    
         let calculatedTitleFrame = 0;
         const scheduleCalculatedTitleSync = () => {
             if (calculatedTitleFrame) return;
@@ -233,7 +236,6 @@
             if (calculatedTitleFrame) cancelAnimationFrame(calculatedTitleFrame);
             calculatedTitleFrame = 0;
         });
-    
         // Monkey-patching (перехват сети): мы подменяем оригинальные window.fetch и XMLHttpRequest.
         // Это позволяет нам "на лету" перехватывать JSON-ответы от сервера Grafana (/api/ds/query) 
         // и изменять сырые метрики (например, инвертировать CPU idle в CPU used или считать RAM) 
@@ -388,7 +390,7 @@
                 // A normal Grafana dashboard has many panels sharing the same
                 // datasource endpoint. Never alter a response until it matches
                 // the selected panel's saved query signature.
-                if (!isDashboardIframe && !targetRefIds.size) {
+                if (targetRefIds !== null && !targetRefIds.size) {
                     diagnostics.unmatched += 1;
                     diagnostics.last = { at: Date.now(), scope, resultRefIds, targetRefIds: [] };
                     pushEvent('scope-mismatch', { ...request, scope, resultRefIds, targetRefIds: [] });
@@ -406,6 +408,8 @@
                 // mutate frames belonging to another dashboard panel.
                 const workspace = createResponseFilterWorkspace(data, targetRefIds, cpuContext.helperRefIds);
                 const scopedData = workspace.data;
+                visualMetadata.responseUnitCodes = window.DashBridgeGrafanaUnit
+                    ?.collectDataFrameUnitCodes?.(scopedData) || [];
                 const countSeries = source => Object.values(source?.results || {}).reduce((total, result) => total
                     + (result.frames || []).reduce((frameTotal, frame) => frameTotal
                         + Math.max(0, (frame.schema?.fields || []).filter(field => field.type !== 'time' && field.name !== 'Time').length), 0), 0);
@@ -523,12 +527,17 @@
                 const observeActive = transformActive || hasPersistentVisualWork() || isThresholdRestorePending()
                     || diagnosticObservationActive || analysisCaptureActive;
                 if (!observeActive) return originalFetch(...args);
-                const requestId = beginRequest('fetch', url);
                 let effectiveArgs = args;
                 let requestBody = null;
                 if (transformActive || diagnosticObservationActive || analysisCaptureActive) {
                     requestBody = await window.DashBridgeGrafanaNetwork.readFetchBody(args[0], args[1]).catch(() => null);
                 }
+                if (isDashboardVariableQuery(requestBody)) {
+                    diagnostics.unmatched += 1;
+                    pushEvent('request-skipped', { transport: 'fetch', url: String(url || ''), reason: 'dashboard-variable-query' });
+                    return originalFetch(...args);
+                }
+                const requestId = beginRequest('fetch', url);
                 if (tools.cpuCapacityFilterEnabled && requestBody !== null) {
                     const prepared = prepareCpuCapacityRequestBody(requestBody);
                     if (prepared.changed) {
@@ -624,6 +633,11 @@
                     const observeActive = transformActive || hasPersistentVisualWork() || isThresholdRestorePending()
                         || diagnosticObservationActive || analysisCaptureActive;
                     if (!observeActive) return originalSend.call(this, body);
+                    if (isDashboardVariableQuery(body)) {
+                        diagnostics.unmatched += 1;
+                        pushEvent('request-skipped', { transport: 'xhr', url: String(this.__dashbridgeRequestUrl || ''), reason: 'dashboard-variable-query' });
+                        return originalSend.call(this, body);
+                    }
                     if (tools.cpuCapacityFilterEnabled) {
                         const prepared = prepareCpuCapacityRequestBody(body);
                         if (prepared.changed) body = prepared.body;
@@ -698,12 +712,7 @@
                 return originalSend.call(this, body);
             };
         };
-    
-    
-
-        return Object.freeze({
-            hasDataTransform, markCalculatedTitle, observeCalculatedTitle, installDataInterceptor
-        });
+        return Object.freeze({ hasDataTransform, markCalculatedTitle, observeCalculatedTitle, installDataInterceptor });
     };
 
     window.DashBridgeGrafanaPanelDataRuntime = Object.freeze({ create });

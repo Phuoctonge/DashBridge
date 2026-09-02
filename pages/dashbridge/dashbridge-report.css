@@ -51,6 +51,16 @@
 .report-panel-card { padding: 0.875rem 1rem; border: 1px solid var(--border-color); border-radius: 0.75rem; background: var(--bg-color); box-shadow: 0 2px 8px rgba(15,23,42,.04); }
 .report-panel-card-header { min-height: 2.375rem; }
 .report-panel-card-header h4 { margin: 0; font-size: 1.05rem; }
+.report-panel-card-main { display: flex; align-items: center; min-width: 0; gap: 0.75rem; }
+.report-panel-drag-handle {
+    display: grid; place-items: center; flex: 0 0 2rem; width: 2rem; height: 2.375rem; padding: 0;
+    border: 1px solid transparent; border-radius: 0.5rem; background: transparent; color: var(--text-muted);
+    cursor: grab; font: 700 1.25rem/1 system-ui, sans-serif; touch-action: none;
+}
+.report-panel-drag-handle:hover { border-color: var(--border-color); background: var(--btn-hover); color: var(--text-main); }
+.report-panel-drag-handle:active { cursor: grabbing; }
+.report-panel-card.is-dragging { opacity: 0.55; }
+.report-panel-card.is-drag-target { border-color: var(--primary); }
 .report-panel-auto-status { display: block; margin-top: 5px; color: var(--text-muted); font-size: .78rem; }
 .report-panel-card-actions { display: flex; align-items: center; gap: 0.875rem; }
 .report-overview-card .report-panel-card-header { padding: 0; border: 0; }
@@ -196,6 +206,7 @@
     .report-settings-overlay, .report-preview-overlay, .report-audit-overlay { padding: 0.5rem; }
     .report-settings-modal, .report-preview-modal, .report-audit-modal { padding: 1rem; }
     .report-settings-header, .report-panel-card-header, .report-section-heading { align-items: flex-start; flex-direction: column; }
+    .report-panel-card-main { width: 100%; }
     .report-panel-card { padding: 1rem; }
     .report-collapsible-section > summary, .report-section-body { padding: 1rem; }
     .report-collapsible-section > summary { padding-right: 2.75rem; }

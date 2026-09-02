@@ -3,11 +3,11 @@
     if (root.DashBridgeGrafanaReportSnapshot) return;
 
     function create({ mergeAxisAndPanelUnit, inferUnitFromAxisTicks, getCachedPanelDefinition,
-        unitFromPanelDefinition, collectGrafanaTableRecords, findUPlot,
+        unitFromPanelDefinition, collectGrafanaTableData, collectGrafanaTableRecords, findUPlot,
         getUPlotYScaleKey, getUPlotUnitDetails } = {}) {
         const dependencies = [
             mergeAxisAndPanelUnit, inferUnitFromAxisTicks, getCachedPanelDefinition,
-            unitFromPanelDefinition, collectGrafanaTableRecords, findUPlot,
+            unitFromPanelDefinition, collectGrafanaTableData, collectGrafanaTableRecords, findUPlot,
             getUPlotYScaleKey, getUPlotUnitDetails,
         ];
         if (dependencies.some(dependency => typeof dependency !== 'function')) {
@@ -23,6 +23,7 @@
             let unit = '';
             let factor = 1;
             let records = [];
+            let visualTable = null;
             const responseDataStatus = window.__dashbridgePanelToolsVisualMetadata?.responseDataStatus
                 || { kind: 'unknown', text: '' };
             const parseLegendCalculation = value => {
@@ -54,6 +55,7 @@
                 return result;
             };
             const legendMaximums = evaluation === 'period_max' ? legendMaxByName() : new Map();
+            const legendMaximumFor = name => legendMaximums.get(name);
             const reportLegendNames = expectedCount => {
                 const names = window.DashBridgeGrafanaDom?.legendSeriesNames?.(root, { unique: false });
                 // A complete legend is still only a fallback for series whose
@@ -85,7 +87,7 @@
                     name: reportSeriesName(item.label, legendNames[index], index),
                     visible: item.lines?.show !== false || item.points?.show !== false,
                     values: (item.data || []).map(point => Number(point?.[1])).filter(Number.isFinite),
-                    legendMaximum: legendMaximums.get(reportSeriesName(item.label, legendNames[index], index))
+                    legendMaximum: legendMaximumFor(reportSeriesName(item.label, legendNames[index], index))
                 }));
             } else {
                 const uplot = findUPlot(root);
@@ -101,23 +103,25 @@
                         name: reportSeriesName(item.label, legendNames[offset], offset),
                         visible: item.show !== false,
                         values: Array.from(uplot.data?.[offset + 1] || []).map(Number).filter(Number.isFinite),
-                        legendMaximum: legendMaximums.get(reportSeriesName(item.label, legendNames[offset], offset))
+                        legendMaximum: legendMaximumFor(reportSeriesName(item.label, legendNames[offset], offset))
                     }));
                 } else {
                     const responseTableRecords = Array.isArray(window.__dashbridgePanelToolsVisualMetadata?.responseTableRecords)
                         ? window.__dashbridgePanelToolsVisualMetadata.responseTableRecords : [];
-                    const tableRecords = responseTableRecords.length
+                    const table = collectGrafanaTableData(root);
+                    const tableRecords = table && responseTableRecords.length
                         ? responseTableRecords.map(item => ({
                             name: String(item?.name || ''), visible: true,
                             values: [Number(item?.value)].filter(Number.isFinite)
                         })).filter(item => item.name && item.values.length)
                         : collectGrafanaTableRecords(root);
                     if (!records.length && tableRecords.length) {
-                        engine = responseTableRecords.length ? 'table-response' : 'table-dom';
+                        engine = table && responseTableRecords.length ? 'table-response' : 'table-dom';
                         const details = unitFromPanelDefinition(getCachedPanelDefinition());
                         unit = details.unit || '';
                         factor = 1;
                         records = tableRecords;
+                        visualTable = table;
                     }
                 }
             }
@@ -149,11 +153,13 @@
                     const configuredRawValue = sla.rawValue !== null && sla.rawValue !== '' && Number.isFinite(Number(sla.rawValue))
                         ? Number(sla.rawValue) : null;
                     return {
-                        state: 'ok', source, evaluation, operator, engine,
+                        state: source === 'none' ? 'no_threshold' : 'ok', source, evaluation, operator, engine,
                         unit: String(sla.unit || unit || '').slice(0, 64),
-                        threshold: configuredValue ?? (configuredRawValue === null ? null : configuredRawValue / factor),
-                        criticalThreshold: configuredValue ?? (configuredRawValue === null ? null : configuredRawValue / factor),
-                        warningThreshold: sla.warningValue !== null && sla.warningValue !== '' && Number.isFinite(Number(sla.warningValue))
+                        threshold: source === 'none' ? null
+                            : configuredValue ?? (configuredRawValue === null ? null : configuredRawValue / factor),
+                        criticalThreshold: source === 'none' ? null
+                            : configuredValue ?? (configuredRawValue === null ? null : configuredRawValue / factor),
+                        warningThreshold: source !== 'none' && sla.warningValue !== null && sla.warningValue !== '' && Number.isFinite(Number(sla.warningValue))
                             ? Number(sla.warningValue) : null,
                         aggregateValue: null,
                         series: [],
@@ -206,7 +212,18 @@
                 if (evaluation === 'period_sum') return stats.sum;
                 return stats.max;
             };
-            const allSeries = records.map(record => {
+            // For period_max the visible Grafana legend is authoritative. A
+            // panel may keep helper series in the plot while hiding them from
+            // the legend, and uPlot can expose every helper under the generic
+            // label "Value". Build the evaluated series directly from named
+            // Max cells so hidden helpers cannot become report results.
+            const evaluationRecords = evaluation === 'period_max' && legendMaximums.size
+                ? Array.from(legendMaximums, ([name, value]) => ({
+                    name, visible: true, legendMaximum: value,
+                    stats: { count: 1, min: value, max: value, sum: value, latest: value }
+                }))
+                : records;
+            const allSeries = evaluationRecords.map(record => {
                 const rawValue = evaluateStats(record.stats);
                 const hasLegendMaximum = evaluation === 'period_max' && Number.isFinite(record.legendMaximum);
                 const value = hasLegendMaximum ? record.legendMaximum : (rawValue === null ? null : rawValue / factor);
@@ -251,7 +268,8 @@
                 averageValue: totalCount ? totalSum / totalCount / factor : null,
                 sumValue: totalSum / factor,
                 series,
-                omittedSeries
+                omittedSeries,
+                table: visualTable
             };
         };
     

@@ -8,14 +8,15 @@
 
     function create({ timeState, getActiveProfile, saveProfiles, getPanels, getPanelTools,
         legendSelection, panelBootstrap, getTransformSettings, postToDashboardFrame,
-        navigateDashboardFrame, refreshAllPanels, documentRef = document, windowRef = window,
+        navigateDashboardFrame, refreshAllPanels, runtimeScopeId, documentRef = document, windowRef = window,
         navigatorRef = navigator, setTimer = setTimeout }) {
         if (!timeState?.defaults || !timeState?.normalize || !timeState?.applyToUrl
+            || !timeState?.formatForInput || !timeState?.formatForLabel
             || typeof getActiveProfile !== 'function' || typeof saveProfiles !== 'function'
             || typeof getPanels !== 'function' || typeof getPanelTools !== 'function'
             || !panelBootstrap?.applyToUrl || typeof getTransformSettings !== 'function'
             || typeof postToDashboardFrame !== 'function' || typeof navigateDashboardFrame !== 'function'
-            || typeof refreshAllPanels !== 'function') {
+            || typeof refreshAllPanels !== 'function' || typeof runtimeScopeId !== 'string' || !runtimeScopeId) {
             throw new TypeError('DashBridge time controller dependencies are incomplete');
         }
 
@@ -42,18 +43,12 @@
             if (state.from.toString().startsWith('now-')) {
                 timeLabel.textContent = 'Last ' + state.from.replace('now-', '');
             } else {
-                let timezoneName = '';
-                try {
-                    const parts = new Intl.DateTimeFormat('en', { timeZoneName: 'short' }).formatToParts(new Date());
-                    timezoneName = parts.find(part => part.type === 'timeZoneName')?.value || '';
-                } catch (_) { }
-                const timezone = documentRef.createElement('span');
-                timezone.className = 'time-picker-timezone';
-                timezone.textContent = timezoneName;
-                timeLabel.replaceChildren(documentRef.createTextNode(
-                    `${timeState.formatForInput(state.from)} to ${timeState.formatForInput(state.to)} `
-                ), timezone);
+                timeLabel.textContent = timeState.formatForLabel(state.from, state.to);
             }
+            const timePickerButton = documentRef.getElementById('timePickerBtn');
+            if (timePickerButton) timePickerButton.title = state.from.toString().startsWith('now-')
+                ? `Выбрать время: ${timeLabel.textContent}`
+                : `Выбрать время: ${timeState.formatForInput(state.from)} — ${timeState.formatForInput(state.to)}`;
             const refreshLabel = documentRef.getElementById('refreshPickerLabel');
             if (refreshLabel) refreshLabel.textContent = state.refresh || 'Off';
         };
@@ -147,7 +142,12 @@
         };
 
         const getPanelForIframe = iframe => {
-            const id = iframe?.closest('.panel-card')?.dataset.panelId;
+            const card = iframe?.closest('.panel-card');
+            const id = card?.dataset.panelId;
+            const activeProfileId = String(getActiveProfile()?.id || '');
+            const frameProfileId = String(iframe?.dataset?.dashbridgeProfileId || card?.dataset?.profileId || '');
+            const frameScopeId = String(iframe?.dataset?.dashbridgeScopeId || card?.dataset?.dashbridgeScopeId || '');
+            if (frameScopeId !== runtimeScopeId || (activeProfileId && frameProfileId !== activeProfileId)) return null;
             return getPanels().find(panel => panel.id === id) || null;
         };
 
@@ -286,8 +286,11 @@
                     state = { ...state, refresh: event.target.dataset.refresh };
                     saveProfileState();
                     updateLabels();
-                    if (!state.refresh && previousRefresh) {
-                        // One navigation destroys a scheduler already created by Grafana.
+                    if (state.refresh !== previousRefresh) {
+                        // Grafana versions disagree on whether a d-solo router
+                        // recreates its scheduler after a history-only refresh
+                        // change. One navigation gives every iframe the same
+                        // document-start policy and scheduler lifecycle.
                         void refreshAllPanels();
                     } else {
                         broadcast();

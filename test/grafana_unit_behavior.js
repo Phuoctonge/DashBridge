@@ -47,6 +47,9 @@ assert.deepStrictEqual(plain(unit.unitFromPanelDefinition({ fieldConfig: { defau
 assert.deepStrictEqual(plain(unit.unitFromPanelDefinition({ fieldConfig: { defaults: { unit: 'percent' } } })), {
     unit: '%', factor: 1, source: 'panel', code: 'percent'
 });
+assert.deepStrictEqual(plain(unit.unitFromPanelDefinition({ fieldConfig: { defaults: { unit: 'percentunit' } } })), {
+    unit: '%', factor: 0.01, source: 'panel', code: 'percentunit'
+}, 'Grafana percentunit stores a 0..1 fraction but displays 0..100%');
 assert.deepStrictEqual(plain(unit.unitFromPanelDefinition({ fieldConfig: { defaults: { unit: 'Bps' } } })), {
     unit: 'B/s', factor: 1, source: 'panel', code: 'Bps'
 });
@@ -68,6 +71,20 @@ assert.deepStrictEqual(plain(unit.mergeAxisAndPanelUnit({ unit: '', factor: 1 },
 assert.deepStrictEqual(plain(unit.mergeAxisAndPanelUnit({ unit: 'MB', factor: Number.NaN }, {
     fieldConfig: { defaults: { unit: 'bytes' } }
 })), { unit: 'B', factor: 1, source: 'panel', code: 'bytes' });
+assert.deepStrictEqual(plain(unit.mergeAxisAndPanelUnit({ unit: 'mins', factor: 60_150.375 }, {
+    fieldConfig: { defaults: { unit: 'ms' } }
+})), { unit: 'mins', factor: 60_000, source: 'axis' },
+'configured raw duration unit must replace the factor inferred from a rounded axis label');
+assert.deepStrictEqual(plain(unit.mergeAxisAndPanelUnit({ unit: 'mins', factor: 60.15 }, {
+    fieldConfig: { defaults: { unit: 's' } }
+})), { unit: 'mins', factor: 60, source: 'axis' },
+'duration conversion must respect panels whose raw values are seconds');
+assert.deepStrictEqual(plain(unit.collectDataFrameUnitCodes({ results: {
+    A: { frames: [{ schema: { fields: [
+        { name: 'Time', type: 'time' },
+        { name: 'Latency', type: 'number', config: { unit: 'ms' } }
+    ] } }] }
+} })), ['ms'], 'DataFrame field metadata must expose its semantic unit without reading chart DOM');
 
 vm.runInContext(source, context);
 assert.strictEqual(context.DashBridgeGrafanaUnit, unit, 'repeated runtime installation must preserve the original API object');

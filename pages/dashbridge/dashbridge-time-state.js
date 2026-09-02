@@ -27,11 +27,33 @@ const DashBridgeTimeState = {
     },
     formatForInput(value) {
         if (!value || String(value).startsWith('now')) return value;
-        const milliseconds = Number.parseInt(value, 10);
-        if (!Number.isFinite(milliseconds) || milliseconds <= 100000000000) return value;
+        const milliseconds = parseGrafanaAbsoluteTime(value);
+        if (milliseconds === null) return value;
         const date = new Date(milliseconds);
         const pad = item => String(item).padStart(2, '0');
         return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+    },
+    formatForLabel(from, to) {
+        const parse = value => {
+            const match = String(this.formatForInput(value) || '').match(
+                /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::\d{2})?$/
+            );
+            return match ? {
+                year: match[1], month: match[2], day: match[3], hour: match[4], minute: match[5]
+            } : null;
+        };
+        const start = parse(from);
+        const end = parse(to);
+        if (!start || !end) return `${this.formatForInput(from)} to ${this.formatForInput(to)}`;
+        const startTime = `${start.hour}:${start.minute}`;
+        const endTime = `${end.hour}:${end.minute}`;
+        if (start.year === end.year && start.month === end.month && start.day === end.day) {
+            return `${start.day}.${start.month}.${start.year} ${startTime}–${endTime}`;
+        }
+        if (start.year === end.year) {
+            return `${start.day}.${start.month} ${startTime}–${end.day}.${end.month} ${endTime}`;
+        }
+        return `${start.day}.${start.month}.${start.year} ${startTime}–${end.day}.${end.month}.${end.year} ${endTime}`;
     },
     formatForUrl(urlValue, value) {
         const milliseconds = parseGrafanaAbsoluteTime(value);

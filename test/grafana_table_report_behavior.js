@@ -36,7 +36,10 @@ const root = {
     querySelectorAll: selector => selector === 'table, [role="table"], [role="grid"]' ? [table] : []
 };
 const records = tableReport.collectGrafanaTableRecords(root);
+const tableData = tableReport.collectGrafanaTableData(root);
 assert.strictEqual(records.length, 2, 'non-numeric table rows must not become report series');
+assert.deepStrictEqual(Array.from(tableData.columns), ['Metric', 'Value']);
+assert.strictEqual(tableData.rows[0][1], '1.25 K', 'table output must preserve the value displayed by Grafana');
 assert.strictEqual(records[0].name, 'DEV_service_/api/v1/data');
 assert.strictEqual(records[0].values[0], 1250, 'Grafana compact K values must be expanded before SLA comparison');
 assert.strictEqual(records[1].values[0], 949);
@@ -56,7 +59,7 @@ assert.strictEqual(tableReport.getResponseTableFrameShape({
 }), null, 'response tables without a numeric value column must fail open');
 vm.runInContext(tableSource, context);
 assert.strictEqual(context.DashBridgeGrafanaTableReport, tableReport, 'reinstallation must preserve the table report API');
-assert(source.includes("engine = responseTableRecords.length ? 'table-response' : 'table-dom'")
+assert(source.includes("engine = table && responseTableRecords.length ? 'table-response' : 'table-dom'")
     && source.includes('records = tableRecords;'),
     'report snapshots must use table rows when neither Flot nor uPlot exists');
 const collectorSource = source.slice(source.indexOf('const collectPanelReportSnapshot'));

@@ -36,7 +36,10 @@
             return `
                 <section class="report-panel-card report-overview-card" data-panel-id="${escapeHtml(panel.id)}" data-report-enabled="${config.enabled}">
                     <div class="report-panel-card-header">
-                        <div><h4>${escapeHtml(panel.title || 'Панель Grafana')}</h4><span class="report-panel-auto-status">${escapeHtml(config.enabled ? `${sourceLabel} · ${includeLabel}` : 'Не добавляется в сообщение')}</span></div>
+                        <div class="report-panel-card-main">
+                            <span class="report-panel-drag-handle" draggable="true" aria-hidden="true" title="Перетащите панель">⠿</span>
+                            <div><h4>${escapeHtml(panel.title || 'Панель Grafana')}</h4><span class="report-panel-auto-status">${escapeHtml(config.enabled ? `${sourceLabel} · ${includeLabel}` : 'Не добавляется в сообщение')}</span></div>
+                        </div>
                         <div class="report-panel-card-actions">
                             <label class="report-switch"><input class="report-enabled" type="checkbox" ${checked(config.enabled)}> Добавлять</label>
                             <button class="btn btn-outline report-open-panel-editor" type="button">Редактировать фразы</button>
@@ -192,8 +195,8 @@
                     sla: {
                         source: currentSource,
                         operator,
-                        value,
-                        warningValue: currentSource === 'cpu_capacity' ? null : warningValue,
+                        value: ['none', 'cpu_capacity'].includes(currentSource) ? null : value,
+                        warningValue: ['none', 'cpu_capacity'].includes(currentSource) ? null : warningValue,
                         unit: '',
                         evaluation: currentSource === 'cpu_capacity'
                             ? (panel.tools?.cpuCapacityFilterMode === 'last' ? 'latest' : 'period_max')
@@ -248,6 +251,8 @@
                         ['{{warningList}}', 'Построчный список рядов предупредительного уровня.'],
                         ['{{breachesList}}', 'Объединённый список критических и предупредительных рядов.'],
                         ['{{allSeriesList}}', 'Все видимые ряды панели с рассчитанными значениями.'],
+                        ['{{tableMarkdown}}', 'Видимая таблица Grafana в формате Markdown с исходным отображением значений.'],
+                        ['{{tableRowCount}} / {{tableColumnCount}}', 'Количество строк и колонок распознанной таблицы Grafana.'],
                         ['{{top3List}}', 'Три худших ряда с учётом направления SLA.'],
                         ['{{stateList}}', 'Список, соответствующий текущему состоянию панели.'],
                         ['{{stateQuote}}', 'Тот же список, где каждая строка начинается с > для цитатного блока.'],
@@ -275,6 +280,7 @@
             const profile = getActiveProfile();
             if (!profile) return;
             const profileConfig = reportEngine.normalizeProfile(profile.report);
+            const orderedPanels = reportEngine.orderPanels(getPanels(), profileConfig.panelOrder);
             const loadTestTemplate = '{{testName}}\nКонтур: {{environment}}\n\nПрошло {{stableLoadDuration}} удержания стабильной нагрузки, {{testDuration}} с начала теста.\n\n{{panels}}';
             const hasTestHeader = profileConfig.template.includes('{{testName}}')
                 || profileConfig.template.includes('{{testDuration}}')
@@ -303,8 +309,8 @@
                         <label class="report-field"><textarea class="report-profile-template">${escapeHtml(profileConfig.template)}</textarea></label>
                         </div>
                     </details>
-                    <div class="report-panel-list-heading"><h3>Панели сообщения</h3><p>Подключайте панели одной галочкой. Порог, единица измерения и данные серверов будут получены автоматически.</p></div>
-                    <div class="report-panel-list">${getPanels().map(panel => reportPanelCardMarkup(panel)).join('')}</div>
+                    <div class="report-panel-list-heading"><h3>Панели сообщения</h3><p>Перетаскивайте панели, чтобы изменить порядок фраз, и подключайте их одной галочкой. Расположение графиков не изменится.</p></div>
+                    <div class="report-panel-list">${orderedPanels.map(panel => reportPanelCardMarkup(panel)).join('')}</div>
                     ${reportVariableReferenceMarkup()}
                     <div class="modal-actions report-settings-actions"><button type="button" class="btn btn-outline report-cancel">Отмена</button><button type="button" class="btn btn-primary report-save">Сохранить</button></div>
                 </section>`;
@@ -324,6 +330,38 @@
                     template.value = reportEngine.DEFAULT_PROFILE_TEMPLATE;
                 }
             });
+            const panelList = overlay.querySelector('.report-panel-list');
+            let draggedCard = null;
+            const clearDragState = () => {
+                draggedCard?.classList.remove('is-dragging');
+                panelList.querySelectorAll('.report-panel-card').forEach(card => card.classList.remove('is-drag-target'));
+                draggedCard = null;
+            };
+            panelList.addEventListener('dragstart', event => {
+                const handle = event.target.closest?.('.report-panel-drag-handle');
+                const card = handle?.closest('.report-panel-card');
+                if (!card) return;
+                draggedCard = card;
+                card.classList.add('is-dragging');
+                if (event.dataTransfer) {
+                    event.dataTransfer.effectAllowed = 'move';
+                    event.dataTransfer.setData('text/plain', card.dataset.panelId);
+                }
+            });
+            panelList.addEventListener('dragover', event => {
+                if (!draggedCard) return;
+                const target = event.target.closest?.('.report-panel-card');
+                if (!target || target === draggedCard) return;
+                event.preventDefault();
+                panelList.querySelectorAll('.report-panel-card').forEach(card => card.classList.remove('is-drag-target'));
+                target.classList.add('is-drag-target');
+                const rect = target.getBoundingClientRect();
+                const after = event.clientY > rect.top + rect.height / 2;
+                panelList.insertBefore(draggedCard, after ? target.nextSibling : target);
+                if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+            });
+            panelList.addEventListener('drop', event => { event.preventDefault(); clearDragState(); });
+            panelList.addEventListener('dragend', clearDragState);
             overlay.querySelectorAll('.report-panel-card').forEach(card => {
                 const enabled = card.querySelector('.report-enabled');
                 enabled.addEventListener('change', () => {
@@ -359,7 +397,10 @@
                     }, panel);
                 });
                 profile.report = reportEngine.normalizeProfile({
+                    ...profile.report,
                     template: overlay.querySelector('.report-profile-template').value,
+                    panelOrder: [...overlay.querySelectorAll('.report-panel-card')]
+                        .map(card => card.dataset.panelId),
                     context: {
                         testName: overlay.querySelector('.report-test-name').value,
                         environment: overlay.querySelector('.report-environment').value,

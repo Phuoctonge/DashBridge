@@ -42,7 +42,6 @@ def read_file():
         + (ROOT / "pages/dashbridge/dashbridge-panel-card-controller.js").read_text(encoding="utf-8") \
         + (ROOT / "pages/dashbridge/dashbridge-panel-transfer-controller.js").read_text(encoding="utf-8") \
         + (ROOT / "pages/dashbridge/dashbridge-panel-addition-controller.js").read_text(encoding="utf-8") \
-        + (ROOT / "pages/dashbridge/dashbridge-panel-actions-controller.js").read_text(encoding="utf-8") \
         + (ROOT / "pages/dashbridge/dashbridge-page-ui-controller.js").read_text(encoding="utf-8")
 
 
@@ -57,7 +56,7 @@ panel_url_content = DASHBRIDGE_PANEL_URL_JS.read_text(encoding="utf-8")
 panel_transfer_content = DASHBRIDGE_PANEL_TRANSFER_JS.read_text(encoding="utf-8")
 panel_addition_content = (ROOT / "pages/dashbridge/dashbridge-panel-addition-controller.js").read_text(encoding="utf-8")
 panel_card_content = (ROOT / "pages/dashbridge/dashbridge-panel-card-controller.js").read_text(encoding="utf-8")
-panel_actions_content = (ROOT / "pages/dashbridge/dashbridge-panel-actions-controller.js").read_text(encoding="utf-8")
+panel_actions_content = panel_card_content
 dashbridge_html = DASHBRIDGE_HTML.read_text(encoding="utf-8")
 
 # ════════════════════════════════════════════════════════

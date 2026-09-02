@@ -29,7 +29,7 @@
     if (!tableReport) {
         throw new Error('DashBridgeGrafanaTableReport must load before DashBridgeGrafanaVisualEngine');
     }
-    const { collectGrafanaTableRecords } = tableReport;
+    const { collectGrafanaTableData, collectGrafanaTableRecords } = tableReport;
 
     // Collects diagnostics in E2E environments
     const debugLog = (...args) => {
@@ -78,6 +78,7 @@
         inferUnitFromAxisTicks,
         getCachedPanelDefinition,
         unitFromPanelDefinition,
+        collectGrafanaTableData,
         collectGrafanaTableRecords,
         findUPlot: findUPlotForThreshold,
         getUPlotYScaleKey,

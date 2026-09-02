@@ -12,7 +12,11 @@ const legacyValues = {
 const context = {
     URL, URLSearchParams, Date, Number, String,
     localStorage: { getItem: key => legacyValues[key] ?? null },
-    parseGrafanaAbsoluteTime: () => null,
+    parseGrafanaAbsoluteTime: value => {
+        const text = String(value || '');
+        const milliseconds = /^\d{13}$/.test(text) ? Number(text) : Date.parse(text);
+        return Number.isFinite(milliseconds) ? milliseconds : null;
+    },
     serializeGrafanaAbsoluteTime: value => String(value),
     detectGrafanaTimeFormat: () => 'milliseconds'
 };
@@ -36,6 +40,12 @@ assert.deepStrictEqual(JSON.parse(JSON.stringify(state.normalize({ from: '' })))
 assert.deepStrictEqual(JSON.parse(JSON.stringify(state.normalize({
     from: 'now-2h', to: 'now', refresh: '1ms'
 }))), { from: 'now-2h', to: 'now', refresh: '' });
+assert.strictEqual(state.formatForLabel('2026-08-27 10:40:48', '2026-08-27 12:40:58'),
+    '27.08.2026 10:40–12:40', 'same-day header labels must omit seconds and timezone');
+assert.strictEqual(state.formatForLabel('2026-08-27 22:00:48', '2026-08-28 01:15:58'),
+    '27.08 22:00–28.08 01:15', 'cross-day labels in one year must stay compact');
+assert.strictEqual(state.formatForLabel('2026-12-31 23:59:59', '2027-01-01 00:01:01'),
+    '31.12.2026 23:59–01.01.2027 00:01', 'cross-year labels must keep both years');
 const offUrl = new URL(state.applyToUrl('https://grafana.example/d-solo/x?refresh=5s', {
         from: 'now-1h', to: 'now', refresh: 'unexpected'
     }));

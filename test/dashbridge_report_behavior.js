@@ -11,6 +11,10 @@ vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js/shared/dashbridge
 const report = context.DashBridgeReport;
 
 const graphPanel = { id: 'p1', title: 'CPU', tools: { thresholdEnabled: true }, report: { enabled: true } };
+assert.deepStrictEqual(Array.from(report.orderPanels(
+    [{ id: 'cpu' }, { id: 'ram' }, { id: 'disk' }], ['ram', 'cpu']
+), panel => panel.id), ['ram', 'cpu', 'disk'],
+'saved report order takes priority and appends newly added panels in dashboard order');
 assert.strictEqual(report.normalizePanel(graphPanel.report, graphPanel).sla.source, 'graph');
 assert.strictEqual(report.normalizePanel({ enabled: true, includeMode: 'breach_only', sla: { source: 'none' } }, graphPanel).includeMode, 'always');
 
@@ -46,6 +50,23 @@ assert(customCapacity.text.includes('vm-01 Load 1m|4|4|vm-01 Load 1m (4 vCPU)|12
 assert.strictEqual(customCapacity.variables.threshold, 'vCPU × 0,8',
     'dynamic Load Average reports expose a readable threshold expression to existing templates');
 assert.strictEqual(customCapacity.variables.cpuCapacityCoefficient, '0,8');
+
+const tablePanel = { id: 'table', title: 'Количество неуспешных All', report: {
+    enabled: true, sla: { source: 'none' }, templates: { neutral: '{{tableMarkdown}}' }
+} };
+const tableRendered = report.renderPanel(tablePanel, {
+    state: 'no_threshold', source: 'none', series: [],
+    table: {
+        columns: ['Metric', 'Value'],
+        rows: [['DEV | API', '1.16 K'], ['PROD API', '530.00']],
+        numericColumns: [false, true], totalRows: 2, truncated: false
+    }
+});
+assert(tableRendered.text.includes('| Metric | Value |')
+    && tableRendered.text.includes('| DEV \\| API | 1.16 K |')
+    && tableRendered.variables.tableRowCount === 2
+    && tableRendered.variables.tableColumnCount === 2,
+'table templates must preserve Grafana display values and escape Markdown delimiters');
 
 const onlyBreach = { ...graphPanel, report: { enabled: true, includeMode: 'breach_only', sla: { source: 'graph' } } };
 assert.strictEqual(report.renderPanel(onlyBreach, { state: 'ok', series: [] }).included, false);

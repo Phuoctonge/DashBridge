@@ -42,6 +42,10 @@ const rendered = report.renderPanel(panel, {
     sumValue: 304,
     cpuCapacityCoefficient: 0.8,
     dataStatusText: 'Данные получены',
+    table: {
+        columns: ['Metric', 'Value'], rows: [['srv-critical', '96.00%']],
+        numericColumns: [false, true], totalRows: 1, truncated: false
+    },
     series: [
         { name: 'srv-critical', value: 96, level: 'critical', cpuCapacity: 8, threshold: 6.4 },
         { name: 'srv-warning', value: 75, level: 'warning', cpuCapacity: 4, threshold: 3.2 },

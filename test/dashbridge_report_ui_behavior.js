@@ -66,6 +66,47 @@ function createDocument() {
             control('.report-test-started', { value: '2026-08-31T10:00' });
             control('.report-stable-started', { value: '2026-08-31T11:00' });
 
+            const panelList = control('.report-panel-list', {
+                children: [],
+                querySelectorAll(selector) { return selector === '.report-panel-card' ? this.children : []; },
+                insertBefore(card, reference) {
+                    this.children = this.children.filter(item => item !== card);
+                    const index = reference ? this.children.indexOf(reference) : -1;
+                    if (index < 0) this.children.push(card); else this.children.splice(index, 0, card);
+                },
+            });
+            const makeReportCard = id => {
+                const enabled = createControl({ checked: true });
+                const status = createControl();
+                const editor = createControl();
+                const handle = createControl();
+                const card = createControl({
+                    dataset: { panelId: id },
+                    classList: { add() {}, remove() {} },
+                    getBoundingClientRect: () => ({ top: 0, height: 100 }),
+                    querySelector(selector) {
+                        if (selector === '.report-enabled') return enabled;
+                        if (selector === '.report-panel-auto-status') return status;
+                        if (selector === '.report-open-panel-editor') return editor;
+                        if (selector === '.report-panel-drag-handle') return handle;
+                        return createControl();
+                    },
+                    closest: selector => selector === '.report-panel-card' ? card : null,
+                });
+                handle.closest = selector => selector === '.report-panel-drag-handle' ? handle
+                    : selector === '.report-panel-card' ? card : null;
+                Object.defineProperties(card, {
+                    previousElementSibling: { get: () => {
+                        const index = panelList.children.indexOf(card); return panelList.children[index - 1] || null;
+                    } },
+                    nextElementSibling: { get: () => {
+                        const index = panelList.children.indexOf(card); return panelList.children[index + 1] || null;
+                    } },
+                    nextSibling: { get: () => card.nextElementSibling },
+                });
+                return card;
+            };
+
             const warningFields = [createControl(), createControl()];
             const textareas = [controls.get('textarea')];
             const overlay = createControl({
@@ -80,10 +121,21 @@ function createDocument() {
                 querySelectorAll(selector) {
                     if (selector === '.report-editor-warning-fields') return warningFields;
                     if (selector === 'textarea') return textareas;
-                    if (selector === '[data-emoji]' || selector === '.report-panel-card') return [];
+                    if (selector === '.report-panel-card') return panelList.children;
+                    if (selector === '[data-emoji]') return [];
                     return [];
                 },
                 remove() { this.removed = true; },
+            });
+            let markup = '';
+            delete overlay.innerHTML;
+            Object.defineProperty(overlay, 'innerHTML', {
+                get: () => markup,
+                set(value) {
+                    markup = value;
+                    panelList.children = [...value.matchAll(/report-overview-card" data-panel-id="([^"]+)"/g)]
+                        .map(match => makeReportCard(match[1]));
+                },
             });
             return overlay;
         },
@@ -108,10 +160,16 @@ function createDocument() {
         tools: { thresholdEnabled: true, thresholdValue: 80, thresholdUnit: '%' },
         report: { enabled: true, sla: { source: 'custom', operator: 'gt', value: 80 } },
     };
-    const profile = { name: 'Prod <unsafe>', report: { template: '{{panels}}' } };
+    const secondPanel = {
+        id: 'panel-2', title: 'RAM', tools: {},
+        report: { enabled: true, sla: { source: 'none' } },
+    };
+    const profile = { name: 'Prod <unsafe>', report: {
+        template: '{{panels}}', panelOrder: ['panel-2', 'panel-1']
+    } };
     let saveCalls = 0;
     const controller = context.DashBridgeReportUi.create({
-        getPanels: () => [panel],
+        getPanels: () => [panel, secondPanel],
         getActiveProfile: () => profile,
         savePanels: async () => { saveCalls += 1; },
         normalizePanelMetadataText: (value, maxLength) => String(value || '').slice(0, maxLength),
@@ -142,9 +200,30 @@ function createDocument() {
     const settingsOverlay = document.overlays.at(-1);
     assert(settingsOverlay.innerHTML.includes('Prod &lt;unsafe&gt;'));
     assert(settingsOverlay.innerHTML.includes('Справочник переменных шаблона'));
+    assert(settingsOverlay.innerHTML.includes('report-panel-drag-handle'),
+        'every message panel must expose a dedicated drag handle');
+    assert(settingsOverlay.innerHTML.indexOf('RAM') < settingsOverlay.innerHTML.indexOf('CPU &lt;production&gt;'),
+        'the settings list must open in the saved message order');
     settingsOverlay.controls.get('.report-cancel').listeners.click();
     assert.strictEqual(settingsOverlay.removed, true, 'cancel must close without persisting');
     assert.strictEqual(saveCalls, 1);
+
+    controller.openReportSettings();
+    const reorderOverlay = document.overlays.at(-1);
+    const panelList = reorderOverlay.controls.get('.report-panel-list');
+    const [ramCard, cpuCard] = panelList.children;
+    panelList.listeners.dragstart({
+        target: ramCard.querySelector('.report-panel-drag-handle'),
+        dataTransfer: { setData() {}, effectAllowed: '' },
+    });
+    panelList.listeners.dragover({
+        target: cpuCard, clientY: 90, preventDefault() {}, dataTransfer: { dropEffect: '' },
+    });
+    panelList.listeners.drop({ preventDefault() {} });
+    await reorderOverlay.controls.get('.report-save').listeners.click();
+    assert.deepStrictEqual(Array.from(profile.report.panelOrder), ['panel-1', 'panel-2'],
+        'dragging cards must persist only the message order');
+    assert.strictEqual(saveCalls, 2);
 
     console.log('PASS DashBridge report UI validates SLA settings and owns modal cleanup');
 })().catch(error => {

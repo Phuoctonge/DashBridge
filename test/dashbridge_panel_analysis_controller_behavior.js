@@ -8,7 +8,6 @@ const vm = require('vm');
 const root = path.join(__dirname, '..');
 const pageSource = [
     'dashbridge.js',
-    'dashbridge-panel-actions-controller.js',
     'dashbridge-panel-card-controller.js',
     'dashbridge-page-ui-controller.js',
     'dashbridge-iframe-message-controller.js',
