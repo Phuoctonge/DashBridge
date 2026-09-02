@@ -395,11 +395,13 @@ function Invoke-SelfTest {
         $source = Join-Path $testRoot 'source'
         $target = Join-Path $testRoot 'target'
         foreach ($directory in @($source, $target)) {
-            New-Item -ItemType Directory -Path (Join-Path $directory 'js') -Force | Out-Null
-            New-Item -ItemType Directory -Path (Join-Path $directory 'html') -Force | Out-Null
+            $jsDirectory = Join-Path $directory 'js'
+            $popupDirectory = Join-Path (Join-Path $directory 'pages') 'popup'
+            New-Item -ItemType Directory -Path $jsDirectory -Force | Out-Null
+            New-Item -ItemType Directory -Path $popupDirectory -Force | Out-Null
             '{"name":"DashBridge","version":"1.0.0"}' | Set-Content -LiteralPath (Join-Path $directory 'manifest.json')
-            '' | Set-Content -LiteralPath (Join-Path $directory 'pages\popup\popup.html')
-            '' | Set-Content -LiteralPath (Join-Path $directory 'js\background.js')
+            '' | Set-Content -LiteralPath (Join-Path $popupDirectory 'popup.html')
+            '' | Set-Content -LiteralPath (Join-Path $jsDirectory 'background.js')
         }
         $userData = Join-Path $testRoot 'User Data'
         $profile = Join-Path $userData 'Default'
