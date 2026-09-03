@@ -40,6 +40,7 @@
                     style.id = "scroll-fix-style";
                     style.textContent = "body#tinymce { overflow-anchor: none !important; scroll-behavior: auto !important; height: auto !important; }";
                     doc.head.appendChild(style);
+                    window.postMessage({ type: 'CONFLUENCE_FIX_APPLIED' }, window.location.origin);
                 }
             } else if (style) {
                 style.remove();

@@ -6,7 +6,7 @@
 //     chrome.windows.create({ url: "pages/popup/popup.html", type: "popup", width: 300, height: 400 });
 // });
 
-importScripts('../vendor/jszip.min.js', 'shared/grafana-settings.js', 'shared/url-validation.js', 'shared/dnr-rules.js', 'shared/grafana-runtime-manifest.js', 'shared/local-state-schema.js', 'shared/grafana-panel-identity.js', 'background-grafana-infrastructure.js', 'background-profile-storage.js', 'background-gui-capture.js', 'background-update-indicator.js');
+importScripts('../vendor/jszip.min.js', 'shared/grafana-settings.js', 'shared/url-validation.js', 'shared/dnr-rules.js', 'shared/grafana-runtime-manifest.js', 'shared/local-state-schema.js', 'shared/grafana-panel-identity.js', 'shared/analytics-contract.js', 'shared/analytics-config.js', 'background-grafana-infrastructure.js', 'background-profile-storage.js', 'background-gui-capture.js', 'background-update-indicator.js', 'background-analytics.js');
 
 const GRAFANA_TAB_VISUAL_STATE_PREFIX = 'grafanaVisualState:';
 
@@ -18,11 +18,44 @@ function isTrustedExtensionPage(sender, page) {
     } catch (_) { return false; }
 }
 
+async function isTrustedConfluenceSender(sender) {
+    if (sender?.id !== chrome.runtime.id || !sender.tab?.id || typeof sender.url !== 'string') return false;
+    let hostname = '';
+    try { hostname = new URL(sender.url).hostname.toLowerCase(); } catch { return false; }
+    const stored = await chrome.storage.sync.get(['confluenceScrollFixEnabled', 'wikiDomains']);
+    if (stored.confluenceScrollFixEnabled !== true) return false;
+    const domains = String(stored.wikiDomains || 'itpm-wiki.mos.ru\nwiki.mos-team.ru\nwiki.lanit.ru')
+        .split('\n').map(value => value.trim().toLowerCase()).filter(Boolean);
+    return domains.some(domain => hostname === domain || hostname.endsWith(`.${domain}`));
+}
+
 const grafanaInfrastructure = DashBridgeBackgroundGrafanaInfrastructure.create();
 const profileStorage = DashBridgeBackgroundProfileStorage.create({
     grafanaInfrastructure, isTrustedExtensionPage,
 });
 const updateIndicator = DashBridgeBackgroundUpdateIndicator.create();
+// Analytics must never make an otherwise valid extension action fail. Some
+// isolated harnesses intentionally load this owner without optional workers.
+const analytics = globalThis.DashBridgeBackgroundAnalytics?.create?.() || {
+    recordLifecycle: async () => ({ ok: false, error: 'analytics-unavailable' }),
+    track: async () => ({ ok: false, error: 'analytics-unavailable' }),
+    send: async () => ({ sent: 0, reason: 'analytics-unavailable' }),
+};
+const ANALYTICS_ALARM = 'dashbridge-analytics-hourly-send';
+const ensureAnalyticsAlarm = async () => {
+    if (!chrome.alarms?.create || !chrome.alarms?.get) return;
+    if (await chrome.alarms.get(ANALYTICS_ALARM)) return;
+    // Jitter spreads a small-company rollout across the hour. Chrome keeps
+    // the periodic alarm without a permanent timer or page process.
+    chrome.alarms.create(ANALYTICS_ALARM, {
+        delayInMinutes: 5 + Math.random() * 50,
+        periodInMinutes: 60,
+    });
+};
+void ensureAnalyticsAlarm().catch(() => undefined);
+chrome.alarms?.onAlarm?.addListener(alarm => {
+    if (alarm?.name === ANALYTICS_ALARM) void analytics.send().catch(() => undefined);
+});
 void updateIndicator.restore().catch(error => console.warn('Failed to restore update indicator:', error));
 
 // Recorder owns the normal detach path. This port is the crash/close fallback:
@@ -51,13 +84,18 @@ chrome.tabs.onRemoved.addListener(tabId => {
         .catch(error => console.warn('Failed to remove Grafana iframe tab rules:', error));
 });
 
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener(details => {
+    void ensureAnalyticsAlarm().catch(() => undefined);
+    if (details?.reason === 'install' || details?.reason === 'update') {
+        void analytics.recordLifecycle(details.reason, details.previousVersion).catch(() => undefined);
+    }
     void updateIndicator.restore().catch(error => console.warn('Failed to restore update indicator:', error));
     grafanaInfrastructure.sync({ backfillOpenFrames: true })
         .catch(error => console.error('Не удалось подготовить инфраструктуру Grafana:', error));
 });
 
 chrome.runtime.onStartup.addListener(() => {
+    void ensureAnalyticsAlarm().catch(() => undefined);
     void updateIndicator.restore().catch(error => console.warn('Failed to restore update indicator:', error));
     grafanaInfrastructure.sync({ backfillOpenFrames: true })
         .catch(error => console.error('Не удалось подготовить инфраструктуру Grafana:', error));
@@ -79,11 +117,41 @@ const guiCaptureController = DashBridgeBackgroundGuiCapture.create({ zipConstruc
 // Do not replace the branch-specific checks with a single "extension sender" test:
 // content scripts and extension pages intentionally have different authority.
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type === 'dashbridge-analytics-track') {
+        const trustedExtensionPage = _sender?.id === chrome.runtime.id
+            && typeof _sender.url === 'string' && _sender.url.startsWith(chrome.runtime.getURL(''));
+        const surface = message.event?.dimensions?.surface;
+        const confluenceEvidence = message.event?.featureId === 'confluence.fix_activated'
+            && message.event?.signal === 'effective';
+        if (trustedExtensionPage) {
+            analytics.track(message.event).then(sendResponse);
+            return true;
+        }
+        if (surface === 'direct_grafana' || confluenceEvidence) {
+            const trust = surface === 'direct_grafana'
+                ? grafanaInfrastructure.isTrustedContentSender(_sender) : isTrustedConfluenceSender(_sender);
+            trust.then(trusted => trusted
+                ? analytics.track(message.event) : { ok: false, error: 'unexpected-sender' }).then(sendResponse);
+            return true;
+        }
+        sendResponse({ ok: false, error: 'unexpected-sender' });
+        return undefined;
+    }
     if (message?.type === 'dashbridge-capture-visible-tab') {
         (async () => {
             if (!await grafanaInfrastructure.isTrustedContentSender(_sender) || !_sender.tab?.windowId) {
                 throw new Error('Недоверенный запрос снимка Grafana.');
             }
+            // An open Grafana document can keep an older isolated content-script
+            // generation after an extension update while MAIN has already been
+            // backfilled. Restore the idempotent image dependency in the exact
+            // requesting document before the bridge resumes and calls crop().
+            const target = typeof _sender.documentId === 'string'
+                ? { tabId: _sender.tab.id, documentIds: [_sender.documentId] }
+                : { tabId: _sender.tab.id, frameIds: [_sender.frameId] };
+            await chrome.scripting.executeScript({
+                target, world: 'ISOLATED', files: ['js/shared/grafana-capture-output.js']
+            });
             return guiCaptureController.captureVisiblePanel(_sender);
         })().then(dataUrl => sendResponse({ ok: !!dataUrl, dataUrl: dataUrl || null }))
             .catch(error => sendResponse({ ok: false, error: error?.message || String(error) }));

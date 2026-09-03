@@ -109,6 +109,7 @@
                     const responseTableRecords = Array.isArray(window.__dashbridgePanelToolsVisualMetadata?.responseTableRecords)
                         ? window.__dashbridgePanelToolsVisualMetadata.responseTableRecords : [];
                     const table = collectGrafanaTableData(root);
+                    visualTable = table;
                     const tableRecords = table && responseTableRecords.length
                         ? responseTableRecords.map(item => ({
                             name: String(item?.name || ''), visible: true,
@@ -121,7 +122,6 @@
                         unit = details.unit || '';
                         factor = 1;
                         records = tableRecords;
-                        visualTable = table;
                     }
                 }
             }
@@ -144,6 +144,15 @@
             };
             records = records.map(record => ({ ...record, stats: record.stats || summarizeValues(record.values) }))
                 .filter(record => record.visible && record.stats?.count > 0);
+            if (!records.length && visualTable?.rows?.length && source === 'none') {
+                return {
+                    state: 'no_threshold', source, evaluation, operator, engine: 'table-dom', unit: '',
+                    threshold: null, criticalThreshold: null, warningThreshold: null,
+                    aggregateValue: null, maxValue: null, minValue: null, lastValue: null,
+                    averageValue: null, sumValue: null, series: [], omittedSeries: 0,
+                    table: visualTable, dataStatus: 'data', dataStatusText: 'Данные таблицы получены'
+                };
+            }
             if (!records.length) {
                 const visualMetadata = window.__dashbridgePanelToolsVisualMetadata;
                 const dataStatus = visualMetadata?.responseDataStatus || { kind: 'unknown', text: '' };

@@ -28,7 +28,10 @@
             const syncWidth = () => { const enabled = thick?.checked === true; width.hidden = !enabled; widthInput.disabled = !enabled; widthInput.setAttribute('aria-hidden', String(!enabled)); };
             thick?.addEventListener('change', syncWidth); syncWidth();
             const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'btn batch-panel-rule-remove'; remove.textContent = 'Удалить';
-            remove.addEventListener('click', () => { row.remove(); scheduleSave(); }); row.append(idBox, options, remove);
+            remove.addEventListener('click', () => {
+                row.remove(); scheduleSave();
+                root.DashBridgeAnalytics?.opened('batch.panel_rule_removed');
+            }); row.append(idBox, options, remove);
             row.querySelectorAll('input').forEach(input => { input.addEventListener('input', scheduleSave); input.addEventListener('change', scheduleSave); });
             container.append(row);
         };

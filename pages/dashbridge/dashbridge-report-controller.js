@@ -113,6 +113,11 @@
             warnings.hidden = !problems.length;
             output.value = collected.output;
             status.textContent = `Готово. Обработано панелей: ${reportPanels.length}; предупреждений: ${problems.length}.`;
+            globalThis.DashBridgeAnalytics?.outcome('dashbridge.report_generated',
+                problems.length ? 'partial' : 'success', {
+                    countBucket: globalThis.DashBridgeAnalytics.bucket(reportPanels.length)
+                });
+            return collected;
         };
 
         const openPreview = () => {
@@ -147,6 +152,8 @@
                 warnings.textContent = '';
                 try { await generate(output, status, warnings, controller.signal); }
                 catch (error) {
+                    globalThis.DashBridgeAnalytics?.outcome('dashbridge.report_generated',
+                        error?.name === 'AbortError' ? 'cancelled' : 'error');
                     if (error?.name !== 'AbortError' && status.isConnected) status.textContent = error.message || String(error);
                 }
                 finally {
@@ -170,8 +177,14 @@
             overlay.addEventListener('click', event => { if (event.target === overlay) close(); });
             regenerate.addEventListener('click', run);
             overlay.querySelector('.report-copy').addEventListener('click', async event => {
-                try { await navigatorRef.clipboard.writeText(output.value); event.currentTarget.textContent = 'Скопировано'; }
-                catch { event.currentTarget.textContent = 'Ошибка копирования'; }
+                try {
+                    await navigatorRef.clipboard.writeText(output.value); event.currentTarget.textContent = 'Скопировано';
+                    globalThis.DashBridgeAnalytics?.outcome('dashbridge.report_copied', 'success');
+                }
+                catch {
+                    event.currentTarget.textContent = 'Ошибка копирования';
+                    globalThis.DashBridgeAnalytics?.outcome('dashbridge.report_copied', 'error');
+                }
                 setTimer(() => { if (event.currentTarget.isConnected) event.currentTarget.textContent = 'Скопировать'; }, 1800);
             });
             void run();

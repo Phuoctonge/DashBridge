@@ -52,6 +52,29 @@ assert.strictEqual(responseSnapshot.engine, 'table-response');
 assert.strictEqual(responseSnapshot.series[0].value, 1159,
     'raw response values must be preferred when a visible Grafana table confirms the visualization type');
 
+context.window.__dashbridgePanelToolsVisualMetadata = { responseTableRecords: [] };
+const wideTableReport = factory.create({
+    mergeAxisAndPanelUnit: value => value,
+    inferUnitFromAxisTicks: () => ({ unit: '', factor: 1 }),
+    getCachedPanelDefinition: () => null,
+    unitFromPanelDefinition: () => ({ unit: '', factor: 1 }),
+    collectGrafanaTableData: () => ({
+        columns: ['transaction', 'Total', 'OK', 'KO'],
+        rows: [['request-a', '100', '98', '2']], numericColumns: [false, true, true, true],
+        totalRows: 1, truncated: false, source: 'dom'
+    }),
+    collectGrafanaTableRecords: () => [],
+    findUPlot: () => null,
+    getUPlotYScaleKey: () => 'y',
+    getUPlotUnitDetails: () => ({ unit: '', factor: 1 }),
+});
+const wideTableSnapshot = wideTableReport.collectPanelReportSnapshot({ root: {}, sla: { source: 'none' } });
+assert.strictEqual(wideTableSnapshot.state, 'no_threshold');
+assert.strictEqual(wideTableSnapshot.engine, 'table-dom');
+assert.strictEqual(wideTableSnapshot.table.columns[0], 'transaction');
+assert.strictEqual(wideTableSnapshot.series.length, 0,
+    'a wide informational table must finish without guessing which numeric column is the SLA value');
+
 const legendRow = { querySelector: () => ({ textContent: '12.4%' }) };
 context.window.DashBridgeGrafanaDom = {
     legendItems: () => [legendRow],

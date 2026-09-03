@@ -311,7 +311,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         })
         .catch(error => console.warn('Could not prepare Grafana iframe rules:', error));
     try {
-        await DashBridgeDataMigration.run();
+        const migration = await DashBridgeDataMigration.run();
+        if (migration?.migrated) {
+            globalThis.DashBridgeAnalytics?.track('extension.data_migration', 'lifecycle', {});
+        }
     } catch (error) {
         // Keep the dashboard available. The schema marker is written last, so
         // the migration is retried without data loss on the next page load.
@@ -502,6 +505,7 @@ DashBridgeIframeMessageController.create({
     savePanels,
     syncPanelAnalysisAction: dashBridgePanelAnalysisController.syncAction,
     acceptTitleResponse: dashBridgePanelToolsController.acceptTitleResponse,
+    acceptPanelToolsApplied: dashBridgePanelToolsController.acceptApplied,
     getCrosshairMode: () => crosshairMode,
     getCrosshairThickness: () => crosshairThickness,
     sendTimeUpdate: dashBridgeTimeController.sendTimeUpdate,

@@ -150,10 +150,17 @@ globalThis.BatchPanelPicker = (() => {
                 panelsMode.dispatchEvent(new Event('change'));
                 document.getElementById('userPanels').value = selectedIds.join(', ');
                 BatchPageState.save();
+                globalThis.DashBridgeAnalytics?.track('batch.panel_selection_applied', 'used', {
+                    workflow: 'main', selectionMode: 'whitelist',
+                    countBucket: globalThis.DashBridgeAnalytics.bucket(selectedIds.length)
+                });
             } else {
                 seriesSelectedPanelIds = selectedIds;
                 document.getElementById('seriesPanelSelectionStatus').textContent = `Выбрано панелей: ${selectedIds.length}`;
                 document.getElementById('loadSelectedSeriesBtn').hidden = false;
+                globalThis.DashBridgeAnalytics?.track('batch.series_selection_changed', 'changed', {
+                    workflow: 'series', countBucket: globalThis.DashBridgeAnalytics.bucket(selectedIds.length)
+                });
             }
             close();
         };

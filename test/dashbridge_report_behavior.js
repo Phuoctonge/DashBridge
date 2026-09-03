@@ -68,6 +68,31 @@ assert(tableRendered.text.includes('| Metric | Value |')
     && tableRendered.variables.tableColumnCount === 2,
 'table templates must preserve Grafana display values and escape Markdown delimiters');
 
+const messageOnlyPanel = { id: 'http', title: 'HTTP', report: {
+    enabled: true, detailsEnabled: true, sla: { source: 'graph' },
+    templates: { breached: '{{criticalList}}', listItem: '{{rawName}} — {{value}}{{unit}}' }
+} };
+const rawMessageSnapshot = {
+    state: 'critical', unit: 's', series: [
+        { name: 'PROD_<_/get', value: 29.7, level: 'critical' },
+        { name: 'PROD_>_/post', value: 10.8, level: 'critical' },
+        { name: 'PROD_*_/delete', value: 1, level: 'critical' },
+        { name: 'PROD_^_/put', value: 2, level: 'critical' }
+    ]
+};
+const messageOnly = report.renderPanel(messageOnlyPanel, rawMessageSnapshot);
+assert(messageOnly.text.includes('PROD_GET_/get — 29,7с')
+    && messageOnly.text.includes('PROD_POST_/post — 10,8с')
+    && messageOnly.text.includes('PROD_DELETE_/delete — 1с')
+    && messageOnly.text.includes('PROD_PUT_/put — 2с'),
+'HTTP markers and duration units are normalized at the generated-message boundary');
+assert.strictEqual(rawMessageSnapshot.series[0].name, 'PROD_<_/get',
+    'message normalization must not mutate captured Grafana data');
+assert.strictEqual(report.localizeMessageText('29,7s; 10,8mins; 915ms; x < y; a > b'),
+    '29,7с; 10,8мин; 915мс; x < y; a > b');
+assert(report.formatMarkdownTable({ columns: ['Name', 'Max'], rows: [['<_/housing', '1.40 mins']] })
+    .includes('| GET_/housing | 1.40 мин |'), 'tableMarkdown uses the same message-only normalization');
+
 const onlyBreach = { ...graphPanel, report: { enabled: true, includeMode: 'breach_only', sla: { source: 'graph' } } };
 assert.strictEqual(report.renderPanel(onlyBreach, { state: 'ok', series: [] }).included, false);
 

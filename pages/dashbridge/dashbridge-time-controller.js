@@ -243,7 +243,11 @@
                     const original = button.innerHTML;
                     button.innerHTML = '✅';
                     setTimer(() => { button.innerHTML = original; }, 1000);
-                } catch (error) { console.error('Failed to copy', error); }
+                    root.DashBridgeAnalytics?.outcome('dashbridge.time_range_copied', 'success');
+                } catch (error) {
+                    root.DashBridgeAnalytics?.outcome('dashbridge.time_range_copied', 'error');
+                    console.error('Failed to copy', error);
+                }
             });
             documentRef.getElementById('pasteTimeBtn').addEventListener('click', async () => {
                 try {
@@ -254,7 +258,11 @@
                     const original = button.innerHTML;
                     button.innerHTML = '✅';
                     setTimer(() => { button.innerHTML = original; }, 1000);
-                } catch (error) { console.error('Failed to paste', error); }
+                    root.DashBridgeAnalytics?.outcome('dashbridge.time_range_pasted', 'success');
+                } catch (error) {
+                    root.DashBridgeAnalytics?.outcome('dashbridge.time_range_pasted', 'invalid_input');
+                    console.error('Failed to paste', error);
+                }
             });
             documentRef.getElementById('applyAbsoluteTime').addEventListener('click', () => {
                 const fromValue = documentRef.getElementById('absTimeFrom').value.trim();
@@ -278,6 +286,9 @@
                 } else {
                     broadcast();
                 }
+                root.DashBridgeAnalytics?.track('dashbridge.time_absolute_range_applied', 'used', {
+                    mode: requiresNavigation ? 'standalone' : 'period'
+                });
             });
             documentRef.querySelectorAll('#refreshPopover .dropdown-item').forEach(button => {
                 if (!button.hasAttribute('data-refresh')) return;
@@ -296,6 +307,7 @@
                         broadcast();
                     }
                     refreshPopover.style.display = 'none';
+                    root.DashBridgeAnalytics?.track('dashbridge.refresh_interval_changed', 'changed', {});
                 });
             });
             documentRef.getElementById('forceRefreshBtn').addEventListener('click', async () => {

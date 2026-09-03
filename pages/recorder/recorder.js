@@ -1,3 +1,4 @@
+/* global DashBridgeAnalytics */
 (function () {
     'use strict';
 
@@ -381,8 +382,10 @@
                 if (!copied) throw new Error('Копирование не поддерживается');
             }
             setStatus('URL запроса скопирован.');
+            DashBridgeAnalytics?.outcome('recorder.request_url_copied', 'success');
         } catch (error) {
             setStatus(`Не удалось скопировать URL: ${error?.message || error}`, true);
+            DashBridgeAnalytics?.outcome('recorder.request_url_copied', 'error');
         }
     }
 
@@ -437,17 +440,23 @@
         if (!ui.file.disabled) ui.file.click();
     });
     ui.filter.addEventListener('input', renderTraffic);
-    ui.trafficMethodFilter.addEventListener('change', renderTraffic);
-    ui.trafficStatusFilter.addEventListener('change', renderTraffic);
-    ui.trafficTypeFilter.addEventListener('change', renderTraffic);
+    ui.filter.addEventListener('change', () => DashBridgeAnalytics?.opened('recorder.traffic_filter_used'));
+    [ui.trafficMethodFilter, ui.trafficStatusFilter, ui.trafficTypeFilter].forEach(control =>
+        control.addEventListener('change', () => {
+            renderTraffic(); DashBridgeAnalytics?.opened('recorder.traffic_filter_used');
+        }));
     ui.clearTrafficFilters.addEventListener('click', clearTrafficFilters);
     ui.showAllSteps.addEventListener('click', () => { state.selectedStepId = null; renderSteps(); renderTraffic(); });
     ui.copyRequestUrl.addEventListener('click', copySelectedRequestUrl);
     ui.toggleSensitiveDetails.addEventListener('click', () => {
         state.revealSensitiveDetails = !state.revealSensitiveDetails; renderRequestDetails();
+        DashBridgeAnalytics?.opened('recorder.sensitive_details_revealed');
     });
-    ui.comparisonFilter.addEventListener('change', renderComparison);
+    ui.comparisonFilter.addEventListener('change', () => {
+        renderComparison(); DashBridgeAnalytics?.opened('recorder.comparison_filter_used');
+    });
     ui.comparisonUrlFilter.addEventListener('input', renderComparison);
+    ui.comparisonUrlFilter.addEventListener('change', () => DashBridgeAnalytics?.opened('recorder.comparison_filter_used'));
     ui.exportComparison.addEventListener('click', exportComparisonReport);
     ui.startUrl.addEventListener('input', scheduleRecorderSettingsSave);
     ui.startUrl.addEventListener('change', () => { void saveRecorderSettings().catch(() => undefined); });

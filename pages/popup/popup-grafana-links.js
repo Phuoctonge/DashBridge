@@ -1,3 +1,4 @@
+/* global DashBridgeAnalytics */
 // === Grafana Links / Dashboards Module ===
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -36,6 +37,7 @@ document.addEventListener("DOMContentLoaded", () => {
             catch (error) { alert(error.message); return; }
             chrome.storage.sync.set({ customButtons: buttons }, () => {
                 if (chrome.runtime.lastError) { alert(`Не удалось сохранить ссылку: ${chrome.runtime.lastError.message}`); return; }
+                DashBridgeAnalytics?.outcome(editId ? 'popup.grafana_link_edited' : 'popup.grafana_link_created', 'success');
                 modal.style.display = "none";
                 renderButtons();
             });
@@ -91,6 +93,7 @@ function setupGrafanaTimestampTool() {
             return;
         }
         timestampStorage.set({ [storageKey]: { ...range, savedAt: Date.now() } });
+        DashBridgeAnalytics?.outcome('popup.grafana_time_read', 'success');
         showRange(range, 'Готово. Нажмите на нужное значение, чтобы скопировать.');
     });
     result.addEventListener('click', async event => {
@@ -100,6 +103,7 @@ function setupGrafanaTimestampTool() {
         if (!output.textContent) return;
         try {
             await navigator.clipboard.writeText(output.textContent);
+            DashBridgeAnalytics?.outcome('popup.grafana_time_copied', 'success');
             showStatus(`${button.dataset.timestampCopy === 'from' ? 'Начало' : 'Конец'} скопировано.`);
         } catch {
             showStatus('Не удалось скопировать значение.', true);
@@ -180,6 +184,7 @@ function openGrafana(baseUrl) {
                 });
 
                 chrome.tabs.update(currentTab.id, { url: url.toString() });
+                DashBridgeAnalytics?.opened('popup.grafana_link_opened');
                 window.close();
             } catch (e) {
                 console.error('Invalid Grafana URL', e);
@@ -215,6 +220,7 @@ function deleteButton(id) {
         let buttons = normalizedCustomButtons(data.customButtons);
         buttons = buttons.filter(b => b.id != id);
         chrome.storage.sync.set({ customButtons: buttons }, renderButtons);
+        DashBridgeAnalytics?.opened('popup.grafana_link_deleted');
     });
 }
 

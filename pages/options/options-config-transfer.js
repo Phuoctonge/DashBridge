@@ -167,6 +167,7 @@
                     anchor.click();
                     setTimeout(() => URL.revokeObjectURL(url), 0);
                     showStatus('Настройки экспортированы в JSON.', 'green');
+                    root.DashBridgeAnalytics?.outcome('options.config_exported', 'success');
                 });
             });
         };
@@ -203,8 +204,10 @@
                     await setStorageValues(chrome.storage.sync, imported.sync);
                     if (Object.keys(imported.local).length) await setStorageValues(chrome.storage.local, imported.local);
                     showStatus('Настройки импортированы. Обновите открытые страницы Dashboard.', 'green');
+                    root.DashBridgeAnalytics?.outcome('options.config_imported', 'success');
                 } catch (error) {
                     showStatus(error?.message || 'Ошибка при чтении файла.', 'red');
+                    root.DashBridgeAnalytics?.outcome('options.config_imported', 'error');
                 } finally {
                     importFile.value = '';
                 }
@@ -212,6 +215,7 @@
             reader.onerror = () => {
                 importFile.value = '';
                 showStatus('Не удалось прочитать выбранный файл.', 'red');
+                root.DashBridgeAnalytics?.outcome('options.config_imported', 'error');
             };
             reader.readAsText(file);
         };

@@ -1,6 +1,6 @@
 # DashBridge: ориентир для дальнейшей разработки
 
-> Сверено с версией 2.4.2, исходным кодом и тестами 2026-09-02. Архитектурный источник
+> Сверено с версией 2.4.3, исходным кодом и тестами 2026-09-03. Архитектурный источник
 > истины — [`architecture.md`](architecture.md), карта
 > разрешений — [`permission-map.md`](permission-map.md), незавершённые
 > направления — [`roadmap.md`](roadmap.md). История не описывает
@@ -266,7 +266,7 @@ foreach ($file in $files) { node --check $file }
 в extension ZIP:
 
 ```powershell
-./scripts/build-release.ps1 -ExpectedTag 'v2.4.2'
+./scripts/build-release.ps1 -ExpectedTag 'v2.4.3'
 ```
 
 Push тега `vX.Y.Z` запускает `.github/workflows/release.yml`: полный набор
@@ -280,6 +280,17 @@ GitHub-путей и имён ZIP/installer assets. Popup скачивает ins
 обходит ручное первичное подтверждение Chromium. После его изменения обязателен
 `pwsh ./scripts/Install-DashBridge.ps1 -SelfTest`; полный контракт находится в
 `docs/installer.md`.
+
+## Изменение аналитики
+
+Перед добавлением аналитики прочитайте `docs/analytics.md`. Каждая новая точка
+должна ссылаться на статический `featureId` из allowlist и передавать только
+закрытые категориальные dimensions. URL, домены, заголовки, имена, Jira/TDM/
+Recorder данные и тексты исключений запрещены. Для долгой операции фиксируйте
+намерение отдельно от результата, для сохранённой настройки — дневной
+`configured`, а `effective` принимайте только от владельца runtime после
+применения. Аналитика остаётся fail-open и не получает отдельный observer или
+частый timer.
 
 ## Политика комментариев
 

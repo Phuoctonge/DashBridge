@@ -341,9 +341,11 @@
         }, () => {
             const saveError = chrome.runtime.lastError;
             if (saveError) {
+                globalThis.DashBridgeAnalytics?.outcome('options.saved', 'error');
                 showMaintStatus(`Не удалось сохранить настройки: ${saveError.message}`, 'red');
                 return;
             }
+            globalThis.DashBridgeAnalytics?.outcome('options.saved', 'success');
             const btn = document.getElementById('saveBtn');
             const text = document.getElementById('saveBtnText');
             if (text) {

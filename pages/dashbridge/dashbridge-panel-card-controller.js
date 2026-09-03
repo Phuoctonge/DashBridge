@@ -47,10 +47,14 @@
         };
 
         const deletePanel = async id => {
-            if (!await showConfirm('Удалить панель?')) return;
+            if (!await showConfirm('Удалить панель?')) {
+                root.DashBridgeAnalytics?.outcome('dashbridge.panel_deleted', 'cancelled');
+                return;
+            }
             setPanels(getPanels().filter(panel => panel.id !== id));
             savePanels();
             removePanelCard(id);
+            root.DashBridgeAnalytics?.outcome('dashbridge.panel_deleted', 'success');
         };
 
         const refreshPanel = id => {
@@ -165,10 +169,12 @@
                 const height = Number(overlay.querySelector('#iframeSettingsHeight').value);
                 if (!isSupportedPanelUrl(rawUrl)) {
                     await showAlert('Укажите корректный HTTP(S) URL Grafana.');
+                    root.DashBridgeAnalytics?.outcome('dashbridge.panel_iframe_settings_changed', 'invalid_input');
                     return;
                 }
                 if (!Number.isFinite(height) || height < 180 || height > 3000) {
                     await showAlert('Высота должна быть от 180 до 3000 px.');
+                    root.DashBridgeAnalytics?.outcome('dashbridge.panel_iframe_settings_changed', 'invalid_input');
                     return;
                 }
                 let url;
@@ -176,10 +182,13 @@
                     url = normalizePanelUrl(rawUrl);
                 } catch (error) {
                     await showAlert(error.message || 'Укажите ссылку Grafana вида /d/... или /d-solo/....');
+                    root.DashBridgeAnalytics?.outcome('dashbridge.panel_iframe_settings_changed', 'invalid_input');
                     return;
                 }
                 const previousSrc = panel.src;
                 const previousGrafanaTheme = panel.grafanaTheme || 'follow';
+                const previousWidth = panel.width;
+                const previousHeight = panel.height;
                 panel.src = url;
                 panel.grafanaTheme = overlay.querySelector('#iframeSettingsTheme').value;
                 panel.width = overlay.querySelector('#iframeSettingsWidth').value;
@@ -190,6 +199,10 @@
                     reloadFrame: previousSrc !== panel.src
                         || previousGrafanaTheme !== panel.grafanaTheme,
                 });
+                root.DashBridgeAnalytics?.outcome('dashbridge.panel_iframe_settings_changed', 'success');
+                if (previousWidth !== panel.width || previousHeight !== panel.height) {
+                    root.DashBridgeAnalytics?.track('dashbridge.panel_layout_changed', 'changed', {});
+                }
             });
         };
 
@@ -200,6 +213,8 @@
             panel.paused = !panel.paused;
             savePanels();
             replacePanelCard(panel.id);
+            root.DashBridgeAnalytics?.outcome(panel.paused
+                ? 'dashbridge.panel_paused' : 'dashbridge.panel_resumed', 'success');
         };
 
         const bindPanelActions = (card, panel, iframe) => {
@@ -318,6 +333,7 @@
                 if (dropSide === 'left') container.insertBefore(draggedElement, targetElement);
                 else container.insertBefore(draggedElement, targetElement.nextSibling);
                 saveCardOrder(container);
+                root.DashBridgeAnalytics?.track('dashbridge.panel_reordered', 'used', {});
                 clearDragMarkers();
             });
         };

@@ -154,6 +154,7 @@
             setPanels(profile ? [...(profile.panels || [])] : []);
             loadActiveProfileTimeState(); await saveProfiles(); renderProfileSwitcher();
             syncTimeControlsFromState(); await renderDashboard();
+            root.DashBridgeAnalytics?.outcome('dashbridge.profile_switched', 'success');
         };
         const createProfile = async name => {
             const currentProfile = getActiveProfile();
@@ -163,11 +164,13 @@
             const profiles = getProfiles(); profiles.push(newProfile);
             setTabActiveProfileId(newProfile.id); setPanels([]); loadActiveProfileTimeState();
             await saveProfiles(); renderProfileSwitcher(); syncTimeControlsFromState(); await renderDashboard();
+            root.DashBridgeAnalytics?.outcome('dashbridge.profile_created', 'success');
         };
         const renameActiveProfile = newName => {
             const profile = getActiveProfile();
             if (!profile || !newName.trim()) return;
             profile.name = newName.trim().slice(0, 120); void saveProfiles(); renderProfileSwitcher();
+            root.DashBridgeAnalytics?.outcome('dashbridge.profile_renamed', 'success');
         };
         const deleteProfile = async id => {
             const profiles = getProfiles();
@@ -181,6 +184,7 @@
                 setPanels([...(next.panels || [])]); loadActiveProfileTimeState(); syncTimeControlsFromState(); await renderDashboard();
             }
             await saveProfiles(); renderProfileSwitcher();
+            root.DashBridgeAnalytics?.outcome('dashbridge.profile_deleted', 'success');
         };
         const getCurrentProfilePanelIdentities = () => new Set(getPanels()
             .map(panel => getProfilePanelIdentity(panel.src)).filter(Boolean));

@@ -214,6 +214,7 @@
                     detailsEnabled: overlay.querySelector('.report-editor-details-enabled').checked,
                 }, panel);
                 await savePanels();
+                globalThis.DashBridgeAnalytics?.outcome('dashbridge.report_panel_settings_saved', 'success');
                 onSaved?.(panel);
                 close();
             });
@@ -409,6 +410,7 @@
                     },
                 });
                 await savePanels();
+                globalThis.DashBridgeAnalytics?.outcome('dashbridge.report_template_saved', 'success');
                 close();
             });
             const focused = focusPanelId

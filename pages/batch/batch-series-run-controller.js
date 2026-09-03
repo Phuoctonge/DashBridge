@@ -73,6 +73,7 @@
             const captureFilename = captureUtils.createFilenameFactory();
             logMessage('🚀 Начало сбора изолированных метрик (Series)...');
             let seriesDiscoveryTabId = null;
+            let analyticsOutcome = 'error';
             try {
                 const batchPageTab = await chromeRef.tabs.getCurrent();
                 const seriesDashboardUrl = documentRef.getElementById('seriesDashUrl').value.trim();
@@ -284,6 +285,7 @@
 
                 if (operation.isActive(runId)) {
                     if (!successfulJobs) {
+                        analyticsOutcome = 'no_data';
                         logMessage('Сбор Series завершён без снимков. Архив не создан.', true);
                         showToast('Не удалось сохранить ни одной Series', 'error');
                     } else {
@@ -304,6 +306,7 @@
                         });
                         await archive.finalize();
                         if (failedJobs) {
+                            analyticsOutcome = 'partial';
                             logMessage(
                                 `Сбор Series завершён частично: сохранено ${successfulJobs}, ошибок ${failedJobs}.`,
                             );
@@ -312,6 +315,7 @@
                                 'info',
                             );
                         } else {
+                            analyticsOutcome = 'success';
                             logMessage('🎉 Сбор успешно завершен!');
                             showToast('Архив скачан!', 'success');
                         }
@@ -320,6 +324,8 @@
             } catch (error) {
                 if (operation.isActive(runId)) logMessage(`💥 Ошибка: ${error.message}`, true);
             } finally {
+                if (!operation.isActive(runId) && analyticsOutcome === 'error') analyticsOutcome = 'cancelled';
+                globalThis.DashBridgeAnalytics?.outcome('batch.series_run', analyticsOutcome, { workflow: 'series' });
                 if (seriesDiscoveryTabId) {
                     await chromeRef.tabs.remove(seriesDiscoveryTabId).catch(() => undefined);
                 }

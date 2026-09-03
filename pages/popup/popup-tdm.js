@@ -1,3 +1,4 @@
+/* global DashBridgeAnalytics */
 function formatTdmExportProgress(message) {
     const current = Number.isFinite(Number(message.current)) ? Number(message.current) : 0;
     const hasKnownTotal = message.total !== undefined && message.total !== null
@@ -130,6 +131,9 @@ async function tdmExport() {
         isExcludeAll: photosCheck.checked && excludeCheck.checked && excludeName === "",
         photoExportId: new Date().toISOString().replace(/[-:T]/g, '').slice(0, 12)
     };
+    const analyticsDimensions = { format: ['html', 'json', 'both'].includes(options.format) ? options.format : 'html' };
+    DashBridgeAnalytics?.track('tdm.export_started', 'used', analyticsDimensions);
+    const finishAnalytics = outcome => DashBridgeAnalytics?.outcome('tdm.export_finished', outcome, analyticsDimensions);
 
     const photoArchive = options.savePhotos && typeof JSZip !== 'undefined'
         ? createRollingZipArchive({
@@ -162,6 +166,7 @@ async function tdmExport() {
         if (chrome.runtime.lastError || !tabs || tabs.length === 0) {
             statusEl.textContent = "Ошибка доступа к вкладке.";
             chrome.runtime.onMessage.removeListener(progressListener);
+            finishAnalytics('error');
             return;
         }
         if (tabs[0]) {
@@ -180,12 +185,14 @@ async function tdmExport() {
                 } catch (error) {
                     statusEl.textContent = "Некорректный адрес TDM в настройках.";
                     chrome.runtime.onMessage.removeListener(progressListener);
+                    finishAnalytics('invalid_input');
                     return;
                 }
 
                 if (activeUrl.hostname.toLowerCase() !== tdmUrl.hostname.toLowerCase()) {
                     statusEl.textContent = `Откройте страницу TDM Chat (${settings.tdmDomain})`;
                     chrome.runtime.onMessage.removeListener(progressListener);
+                    finishAnalytics('unsupported_page');
                     return;
                 }
                 chrome.scripting.executeScript({
@@ -195,12 +202,17 @@ async function tdmExport() {
                 }, async (results) => {
                     if (chrome.runtime.lastError) {
                         statusEl.textContent = "Ошибка расширения: " + chrome.runtime.lastError.message;
+                        finishAnalytics('error');
                     } else if (!results || !results[0]) {
                         statusEl.textContent = "Ошибка: не удалось связаться со страницей.";
+                        finishAnalytics('error');
                     } else if (results[0].result === null) {
                         statusEl.textContent = "Ошибка парсинга. Обновите чат.";
+                        finishAnalytics('error');
                     } else if (results[0].result && results[0].result.error) {
                         statusEl.textContent = "Ошибка: " + results[0].result.error;
+                        finishAnalytics(/нет сообщений/i.test(results[0].result.error) ? 'no_data'
+                            : (/10 минут/i.test(results[0].result.error) ? 'timeout' : 'error'));
                     } else {
                         const payload = results[0].result;
                         if (options.format === 'html' || options.format === 'both') {
@@ -218,12 +230,15 @@ async function tdmExport() {
                             photoQueue.then(() => photoArchive.finalize()).then(() => {
                                 statusEl.textContent = "Экспорт полностью завершен!";
                                 setTimeout(() => { statusEl.style.display = "none"; }, 5000);
+                                finishAnalytics('success');
                             }).catch(e => {
                                 statusEl.textContent = "Ошибка ZIP: " + e.message;
+                                finishAnalytics('partial');
                             });
                         } else {
                             statusEl.textContent = "Экспорт успешно завершен!";
                             setTimeout(() => { statusEl.style.display = "none"; }, 5000);
+                            finishAnalytics('success');
                         }
                     }
                     chrome.runtime.onMessage.removeListener(progressListener);

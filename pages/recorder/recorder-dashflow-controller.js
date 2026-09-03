@@ -141,8 +141,10 @@
                 }
                 state.loadedManifest = manifest;
                 setStatus(`Файл ${filename} передан в загрузки Chrome.`);
+                root.DashBridgeAnalytics?.outcome('recorder.dashflow_exported', 'success', { format: 'dashflow' });
             } catch (error) {
                 setStatus(`Не удалось сохранить .dashflow: ${error?.message || error}`, true);
+                root.DashBridgeAnalytics?.outcome('recorder.dashflow_exported', 'error', { format: 'dashflow' });
             } finally {
                 updateControls();
             }
@@ -185,8 +187,10 @@
                     `Загружено: ${state.steps.length} шагов, baseline ${state.requests.size} запросов.`,
                 );
                 scheduleRender();
+                root.DashBridgeAnalytics?.outcome('recorder.dashflow_imported', 'success', { format: 'dashflow' });
             } catch (error) {
                 setStatus(`Не удалось открыть .dashflow: ${error?.message || error}`, true);
+                root.DashBridgeAnalytics?.outcome('recorder.dashflow_imported', 'error', { format: 'dashflow' });
             } finally {
                 state.importing = false;
                 ui.file.value = '';

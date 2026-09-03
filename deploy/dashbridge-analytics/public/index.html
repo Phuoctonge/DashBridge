@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>DashBridge Analytics</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style-extra.css">
+    <script src="labels.js" defer></script>
+    <script src="app.js" defer></script>
+</head>
+<body>
+    <header><div><h1>DashBridge Analytics</h1><p>Обезличенные почасовые агрегаты</p></div><div class="header-actions"><button id="reset" class="secondary">Сбросить фильтры</button><button id="refresh">Обновить</button></div></header>
+    <main>
+        <section class="filters" aria-label="Фильтры">
+            <label>Период<select id="days"><option value="7">7 дней</option><option value="30" selected>30 дней</option><option value="90">90 дней</option><option value="180">180 дней</option><option value="365">365 дней</option></select></label>
+            <label>Версия<select id="version"><option value="">Все</option></select></label>
+            <label>Функция<select id="feature"><option value="">Все</option></select></label>
+            <label>Тип действия<select id="signal"><option value="">Все</option><option value="used">Использовано</option><option value="changed">Настройка изменена</option><option value="configured">Сохранено в конфигурации</option><option value="effective">Подтверждено в работе</option><option value="outcome">Результат операции</option><option value="lifecycle">Состояние расширения</option></select></label>
+            <label>Анонимный пользователь<select id="installation"><option value="">Все</option></select></label>
+        </section>
+        <p id="status" role="status">Загрузка…</p>
+        <details class="legend"><summary>Что означают показатели?</summary><p><b>Использовали</b> — вызвали функцию. <b>Настроили</b> — функция сохранена и может работать без повторного клика. <b>Сработало</b> — runtime подтвердил фактическое применение. <b>Проблемы</b> — ошибка, тайм-аут, отсутствие данных или частичный результат.</p></details>
+        <section class="cards" aria-label="Сводка">
+            <article><span>Установки</span><strong id="totalUsers">—</strong></article>
+            <article><span>События</span><strong id="totalEvents">—</strong></article>
+            <article><span>Агрегаты</span><strong id="totalAggregates">—</strong></article>
+            <article><span>Размер SQLite</span><strong id="databaseSize">—</strong></article>
+        </section>
+        <section class="panel"><h2>Активность по дням</h2><div id="timeline" class="timeline"></div></section>
+        <section class="panel"><h2>Лента действий по часам</h2><p class="hint">Время намеренно округлено до часа. Нажмите на пользователя, чтобы оставить только его действия.</p><div class="table-wrap"><table id="actions"><thead><tr><th data-key="periodStart">Час</th><th data-key="userLabel">Пользователь</th><th data-key="featureName">Что сделал</th><th data-key="signalName">Тип</th><th data-key="details">Результат и параметры</th><th data-key="events">Количество</th></tr></thead><tbody></tbody></table></div></section>
+        <section class="panel"><h2>Использование функций</h2><p class="hint">Доля считается от активных установок за выбранный период.</p><div class="table-wrap"><table id="features"><thead><tr><th data-key="featureName">Функция</th><th data-key="adoption">Доля</th><th data-key="usedUsers">Использовали</th><th data-key="configuredUsers">Настроили</th><th data-key="effectiveUsers">Сработало</th><th data-key="successUsers">Успешно</th><th data-key="issueUsers">Проблемы</th><th data-key="events">События</th></tr></thead><tbody></tbody></table></div></section>
+        <section class="panel"><h2>Ошибки и проблемы</h2><p class="hint">Только безопасные категории — тексты ошибок и адреса не собираются.</p><div class="table-wrap"><table id="problems"><thead><tr><th data-key="featureName">Функция</th><th data-key="version">Версия</th><th data-key="outcomeName">Результат</th><th data-key="users">Пользователи</th><th data-key="events">Количество</th></tr></thead><tbody></tbody></table></div></section>
+        <section class="panel"><h2>Версии расширения</h2><div class="table-wrap"><table id="versions"><thead><tr><th data-key="version">Версия</th><th data-key="users">Установки</th><th data-key="events">События</th><th data-key="issues">Проблемы</th><th data-key="issueRate">Доля проблем</th><th data-key="lastSeen">Последняя активность</th></tr></thead><tbody></tbody></table></div></section>
+        <section class="panel"><h2>Анонимные пользователи</h2><p class="hint">Идентификатор создаётся случайно в браузере и не связан с именем, почтой или IP. Нажмите строку для фильтрации.</p><div class="table-wrap"><table id="installations"><thead><tr><th data-key="userLabel">Пользователь</th><th data-key="version">Версия</th><th data-key="features">Функции</th><th data-key="events">Действия</th><th data-key="lastSeen">Последняя активность</th></tr></thead><tbody></tbody></table></div></section>
+        <section class="panel"><h2>Дополнительные категории</h2><div class="table-wrap"><table id="dimensions"><thead><tr><th data-key="details">Параметры</th><th data-key="users">Пользователи</th><th data-key="events">Количество</th></tr></thead><tbody></tbody></table></div></section>
+        <section class="panel"><h2>Состояние приёма данных</h2><div id="operations" class="operations"></div></section>
+    </main>
+</body>
+</html>

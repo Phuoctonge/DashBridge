@@ -67,6 +67,7 @@ globalThis.DashBridgeCapture = (() => {
             syncToggles(prepared);
             broadcastPrepared(prepared);
             if (persist) void storage.set({ grafanaCompactScreenshot: prepared });
+            if (persist) globalThis.DashBridgeAnalytics?.changed('dashbridge.capture_prepared_changed', prepared);
             return prepared;
         };
 
@@ -202,6 +203,7 @@ globalThis.DashBridgeCapture = (() => {
             const activePanels = panels.filter(panel => !panel.paused);
             const pausedCount = panels.length - activePanels.length;
             if (!activePanels.length) {
+                globalThis.DashBridgeAnalytics?.outcome('dashbridge.capture_all_zip', 'no_data');
                 await showAlert(pausedCount
                     ? 'Все графики текущего профиля поставлены на паузу.'
                     : 'В текущем профиле нет графиков.');
@@ -220,6 +222,7 @@ globalThis.DashBridgeCapture = (() => {
                     .map(control => [control, control.disabled])
             );
             lockedControls.forEach((_wasDisabled, control) => { control.disabled = true; });
+            let analyticsOutcome = 'error';
 
             try {
                 for (let index = 0; index < activePanels.length; index += 1) {
@@ -260,12 +263,17 @@ globalThis.DashBridgeCapture = (() => {
                 button.classList.add('active');
                 setTimeout(() => button.classList.remove('active'), 1600);
                 if (errors.length) {
+                    analyticsOutcome = 'partial';
                     await showAlert(`ZIP создан. Успешно: ${activePanels.length - (errors.length - (pausedCount ? 1 : 0))} из ${activePanels.length}. Подробности добавлены в errors.txt.`);
-                }
+                } else analyticsOutcome = 'success';
             } catch (error) {
                 console.error('DashBridge archive capture failed:', error);
                 await showAlert('Не удалось сохранить снимки: ' + (error?.message || String(error)));
             } finally {
+                globalThis.DashBridgeAnalytics?.outcome('dashbridge.capture_all_zip', analyticsOutcome, {
+                    prepared: getDefaultCapturePrepared(),
+                    countBucket: globalThis.DashBridgeAnalytics.bucket(activePanels.length), format: 'zip'
+                });
                 window.scrollTo(originalScroll.x, originalScroll.y);
                 button.innerHTML = originalHtml;
                 button.title = originalTitle;
@@ -292,9 +300,17 @@ globalThis.DashBridgeCapture = (() => {
                     title: panel?.title
                 });
                 if (!result?.ok) throw new Error(result?.error || 'capture-failed');
+                globalThis.DashBridgeAnalytics?.outcome(outputAction === 'copy'
+                    ? 'dashbridge.capture_panel_copy' : 'dashbridge.capture_panel_download', 'success', {
+                    prepared: getDefaultCapturePrepared(), format: 'png'
+                });
                 button.classList.add('capture-action-success');
                 setTimeout(() => button.classList.remove('capture-action-success'), 1600);
             } catch (error) {
+                globalThis.DashBridgeAnalytics?.outcome(outputAction === 'copy'
+                    ? 'dashbridge.capture_panel_copy' : 'dashbridge.capture_panel_download', 'error', {
+                    prepared: getDefaultCapturePrepared(), format: 'png'
+                });
                 console.error('DashBridge panel capture failed:', error);
                 button.classList.add('capture-action-error');
                 setTimeout(() => button.classList.remove('capture-action-error'), 2000);

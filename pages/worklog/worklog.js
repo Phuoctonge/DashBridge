@@ -1,3 +1,4 @@
+/* global DashBridgeAnalytics, DashBridgeAnalyticsContract */
 globalThis.DashBridgeWorklogMetrics = Object.freeze({
     calculateTotals(worklogs, now = new Date()) {
         const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -123,6 +124,7 @@ document.addEventListener("DOMContentLoaded", () => {
             renderTable();
             saveToStorage();
             showToast("Действие отменено");
+            DashBridgeAnalytics?.opened('jira.undo');
         } catch (e) {
             console.error("Failed to undo:", e);
             showToast("Ошибка при отмене действия", { type: 'error' });
@@ -138,6 +140,7 @@ document.addEventListener("DOMContentLoaded", () => {
             renderTable();
             saveToStorage();
             showToast("Действие возвращено");
+            DashBridgeAnalytics?.opened('jira.redo');
         } catch (e) {
             console.error("Failed to redo:", e);
             showToast("Ошибка при возврате действия", { type: 'error' });
@@ -383,6 +386,7 @@ document.addEventListener("DOMContentLoaded", () => {
             saveToStorage();
             updateStats();
             showToast("Строка удалена", true);
+            DashBridgeAnalytics?.opened('jira.row_deleted');
         });
         document.querySelectorAll('.clone-row').forEach(b => b.onclick = (e) => {
             const btn = e.target.closest('button');
@@ -414,6 +418,7 @@ document.addEventListener("DOMContentLoaded", () => {
             saveToStorage();
             updateStats();
             attachListeners();
+            DashBridgeAnalytics?.opened('jira.row_cloned');
         });
     }
 
@@ -492,6 +497,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!authText) return;
         authText.textContent = "Проверка...";
         const result = await jiraClient.checkAuth();
+        DashBridgeAnalytics?.outcome('jira.auth_checked', result.ok ? 'success'
+            : (result.reason === 'network' ? 'error' : 'auth_required'));
         if (result.ok) {
             authText.textContent = `Авторизован: ${result.displayName}`;
             authDot.className = "auth-dot auth-ok";
@@ -526,6 +533,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (btn.classList.contains("needs-refresh")) { renderTable(); updateSortButtonUI(); }
         else { sortOrder = sortOrder === 'desc' ? 'asc' : 'desc'; updateSortButtonUI(); renderTable(); }
         saveToStorage();
+        DashBridgeAnalytics?.opened('jira.sort_changed');
     };
     document.getElementById("checkAuth").onclick = checkJiraAuth;
     addRowBtn.onclick = () => { saveToHistory(); addNewRow(); };
@@ -539,16 +547,25 @@ document.addEventListener("DOMContentLoaded", () => {
         if (worklogs.length === 0) addNewRow();
         renderTable();
         saveToStorage();
+        DashBridgeAnalytics?.outcome('jira.sent_rows_cleared', 'success', {
+            countBucket: DashBridgeAnalytics.bucket(sentCount)
+        });
     };
 
     sendAllBtn.onclick = async () => {
         let hasErrors = false;
         for (let l of worklogs) { if (l.status !== 'sent' && (!l.issueId || !l.timeSpent || !l.dateStarted)) { hasErrors = true; l.status = 'error'; } }
-        if (hasErrors) { renderTable(); alert("Заполните обязательные поля!"); return; }
+        if (hasErrors) {
+            DashBridgeAnalytics?.outcome('jira.batch_send', 'invalid_input');
+            renderTable(); alert("Заполните обязательные поля!"); return;
+        }
         sendAllBtn.disabled = true;
+        let attempted = 0;
+        let succeeded = 0;
         for (let i = 0; i < worklogs.length; i++) {
             if (worklogs[i].status === 'sent') continue;
             const log = worklogs[i], key = log.issueKey || log.issueId;
+            attempted += 1;
             try {
                 const d = parseDate(log.dateStarted);
                 if (isNaN(d.getTime())) throw new Error("Invalid date");
@@ -562,6 +579,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     console.error(`[Jira Error] ${result.status}: ${result.errorText}`);
                 }
                 worklogs[i].status = result.ok ? 'sent' : 'error';
+                if (result.ok) succeeded += 1;
             } catch (e) {
                 console.error("[Worklog Error]", e);
                 worklogs[i].status = 'error';
@@ -583,5 +601,8 @@ document.addEventListener("DOMContentLoaded", () => {
         // Одна полная перерисовка по завершении для корректной группировки и анимации
         renderTable();
         saveToStorage(); sendAllBtn.disabled = false;
+        DashBridgeAnalytics?.outcome('jira.batch_send', !attempted ? 'no_data'
+            : (succeeded === attempted ? 'success' : (succeeded ? 'partial' : 'error')),
+        { countBucket: DashBridgeAnalyticsContract?.bucket?.(attempted) || (attempted > 10 ? '11_plus' : '1') });
     };
 });

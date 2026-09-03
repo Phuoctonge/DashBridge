@@ -106,6 +106,7 @@
         const range = normalizeRange({ from: picker.inputs[0].value, to: picker.inputs[1].value });
         if (!range) throw new Error('empty-range');
         await navigator.clipboard.writeText(serializeRange(range));
+        globalThis.DashBridgeAnalytics?.outcome('grafana.time_range_copied', 'success', { surface: 'direct_grafana' });
         flash(button, 'Диапазон скопирован');
     };
     const pastePickerRange = async (button, picker) => {
@@ -113,6 +114,7 @@
         if (!range) throw new Error('invalid-range');
         setInputValue(picker.inputs[0], range.from);
         setInputValue(picker.inputs[1], range.to);
+        globalThis.DashBridgeAnalytics?.outcome('grafana.time_range_pasted', 'success', { surface: 'direct_grafana' });
         flash(button, 'Диапазон вставлен');
     };
     const createButton = (kind, picker) => {
@@ -131,6 +133,9 @@
                     await pastePickerRange(button, picker);
                 }
             } catch {
+                globalThis.DashBridgeAnalytics?.outcome(
+                    kind === 'copy' ? 'grafana.time_range_copied' : 'grafana.time_range_pasted',
+                    'invalid_input', { surface: 'direct_grafana' });
                 flash(button, kind === 'copy' ? 'Не удалось скопировать' : 'В буфере нет диапазона', true);
             }
         });
@@ -149,7 +154,12 @@
             event.preventDefault();
             event.stopImmediatePropagation();
             void (kind === 'copy' ? copyPickerRange(button, picker) : pastePickerRange(button, picker))
-                .catch(() => flash(button, kind === 'copy' ? 'Не удалось скопировать' : 'В буфере нет диапазона', true));
+                .catch(() => {
+                    globalThis.DashBridgeAnalytics?.outcome(
+                        kind === 'copy' ? 'grafana.time_range_copied' : 'grafana.time_range_pasted',
+                        'invalid_input', { surface: 'direct_grafana' });
+                    flash(button, kind === 'copy' ? 'Не удалось скопировать' : 'В буфере нет диапазона', true);
+                });
         }, true);
     };
     const enhanceNativeClipboard = (nativeButtons, applyButton, picker) => {

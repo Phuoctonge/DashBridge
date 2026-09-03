@@ -1,10 +1,11 @@
 {
     "manifest_version": 3,
     "name": "DashBridge",
-    "version": "2.4.2",
+    "version": "2.4.3",
     "description": "Grafana-инструменты, Traffic Recorder с .dashflow record/replay, Jira Worklog и TDM-экспорт.",
     "permissions": [
         "storage",
+        "alarms",
         "unlimitedStorage",
         "activeTab",
         "tabs",
@@ -59,6 +60,7 @@
                 "js/shared/grafana-settings.js",
                 "js/shared/grafana-panel-identity.js",
                 "js/shared/grafana-capture-output.js",
+                "js/shared/analytics-client.js",
                 "js/content/content.js",
                 "js/content/grafana-time-picker-clipboard.js"
             ],

@@ -23,6 +23,7 @@
             const panels = getPanels();
             if (panels.length === 0) {
                 await showAlert('Нет панелей для экспорта.');
+                root.DashBridgeAnalytics?.outcome('dashbridge.profile_exported', 'no_data');
                 return;
             }
             const profile = getActiveProfile();
@@ -37,6 +38,9 @@
             anchor.click();
             documentRef.body.removeChild(anchor);
             urlApi.revokeObjectURL(url);
+            root.DashBridgeAnalytics?.outcome('dashbridge.profile_exported', 'success', {
+                countBucket: root.DashBridgeAnalytics.bucket(panels.length)
+            });
         };
 
         const importPanels = async file => {
@@ -58,6 +62,7 @@
                     } = imported;
                     if (importedPanels.length === 0) {
                         await showAlert('В файле нет панелей с корректными настройками и URL.');
+                        root.DashBridgeAnalytics?.outcome('dashbridge.profile_imported', 'no_data');
                         return;
                     }
                     const choice = await showConfirm(
@@ -92,12 +97,17 @@
                         syncTimeControlsFromState();
                         renderDashboard();
                     }
+                    root.DashBridgeAnalytics?.outcome('dashbridge.profile_imported', 'success', {
+                        countBucket: root.DashBridgeAnalytics.bucket(importedPanels.length)
+                    });
                 } catch (error) {
                     if (error?.code === transfer.INVALID_PANELS_CODE) {
                         await showAlert(error.message);
+                        root.DashBridgeAnalytics?.outcome('dashbridge.profile_imported', 'invalid_input');
                         return;
                     }
                     await showAlert('Ошибка чтения файла: ' + error.message);
+                    root.DashBridgeAnalytics?.outcome('dashbridge.profile_imported', 'error');
                 }
             };
             reader.readAsText(file);

@@ -1,0 +1,14 @@
+{
+  "name": "dashbridge-analytics",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Privacy-preserving analytics receiver and admin dashboard for DashBridge",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

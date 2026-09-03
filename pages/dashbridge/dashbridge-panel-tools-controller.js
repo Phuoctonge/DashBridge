@@ -19,6 +19,19 @@
         const thresholdWaiters = new Map();
         const thresholdStates = new Map();
         const titleWaiters = new Map();
+        const appliedWaiters = new Map();
+        const analyticsFeatures = Object.freeze({
+            removeFill: 'grafana.panel.fill_removed', thickenLines: 'grafana.panel.lines_thickened',
+            invertLegend: 'grafana.panel.legend_inverted', invertIdle: 'grafana.panel.cpu_idle_to_load',
+            convertMemToUsed: 'grafana.panel.ram_to_used', forceMemByteUnit: 'grafana.panel.ram_force_byte_unit',
+            seriesQueryFilterEnabled: 'grafana.panel.series_value_filter',
+            seriesQueryFilterHighlightEnabled: 'grafana.panel.series_highlight',
+            cpuCapacityFilterEnabled: 'grafana.panel.load_cpu_capacity_filter',
+            cpuCapacityFilterHighlightEnabled: 'grafana.panel.load_cpu_capacity_highlight',
+            cpuCapacityFilterLoad1: 'grafana.panel.load_series_1m', cpuCapacityFilterLoad5: 'grafana.panel.load_series_5m',
+            cpuCapacityFilterLoad15: 'grafana.panel.load_series_15m', thresholdEnabled: 'grafana.panel.threshold',
+            thresholdNotifyEnabled: 'grafana.panel.threshold_notification', capturePrepared: 'grafana.panel.compact_capture'
+        });
 
         const normalizeTools = panel => {
             const saved = panel.tools || {};
@@ -68,9 +81,27 @@
             };
         };
 
-        const apply = (panel, iframe) => postToDashboardFrame(iframe, {
-            action: 'applyPanelTools', tools: normalizeTools(panel), transformSettings: getTransformSettings()
-        });
+        const apply = (panel, iframe) => {
+            const tools = normalizeTools(panel);
+            const requestId = `panel-tools-${now()}-${random().toString(36).slice(2)}`;
+            appliedWaiters.set(requestId, Object.entries(analyticsFeatures)
+                .filter(([key]) => tools[key] === true).map(([, featureId]) => featureId));
+            setTimer(() => appliedWaiters.delete(requestId), 25_000);
+            return postToDashboardFrame(iframe, {
+                action: 'applyPanelTools', requestId, tools, transformSettings: getTransformSettings()
+            });
+        };
+
+        const acceptApplied = message => {
+            const features = appliedWaiters.get(message?.requestId);
+            if (!features || !['applied', 'error'].includes(message?.commandStatus)) return false;
+            appliedWaiters.delete(message.requestId);
+            features.forEach(featureId => root.DashBridgeAnalytics?.track(featureId,
+                message.commandStatus === 'applied' ? 'effective' : 'outcome', {
+                    surface: 'dashbridge', outcome: message.commandStatus === 'applied' ? 'success' : 'error'
+                }));
+            return true;
+        };
 
         const requestTitle = (panel, iframe) => {
             if (!panel || !iframe) return Promise.resolve('');
@@ -211,6 +242,15 @@
                     nextTools.forceMemByteUnit = nextTools.convertMemToUsed
                         ? false : (previousTools.convertMemToUsed || previousTools.forceMemByteUnit);
                     panel.tools = nextTools;
+                    Object.entries(analyticsFeatures).forEach(([key, featureId]) => {
+                        if (!!previousTools[key] !== !!nextTools[key]) {
+                            root.DashBridgeAnalytics?.changed(featureId, !!nextTools[key], { surface: 'dashbridge' });
+                        }
+                    });
+                    const previousLegend = JSON.stringify(previousTools.legendVisibleSeries || []);
+                    const nextLegend = JSON.stringify(nextTools.legendVisibleSeries || []);
+                    if (previousLegend !== nextLegend) root.DashBridgeAnalytics?.changed(
+                        'grafana.panel.legend_selection', !!nextTools.legendVisibleSeries?.length, { surface: 'dashbridge' });
                     savePanels();
                     const liveApplyKeys = ['thresholdEnabled', 'thresholdNotifyEnabled', 'thresholdValue', 'thresholdRawValue', 'thresholdInputUnit', 'thresholdUnit'];
                     const liveApplyOnlyChange = liveApplyKeys.some(key => previousTools[key] !== nextTools[key])
@@ -259,7 +299,7 @@
             documentRef.querySelector(`.threshold-notification[data-panel-id="${cssEscape(panelId)}"]`)?.remove();
         };
 
-        return Object.freeze({ normalizeTools, apply, open, acceptTitleResponse, acceptLegendSeries,
+        return Object.freeze({ normalizeTools, apply, open, acceptApplied, acceptTitleResponse, acceptLegendSeries,
             acceptThresholdStatus, updateThresholdStatus, removePanel });
     }
 

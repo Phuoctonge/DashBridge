@@ -61,7 +61,7 @@ if __name__ == "__main__":
             and "rect?.dpr" in output and "drawImage" in output,
         "native capture uses the background tab authority": "dashbridge-capture-visible-tab" in content
             and "dashbridge-capture-visible-tab" in background,
-        "clipboard writes from the focused Grafana document": "DashBridgeGrafanaCaptureOutput.copy(image.blob)" in content
+        "clipboard writes from the focused Grafana document": "captureOutput.copy(image.blob)" in content
             and '"clipboardWrite"' in manifest and '"offscreen"' not in manifest
             and "copyPanelCaptureInOffscreenDocument" not in background,
         "uPlot and Flot retain explicit resize restoration": "restoreUPlot" in layout and "restoreFlot" in layout,

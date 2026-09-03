@@ -92,6 +92,7 @@
         if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
             chrome.storage.sync.set({ [SYNC_KEY]: newTheme });
         }
+        globalThis.DashBridgeAnalytics?.track('ui.theme_changed', 'changed', { theme: newTheme });
     }
 
     function bindThemeToggle() {

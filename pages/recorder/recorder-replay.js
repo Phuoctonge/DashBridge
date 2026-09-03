@@ -211,13 +211,18 @@
                 await stopActiveSession(false); buildComparison();
                 progress?.finish({ status: 'complete', message: `Replay завершён: ${replaySteps.length} шагов` });
                 setStatus(`Replay завершен: ${replaySteps.length} шагов, собрано ${state.requests.size} запросов. Сравнение готово.`);
+                root.DashBridgeAnalytics?.outcome('recorder.replay_finished', 'success');
             } catch (error) {
                 await stopActiveSession(false);
                 if (state.baselineRequests.size && state.requests.size) buildComparison();
-                if (state.stopRequested) setStatus('Replay остановлен пользователем.');
+                if (state.stopRequested) {
+                    setStatus('Replay остановлен пользователем.');
+                    root.DashBridgeAnalytics?.outcome('recorder.replay_finished', 'cancelled');
+                }
                 else {
                     progress?.finish({ status: 'error', message: `Replay остановлен: ${error?.message || error}` });
                     setStatus(`Replay остановлен: ${error?.message || error}`, true);
+                    root.DashBridgeAnalytics?.outcome('recorder.replay_finished', 'error');
                 }
             }
             scheduleRender();

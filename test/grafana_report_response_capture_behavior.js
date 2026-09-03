@@ -15,6 +15,10 @@ const visualSource = fs.readFileSync(
     path.join(__dirname, '..', 'js', 'content', 'grafana-report-snapshot.js'),
     'utf8'
 );
+const panelToolsSource = fs.readFileSync(
+    path.join(__dirname, '..', 'js', 'content', 'grafana-panel-tools.js'),
+    'utf8'
+);
 
 assert(toolsSource.includes('const observeActive = transformActive || hasPersistentVisualWork()')
     && !toolsSource.includes('const observeActive = isDashboardIframe ||')
@@ -38,6 +42,13 @@ assert(visualSource.includes('const collectPanelReportSnapshot')
     && !visualSource.includes('responseReportSeriesStats')
     && !visualSource.includes('responseReportTruncated'),
     'report evaluation must run only on explicit request using the current chart/table runtime data');
+
+const reportRequestSource = panelToolsSource.slice(panelToolsSource.indexOf("event.data?.action === 'collectPanelReportSnapshot'"));
+assert(reportRequestSource.includes('const getReportRoot = () =>')
+    && reportRequestSource.includes('root: getReportRoot(), sla: event.data.sla || {}')
+    && reportRequestSource.includes('current.table?.rows')
+    && reportRequestSource.includes('dataObserver.observe(document.documentElement'),
+    'report collection must follow a Grafana panel/Data Grid remount instead of observing a detached root until timeout');
 
 assert(!toolsSource.includes('responseReportRecords')
     && !visualSource.includes('responseReportRecords')

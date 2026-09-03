@@ -70,6 +70,7 @@
             crosshairToggle?.addEventListener('change', event => {
                 const mode = event.target.checked ? 'line' : 'off';
                 setCrosshairMode(mode);
+                root.DashBridgeAnalytics?.changed('dashbridge.crosshair_changed', mode === 'line');
                 try { storageRef.setItem('dashbridge_crosshairMode', mode); } catch { /* optional storage */ }
                 if (mode === 'off') hideCrosshair();
                 getFrames().forEach(iframe => {
@@ -89,6 +90,9 @@
                 getFrames().forEach(iframe => {
                     postToDashboardFrame(iframe, { action: 'setCrosshairThickness', thickness });
                 });
+            });
+            crosshairSlider?.addEventListener('change', () => {
+                root.DashBridgeAnalytics?.track('dashbridge.crosshair_thickness_changed', 'changed', {});
             });
 
             documentRef.getElementById('profilePickerBtn').addEventListener('click', event => {

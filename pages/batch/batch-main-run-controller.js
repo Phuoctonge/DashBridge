@@ -60,6 +60,7 @@
                 phase: 'Получение списка панелей',
             });
             const captureFilename = captureUtils.createFilenameFactory();
+            let analyticsOutcome = 'error';
             logMessage('🚀 Начало работы массового сбора...');
             try {
                 const dashboardResult = await panelPicker.getDashboardPanelsWithRecovery(urlStr);
@@ -148,6 +149,7 @@
 
                 if (operation.isActive(runId)) {
                     if (!successfulJobs) {
+                        analyticsOutcome = 'no_data';
                         logMessage('Сбор завершён без снимков. Архив не создан.', true);
                         showToast('Не удалось сохранить ни одной панели', 'error');
                     } else {
@@ -163,9 +165,11 @@
                         });
                         await archive.finalize();
                         if (failedJobs) {
+                            analyticsOutcome = 'partial';
                             logMessage(`Сбор завершён частично: сохранено ${successfulJobs}, ошибок ${failedJobs}.`);
                             showToast(`Архив скачан: ${successfulJobs} успешно, ${failedJobs} с ошибкой`, 'info');
                         } else {
+                            analyticsOutcome = 'success';
                             logMessage('🎉 Сбор успешно завершен!');
                             showToast('Архив скачан!', 'success');
                         }
@@ -177,6 +181,8 @@
                     showToast('Критическая ошибка', 'error');
                 }
             } finally {
+                if (!operation.isActive(runId) && analyticsOutcome === 'error') analyticsOutcome = 'cancelled';
+                globalThis.DashBridgeAnalytics?.outcome('batch.main_run', analyticsOutcome, { workflow: 'main' });
                 await operation.finish(runId);
             }
         };

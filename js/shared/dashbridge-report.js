@@ -107,7 +107,24 @@
         return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(number);
     };
 
-    const markdownCell = value => String(value ?? '').slice(0, 500)
+    const MESSAGE_DURATION_UNITS = Object.freeze({
+        us: 'мкс', 'µs': 'мкс', 'μs': 'мкс', ms: 'мс', s: 'с', min: 'мин', mins: 'мин', h: 'ч', d: 'д'
+    });
+    function localizeMessageText(value) {
+        return String(value ?? '')
+            .replace(/(^|_)<_/gu, '$1GET_')
+            .replace(/(^|_)>_/gu, '$1POST_')
+            .replace(/(^|_)(?:\\)?\*_/gu, '$1DELETE_')
+            .replace(/(^|_)\^_/gu, '$1PUT_')
+            .replace(/(\d(?:[.,]\d+)?\s*)(µs|μs|us|ms|mins?|s|h|d)\b/giu,
+                (_match, amount, unit) => `${amount}${MESSAGE_DURATION_UNITS[unit.toLowerCase()] || unit}`);
+    }
+    const localizeMessageUnit = value => {
+        const unit = String(value ?? '');
+        return MESSAGE_DURATION_UNITS[unit.toLowerCase()] || unit;
+    };
+
+    const markdownCell = value => localizeMessageText(String(value ?? '').slice(0, 500))
         .replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\r?\n/g, '<br>');
     function formatMarkdownTable(value) {
         const columns = Array.isArray(value?.columns) ? value.columns.slice(0, 20).map(markdownCell) : [];
@@ -153,7 +170,7 @@
             const value = finiteOrNull(item?.cpuCapacity);
             return value !== null && value > 0 ? value : null;
         };
-        const rawNameOf = item => String(item?.name || '');
+        const rawNameOf = item => localizeMessageText(item?.name || '');
         const displayNameOf = item => {
             const rawName = rawNameOf(item);
             const cpuCapacity = cpuCapacityOf(item);
@@ -163,7 +180,7 @@
             name: displayNameOf(item), rawName: rawNameOf(item),
             vCpu: formatNumber(cpuCapacityOf(item)), cpuCapacity: formatNumber(cpuCapacityOf(item)),
             seriesThreshold: formatNumber(item?.threshold ?? item?.cpuCapacityThreshold),
-            value: formatNumber(item?.value), unit: snapshot?.unit || '',
+            value: formatNumber(item?.value), unit: localizeMessageUnit(snapshot?.unit),
             level: levelOf(item), panelTitle: panel?.title || 'Панель Grafana'
         }).trim();
         const list = items => items.map(itemText).filter(Boolean).join('\n');
@@ -181,7 +198,7 @@
             threshold: dynamicThreshold || formatNumber(snapshot?.threshold),
             criticalThreshold: dynamicThreshold || formatNumber(snapshot?.criticalThreshold ?? snapshot?.threshold),
             warningThreshold: formatNumber(snapshot?.warningThreshold),
-            unit: snapshot?.unit || '',
+            unit: localizeMessageUnit(snapshot?.unit),
             servers: critical.map(displayNameOf).filter(Boolean).join(', '),
             serverCount: critical.length,
             criticalServers: critical.map(displayNameOf).filter(Boolean).join(', '),
@@ -201,7 +218,7 @@
             sumValue: formatNumber(snapshot?.sumValue),
             aggregateValue: formatNumber(snapshot?.aggregateValue),
             cpuCapacityCoefficient: formatNumber(snapshot?.cpuCapacityCoefficient),
-            dataStatus: String(snapshot?.dataStatusText || snapshot?.error || ''),
+            dataStatus: localizeMessageText(snapshot?.dataStatusText || snapshot?.error || ''),
             period: context.period || '',
             generatedAt: context.generatedAt || ''
         };
@@ -229,7 +246,7 @@
         }
         const details = config.detailsEnabled && ['warning', 'critical'].includes(state)
             ? renderTemplate(config.templates.details, variables).trim() : '';
-        return { included: true, state, text: [main, details].filter(Boolean).join('\n'), variables };
+        return { included: true, state, text: localizeMessageText([main, details].filter(Boolean).join('\n')), variables };
     }
 
     const russianPlural = (number, forms) => {
@@ -268,7 +285,7 @@
         let output = renderTemplate(config.template, variables);
         output = output.replace(/\{\{\s*panel:([a-zA-Zа-яА-ЯёЁ0-9_]+)\s*\}\}/gu,
             (match, key) => byKey[key] || '');
-        return output.replace(/\n{3,}/g, '\n\n').trim();
+        return localizeMessageText(output.replace(/\n{3,}/g, '\n\n').trim());
     }
 
     root.DashBridgeReport = Object.freeze({
@@ -276,6 +293,6 @@
         DEFAULT_NEUTRAL_TEMPLATE, DEFAULT_UNAVAILABLE_TEMPLATE, DEFAULT_LIST_ITEM_TEMPLATE, DEFAULT_DETAILS_TEMPLATE,
         PROFILE_VARIABLES, PANEL_VARIABLES, LIST_VARIABLES,
         normalizeProfile, normalizePanel, orderPanels, renderTemplate, extractTemplateVariables, panelVariables,
-        renderPanel, compose, formatNumber, formatMarkdownTable, formatDuration, slug
+        renderPanel, compose, formatNumber, formatMarkdownTable, formatDuration, localizeMessageText, slug
     });
 })(globalThis);

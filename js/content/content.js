@@ -74,6 +74,52 @@
         if (!grafanaMenuScopeAllowed || !hasActiveUserGesture()
             || typeof event.detail?.enabled !== 'boolean') return;
         chrome.storage.sync.set({ grafanaCompactScreenshot: event.detail.enabled });
+        globalThis.DashBridgeAnalytics?.changed('grafana.panel.compact_capture', event.detail.enabled,
+            { surface: 'direct_grafana' });
+    });
+
+    const panelToolFeatures = Object.freeze({
+        removeFill: 'grafana.panel.fill_removed', thickenLines: 'grafana.panel.lines_thickened',
+        invertLegend: 'grafana.panel.legend_inverted', legendSelection: 'grafana.panel.legend_selection',
+        invertIdle: 'grafana.panel.cpu_idle_to_load', convertMemToUsed: 'grafana.panel.ram_to_used',
+        forceMemByteUnit: 'grafana.panel.ram_force_byte_unit', seriesQueryFilterEnabled: 'grafana.panel.series_value_filter',
+        seriesQueryFilterHighlightEnabled: 'grafana.panel.series_highlight',
+        cpuCapacityFilterEnabled: 'grafana.panel.load_cpu_capacity_filter',
+        cpuCapacityFilterHighlightEnabled: 'grafana.panel.load_cpu_capacity_highlight',
+        cpuCapacityFilterLoad1: 'grafana.panel.load_series_1m', cpuCapacityFilterLoad5: 'grafana.panel.load_series_5m',
+        cpuCapacityFilterLoad15: 'grafana.panel.load_series_15m', thresholdEnabled: 'grafana.panel.threshold',
+        thresholdNotifyEnabled: 'grafana.panel.threshold_notification', capturePrepared: 'grafana.panel.compact_capture'
+    });
+    document.addEventListener('dashbridgeAnalyticsPanelToolsChanged', event => {
+        if (!grafanaMenuScopeAllowed || !Array.isArray(event.detail?.changes)
+            || event.detail.changes.length > 20) return;
+        event.detail.changes.forEach(change => {
+            const featureId = panelToolFeatures[change?.key];
+            if (featureId && typeof change.enabled === 'boolean') {
+                if (event.detail.signal === 'effective') {
+                    globalThis.DashBridgeAnalytics?.track(featureId, 'effective', {
+                        surface: 'direct_grafana', state: change.enabled ? 'enabled' : 'disabled'
+                    });
+                } else {
+                    globalThis.DashBridgeAnalytics?.changed(featureId, change.enabled, { surface: 'direct_grafana' });
+                }
+            }
+        });
+    });
+    const directActions = Object.freeze({
+        analysis_opened: 'grafana.panel.analysis_opened', analysis_copy_all: 'grafana.panel.analysis_copy_all',
+        analysis_copy_top3: 'grafana.panel.analysis_copy_top3', settings_saved: 'grafana.panel.settings_saved'
+    });
+    document.addEventListener('dashbridgeAnalyticsDirectAction', event => {
+        if (!grafanaMenuScopeAllowed) return;
+        if (event.detail?.action === 'analysis_mode_changed' && ['period', 'latest'].includes(event.detail.mode)) {
+            globalThis.DashBridgeAnalytics?.track('grafana.panel.analysis_mode_changed', 'used', {
+                surface: 'direct_grafana', mode: event.detail.mode
+            });
+            return;
+        }
+        const featureId = directActions[event.detail?.action];
+        if (featureId) globalThis.DashBridgeAnalytics?.track(featureId, 'used', { surface: 'direct_grafana' });
     });
 
     let panelCaptureInProgress = false;
@@ -90,16 +136,20 @@
             const outputSize = detail.prepared
                 ? { width: Number(detail.outputWidth) || 1000, height: Number(detail.outputHeight) || 520 }
                 : null;
-            const image = await globalThis.DashBridgeGrafanaCaptureOutput.crop(captured.dataUrl, detail.rect, outputSize);
+            const captureOutput = globalThis.DashBridgeGrafanaCaptureOutput;
+            if (typeof captureOutput?.crop !== 'function') {
+                throw new Error('Модуль обработки снимка Grafana не загрузился. Повторите захват.');
+            }
+            const image = await captureOutput.crop(captured.dataUrl, detail.rect, outputSize);
             if (detail.action === 'copy') {
                 // The active Grafana document owns focus after the toolbar click.
                 // An offscreen extension document never does, so Chromium can
                 // reject Clipboard.write there with "Document is not focused".
-                await globalThis.DashBridgeGrafanaCaptureOutput.copy(image.blob);
+                await captureOutput.copy(image.blob);
             } else {
                 const download = await chrome.runtime.sendMessage({
                     type: 'dashbridge-download-panel-capture', dataUrl: image.dataUrl,
-                    filename: globalThis.DashBridgeGrafanaCaptureOutput.filename(detail.title)
+                    filename: captureOutput.filename(detail.title)
                 });
                 if (!download?.ok) throw new Error(download?.error || 'capture-download-failed');
             }
@@ -109,6 +159,9 @@
         } finally {
             panelCaptureInProgress = false;
             document.dispatchEvent(new CustomEvent('dashbridgePanelCaptureResult', { detail: result }));
+            globalThis.DashBridgeAnalytics?.outcome(
+                detail.action === 'copy' ? 'grafana.panel.capture_png_copy' : 'grafana.panel.capture_png_download',
+                result.ok ? 'success' : 'error', { surface: 'direct_grafana', prepared: !!detail.prepared });
         }
     });
 
@@ -209,11 +262,15 @@
                     profileId: creating ? '' : selectedProfileId, newProfileName: creating ? name : ''
                 });
                 if (!response?.ok) throw new Error(response?.error || 'Не удалось сохранить график.');
+                globalThis.DashBridgeAnalytics?.outcome('grafana.panel.saved_to_dashbridge', 'success',
+                    { surface: 'direct_grafana' });
                 status.textContent = response.duplicate
                     ? `График уже есть в профиле «${response.profileName}».`
                     : `Сохранено в профиль «${response.profileName}».`;
                 setTimeout(close, 900);
             } catch (error) {
+                globalThis.DashBridgeAnalytics?.outcome('grafana.panel.saved_to_dashbridge', 'error',
+                    { surface: 'direct_grafana' });
                 status.textContent = error?.message || String(error); status.classList.add('error');
                 save.disabled = false; cancel.disabled = false;
             }
@@ -275,6 +332,11 @@
                 if (event.source !== window) return;
                 if (event.data && event.data.type === "INJECT_READY") {
                     sendStateToPage(currentActive, currentIframeIds);
+                }
+                if (event.data?.type === 'CONFLUENCE_FIX_APPLIED' && currentActive) {
+                    globalThis.DashBridgeAnalytics?.track('confluence.fix_activated', 'effective', {
+                        state: 'enabled'
+                    });
                 }
             });
 

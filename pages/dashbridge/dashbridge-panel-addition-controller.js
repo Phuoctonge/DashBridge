@@ -144,6 +144,9 @@
                 getPanels().push(addedPanel);
                 savePanels();
                 appendPanelCards([addedPanel]);
+                root.DashBridgeAnalytics?.outcome('dashbridge.panel_added', 'success', {
+                    method: 'single_url', countBucket: '1'
+                });
                 closeSingleModal();
             });
 
@@ -194,6 +197,10 @@
                 getPanels().push(...newPanels);
                 savePanels();
                 appendPanelCards(newPanels);
+                root.DashBridgeAnalytics?.outcome('dashbridge.panels_added_manual',
+                    newPanels.length === panelIds.length ? 'success' : 'partial', {
+                        method: 'manual_ids', countBucket: root.DashBridgeAnalytics.bucket(newPanels.length)
+                    });
                 closeQuickAddModal();
                 if (newPanels.length !== panelIds.length) {
                     await showAlert(`Добавлено панелей: ${newPanels.length}. Уже существующие панели пропущены.`);
@@ -234,6 +241,8 @@
                     if (loadVersion !== dashboardPickerLoadVersion
                         || dashboardPicker.style.display !== 'flex') return;
                     renderDashboardPickerPanels(dashboardUrl, result.panelList);
+                    root.DashBridgeAnalytics?.outcome('dashbridge.panels_discovered',
+                        result.panelList?.length ? 'success' : 'no_data', { method: 'dashboard_discovery' });
                 } catch (error) {
                     if (loadVersion !== dashboardPickerLoadVersion) return;
                     const unauthorized = [401, 403].includes(Number(error?.status))
@@ -241,6 +250,8 @@
                     dashboardPickerStatus.textContent = unauthorized
                         ? 'Требуется авторизация Grafana. Откройте дашборд в обычной вкладке, войдите и повторите запрос.'
                         : `Не удалось получить панели: ${String(error?.message || error).slice(0, 300)}`;
+                    root.DashBridgeAnalytics?.outcome('dashbridge.panels_discovered',
+                        unauthorized ? 'auth_required' : 'error', { method: 'dashboard_discovery' });
                 } finally {
                     if (loadVersion === dashboardPickerLoadVersion) {
                         dashboardPickerLoad.disabled = false;
@@ -286,6 +297,10 @@
                 getPanels().push(...addedPanels);
                 await savePanels();
                 appendPanelCards(addedPanels);
+                root.DashBridgeAnalytics?.outcome('dashbridge.panels_added_from_discovery',
+                    selectedPanels.length === selectedIndexes.length ? 'success' : 'partial', {
+                        method: 'dashboard_discovery', countBucket: root.DashBridgeAnalytics.bucket(addedPanels.length)
+                    });
                 closeDashboardPicker();
                 if (selectedPanels.length !== selectedIndexes.length) {
                     await showAlert(`Добавлено панелей: ${selectedPanels.length}. Уже существующие панели пропущены.`);

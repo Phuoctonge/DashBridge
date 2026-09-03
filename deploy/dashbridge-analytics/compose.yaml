@@ -1,0 +1,38 @@
+services:
+  analytics:
+    build:
+      context: .
+    container_name: dashbridge-analytics
+    restart: unless-stopped
+    environment:
+      ADMIN_GATEWAY_USER: admin
+      RETENTION_DAYS: ${RETENTION_DAYS:-400}
+      MAX_DATABASE_MIB: ${MAX_DATABASE_MIB:-512}
+    volumes:
+      - ./data:/data
+    networks:
+      - analytics_private
+    expose:
+      - "8080"
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  analytics_private:
+    external: true

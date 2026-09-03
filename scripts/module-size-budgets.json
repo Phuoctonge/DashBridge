@@ -5,9 +5,9 @@
   },
   "exceptions": {
     "js/content/grafana-panel-tools.js": {
-      "maxLines": 2300,
+      "maxLines": 2320,
       "maxBytes": 135168,
-      "reason": "MAIN dispatcher and tightly coupled panel/threshold coordination facade; extracted lifecycles remain separate owners."
+      "reason": "MAIN dispatcher and tightly coupled panel/threshold coordination facade, including its privacy-safe settings event bridge; extracted lifecycles remain separate owners."
     },
     "js/content/grafana-threshold-visuals.js": {
       "maxLines": 780,

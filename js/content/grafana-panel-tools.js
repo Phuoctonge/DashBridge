@@ -1629,21 +1629,20 @@
         if (event.data?.action === 'collectPanelReportSnapshot') {
             const requestId = typeof event.data.requestId === 'string' ? event.data.requestId.slice(0, 160) : '';
             if (!isDashboardIframe || !requestId) return;
-            const targetPanel = getTargetPanel();
-            const root = window.DashBridgeGrafanaDom?.outerPanel(targetPanel) || targetPanel || document;
+            const getReportRoot = () => { const panel = getTargetPanel(); return window.DashBridgeGrafanaDom?.outerPanel(panel) || panel || document; };
             let snapshot;
             try {
                 const collect = () => window.DashBridgeGrafanaVisualEngine?.collectPanelReportSnapshot?.({
-                    root, sla: event.data.sla || {}
+                    root: getReportRoot(), sla: event.data.sla || {}
                 }) || { state: 'no_data', series: [] };
                 const readySnapshot = () => {
-                    const status = window.__dashbridgePanelToolsVisualMetadata?.responseDataStatus?.kind || 'unknown';
-                    const current = collect();
+                    const status = window.__dashbridgePanelToolsVisualMetadata?.responseDataStatus?.kind || 'unknown', current = collect();
                     // Grafana can leave one background request pending even
                     // after a table/chart has rendered usable data. What the
                     // user currently sees is a valid report snapshot and must
                     // not wait for that unrelated request to time out.
                     if (Array.isArray(current.series) && current.series.length) return current;
+                    if (Array.isArray(current.table?.rows) && current.table.rows.length) return current;
                     if (status === 'loading') return null;
                     const terminalStatuses = new Set([
                         'filtered_empty', 'empty_source', 'http_error', 'network_error', 'decode_error', 'aborted'
@@ -1655,7 +1654,7 @@
                     if (terminalStatuses.has(status)) {
                         return current;
                     }
-                    const nativeNoData = Array.from(root?.querySelectorAll?.('div, span') || []).some(element =>
+                    const nativeNoData = Array.from(getReportRoot()?.querySelectorAll?.('div, span') || []).some(element =>
                         element.children.length === 0 && /^No data$/i.test(String(element.textContent || '').trim()));
                     return nativeNoData ? current : null;
                 };
@@ -1701,7 +1700,8 @@
                     window.addEventListener('dashbridgePanelDataSettled', scheduleInspect);
                     if (typeof MutationObserver === 'function') {
                         dataObserver = new MutationObserver(scheduleInspect);
-                        dataObserver.observe(root === document ? document.documentElement : root, {
+                        // Grafana 12 can replace the panel while its virtualized Data Grid mounts.
+                        dataObserver.observe(document.documentElement, {
                             childList: true, subtree: true, characterData: true
                         });
                     }
@@ -2147,6 +2147,23 @@
                     ? false
                     : (state.convertMemToUsed || state.forceMemByteUnit);
                 enforceSingleResponseSeriesFilter(nextState);
+                const analyticsKeys = ['removeFill', 'thickenLines', 'invertLegend', 'invertIdle', 'convertMemToUsed',
+                    'forceMemByteUnit', 'seriesQueryFilterEnabled', 'seriesQueryFilterHighlightEnabled',
+                    'cpuCapacityFilterEnabled', 'cpuCapacityFilterHighlightEnabled', 'cpuCapacityFilterLoad1',
+                    'cpuCapacityFilterLoad5', 'cpuCapacityFilterLoad15', 'thresholdEnabled',
+                    'thresholdNotifyEnabled', 'capturePrepared'];
+                const changes = analyticsKeys.filter(key => !!state[key] !== !!nextState[key]).map(key => ({
+                    key, enabled: !!nextState[key]
+                }));
+                if (JSON.stringify(state.legendVisibleSeries || []) !== JSON.stringify(nextState.legendVisibleSeries || [])) {
+                    changes.push({ key: 'legendSelection', enabled: !!nextState.legendVisibleSeries?.length });
+                }
+                if (changes.length) document.dispatchEvent(new CustomEvent(
+                    'dashbridgeAnalyticsPanelToolsChanged', { detail: { changes } }
+                ));
+                document.dispatchEvent(new CustomEvent(
+                    'dashbridgeAnalyticsDirectAction', { detail: { action: 'settings_saved' } }
+                ));
                 const completeHideActive = legendSelection.isCompleteHideActive(nextState);
                 if (!isDashboardIframe && (nextState.seriesQueryFilterEnabled || nextState.cpuCapacityFilterEnabled || completeHideActive)) {
                     nextState.targetQuerySignatures = await window.DashBridgeGrafanaVisualEngine?.getPanelQuerySignaturesAsync?.({
@@ -2259,6 +2276,9 @@
                     // can switch immediately without querying Grafana.
                     syncThresholdHighlightState(thresholdRoot);
                 }
+                if (changes.length) document.dispatchEvent(new CustomEvent(
+                    'dashbridgeAnalyticsPanelToolsChanged', { detail: { changes, signal: 'effective' } }
+                ));
             }
         });
     };

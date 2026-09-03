@@ -84,10 +84,20 @@
 
             const state = {
                 requestId, panel, iframe, type, overlay, mode: 'period', snapshot: null, notice: '', status: 'loading',
+                resultRecorded: false,
                 receive(message) {
                     this.status = message.status || 'loading';
                     this.notice = typeof message.notice === 'string' ? message.notice.substring(0, 500) : '';
                     if (message.snapshot && typeof message.snapshot === 'object') this.snapshot = message.snapshot;
+                    if (!this.resultRecorded && ['ready', 'empty', 'error'].includes(this.status)) {
+                        const hasItems = ['period', 'latest'].some(mode =>
+                            Array.isArray(this.snapshot?.[mode]?.items) && this.snapshot[mode].items.length);
+                        root.DashBridgeAnalytics?.outcome('dashbridge.analysis_result',
+                            this.status === 'ready' && hasItems ? 'success'
+                                : (this.status === 'empty' || !hasItems ? 'no_data' : 'error'),
+                            { source: 'response' });
+                        this.resultRecorded = true;
+                    }
                     render();
                 }
             };
@@ -140,13 +150,25 @@
                 try {
                     await navigatorRef.clipboard.writeText(text);
                     button.textContent = 'Скопировано';
+                    root.DashBridgeAnalytics?.outcome(key === 'copyAll'
+                        ? 'dashbridge.analysis_copy_all' : 'dashbridge.analysis_copy_top3', 'success',
+                    { mode: state.mode });
                 } catch {
                     button.textContent = 'Ошибка копирования';
+                    root.DashBridgeAnalytics?.outcome(key === 'copyAll'
+                        ? 'dashbridge.analysis_copy_all' : 'dashbridge.analysis_copy_top3', 'error',
+                    { mode: state.mode });
                 }
                 setTimer(() => { if (button.isConnected) button.textContent = original; }, 2000);
             };
-            period.addEventListener('click', () => { state.mode = 'period'; render(); });
-            latest.addEventListener('click', () => { state.mode = 'latest'; render(); });
+            period.addEventListener('click', () => {
+                state.mode = 'period'; render();
+                root.DashBridgeAnalytics?.opened('dashbridge.analysis_mode_period');
+            });
+            latest.addEventListener('click', () => {
+                state.mode = 'latest'; render();
+                root.DashBridgeAnalytics?.opened('dashbridge.analysis_mode_latest');
+            });
             copyAll.addEventListener('click', () => { void copyText(copyAll, 'copyAll'); });
             copyTop.addEventListener('click', () => { void copyText(copyTop, 'copyTop'); });
             closeButton.addEventListener('click', close);
@@ -157,6 +179,8 @@
                 render();
             }
             closeButton.focus();
+            root.DashBridgeAnalytics?.opened(type === 'cpu'
+                ? 'dashbridge.analysis_cpu_opened' : 'dashbridge.analysis_ram_opened');
             return true;
         };
 

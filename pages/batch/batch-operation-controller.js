@@ -16,8 +16,11 @@
         const releaseWindow = () => captureWindowRunner.release();
         async function cancel() {
             if (!processing) return false;
+            const featureId = document.querySelector('.tab-btn.active')?.dataset.tab === 'tab-series'
+                ? 'batch.series_cancelled' : 'batch.main_cancelled';
             lifecycle.cancel(); processing = false; progress.cancel();
             logMessage('⛔ Сбор отменён пользователем.'); showToast('Сбор отменён', 'info');
+            root.DashBridgeAnalytics?.outcome(featureId, 'cancelled');
             await releaseWindow(); setProcessing(false); return true;
         }
         const begin = async ({ title, phase }) => {

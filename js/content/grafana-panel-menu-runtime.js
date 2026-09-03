@@ -139,6 +139,9 @@
         const openPanelAnalysis = (panel, type, title) => {
             const analysis = window.DashBridgeGrafanaPanelAnalysis;
             if (!analysis || !panel || !['cpu', 'ram'].includes(type)) return;
+            document.dispatchEvent(new CustomEvent('dashbridgeAnalyticsDirectAction', {
+                detail: { action: 'analysis_opened' }
+            }));
             window.__dashbridgePanelAnalysisCaptureSession?.cancel?.('replaced');
             window.__dashbridgePanelAnalysisCaptureSession = null;
             document.querySelector('.dashbridge-panel-analysis-overlay')?.remove();
@@ -277,14 +280,26 @@
                 const original = button.textContent;
                 try {
                     await navigator.clipboard.writeText(formatPanelAnalysisCopy(currentItems, type, topOnly, settings));
+                    document.dispatchEvent(new CustomEvent('dashbridgeAnalyticsDirectAction', {
+                        detail: { action: topOnly ? 'analysis_copy_top3' : 'analysis_copy_all' }
+                    }));
                     button.textContent = 'Скопировано';
                 } catch {
                     button.textContent = 'Ошибка копирования';
                 }
                 setTimeout(() => { if (button.isConnected) button.textContent = original; }, 2000);
             };
-            period.addEventListener('click', () => { selectedMode = 'period'; render(); });
-            latest.addEventListener('click', () => { selectedMode = 'latest'; render(); });
+            const publishMode = mode => {
+                document.dispatchEvent(new CustomEvent('dashbridgeAnalyticsDirectAction', {
+                    detail: { action: 'analysis_mode_changed', mode }
+                }));
+            };
+            period.addEventListener('click', () => {
+                selectedMode = 'period'; render(); publishMode('period');
+            });
+            latest.addEventListener('click', () => {
+                selectedMode = 'latest'; render(); publishMode('latest');
+            });
             copyAll.addEventListener('click', () => { void copy(copyAll, false); });
             copyTop.addEventListener('click', () => { void copy(copyTop, true); });
             const dispose = () => {

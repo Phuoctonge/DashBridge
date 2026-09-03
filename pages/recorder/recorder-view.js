@@ -120,7 +120,11 @@
                         row.tabIndex = 0;
                         row.classList.toggle('selected', request.requestId === state.selectedRequestId);
                         row.setAttribute('aria-selected', String(request.requestId === state.selectedRequestId));
-                        const selectRequest = () => { state.selectedRequestId = request.requestId; state.revealSensitiveDetails = false; renderTraffic(); renderRequestDetails(); };
+                        const selectRequest = () => {
+                            state.selectedRequestId = request.requestId; state.revealSensitiveDetails = false;
+                            renderTraffic(); renderRequestDetails();
+                            globalThis.DashBridgeAnalytics?.opened('recorder.request_details_opened');
+                        };
                         row.addEventListener('click', selectRequest);
                         row.addEventListener('keydown', event => {
                             if (event.key !== 'Enter' && event.key !== ' ') return;
@@ -269,7 +273,11 @@
 
             async function exportComparisonReport() {
                 const visible = filteredComparisonItems();
-                if (!visible.length) { setStatus('По текущим фильтрам нечего экспортировать', true); return; }
+                if (!visible.length) {
+                    setStatus('По текущим фильтрам нечего экспортировать', true);
+                    globalThis.DashBridgeAnalytics?.outcome('recorder.comparison_export_xlsx', 'no_data', { format: 'xlsx' });
+                    return;
+                }
                 try {
                     if (!comparisonXlsx?.build) throw new Error('Модуль Excel не загружен');
                     ui.exportComparison.disabled = true; setStatus('Формирование Excel-отчёта…');
@@ -292,8 +300,10 @@
                     try { await chrome.downloads.download({ url, filename, saveAs: true }); }
                     finally { setTimeout(() => URL.revokeObjectURL(url), 1000); }
                     setStatus(`Excel-отчёт ${filename} передан в загрузки Chrome.`);
+                    globalThis.DashBridgeAnalytics?.outcome('recorder.comparison_export_xlsx', 'success', { format: 'xlsx' });
                 } catch (error) {
                     setStatus(`Не удалось сформировать Excel: ${error?.message || error}`, true);
+                    globalThis.DashBridgeAnalytics?.outcome('recorder.comparison_export_xlsx', 'error', { format: 'xlsx' });
                 } finally {
                     updateControls();
                 }

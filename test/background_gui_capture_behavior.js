@@ -12,7 +12,9 @@ const chrome = {
     },
     scripting: {
         getRegisteredContentScripts: async () => [], registerContentScripts: async () => {},
-        unregisterContentScripts: async () => {}, executeScript: async () => [],
+        unregisterContentScripts: async () => {}, executeScript: async options => {
+            chrome.__lastScriptInjection = options; return [];
+        },
     },
     windows: { create: async () => ({}), update: async () => {}, remove: async () => {} },
     downloads: { download: async () => 1 },
@@ -96,6 +98,16 @@ const grafanaSender = (url, frameId = 0) => ({
     const ready = waitForGuiCaptureReady(42, 100);
     messageListener({ type: 'dashbridge-gui-capture-ready' }, { tab: { id: 42 } }, () => {});
     assert.strictEqual(await ready, true, 'matching tab render event must resolve the waiter');
+    const captureResult = await new Promise(resolve => messageListener(
+        { type: 'dashbridge-capture-visible-tab' },
+        { ...grafanaSender('https://grafana.test/d/uid/name'), documentId: 'document-7' }, resolve
+    ));
+    assert.strictEqual(captureResult.ok, true);
+    assert.strictEqual(JSON.stringify(chrome.__lastScriptInjection.target),
+        JSON.stringify({ tabId: 7, documentIds: ['document-7'] }),
+        'capture must restore the isolated image dependency in the requesting document');
+    assert.strictEqual(JSON.stringify(chrome.__lastScriptInjection.files),
+        JSON.stringify(['js/shared/grafana-capture-output.js']));
     console.log('PASS background GUI capture waiter resolves for the emitting tab');
 })().catch(error => { console.error(error); process.exitCode = 1; });
 
@@ -106,3 +118,5 @@ assert(contentSource.includes('let grafanaMenuScopeAllowed = false')
     'isolated Grafana authority must remain in closure state and require an active user gesture');
 assert(!contentSource.includes("document.documentElement.dataset.dashbridgeGrafanaMenuEnabled !== 'true'"),
     'page-controlled datasets must not authorize isolated-world Chrome API bridges');
+assert(contentSource.includes("typeof captureOutput?.crop !== 'function'"),
+    'the isolated bridge must fail explicitly if the repaired capture dependency is still unavailable');

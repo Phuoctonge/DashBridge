@@ -27,6 +27,7 @@
 
         const stop = async (showStatus = true) => {
             if (!['recording', 'replaying'].includes(state.mode) && !state.attached) return;
+            const stoppedMode = state.mode;
             if (showStatus) state.stopRequested = true;
             await delay(250);
             const pendingCaptures = () => [
@@ -62,12 +63,14 @@
             if (showStatus) {
                 getProgressController()?.cancel();
                 setStatus(`Сессия остановлена: ${state.steps.length} шагов, ${state.requests.size} запросов.`);
+                if (stoppedMode === 'recording') root.DashBridgeAnalytics?.outcome('recorder.record_stopped', 'success');
             }
             scheduleRender();
         };
 
         const finalizeUnexpected = async (message, { debuggerDetached = false } = {}) => {
             if (!['recording', 'replaying'].includes(state.mode)) return;
+            const detachedMode = state.mode;
             const ephemeralWindowId = state.sessionOptions.disableCookies ? state.windowId : null;
             state.attached = false;
             state.detachedUnexpectedly = true;
@@ -100,6 +103,8 @@
             getProgressController()?.finish({ status: 'error', message });
             setStatus(message, true);
             scheduleRender();
+            root.DashBridgeAnalytics?.outcome(detachedMode === 'replaying'
+                ? 'recorder.replay_finished' : 'recorder.unexpected_detach', 'error');
             if (Number.isInteger(ephemeralWindowId)) {
                 await chromeRef.windows.remove(ephemeralWindowId).catch(() => undefined);
             }
@@ -137,12 +142,14 @@
                 setStatus('Запись активна. Выполняйте сценарий в открывшейся вкладке.');
                 await chromeRef.tabs.update(tabId, { url: startUrl });
                 updateRecordingProgress();
+                root.DashBridgeAnalytics?.outcome('recorder.record_started', 'success');
             } catch (error) {
                 await stop(false);
                 getProgressController()?.finish({
                     status: 'error', message: `Не удалось начать запись: ${error?.message || error}`,
                 });
                 setStatus(`Не удалось начать запись: ${error?.message || error}`, true);
+                root.DashBridgeAnalytics?.outcome('recorder.record_started', 'error');
             }
         };
 

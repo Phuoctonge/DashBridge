@@ -1,11 +1,12 @@
 # DashBridge permission map
 
-Сверено с `manifest.json` версии 2.4.2 и действующими runtime-потоками
-2026-09-02.
+Сверено с `manifest.json` версии 2.4.3 и действующими runtime-потоками
+2026-09-03.
 
 | Permission | Функция |
 |---|---|
-| `storage` | Настройки, профили, versioned migration/backup, worklog, Batch state, Recorder draft и bounded diagnostics. |
+| `storage` | Настройки, профили, versioned migration/backup, worklog, Batch state, Recorder draft, bounded diagnostics и ограниченная очередь обезличенных почасовых агрегатов. |
+| `alarms` | Один периодический wake-up service worker для отправки не более одной накопленной пачки аналитики в час. Если очередь пуста, сетевого запроса нет. |
 | `unlimitedStorage` | Обратная совместимость с уже большими локальными профилями, отчётами и Recorder payload. Новые объёмные данные всё равно имеют caps. |
 | `activeTab` | Команды Popup для явно выбранной Grafana/Jira/TDM-вкладки. |
 | `tabs` | Поиск активной вкладки, backfill Grafana runtime, временные Batch/Recorder-вкладки, навигация capture и `captureVisibleTab`. |
@@ -34,3 +35,8 @@ import ограничен 16 МиБ. Test runner остаётся внутрен
 `streams.json`, HTTP bodies, cookies, токены и введённые значения, включая
 password inputs. Manifest фиксирует лимиты и неполноту capture. Recorder
 предупреждает о секретах до записи; файлы исключены из Git через `.gitignore`.
+
+Клиентская аналитика использует только `storage` и один редкий `alarms` wake-up.
+Фиксированный HTTPS endpoint покрывается существующим `<all_urls>` host access;
+запрос выполняется без credentials/referrer, а сервер не хранит IP/access logs.
+Контракт данных описан в `docs/analytics.md`.

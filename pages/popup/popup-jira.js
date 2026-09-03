@@ -1,3 +1,4 @@
+/* global DashBridgeAnalytics */
 async function dashbridgeTransferJiraWorklogs(expectedOrigin, expectedBasePath = '') {
     const issueKeyPattern = /^[A-Z][A-Z0-9_]*-\d+$/;
     const normalizeIssueKey = value => {
@@ -128,14 +129,22 @@ document.addEventListener('DOMContentLoaded', () => {
             const activeOrigin = tab?.url ? normalizeHttpOrigin(tab.url) : null;
             if (!expectedOrigin || !tab?.id || activeOrigin !== expectedOrigin) {
                 alert(`Откройте задачу на настроенном сервере Jira (${expectedOrigin || 'проверьте настройки Jira'}).`);
+                DashBridgeAnalytics?.outcome('jira.popup_transfer', 'invalid_input');
                 return;
             }
-            await chrome.scripting.executeScript({
+            const executions = await chrome.scripting.executeScript({
                 target: { tabId: tab.id }, func: dashbridgeTransferJiraWorklogs, args: [expectedOrigin, expectedBasePath]
             });
+            const result = executions?.[0]?.result;
+            const outcome = result?.status === 'complete' ? 'success'
+                : (result?.status === 'partial' ? 'partial' : 'cancelled');
+            const dimensions = Number(result?.total) > 0
+                ? { countBucket: DashBridgeAnalytics.bucket(result.total) } : {};
+            DashBridgeAnalytics?.outcome('jira.popup_transfer', outcome, dimensions);
         } catch (error) {
             console.error('Не удалось запустить перенос worklog:', error);
             alert('Не удалось запустить перенос worklog. Проверьте активную вкладку и разрешения расширения.');
+            DashBridgeAnalytics?.outcome('jira.popup_transfer', 'error');
         }
     };
 });

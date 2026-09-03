@@ -1,0 +1,2 @@
+.empty { padding: 22px !important; text-align: center !important; color: var(--muted); font-weight: 400; }
+.timeline.is-empty { height: auto; min-height: 72px; align-items: center; justify-content: center; }

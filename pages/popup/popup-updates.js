@@ -1,4 +1,4 @@
-(function () {
+(function (root) {
     'use strict';
 
     const API_URL = 'https://api.github.com/repos/Phuoctonge/DashBridge/releases/latest';
@@ -19,7 +19,11 @@
         if (!notice || !text || !button) return;
         text.textContent = `Файлы версии ${diskVersion} готовы (запущена ${currentVersion})`;
         button.textContent = 'Перезагрузить расширение';
-        button.onclick = () => chrome.runtime.reload();
+        root.DashBridgeAnalytics?.track('update.local_reload_required', 'lifecycle', {});
+        button.onclick = () => {
+            root.DashBridgeAnalytics?.track('update.extension_reloaded', 'lifecycle', {});
+            setTimeout(() => chrome.runtime.reload(), 50);
+        };
         notice.hidden = false;
     }
 
@@ -48,7 +52,11 @@
         if (!notice || !text || !button) return;
         const currentVersion = chrome.runtime.getManifest().version;
         text.textContent = `Доступна версия ${release.version} (установлена ${currentVersion})`;
-        button.onclick = () => chrome.tabs.create({ url: release.installerUrl });
+        button.onclick = () => {
+            root.DashBridgeAnalytics?.opened('update.installer_opened');
+            chrome.tabs.create({ url: release.installerUrl });
+        };
+        root.DashBridgeAnalytics?.track('update.available', 'lifecycle', {});
         notice.hidden = false;
     }
 
@@ -99,4 +107,4 @@
         await checkLocalFiles();
         await checkForUpdates();
     });
-})();
+})(globalThis);

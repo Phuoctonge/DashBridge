@@ -1,7 +1,7 @@
 # Архитектура DashBridge
 
-> Сверено с версией 2.4.2, исходным кодом, тестами и dependency graph
-> 2026-09-02. Здесь описан фактически работающий код. Незавершённые
+> Сверено с версией 2.4.3, исходным кодом, тестами и dependency graph
+> 2026-09-03. Здесь описан фактически работающий код. Незавершённые
 > направления вынесены в `docs/roadmap.md`, ключевые прежние решения — в
 > `docs/history/architecture-decisions.md`.
 
@@ -489,6 +489,10 @@ Prepared mode сохраняет пропорции и вписывается в
 
 Copy выполняется максимально близко к клику из сфокусированного Grafana
 document. Ошибка capture/crop/download/clipboard также проходит восстановление.
+Перед `captureVisibleTab` service worker после повторной проверки отправителя
+идемпотентно восстанавливает `grafana-capture-output.js` в isolated world именно
+запросившего document. Это закрывает рассинхронизацию поколений MAIN/isolated
+runtime в уже открытой вкладке после обновления расширения.
 
 ### Popup CPU/RAM
 
@@ -855,6 +859,18 @@ manifest с файлом на диске и предлагает штатный 
 контракт: `docs/installer.md`.
 
 ## Куда добавлять функцию
+
+### Обезличенная аналитика
+
+`js/background-analytics.js` — единственный владелец installation ID, почасовой
+агрегации, дневного snapshot, очереди, retry и отправки. Service worker создаёт
+единственный jittered `chrome.alarms` wake-up и отправляет не более одной пачки
+в час; пустая очередь не вызывает сеть. Extension pages и
+isolated content script используют fail-open facade
+`js/shared/analytics-client.js`; MAIN сообщает только закрытые действия через
+CustomEvent, а isolated bridge повторно переводит их в разрешённые feature ID.
+Service worker проверяет sender отдельно для extension pages, настроенной
+Grafana и Confluence. Полный контракт и запрет данных: `docs/analytics.md`.
 
 - Popup UI: `pages/popup/` + порядок `pages/popup/popup.html`.
 - Новая page: feature-каталог в `pages/`, общие UI-зависимости из `pages/shared/`, ранний `theme.js`.

@@ -32,7 +32,8 @@
     function create({ getFrameOrigin: resolveFrameOrigin = getFrameOrigin, getPanelForIframe, getPanels,
         acceptReportSnapshot, acceptPanelAnalysis, capturePanel,
         setCapturePrepared, savePanels, syncPanelAnalysisAction,
-        acceptTitleResponse, postToDashboardFrame = post, getCrosshairMode,
+        acceptTitleResponse, acceptPanelToolsApplied = () => undefined,
+        postToDashboardFrame = post, getCrosshairMode,
         getCrosshairThickness, sendTimeUpdate, applyPanelTools,
         retryPanelAnalysis, acceptLegendSeries, acceptThresholdStatus,
         broadcastCrosshair, hideCrosshair, windowRef = window,
@@ -40,7 +41,7 @@
         const required = [
             resolveFrameOrigin, getPanelForIframe, getPanels, acceptReportSnapshot,
             acceptPanelAnalysis, capturePanel, setCapturePrepared, savePanels,
-            syncPanelAnalysisAction, acceptTitleResponse, postToDashboardFrame,
+            syncPanelAnalysisAction, acceptTitleResponse, acceptPanelToolsApplied, postToDashboardFrame,
             getCrosshairMode, getCrosshairThickness, sendTimeUpdate,
             applyPanelTools, retryPanelAnalysis, acceptLegendSeries,
             acceptThresholdStatus, broadcastCrosshair, hideCrosshair,
@@ -98,6 +99,12 @@
             if (event.data.action === 'dashbridgePanelTitleResponse'
                 && typeof event.data.requestId === 'string') {
                 acceptTitleResponse(event.data);
+                return;
+            }
+            if (event.data.action === 'panelToolsApplied'
+                && typeof event.data.requestId === 'string'
+                && ['applied', 'error'].includes(event.data.commandStatus)) {
+                acceptPanelToolsApplied(event.data, sourcePanel);
                 return;
             }
             if (event.data.action === 'dashbridgeIframeReady') {
