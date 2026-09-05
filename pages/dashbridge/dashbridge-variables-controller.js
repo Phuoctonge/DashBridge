@@ -1,7 +1,7 @@
 (function initDashBridgeVariablesController(root) {
     'use strict';
     function create({ getPanels, getActiveProfile, getPanelForIframe, applyPanelParamsToUrl,
-        navigateDashboardFrame, savePanels, invalidate, replacePanelCard,
+        navigateDashboardFrame, savePanels, invalidate, replacePanelCard, updatePanelCard,
         documentRef = document, windowRef = window }) {
         const codec = root.DashBridgeVariablesState;
         const host = documentRef.getElementById('dashboardVariables');
@@ -280,7 +280,13 @@
                 for (const [panel, src] of changes) {
                     if (panel.src === src) continue;
                     panel.src = src;
-                    replacePanelCard(panel.id);
+                    // The correlated source already has Grafana's settled native
+                    // state. Rebuilding it would execute the same queries twice.
+                    if (panel.id === transaction.panel.id && frameFor(panel) === transaction.frame) {
+                        updatePanelCard(panel.id, { reloadFrame: false });
+                    } else {
+                        replacePanelCard(panel.id);
+                    }
                 }
                 const result = await savePanels();
                 if (!alive(group)) return;

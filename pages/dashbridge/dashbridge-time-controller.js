@@ -170,7 +170,7 @@
                 if (iframe.contentWindow && iframe.src && iframe.src !== 'about:blank') {
                     sendTimeUpdate(iframe);
                 } else if (iframe.dataset.src) {
-                    iframe.dataset.src = applyPanelParamsToUrl(panel, iframe.dataset.src);
+                    iframe.dataset.src = applyPanelParamsToUrl(panel);
                 }
             });
         };
@@ -179,7 +179,7 @@
             documentRef.querySelectorAll('iframe[name="dashbridge-iframe"]').forEach(iframe => {
                 const panel = getPanelForIframe(iframe);
                 if ((panel?.grafanaTheme || 'follow') !== 'follow' || !iframe.src || iframe.src === 'about:blank') return;
-                navigateDashboardFrame(iframe, applyPanelParamsToUrl(panel, iframe.src));
+                navigateDashboardFrame(iframe, applyPanelParamsToUrl(panel));
             });
         });
 
@@ -280,8 +280,7 @@
                     documentRef.querySelectorAll('iframe[name="dashbridge-iframe"]').forEach(iframe => {
                         const panel = getPanelForIframe(iframe);
                         if (!panel) return;
-                        const currentUrl = iframe.dataset.src || iframe.src || panel.src;
-                        navigateDashboardFrame(iframe, applyPanelParamsToUrl(panel, currentUrl));
+                        navigateDashboardFrame(iframe, applyPanelParamsToUrl(panel));
                     });
                 } else {
                     broadcast();

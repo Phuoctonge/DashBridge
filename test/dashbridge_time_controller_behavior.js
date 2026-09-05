@@ -145,6 +145,8 @@ assert.strictEqual(saveCount, 1, 'Refresh Off persists the active profile exactl
 assert.strictEqual(refreshCount, 1, 'Refresh Off navigates active panels exactly once');
 
 elements.absTimeFrom.value = '2025-04-25 10:48:00';
+// Native Scenes changes do not rewrite the parent iframe's src attribute.
+panels[0].src += '&var-instance=selected&var-instance=second';
 elements.absTimeTo.value = '2025-04-25 12:49:00';
 elements.applyAbsoluteTime.click();
 assert(Number(controller.getState().from) > 1_000_000_000_000, 'absolute input remains normalized to milliseconds');
@@ -152,9 +154,11 @@ assert.strictEqual(elements.timePickerLabel.textContent,
     `${controller.getState().from}–${controller.getState().to}`,
     'absolute header labels must use the compact time-state formatter');
 assert.strictEqual(navigated.length, 2, 'absolute range navigates each known iframe once');
+assert.deepStrictEqual(new URL(navigated[0].url).searchParams.getAll('var-instance'), ['selected', 'second']);
 
 frames = [loadedFrame];
 listeners.get('dashbridge-theme-change')();
 assert.strictEqual(navigated.length, 3, 'follow-theme iframe navigates on theme change');
+assert.deepStrictEqual(new URL(navigated[2].url).searchParams.getAll('var-instance'), ['selected', 'second']);
 
 console.log('PASS DashBridge time controller owns profile state, URL policy and iframe lifecycle');

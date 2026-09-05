@@ -56,7 +56,7 @@ checks = {
     "DashBridge keeps the complete-hide filter out of request URLs": "url.hash = hashParams.toString();" in TIME_CONTROLLER
         and "url.searchParams.set(LEGEND_FILTER_PARAM" not in TIME_CONTROLLER
         and "new URLSearchParams(url.hash.slice(1)).get('dashbridgeLegendFilter')" in COMMON,
-    "Dashboard refresh regenerates the iframe URL with the filter": "new URL(applyPanelParamsToUrl(panel, iframe.src))" in DASHBOARD,
+    "Dashboard refresh regenerates the saved panel URL with the filter": "new URL(applyPanelParamsToUrl(panel))" in DASHBOARD,
     "Grafana reads the serialized filter at document start": "readBootstrapLegendFilter" in COMMON
         and "installDataInterceptor();" in COMMON,
     "complete-hide filter preserves time and drops empty frames": "field.type === 'time' || field.name === 'Time'" in COMMON

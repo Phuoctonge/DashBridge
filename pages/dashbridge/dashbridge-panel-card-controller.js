@@ -62,7 +62,7 @@
             if (panel) setPanelDataStatus(panel, null);
             const iframe = forceLoadPanel(id);
             if (iframe?.src) {
-                const url = new URL(applyPanelParamsToUrl(panel, iframe.src));
+                const url = new URL(applyPanelParamsToUrl(panel));
                 url.searchParams.set('_t', now());
                 navigateDashboardFrame(iframe, url.toString());
             }

@@ -384,8 +384,8 @@ async function refreshAllPanels() {
     document.querySelectorAll('iframe[name="dashbridge-iframe"]').forEach(iframe => {
         const panel = getPanelForIframe(iframe);
         if (!panel || panel.paused) return;
-        if (iframe.src) navigateDashboardFrame(iframe, applyPanelParamsToUrl(panel, iframe.src));
-        else if (iframe.dataset.src) iframe.dataset.src = applyPanelParamsToUrl(panel, iframe.dataset.src);
+        if (iframe.src) navigateDashboardFrame(iframe, applyPanelParamsToUrl(panel));
+        else if (iframe.dataset.src) iframe.dataset.src = applyPanelParamsToUrl(panel);
     });
 }
 
@@ -526,4 +526,5 @@ window.DashBridgeVariablesController.create({
     savePanels,
     invalidate: () => { invalidateActiveProfileRuntime(); closeDashboardPanelAnalysis(); },
     replacePanelCard: replaceDashboardPanelCard,
+    updatePanelCard,
 }).start();

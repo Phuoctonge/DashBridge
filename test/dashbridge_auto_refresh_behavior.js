@@ -52,7 +52,7 @@ const absoluteEnd = timeSource.indexOf("documentRef.querySelectorAll('#refreshPo
 const absoluteSource = timeSource.slice(absoluteStart, absoluteEnd);
 assert(absoluteStart >= 0 && absoluteEnd > absoluteStart
     && absoluteSource.includes('if (requiresNavigation)')
-    && absoluteSource.includes('navigateDashboardFrame(iframe, applyPanelParamsToUrl(panel, currentUrl))')
+    && absoluteSource.includes('navigateDashboardFrame(iframe, applyPanelParamsToUrl(panel))')
     && absoluteSource.includes('broadcast();')
     && absoluteSource.indexOf('broadcast()') > absoluteSource.indexOf('if (requiresNavigation)'),
     'absolute ranges must navigate once while relative ranges keep the seamless update path');
