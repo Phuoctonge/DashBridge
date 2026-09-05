@@ -102,9 +102,18 @@
             const details = documentRef.createElement('details');
             details.className = 'dashboard-variable';
             const summary = documentRef.createElement('summary');
-            summary.className = 'btn btn-outline';
             const fullText = variable.texts.join(' + ') || variable.values.join(' + ') || '—';
-            summary.textContent = `${variable.hide === 1 ? '' : variable.label + ': '}${variable.values.length > 2 ? `Выбрано: ${variable.values.length}` : fullText}`;
+            if (variable.hide !== 1) {
+                const label = documentRef.createElement('span');
+                label.className = 'dashboard-variable-label';
+                label.textContent = variable.label;
+                summary.appendChild(label);
+            }
+            const value = documentRef.createElement('span');
+            value.className = 'dashboard-variable-value btn btn-outline';
+            value.textContent = variable.values.length > 2 ? `Выбрано: ${variable.values.length}` : fullText;
+            summary.appendChild(value);
+            summary.setAttribute('aria-label', `${variable.label}: ${value.textContent}`);
             summary.title = `${variable.label}: ${fullText}`;
             details.appendChild(summary);
             const body = documentRef.createElement('div');

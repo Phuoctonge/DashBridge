@@ -29,8 +29,23 @@
 .dashboard-variable-controls { display: flex; flex-wrap: wrap; gap: .5rem; min-width: 0; }
 .dashboard-variable { position: relative; min-width: 0; max-width: 24rem; }
 .dashboard-variable summary {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    cursor: pointer;
+    list-style: none;
+    border-radius: var(--radius-md);
+}
+.dashboard-variable-label {
+    font-size: .875rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+}
+.dashboard-variable-value {
     display: block;
     position: relative;
+    min-width: 0;
     padding-inline-end: 2.25rem;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -38,7 +53,7 @@
     list-style: none;
 }
 .dashboard-variable summary::-webkit-details-marker { display: none; }
-.dashboard-variable summary::after {
+.dashboard-variable-value::after {
     content: '';
     position: absolute;
     inset-inline-end: .875rem;
@@ -49,8 +64,8 @@
     border-block-end: 1.5px solid currentColor;
     transform: rotate(45deg);
 }
-.dashboard-variable[open] summary { border-color: var(--primary); color: var(--tab-active-text); background: var(--tab-active-bg); }
-.dashboard-variable[open] summary::after { transform: rotate(225deg); top: calc(50% - .0625rem); }
+.dashboard-variable[open] .dashboard-variable-value { border-color: var(--primary); color: var(--tab-active-text); background: var(--tab-active-bg); }
+.dashboard-variable[open] .dashboard-variable-value::after { transform: rotate(225deg); top: calc(50% - .0625rem); }
 .dashboard-variable-options {
     position: absolute;
     inset-block-start: calc(100% + .375rem);
