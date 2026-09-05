@@ -108,15 +108,38 @@ const grafanaSender = (url, frameId = 0) => ({
         'capture must restore the isolated image dependency in the requesting document');
     assert.strictEqual(JSON.stringify(chrome.__lastScriptInjection.files),
         JSON.stringify(['js/shared/grafana-capture-output.js']));
+    const indicatorResult = await new Promise(resolve => messageListener(
+        { type: 'dashbridge-apply-update-indicator', version: '2.4.3' },
+        { id: 'extension-id', url: 'chrome-extension://extension-id/pages/popup/popup.html' }, resolve
+    ));
+    assert.strictEqual(indicatorResult?.ok, true);
+    assert.strictEqual(indicatorResult?.applied, true,
+        'the exact popup must receive confirmation that the service worker applied the newer version');
+    const rejectedIndicator = await new Promise(resolve => messageListener(
+        { type: 'dashbridge-apply-update-indicator', version: '2.4.3' },
+        { id: 'extension-id', url: 'chrome-extension://extension-id/pages/options/options.html' }, resolve
+    ));
+    assert.strictEqual(rejectedIndicator.ok, false,
+        'another extension page must not gain the popup update-indicator authority');
     console.log('PASS background GUI capture waiter resolves for the emitting tab');
 })().catch(error => { console.error(error); process.exitCode = 1; });
 
 const contentSource = fs.readFileSync('js/content/content.js', 'utf8');
 assert(contentSource.includes('let grafanaMenuScopeAllowed = false')
     && contentSource.includes('grafanaMenuScopeAllowed = allowed')
-    && contentSource.includes('!grafanaMenuScopeAllowed || !hasActiveUserGesture()'),
+    && contentSource.includes("!grafanaMenuScopeAllowed ? 'scope'")
+    && contentSource.includes("!hasActiveUserGesture() ? 'user-activation'"),
     'isolated Grafana authority must remain in closure state and require an active user gesture');
+assert(contentSource.includes("stage: rejectedStage")
+    && contentSource.includes("stage = 'capture-visible-tab'")
+    && contentSource.includes("stage = 'crop'")
+    && contentSource.includes("stage = 'download'"),
+    'direct capture must report the exact rejected or failed stage instead of timing out silently');
 assert(!contentSource.includes("document.documentElement.dataset.dashbridgeGrafanaMenuEnabled !== 'true'"),
     'page-controlled datasets must not authorize isolated-world Chrome API bridges');
 assert(contentSource.includes("typeof captureOutput?.crop !== 'function'"),
     'the isolated bridge must fail explicitly if the repaired capture dependency is still unavailable');
+assert(contentSource.includes("fallback: 'download'")
+    && contentSource.includes('clipboardError: clipboardError?.message')
+    && contentSource.includes('insecureContext: globalThis.isSecureContext !== true'),
+    'an unavailable image clipboard must download the already-rendered PNG and describe the fallback');

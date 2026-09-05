@@ -155,6 +155,7 @@
         'internal.grafana_test_runner': 'Запущены тесты Grafana',
         'internal.message_test_runner': 'Запущены тесты отчётов',
         'internal.debug_easter_egg': 'Открыт служебный экран отладки',
+        'internal.panel_tools_apply': 'Применение инструментов панели Grafana',
     });
     const signals = Object.freeze({ used: 'Использовано', changed: 'Настройка изменена',
         configured: 'Сохранено в конфигурации', effective: 'Подтверждено в работе',
@@ -174,11 +175,15 @@
         grafana_debug: 'Диагностика Grafana', jira: 'Jira', html: 'HTML', json: 'JSON', both: 'HTML и JSON',
         png: 'PNG', zip: 'ZIP', dashflow: 'Сценарий DashFlow', xlsx: 'Excel', main: 'Основной', series: 'Серии', auto: 'Автоматически',
         current: 'Текущая', light: 'Светлая', dark: 'Тёмная', none: 'Нет', graph: 'График',
-        custom: 'Пользовательский', cpu_capacity: 'Количество CPU', dom: 'Страница', response: 'Ответ Grafana' });
+        custom: 'Пользовательский', cpu_capacity: 'Количество CPU', dom: 'Страница', response: 'Ответ Grafana',
+        runtime_dependency_missing: 'Не загрузился runtime-компонент',
+        visual_verification_failed: 'Изменение не подтвердилось после перерисовки',
+        legend_apply_failed: 'Не удалось применить состояние легенды', timeout: 'Истёк тайм-аут',
+        unexpected_exception: 'Непредвиденная ошибка расширения' });
     const dimensionNames = Object.freeze({ surface: 'Раздел', outcome: 'Результат', state: 'Состояние', mode: 'Режим',
         method: 'Способ', module: 'Модуль', format: 'Формат', theme: 'Тема', selectionMode: 'Выбор',
-        workflow: 'Процесс', prepared: 'Подготовленный режим', countBucket: 'Количество', renderer: 'Графический движок',
-        grafanaMajor: 'Версия Grafana', source: 'Источник' });
+        workflow: 'Процесс', prepared: 'Подготовленный режим', countBucket: 'Объектов в операции', renderer: 'Графический движок',
+        grafanaMajor: 'Версия Grafana', source: 'Источник', failure: 'Причина сбоя' });
     const api = Object.freeze({ features, signals, values, dimensionNames });
     root.DashBridgeAnalyticsLabels = api;
     if (typeof module === 'object' && module.exports) module.exports = api;

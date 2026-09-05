@@ -160,7 +160,20 @@ globalThis.DashBridgeCapture = (() => {
                     dpr: window.devicePixelRatio || 1
                 }, outputSize);
                 if (request.outputAction === 'copy') {
-                    await window.DashBridgeGrafanaCaptureOutput.copy(image.blob);
+                    try {
+                        await window.DashBridgeGrafanaCaptureOutput.copy(image.blob);
+                    } catch (clipboardError) {
+                        await chrome.downloads.download({
+                            url: image.dataUrl,
+                            filename: window.DashBridgeGrafanaCaptureOutput.filename(request.title || panel?.title),
+                            saveAs: false
+                        });
+                        result = {
+                            action: 'dashbridgePanelCaptureResult', requestId: request.requestId, ok: true,
+                            fallback: 'download', clipboardError: clipboardError?.message || String(clipboardError),
+                            insecureContext: window.isSecureContext !== true
+                        };
+                    }
                 } else if (request.outputAction === 'archive') {
                     result = { action: 'dashbridgePanelCaptureResult', requestId: request.requestId, ok: true, image };
                 } else {
@@ -170,7 +183,7 @@ globalThis.DashBridgeCapture = (() => {
                         saveAs: false
                     });
                 }
-                if (request.outputAction !== 'archive') {
+                if (request.outputAction !== 'archive' && !result.ok) {
                     result = { action: 'dashbridgePanelCaptureResult', requestId: request.requestId, ok: true };
                 }
             } catch (error) {

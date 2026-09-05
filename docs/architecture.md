@@ -494,6 +494,19 @@ document. Ошибка capture/crop/download/clipboard также проходи
 запросившего document. Это закрывает рассинхронизацию поколений MAIN/isolated
 runtime в уже открытой вкладке после обновления расширения.
 
+Popup-отчёт удалённой диагностики сохраняет последнюю ограниченную стадию
+panel capture (`user-activation`, `capture-visible-tab`, `crop`, `download`,
+`clipboard` либо `complete`), готовность MAIN/capture runtime и инвентарь
+известных DOM-маркеров Grafana 9–13. Он маскирует значения dashboard variables
+и секретные query-параметры, не читает cookies, ответы запросов и значения
+временных рядов.
+
+Если PNG уже создан, но Image Clipboard недоступен (в частности, на HTTP),
+copy fail-open сохраняет тот же PNG через Downloads. MAIN capture runtime
+показывает неблокирующий `role=status` toast с ручным закрытием и пятсекундным
+таймером; смена runtime generation удаляет уведомление и timer. Решение
+опирается на capability/error, а не на версию Grafana.
+
 ### Popup CPU/RAM
 
 ```text
@@ -614,7 +627,7 @@ password values и auth/cookie headers открыто и исключён из G
 | Область | Данные | Контракт |
 |---|---|---|
 | `storage.sync` | Grafana/Options, домены, compact capture, Popup, тема | Небольшие настройки; частые inputs debounce + flush. |
-| `storage.local` | Profiles, backups, Worklog/cache, Batch, diagnostics/status, `dashbridgeUpdateIndicator` | Долговечные/объёмные данные и служебная версия доступного обновления. |
+| `storage.local` | Profiles, backups, Worklog/cache, Batch, diagnostics/status, `dashbridgeUpdateIndicator`, `dashbridgeInstallationId` | Долговечные/объёмные данные, отдельный псевдоним аналитики и служебная версия доступного обновления. |
 | `storage.session` | `grafanaVisualState:<tabId>` | Служебное состояние вкладки, удаляется при закрытии. |
 | `localStorage` | Тема page | Синхронно до paint, затем sync reconciliation. |
 | MAIN `Map` | Live state по `panelKey` | Только document, переживает React DOM repair. |
@@ -841,10 +854,13 @@ Popup при открытии запрашивает только `releases/late
 час. Draft/prerelease, неожиданный тег, GitHub URL и отсутствие точных
 ZIP/installer assets отклоняются. При более новой версии показывается ссылка на
 installer. Popup сохраняет в `dashbridgeUpdateIndicator` только проверенную
-семантическую версию. Service worker меняет action icon и title, следит
-за этим ключом и восстанавливает индикатор после своего или браузерного
-перезапуска. Установка остаётся явным действием пользователя; после установки
-актуальной версии устаревшее состояние и индикатор удаляются автоматически.
+семантическую версию, затем отправляет service worker узкую команду применения
+и дожидается ответа. Команда принимается только от точного popup URL. Service
+worker меняет action icon и title, следит за storage-ключом и восстанавливает
+индикатор после своего или браузерного перезапуска; если Chrome отклоняет
+динамическую иконку, остаётся красный badge `!`. Установка остаётся явным
+действием пользователя; после установки актуальной версии устаревшее состояние
+и индикатор удаляются автоматически.
 
 `scripts/Install-DashBridge.ps1` работает вне extension trust boundary: выбирает
 установленный Chrome/Edge/Яндекс Браузер, best-effort ищет прежний unpacked path
@@ -857,6 +873,24 @@ manifest с файлом на диске и предлагает штатный 
 локальная готовая версия имеет приоритет над повторным remote download notice.
 Первичная регистрация через **Загрузить распакованное** остаётся ручной. Полный
 контракт: `docs/installer.md`.
+
+Analytics collector также развёртывается отдельно от extension runtime.
+`scripts/Start-AnalyticsDev.ps1` владеет локальным watch и синтетической SQLite,
+а `scripts/Publish-Analytics.ps1` — проверкой и загрузкой ограниченного release.
+VPS helper принимает только server/contract/public, запрещает symlink и
+небезопасные archive paths, сохраняет backup и откатывается при неуспешном
+health-check. Production SQLite принадлежит отдельному `/data`; UI-assets
+читаются на запрос и обновляются без restart ingestion, backend — коротким
+restart постоянного bind-mounted Node container без Docker build.
+
+Analytics collector также развёртывается отдельно от extension runtime.
+`scripts/Start-AnalyticsDev.ps1` владеет локальным watch и синтетической SQLite,
+а `scripts/Publish-Analytics.ps1` — проверкой и загрузкой ограниченного release.
+VPS helper принимает только server/contract/public, запрещает symlink и
+небезопасные archive paths, сохраняет backup и откатывается при неуспешном
+health-check. Production SQLite принадлежит отдельному `/data`; UI-assets
+читаются на запрос и обновляются без restart ingestion, backend — коротким
+restart постоянного bind-mounted Node container без Docker build.
 
 ## Куда добавлять функцию
 

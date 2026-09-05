@@ -17,6 +17,8 @@ const dimensions = Object.freeze({
     renderer: new Set(['uplot', 'flot', 'unknown']),
     grafanaMajor: new Set(['unknown', '8', '9', '10', '11', '12', '13']),
     source: new Set(['none', 'graph', 'custom', 'cpu_capacity', 'dom', 'response']),
+    failure: new Set(['runtime_dependency_missing', 'visual_verification_failed',
+        'legend_apply_failed', 'timeout', 'unexpected_exception']),
 });
 
 const definitions = new Map();
@@ -84,6 +86,7 @@ add(['options.saved', 'options.config_exported', 'options.config_imported'], ['u
 add(['options.module_availability'], ['configured'], ['module', 'state']);
 add(['internal.debug_report', 'internal.gui_capture', 'internal.grafana_test_runner', 'internal.message_test_runner', 'internal.debug_easter_egg'],
     ['used', 'outcome'], ['outcome']);
+add(['internal.panel_tools_apply'], ['outcome'], ['outcome', 'surface', 'failure']);
 
 const exactKeys = (value, expected) => value && typeof value === 'object' && !Array.isArray(value)
     && Object.keys(value).length === expected.length && expected.every(key => Object.hasOwn(value, key));

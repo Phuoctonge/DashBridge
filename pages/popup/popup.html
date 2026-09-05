@@ -214,8 +214,9 @@
                         <path d="M9 9h.01M15 9h.01M9 15h6" />
                     </svg> Отладочная информация Grafana</h3>
                 <p style="font-size: 0.6875rem; color: var(--text-muted); margin: 0 0 0.75rem; line-height: 1.4;">
-                    Собирает сведения только для отладки: версию и окружение Grafana, структуру панелей,
-                    размеры canvas, легенды и DOM-цепочки. Данные дашборда, запросы и cookies не копируются.
+                    Собирает сведения только для отладки: версии DashBridge и Grafana, структуру панелей,
+                    готовность захвата, размеры canvas, DOM-маркеры и последнюю ошибку снимка. Cookies, ответы
+                    запросов и значения временных рядов не копируются.
                 </p>
                 <div style="display: flex; flex-direction: column; gap: 0.5rem;">
                     <button id="grafanaDebugFullBtn" class="btn btn-primary">Скопировать полный отчёт</button>

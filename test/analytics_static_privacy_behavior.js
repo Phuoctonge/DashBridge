@@ -47,4 +47,11 @@ files.forEach(file => {
     }
 });
 assert(calls >= 40, 'privacy audit must continue to cover the feature instrumentation');
+const browserSmoke = fs.readFileSync('test/run-extension-browser-smoke.js', 'utf8');
+assert(browserSmoke.includes("const extensionEntries = Object.freeze(['manifest.json'")
+    && browserSmoke.includes('stageExtension(extensionRoot, analyticsSink.endpoint)')
+    && browserSmoke.includes("server.listen(0, '127.0.0.1', resolve)")
+    && browserSmoke.includes('localAnalyticsRequests: analyticsSink.requests.length')
+    && !browserSmoke.includes('--host-resolver-rules'),
+'browser smoke must exercise analytics through a staged loopback endpoint without DNS changes or production traffic');
 console.log(`PASS ${calls} literal analytics calls use catalogued features without sensitive dimensions`);

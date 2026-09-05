@@ -13,7 +13,10 @@ const sync = { module_grafana: true, module_jira: false, confluenceScrollFixEnab
 const localArea = {
     async get(keys) {
         if (keys === null) return clone(local);
-        return { dashbridgeAnalyticsState: clone(local.dashbridgeAnalyticsState) };
+        return {
+            dashbridgeAnalyticsState: clone(local.dashbridgeAnalyticsState),
+            dashbridgeInstallationId: local.dashbridgeInstallationId,
+        };
     },
     async set(values) { local = { ...local, ...clone(values) }; }
 };
@@ -105,5 +108,31 @@ const analytics = context.DashBridgeBackgroundAnalytics.create({
     const concurrentState = await concurrentAnalytics.loadState();
     assert.equal(concurrentState.inflight.length, 0, 'an alarm must not race the first storage load');
     assert.equal(concurrentState.aggregates.length, 0, 'the serialized alarm must send the newly tracked aggregate');
+
+    const firstInstallationId = state.installationId;
+    const restartedAnalytics = context.DashBridgeBackgroundAnalytics.create({
+        contract: context.DashBridgeAnalyticsContract, config, storageArea: localArea,
+        syncStorageArea: syncArea, runtimeApi: context.chrome.runtime,
+        fetchFn: context.fetch, randomUUID: context.crypto.randomUUID, now: () => timestamp
+    });
+    assert.strictEqual((await restartedAnalytics.loadState()).installationId, firstInstallationId,
+        'a service-worker restart or extension update must reuse the separately persisted installation ID');
+
+    const durableId = '00000000-0000-4000-8000-000000009999';
+    const migratedLocal = {
+        dashbridgeInstallationId: durableId,
+        dashbridgeAnalyticsState: { schemaVersion: 999, installationId: '00000000-0000-4000-8000-000000001111' }
+    };
+    const migratedArea = {
+        async get() { return clone(migratedLocal); },
+        async set(values) { Object.assign(migratedLocal, clone(values)); }
+    };
+    const migratedAnalytics = context.DashBridgeBackgroundAnalytics.create({
+        contract: context.DashBridgeAnalyticsContract, config, storageArea: migratedArea,
+        syncStorageArea: syncArea, runtimeApi: context.chrome.runtime,
+        fetchFn: context.fetch, randomUUID: context.crypto.randomUUID, now: () => timestamp
+    });
+    assert.strictEqual((await migratedAnalytics.loadState()).installationId, durableId,
+        'an analytics schema migration must preserve the dedicated installation ID');
     console.log('PASS background analytics aggregates, snapshots, validates and batches anonymously');
 })().catch(error => { console.error(error); process.exit(1); });

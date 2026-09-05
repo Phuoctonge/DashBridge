@@ -29,6 +29,11 @@ assert(source.includes("const INDICATOR_KEY = 'dashbridgeUpdateIndicator'")
     && source.includes('[INDICATOR_KEY]: { version }')
     && source.includes('chrome.storage.local.remove(INDICATOR_KEY)'),
 'popup must persist only the trusted update version and clear a stale update indicator');
+assert(source.includes("type: 'dashbridge-apply-update-indicator', version")
+    && source.includes('await chrome.storage.local.set({ [INDICATOR_KEY]: { version } })')
+    && source.includes('return applyUpdateIndicator(version)')
+    && source.includes('await rememberUpdate(release.version)'),
+'popup must persist the trusted version before requesting and awaiting explicit service-worker application');
 assert(source.includes("chrome.runtime.getURL('manifest.json')")
     && source.includes("cache: 'no-store'")
     && source.includes('localReloadRequired')

@@ -1,0 +1,105 @@
+#!/bin/sh
+set -eu
+
+archive=${1:-}
+expected_hash=${2:-}
+stack_root=${DASHBRIDGE_ANALYTICS_ROOT:-/opt/stacks/dashbridge-analytics}
+app_root="$stack_root/app"
+compose_file="$stack_root/compose.yaml"
+
+fail() { printf '%s\n' "dashbridge-analytics-apply: $*" >&2; exit 1; }
+[ "$(id -u)" -eq 0 ] || fail 'must run as root'
+[ -f "$archive" ] || fail 'release archive does not exist'
+[ -n "$expected_hash" ] || fail 'expected SHA-256 is required'
+[ "$stack_root" = /opt/stacks/dashbridge-analytics ] || fail 'unexpected stack root'
+
+actual_hash=$(sha256sum "$archive" | awk '{print $1}')
+[ "$actual_hash" = "$expected_hash" ] || fail 'release SHA-256 does not match'
+[ "$(wc -c < "$archive")" -le 4194304 ] || fail 'release archive exceeds 4 MiB'
+
+staging=$(mktemp -d /tmp/dashbridge-analytics-release.XXXXXX)
+backup="$stack_root/backups/$(date -u +%Y%m%dT%H%M%SZ).tar.gz"
+cleanup() { rm -rf "$staging"; rm -f "$archive"; }
+trap cleanup EXIT INT TERM
+
+tar -tvzf "$archive" | while IFS= read -r listing; do
+    kind=$(printf %.1s "$listing")
+    case "$kind" in -|d) ;; *) fail 'release contains a link or special file' ;; esac
+done
+tar -tzf "$archive" | while IFS= read -r entry; do
+    normalized=${entry#./}
+    case "$normalized" in /*|../*|*/../*|*/..) fail "unsafe archive entry: $entry" ;; esac
+    case "$normalized" in
+        server.js|analytics-contract.js|public|public/*|'') ;;
+        *) fail "unexpected archive entry: $entry" ;;
+    esac
+done
+tar --no-same-owner --no-same-permissions -xzf "$archive" -C "$staging"
+[ "$(du -sk "$staging" | awk '{print $1}')" -le 8192 ] || fail 'expanded release exceeds 8 MiB'
+if find "$staging" \( -type l -o ! -type f ! -type d \) -print -quit | grep -q .; then
+    fail 'release may contain only regular files and directories'
+fi
+for required in server.js analytics-contract.js public/index.html public/app.js public/labels.js public/style.css public/style-extra.css; do
+    [ -f "$staging/$required" ] || fail "release is missing $required"
+done
+
+docker run --rm -v "$staging:/release:ro" -w /release node:24-alpine node --check server.js >/dev/null
+docker run --rm -v "$staging:/release:ro" -w /release node:24-alpine node --check analytics-contract.js >/dev/null
+docker run --rm -v "$staging:/release:ro" -w /release node:24-alpine node --check public/app.js >/dev/null
+[ -f "$compose_file" ] || fail 'the installed compose.yaml is missing'
+docker compose -f "$compose_file" config --quiet
+
+mkdir -p "$stack_root/backups" "$stack_root/data" "$app_root"
+current_files=''
+for item in server.js analytics-contract.js public; do
+    [ -e "$app_root/$item" ] && current_files="$current_files $item"
+done
+if [ -n "$current_files" ]; then
+    # shellcheck disable=SC2086
+    tar -czf "$backup" -C "$app_root" $current_files
+fi
+
+backend_changed=0
+for item in server.js analytics-contract.js; do
+    if [ ! -f "$app_root/$item" ] || ! cmp -s "$staging/$item" "$app_root/$item"; then backend_changed=1; fi
+done
+
+rollback() {
+    printf '%s\n' 'Health check failed; restoring the previous analytics release.' >&2
+    if [ -f "$backup" ]; then
+        tar -xzf "$backup" -C "$app_root"
+        docker compose -f "$compose_file" up -d --force-recreate analytics || true
+    fi
+    exit 1
+}
+
+for item in server.js analytics-contract.js; do
+    install -m 0644 "$staging/$item" "$app_root/$item.new"
+    mv -f "$app_root/$item.new" "$app_root/$item"
+done
+mkdir -p "$app_root/public"
+for source in "$staging"/public/*; do
+    name=${source##*/}
+    install -m 0644 "$source" "$app_root/public/$name.new"
+    mv -f "$app_root/public/$name.new" "$app_root/public/$name"
+done
+
+if [ "$backend_changed" -eq 1 ]; then
+    docker compose -f "$compose_file" restart analytics || rollback
+fi
+
+healthy=0
+attempt=0
+while [ "$attempt" -lt 20 ]; do
+    if docker compose -f "$compose_file" exec -T analytics node -e \
+        "fetch('http://127.0.0.1:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"; then
+        healthy=1
+        break
+    fi
+    attempt=$((attempt + 1))
+    sleep 1
+done
+[ "$healthy" -eq 1 ] || rollback
+
+find "$stack_root/backups" -maxdepth 1 -type f -name '*.tar.gz' -mtime +30 -delete
+printf '%s\n' "Analytics release applied (backend=$backend_changed)."

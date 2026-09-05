@@ -11,8 +11,12 @@ vm.runInContext(fs.readFileSync('js/background-update-indicator.js', 'utf8'), co
 
 const calls = [];
 let stored = { dashbridgeUpdateIndicator: { version: '2.4.3' } };
+let rejectIcon = false;
 const actionApi = {
-    setIcon: value => { calls.push(['icon', JSON.parse(JSON.stringify(value))]); return Promise.resolve(); },
+    setIcon: value => {
+        calls.push(['icon', JSON.parse(JSON.stringify(value))]);
+        return rejectIcon ? Promise.reject(new Error('icon rejected')) : Promise.resolve();
+    },
     setBadgeText: value => { calls.push(['badge', value.text]); return Promise.resolve(); },
     setBadgeBackgroundColor: value => { calls.push(['color', value.color]); return Promise.resolve(); },
     setTitle: value => { calls.push(['title', value.title]); return Promise.resolve(); }
@@ -41,6 +45,13 @@ const controller = context.DashBridgeBackgroundUpdateIndicator.create({ actionAp
     calls.length = 0;
     await controller.handleStorageChange({ dashbridgeUpdateIndicator: { newValue: { version: '2.5.0' } } }, 'local');
     assert(calls.some(([type, value]) => type === 'icon' && value.path[48] === 'icons/icon48-update.png'));
+
+    calls.length = 0;
+    rejectIcon = true;
+    assert.strictEqual(await controller.apply({ version: '2.5.0' }), true);
+    assert(calls.some(([type, value]) => type === 'badge' && value === '!'),
+        'a visible badge must remain when Chrome rejects the replacement icon');
+    assert(calls.some(([type, value]) => type === 'color' && value === '#d93025'));
     assert.strictEqual(context.DashBridgeBackgroundUpdateIndicator.isNewerVersion('2.4.2', '2.4.2'), false);
     assert.strictEqual(context.DashBridgeBackgroundUpdateIndicator.isNewerVersion('invalid', '2.4.2'), false);
     console.log('PASS update availability persists as a service-worker-owned action indicator');

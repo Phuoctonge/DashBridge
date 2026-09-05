@@ -18,6 +18,8 @@
         renderer: new Set(['uplot', 'flot', 'unknown']),
         grafanaMajor: new Set(['unknown', '8', '9', '10', '11', '12', '13']),
         source: new Set(['none', 'graph', 'custom', 'cpu_capacity', 'dom', 'response']),
+        failure: new Set(['runtime_dependency_missing', 'visual_verification_failed',
+            'legend_apply_failed', 'timeout', 'unexpected_exception']),
     });
 
     const definitions = new Map();
@@ -98,6 +100,7 @@
     add(['options.module_availability'], ['configured'], ['module', 'state']);
     add(['internal.debug_report', 'internal.gui_capture', 'internal.grafana_test_runner', 'internal.message_test_runner', 'internal.debug_easter_egg'],
         ['used', 'outcome'], ['outcome']);
+    add(['internal.panel_tools_apply'], ['outcome'], ['outcome', 'surface', 'failure']);
 
     const normalize = input => {
         if (!input || typeof input !== 'object' || Array.isArray(input)) return null;

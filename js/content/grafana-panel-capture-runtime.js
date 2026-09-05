@@ -8,7 +8,53 @@
         } = context;
 
         let panelCaptureInProgress = false;
+        let captureNoticeTimer = null;
         const nextPaint = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        const removeCaptureNotice = () => {
+            if (captureNoticeTimer) clearTimeout(captureNoticeTimer);
+            captureNoticeTimer = null;
+            document.getElementById('dashbridge-panel-capture-notice')?.remove();
+        };
+        const showCaptureNotice = message => {
+            removeCaptureNotice();
+            if (!document.getElementById('dashbridge-panel-capture-notice-style')) {
+                const style = document.createElement('style');
+                style.id = 'dashbridge-panel-capture-notice-style';
+                style.textContent = `
+                    #dashbridge-panel-capture-notice{position:fixed;left:50%;bottom:24px;z-index:2147483647;width:min(480px,calc(100vw - 32px));display:flex;align-items:center;gap:10px;box-sizing:border-box;transform:translateX(-50%);padding:12px 42px 12px 14px;border:1px solid #4b5563;border-radius:10px;background:#1f2937;color:#f9fafb;box-shadow:0 12px 32px rgba(0,0,0,.32);font:500 14px/1.4 system-ui,sans-serif;animation:dashbridge-capture-notice-in .16s ease-out}
+                    #dashbridge-panel-capture-notice .dashbridge-panel-capture-notice-icon{color:#34d399;font-size:18px;font-weight:800}
+                    #dashbridge-panel-capture-notice .dashbridge-panel-capture-notice-close{position:absolute;top:5px;right:7px;width:30px;height:30px;padding:0;border:0;border-radius:6px;background:transparent;color:#d1d5db;cursor:pointer;font:22px/1 system-ui,sans-serif}
+                    #dashbridge-panel-capture-notice .dashbridge-panel-capture-notice-close:hover{background:rgba(255,255,255,.12);color:#fff}
+                    #dashbridge-panel-capture-notice .dashbridge-panel-capture-notice-close:focus-visible{outline:2px solid #93c5fd;outline-offset:1px}
+                    @keyframes dashbridge-capture-notice-in{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
+                    @media(prefers-reduced-motion:reduce){#dashbridge-panel-capture-notice{animation:none}}
+                `;
+                document.documentElement.appendChild(style);
+            }
+            const notice = document.createElement('div');
+            notice.id = 'dashbridge-panel-capture-notice';
+            notice.setAttribute('role', 'status');
+            notice.setAttribute('aria-atomic', 'true');
+            const icon = document.createElement('span');
+            icon.className = 'dashbridge-panel-capture-notice-icon';
+            icon.setAttribute('aria-hidden', 'true');
+            icon.textContent = '✓';
+            const text = document.createElement('span');
+            text.textContent = String(message || 'Файл сохранён.');
+            const close = document.createElement('button');
+            close.type = 'button';
+            close.className = 'dashbridge-panel-capture-notice-close';
+            close.setAttribute('aria-label', 'Закрыть уведомление');
+            close.textContent = '×';
+            close.addEventListener('click', removeCaptureNotice, { once: true });
+            notice.append(icon, text, close);
+            document.body.appendChild(notice);
+            captureNoticeTimer = setTimeout(removeCaptureNotice, 5000);
+        };
+        registerRuntimeCleanup(() => {
+            removeCaptureNotice();
+            document.getElementById('dashbridge-panel-capture-notice-style')?.remove();
+        });
         const fitPanelCaptureSize = options => {
             const sharedFit = window.DashBridgeGrafanaCaptureOutput?.fitPreparedSize;
             if (typeof sharedFit === 'function') return sharedFit(options);
@@ -444,11 +490,27 @@
             const state = readPanelCaptureState(panel);
             const prepared = !!state.capturePrepared;
             const dimensions = panelCaptureDimensions();
+            const startedAt = Date.now();
+            const diagnostic = {
+                schema: 'dashbridge-panel-capture-diagnostic/v1', requestId, action, prepared,
+                panelKey: getPanelStateKey(panel), startedAt: new Date(startedAt).toISOString(),
+                userActivationAtClick: navigator.userActivation?.isActive === true,
+                phase: 'started'
+            };
+            const publishDiagnostic = patch => {
+                Object.assign(diagnostic, patch, {
+                    elapsedMs: Date.now() - startedAt,
+                    updatedAt: new Date().toISOString()
+                });
+                window.__dashbridgeLastPanelCaptureDiagnostic = { ...diagnostic };
+            };
+            publishDiagnostic({});
             const originalTitle = button.title;
             button.disabled = true;
             button.title = action === 'copy' ? 'Копирование снимка…' : 'Сохранение снимка…';
             let session = null;
             try {
+                publishDiagnostic({ phase: 'preparing' });
                 document.documentElement.classList.add('dashbridge-panel-capture-mode');
                 host.classList.add('dashbridge-panel-capture-hidden');
                 await nextPaint();
@@ -462,17 +524,36 @@
                     }, extensionOrigin);
                 } else {
                     session = await prepareNativePanelCapture(panel, prepared, dimensions);
+                    publishDiagnostic({ phase: 'prepared', rect: { ...session.rect } });
                     resultPromise = waitForPanelCaptureResult(requestId, false);
                     document.dispatchEvent(new CustomEvent('dashbridgePanelCaptureRequest', { detail: {
                         requestId, action, prepared, outputWidth: dimensions.width, outputHeight: dimensions.height,
                         rect: session.rect, title: getPanelCaptureTitle(panel)
                     } }));
                 }
+                publishDiagnostic({ phase: 'waiting-for-result' });
                 const result = await resultPromise;
-                if (!result?.ok) throw new Error(result?.error || 'capture-failed');
+                if (!result?.ok) {
+                    const failure = new Error(result?.error || 'capture-failed');
+                    failure.stage = result?.stage || null;
+                    throw failure;
+                }
+                if (result.fallback === 'download') {
+                    showCaptureNotice(result.insecureContext
+                        ? 'Буфер изображений недоступен на HTTP — файл сохранён.'
+                        : 'Не удалось скопировать изображение — файл сохранён.');
+                }
+                publishDiagnostic({
+                    phase: 'complete', resultStage: result.stage || 'complete', ok: true,
+                    fallback: result.fallback || null
+                });
                 button.classList.add('dashbridge-panel-capture-success');
                 setTimeout(() => button.classList.remove('dashbridge-panel-capture-success'), 1600);
             } catch (error) {
+                publishDiagnostic({
+                    phase: 'failed', ok: false, resultStage: error?.stage || null,
+                    error: String(error?.message || error).slice(0, 500)
+                });
                 console.error('DashBridge panel capture failed:', error);
                 button.classList.add('dashbridge-panel-capture-error');
                 setTimeout(() => button.classList.remove('dashbridge-panel-capture-error'), 2000);
@@ -483,6 +564,7 @@
                 button.disabled = false;
                 button.title = originalTitle;
                 panelCaptureInProgress = false;
+                publishDiagnostic({ restored: true });
             }
         };
     

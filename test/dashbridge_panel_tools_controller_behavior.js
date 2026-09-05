@@ -22,7 +22,14 @@ const documentRef = {
         };
     }
 };
-const context = { console, setTimeout, clearTimeout };
+const analyticsEvents = [];
+const context = { console, setTimeout, clearTimeout, DashBridgeAnalytics: {
+    track: (featureId, signal, dimensions) => analyticsEvents.push({ featureId, signal, dimensions }),
+    changed: () => undefined,
+    outcome: (featureId, outcome, dimensions) => analyticsEvents.push({
+        featureId, signal: 'outcome', dimensions: { ...dimensions, outcome }
+    }),
+} };
 context.globalThis = context;
 vm.runInNewContext(fs.readFileSync('pages/dashbridge/dashbridge-panel-tools-controller.js', 'utf8'), context);
 
@@ -76,6 +83,12 @@ assert.strictEqual(tools.cpuCapacityFilterCoefficient, 0.8);
 controller.apply(panel, iframe);
 assert.strictEqual(messages.at(-1).action, 'applyPanelTools');
 assert.strictEqual(messages.at(-1).transformSettings.grafanaCpuCapacityCoefficient, 0.8);
+assert.strictEqual(controller.acceptApplied({ requestId: messages.at(-1).requestId,
+    commandStatus: 'error', failureCode: 'visual_verification_failed' }), true);
+assert.deepStrictEqual(analyticsEvents, [{
+    featureId: 'internal.panel_tools_apply', signal: 'outcome',
+    dimensions: { surface: 'dashbridge', failure: 'visual_verification_failed', outcome: 'error' }
+}], 'one shared command failure must not be multiplied across every enabled panel tool');
 
 (async () => {
     await controller.open(panel, iframe);

@@ -4,6 +4,7 @@
     const STORAGE_KEY = 'dashbridgeUpdateIndicator';
     const NORMAL_ICONS = Object.freeze({ 16: 'icons/icon16.png', 48: 'icons/icon48.png', 128: 'icons/icon128.png' });
     const UPDATE_ICONS = Object.freeze({ 16: 'icons/icon16-update.png', 48: 'icons/icon48-update.png', 128: 'icons/icon128-update.png' });
+    const UPDATE_BADGE_COLOR = '#d93025';
     const parseVersion = value => {
         const match = String(value || '').trim().match(/^(\d{1,5})\.(\d{1,5})\.(\d{1,5})$/);
         return match ? match.slice(1).map(Number) : null;
@@ -24,9 +25,18 @@
             throw new TypeError('Update indicator dependencies are incomplete');
         }
         const show = async version => {
+            let iconApplied = true;
+            try {
+                await actionApi.setIcon({ path: UPDATE_ICONS });
+            } catch (_error) {
+                iconApplied = false;
+            }
+            const badgeTasks = [actionApi.setBadgeText({ text: iconApplied ? '' : '!' })];
+            if (!iconApplied && actionApi.setBadgeBackgroundColor) {
+                badgeTasks.push(actionApi.setBadgeBackgroundColor({ color: UPDATE_BADGE_COLOR }));
+            }
             await Promise.all([
-                actionApi.setIcon({ path: UPDATE_ICONS }),
-                actionApi.setBadgeText({ text: '' }),
+                ...badgeTasks,
                 actionApi.setTitle({ title: `DashBridge — доступно обновление ${version}` })
             ]);
         };
@@ -54,7 +64,7 @@
         const handleStorageChange = (changes, areaName) => areaName === 'local' && changes[STORAGE_KEY]
             ? apply(changes[STORAGE_KEY].newValue) : Promise.resolve(false);
 
-        return Object.freeze({ restore, handleStorageChange });
+        return Object.freeze({ apply, restore, handleStorageChange });
     };
 
     root.DashBridgeBackgroundUpdateIndicator = Object.freeze({ create, STORAGE_KEY, isNewerVersion });

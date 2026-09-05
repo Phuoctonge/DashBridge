@@ -7,11 +7,17 @@ const { DatabaseSync } = require('node:sqlite');
 const { validateBatch } = require('./analytics-contract');
 
 const port = Math.max(1, Math.min(65535, Number(process.env.PORT) || 8080));
+const host = process.env.HOST || '0.0.0.0';
 const dataDir = process.env.DATA_DIR || '/data';
 const databasePath = path.join(dataDir, 'analytics.sqlite');
 const retentionDays = Math.max(30, Math.min(1500, Number(process.env.RETENTION_DAYS) || 400));
 const maxDatabaseBytes = Math.max(64, Number(process.env.MAX_DATABASE_MIB) || 512) * 1024 * 1024;
 const adminGatewayUser = process.env.ADMIN_GATEWAY_USER || 'admin';
+const devAdminBypass = process.env.DASHBRIDGE_ANALYTICS_DEV === '1';
+
+if (devAdminBypass && !['127.0.0.1', '::1', 'localhost'].includes(host)) {
+    throw new Error('DASHBRIDGE_ANALYTICS_DEV requires a loopback HOST');
+}
 
 fs.mkdirSync(dataDir, { recursive: true });
 const db = new DatabaseSync(databasePath);
@@ -49,7 +55,7 @@ const metricNumber = name => Number(readMetric.get(name)?.value) || 0;
 const incrementMetric = (name, amount = 1) => writeMetric.run(name, String(metricNumber(name) + amount));
 const setMetric = (name, value) => writeMetric.run(name, String(value));
 
-const publicDir = path.join(__dirname, 'public');
+const publicDir = process.env.PUBLIC_DIR || path.join(__dirname, 'public');
 const publicFiles = Object.freeze({
     '/admin': ['index.html', 'text/html; charset=utf-8'],
     '/admin/': ['index.html', 'text/html; charset=utf-8'],
@@ -58,9 +64,19 @@ const publicFiles = Object.freeze({
     '/admin/style.css': ['style.css', 'text/css; charset=utf-8'],
     '/admin/style-extra.css': ['style-extra.css', 'text/css; charset=utf-8'],
 });
-const assets = new Map(Object.entries(publicFiles).map(([route, [file, contentType]]) => [
-    route, { body: fs.readFileSync(path.join(publicDir, file)), contentType },
-]));
+const readAsset = route => {
+    const definition = publicFiles[route];
+    if (!definition) return null;
+    const [file, contentType] = definition;
+    try {
+        // Admin assets are intentionally read for every request. Publishing a
+        // visual-only release therefore never restarts the ingestion process.
+        return { body: fs.readFileSync(path.join(publicDir, file)), contentType };
+    } catch (error) {
+        if (error?.code === 'ENOENT') return null;
+        throw error;
+    }
+};
 
 const send = (response, status, body = '', headers = {}) => {
     response.writeHead(status, {
@@ -77,6 +93,7 @@ const sendJson = (response, status, value, headers = {}) => send(response, statu
     'content-type': 'application/json; charset=utf-8', ...headers,
 });
 const requireAdmin = (request, response) => {
+    if (devAdminBypass) return true;
     // User authentication belongs to Caddy's audited basic_auth module. Caddy
     // removes any client-supplied copy and sets this identity only after bcrypt
     // verification. The app is not published on a host port.
@@ -181,15 +198,18 @@ function adminData(url) {
             MAX(period_start) AS lastSeen`, 'GROUP BY installation_id', 'ORDER BY lastSeen DESC', 'LIMIT 500'),
         timeline: query(`substr(period_start, 1, 10) AS day, SUM(event_count) AS events,
             COUNT(DISTINCT installation_id) AS users`, 'GROUP BY day', 'ORDER BY day ASC', 'LIMIT 1500'),
-        dimensions: query(`dimensions_json AS dimensions, SUM(event_count) AS events,
-            COUNT(DISTINCT installation_id) AS users`, 'GROUP BY dimensions_json', 'ORDER BY events DESC', 'LIMIT 200'),
+        dimensions: query(`feature_id AS featureId, signal, dimensions_json AS dimensions,
+            SUM(event_count) AS events, COUNT(DISTINCT installation_id) AS users`,
+        'GROUP BY feature_id, signal, dimensions_json', 'ORDER BY events DESC', 'LIMIT 500',
+        `AND dimensions_json <> '{}'`),
         actions: query(`period_start AS periodStart, installation_id AS installationId,
             feature_id AS featureId, signal, dimensions_json AS dimensions,
             event_count AS events, extension_version AS version`, '', 'ORDER BY period_start DESC', 'LIMIT 1000'),
         problems: query(`feature_id AS featureId, extension_version AS version,
             json_extract(dimensions_json, '$.outcome') AS outcome,
+            json_extract(dimensions_json, '$.failure') AS failure,
             COUNT(DISTINCT installation_id) AS users, SUM(event_count) AS events`,
-        'GROUP BY feature_id, extension_version, outcome', 'ORDER BY events DESC', 'LIMIT 500',
+        'GROUP BY feature_id, extension_version, outcome, failure', 'ORDER BY events DESC', 'LIMIT 500',
         `AND signal = 'outcome' AND json_extract(dimensions_json, '$.outcome') NOT IN ('success', 'cancelled')`),
         operations: {
             acceptedBatches: metricNumber('accepted_batches'),
@@ -289,13 +309,13 @@ const server = http.createServer(async (request, response) => {
         if (request.method === 'GET' && url.pathname === '/admin/api/data') {
             sendJson(response, 200, adminData(url)); return;
         }
-        const asset = request.method === 'GET' ? assets.get(url.pathname) : null;
+        const asset = request.method === 'GET' ? readAsset(url.pathname) : null;
         if (asset) { send(response, 200, asset.body, { 'content-type': asset.contentType }); return; }
     }
     sendJson(response, 404, { ok: false, error: 'not-found' });
 });
 
-server.listen(port, '0.0.0.0', () => console.log(`DashBridge analytics listening on port ${port}`));
+server.listen(port, host, () => console.log(`DashBridge analytics listening on ${host}:${port}`));
 const shutdown = () => server.close(() => { db.close(); process.exit(0); });
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);

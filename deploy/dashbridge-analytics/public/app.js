@@ -11,6 +11,10 @@ const hour = value => value ? new Date(value).toLocaleString('ru-RU', {
 const userLabel = id => id ? `Пользователь ${String(id).slice(0, 8)}…${String(id).slice(-4)}` : '—';
 const featureName = id => labels.features[id] || id;
 const signalName = signal => labels.signals[signal] || signal;
+const failureOwners = Object.freeze({ runtime_dependency_missing: 'Расширение',
+    visual_verification_failed: 'Расширение / совместимость с Grafana',
+    legend_apply_failed: 'Совместимость с Grafana', timeout: 'Окружение / производительность',
+    unexpected_exception: 'Расширение' });
 let current = null;
 let sortState = { table: 'features', key: 'events', direction: -1 };
 
@@ -102,9 +106,12 @@ function render(data) {
     ]);
     renderTable('problems', data.problems.map(item => ({ ...item,
         featureName: featureName(item.featureId), outcomeName: labels.values[item.outcome] || item.outcome,
+        failureName: item.failure ? (labels.values[item.failure] || item.failure) : 'Не собиралась в этой версии',
+        ownerName: item.failure ? (failureOwners[item.failure] || 'Требуется анализ') : 'Недостаточно данных',
     })), [
         { key: 'featureName', title: (_value, row) => row.featureId }, { key: 'version' },
-        { key: 'outcomeName' }, { key: 'users', format: number }, { key: 'events', format: number },
+        { key: 'outcomeName' }, { key: 'failureName' }, { key: 'ownerName' },
+        { key: 'users', format: number }, { key: 'events', format: number },
     ]);
     renderTable('versions', data.versions.map(item => ({ ...item,
         issueRate: Number(item.outcomes) ? Number(item.issues) / Number(item.outcomes) * 100 : 0,
@@ -117,7 +124,11 @@ function render(data) {
         { key: 'userLabel', title: (_value, row) => row.installationId }, { key: 'version' },
         { key: 'features', format: number }, { key: 'events', format: number }, { key: 'lastSeen', format: date },
     ], 'installationId');
-    renderTable('dimensions', data.dimensions.map(item => ({ ...item, details: parseDimensions(item.dimensions) })), [
+    renderTable('dimensions', data.dimensions.map(item => ({ ...item,
+        featureName: featureName(item.featureId), signalName: signalName(item.signal),
+        details: parseDimensions(item.dimensions),
+    })), [
+        { key: 'featureName', title: (_value, row) => row.featureId }, { key: 'signalName' },
         { key: 'details' }, { key: 'users', format: number }, { key: 'events', format: number },
     ]);
     const timeline = byId('timeline'); timeline.replaceChildren();
@@ -127,10 +138,26 @@ function render(data) {
         empty.textContent = 'Нет данных для выбранных фильтров'; timeline.appendChild(empty);
     }
     const maximum = Math.max(1, ...data.timeline.map(item => Number(item.events)));
-    data.timeline.forEach(item => {
+    data.timeline.forEach((item, index) => {
         const bar = document.createElement('div'); bar.className = 'bar';
         bar.style.height = `${Math.max(3, Number(item.events) / maximum * 100)}%`;
-        bar.dataset.label = `${item.day}: ${number(item.events)}, пользователей: ${number(item.users)}`;
+        const eventCount = number(item.events); const userCount = number(item.users);
+        bar.setAttribute('aria-label', `${item.day}: событий ${eventCount}, пользователей ${userCount}`);
+        const tooltip = document.createElement('span'); tooltip.className = 'bar-tooltip';
+        const day = document.createElement('strong'); day.textContent = item.day;
+        const totals = document.createElement('span');
+        totals.textContent = `Событий: ${eventCount} · Пользователей: ${userCount}`;
+        tooltip.append(day, totals); bar.appendChild(tooltip);
+        bar.addEventListener('pointerenter', () => {
+            tooltip.style.left = '50%'; tooltip.style.transform = 'translateX(-50%)';
+            const timelineRect = timeline.getBoundingClientRect(); const barRect = bar.getBoundingClientRect();
+            const tooltipWidth = tooltip.getBoundingClientRect().width;
+            const centeredLeft = barRect.width / 2 - tooltipWidth / 2;
+            const minimumLeft = timelineRect.left - barRect.left;
+            const maximumLeft = timelineRect.right - barRect.left - tooltipWidth;
+            tooltip.style.left = `${Math.min(Math.max(centeredLeft, minimumLeft), maximumLeft)}px`;
+            tooltip.style.transform = 'none';
+        });
         timeline.appendChild(bar);
     });
     const operations = data.operations || {};

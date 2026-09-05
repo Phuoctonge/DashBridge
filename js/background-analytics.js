@@ -2,6 +2,7 @@
     'use strict';
 
     const STORAGE_KEY = 'dashbridgeAnalyticsState';
+    const INSTALLATION_ID_KEY = 'dashbridgeInstallationId';
     const STATE_VERSION = 1;
     const hourStart = timestamp => new Date(Math.floor(timestamp / 3_600_000) * 3_600_000).toISOString();
     const dayKey = timestamp => new Date(timestamp).toISOString().slice(0, 10);
@@ -21,9 +22,10 @@
         let operation = Promise.resolve();
         let sendScheduled = false;
 
-        const freshState = () => ({
+        const validInstallationId = value => typeof value === 'string' && /^[a-zA-Z0-9-]{16,80}$/.test(value);
+        const freshState = (installationId = randomUUID()) => ({
             schemaVersion: STATE_VERSION,
-            installationId: randomUUID(),
+            installationId,
             aggregates: [],
             inflight: [],
             droppedAggregates: 0,
@@ -49,12 +51,14 @@
         const load = async () => {
             if (cachedState) return cachedState;
             if (!loadPromise) loadPromise = (async () => {
-                const stored = await storageArea.get([STORAGE_KEY]);
+                const stored = await storageArea.get([STORAGE_KEY, INSTALLATION_ID_KEY]);
                 const source = stored?.[STORAGE_KEY];
-                const state = source && source.schemaVersion === STATE_VERSION ? { ...freshState(), ...source } : freshState();
-                if (typeof state.installationId !== 'string' || !/^[a-zA-Z0-9-]{16,80}$/.test(state.installationId)) {
-                    state.installationId = randomUUID();
-                }
+                const installationId = validInstallationId(stored?.[INSTALLATION_ID_KEY])
+                    ? stored[INSTALLATION_ID_KEY]
+                    : (validInstallationId(source?.installationId) ? source.installationId : randomUUID());
+                const state = source && source.schemaVersion === STATE_VERSION
+                    ? { ...freshState(installationId), ...source, installationId }
+                    : freshState(installationId);
                 state.aggregates = Array.isArray(state.aggregates) ? state.aggregates.map(sanitizeRecord).filter(Boolean) : [];
                 state.inflight = Array.isArray(state.inflight) ? state.inflight.map(sanitizeRecord).filter(Boolean) : [];
                 if (state.inflight.length) state.aggregates.unshift(...state.inflight);
@@ -64,7 +68,10 @@
             })().finally(() => { loadPromise = null; });
             return loadPromise;
         };
-        const persist = state => storageArea.set({ [STORAGE_KEY]: state });
+        const persist = state => storageArea.set({
+            [STORAGE_KEY]: state,
+            [INSTALLATION_ID_KEY]: state.installationId,
+        });
         const append = (state, normalized, timestamp = now()) => {
             const periodStart = hourStart(timestamp);
             const dimensionsKey = stableDimensions(normalized.dimensions);
@@ -262,5 +269,5 @@
         return Object.freeze({ track, send, recordLifecycle, loadState: load, storageKey: STORAGE_KEY });
     }
 
-    root.DashBridgeBackgroundAnalytics = Object.freeze({ create, STORAGE_KEY });
+    root.DashBridgeBackgroundAnalytics = Object.freeze({ create, STORAGE_KEY, INSTALLATION_ID_KEY });
 })(globalThis);

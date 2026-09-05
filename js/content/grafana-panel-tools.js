@@ -1934,11 +1934,11 @@
         // temporary MAIN-world listener in this same document.
         if (isDashboardIframe) window.parent.postMessage(applied, extensionOrigin);
         else window.postMessage(applied, location.origin);
-    };
-    // MessageEvent listeners do not await async handlers. Without an explicit
+    }; // MessageEvent listeners do not await async handlers. Without an explicit
     // queue, rapid UI changes execute concurrently against the shared `tools`
     // object and an older command can finish after a newer one. Preserve every
     // click in FIFO order and expose queue timing in acknowledgements/E2E JSON.
+    const panelToolsFailureCode = error => error?.name === 'TimeoutError' || String(error?.message || error || '').toLowerCase().includes('timeout') ? 'timeout' : [['runtime is unavailable', 'runtime_dependency_missing'], ['legend-visibility-reapply-failed', 'legend_apply_failed'], ['visual-command-post-resize-mismatch', 'visual_verification_failed']].find(([pattern]) => String(error?.message || error || '').toLowerCase().includes(pattern))?.[1] || 'unexpected_exception';
     const panelToolsMessageHandler = event => {
         if (event.origin !== extensionOrigin) return;
         if (event.data?.action !== 'applyPanelTools') {
@@ -1969,6 +1969,7 @@
                 requestId: event.data.requestId,
                 runtimeGeneration: window.__dashbridgePanelToolsRuntimeGeneration,
                 commandStatus: 'error',
+                failureCode: panelToolsFailureCode(error),
                 commandError: {
                     name: error?.name || 'Error',
                     message: error?.message || String(error),

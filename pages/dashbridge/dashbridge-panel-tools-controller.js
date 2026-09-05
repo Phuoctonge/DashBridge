@@ -96,10 +96,19 @@
             const features = appliedWaiters.get(message?.requestId);
             if (!features || !['applied', 'error'].includes(message?.commandStatus)) return false;
             appliedWaiters.delete(message.requestId);
-            features.forEach(featureId => root.DashBridgeAnalytics?.track(featureId,
-                message.commandStatus === 'applied' ? 'effective' : 'outcome', {
-                    surface: 'dashbridge', outcome: message.commandStatus === 'applied' ? 'success' : 'error'
+            if (message.commandStatus === 'applied') {
+                features.forEach(featureId => root.DashBridgeAnalytics?.track(featureId, 'effective', {
+                    surface: 'dashbridge', outcome: 'success'
                 }));
+            } else {
+                const knownFailureCodes = new Set(['runtime_dependency_missing', 'visual_verification_failed',
+                    'legend_apply_failed', 'timeout', 'unexpected_exception']);
+                const failure = knownFailureCodes.has(message.failureCode)
+                    ? message.failureCode : 'unexpected_exception';
+                root.DashBridgeAnalytics?.outcome('internal.panel_tools_apply', 'error', {
+                    surface: 'dashbridge', failure
+                });
+            }
             return true;
         };
 

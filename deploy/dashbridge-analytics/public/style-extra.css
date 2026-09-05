@@ -1,2 +1,40 @@
 .empty { padding: 22px !important; text-align: center !important; color: var(--muted); font-weight: 400; }
-.timeline.is-empty { height: auto; min-height: 72px; align-items: center; justify-content: center; }
+.timeline { height: 224px; padding-top: 64px; }
+.timeline.is-empty { height: auto; min-height: 72px; padding-top: 20px; align-items: center; justify-content: center; }
+.bar:hover { z-index: 1; }
+.bar:hover::after { content: none; }
+.bar-tooltip { display: none; position: absolute; z-index: 1; bottom: calc(100% + 7px); left: 50%;
+    transform: translateX(-50%); width: max-content; max-width: min(240px, calc(100vw - 50px)); padding: 7px 9px;
+    border: 1px solid var(--line); border-radius: 7px; background: #020617; box-shadow: 0 8px 22px #0008;
+    color: var(--text); font-size: 12px; line-height: 1.35; pointer-events: none; }
+.bar-tooltip strong, .bar-tooltip span { display: block; }
+.bar-tooltip span { color: var(--muted); }
+.bar:hover .bar-tooltip { display: block; }
+.panel { min-width: 0; }
+.panel { scroll-margin-block-start: 88px; }
+.filters label { min-width: 0; }
+.filters select { width: 100%; min-width: 0; text-overflow: ellipsis; }
+button, select { min-height: 44px; }
+.legend summary { min-height: 44px; display: flex; align-items: center; }
+.table-wrap { max-width: 100%; max-height: none; overflow-x: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.table-wrap-feed { max-height: 440px; overflow: auto; }
+.table-wrap-long { max-height: min(65dvh, 640px); overflow: auto; }
+@media (max-width: 900px) {
+    .table-wrap::before { content: 'Листайте таблицу вправо →'; position: sticky; left: 0; display: block;
+        width: max-content; padding: 0 0 8px; color: var(--muted); font-size: 12px; }
+    #actions { min-width: 52rem; }
+    #features { min-width: 48rem; }
+    #problems { min-width: 66rem; }
+    #versions { min-width: 40rem; }
+    #installations { min-width: 38rem; }
+    #dimensions { min-width: 52rem; }
+}
+@media (max-width: 600px) {
+    .filters { grid-template-columns: minmax(0, 1fr); }
+    .filters label, .filters select { min-width: 0; width: 100%; }
+    header { flex-wrap: wrap; }
+    header > div:first-child { min-width: 0; }
+    header h1 { overflow-wrap: anywhere; }
+    .header-actions { width: 100%; margin-inline-start: 0; flex-direction: row; }
+    .header-actions button { flex: 1 1 0; }
+}

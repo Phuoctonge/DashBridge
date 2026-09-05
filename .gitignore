@@ -16,3 +16,9 @@ dist/
 # Development-only analysis and browser smoke dependencies/artifacts.
 node_modules/
 test-results/
+
+# Local analytics preview data and deployment credentials never enter Git.
+deploy/dashbridge-analytics/.dev-data/
+deploy/dashbridge-analytics/.dev-data-*/
+.deploy-keys/
+.analytics-deploy.json

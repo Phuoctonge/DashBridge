@@ -1,6 +1,7 @@
 'use strict';
 
 const fs = require('node:fs');
+const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
 const { chromium } = require('@playwright/test');
@@ -11,6 +12,60 @@ const reportPath = path.join(resultsRoot, 'extension-smoke.json');
 const chromeExecutable = process.env.DASHBRIDGE_CHROME_PATH
     || chromium.executablePath();
 const settleMs = Number.parseInt(process.env.DASHBRIDGE_SMOKE_SETTLE_MS || '1000', 10);
+const extensionEntries = Object.freeze(['manifest.json', 'icons', 'js', 'pages', 'vendor']);
+
+function stageExtension(directory, analyticsEndpoint) {
+    fs.mkdirSync(directory, { recursive: true });
+    for (const entry of extensionEntries) {
+        fs.cpSync(path.join(projectRoot, entry), path.join(directory, entry), { recursive: true });
+    }
+    const configPath = path.join(directory, 'js', 'shared', 'analytics-config.js');
+    const source = fs.readFileSync(configPath, 'utf8');
+    const staged = source.replace(/endpoint:\s*'[^']*'/,
+        `endpoint: '${analyticsEndpoint}'`);
+    if (staged === source) throw new Error('Could not redirect the staged analytics endpoint');
+    fs.writeFileSync(configPath, staged, 'utf8');
+}
+
+async function startAnalyticsSink() {
+    const requests = [];
+    const server = http.createServer((request, response) => {
+        if (request.method === 'OPTIONS') {
+            response.writeHead(204, {
+                'access-control-allow-origin': '*',
+                'access-control-allow-methods': 'POST, OPTIONS',
+                'access-control-allow-headers': 'content-type'
+            });
+            response.end(); return;
+        }
+        if (request.method !== 'POST' || request.url !== '/v1/events/batch') {
+            response.writeHead(404); response.end(); return;
+        }
+        let body = '';
+        request.setEncoding('utf8');
+        request.on('data', chunk => {
+            body += chunk;
+            if (body.length > 1_000_000) request.destroy();
+        });
+        request.on('end', () => {
+            requests.push(body);
+            response.writeHead(202, {
+                'access-control-allow-origin': '*',
+                'content-type': 'application/json; charset=utf-8'
+            });
+            response.end('{"ok":true}');
+        });
+    });
+    await new Promise((resolve, reject) => {
+        server.once('error', reject);
+        server.listen(0, '127.0.0.1', resolve);
+    });
+    const address = server.address();
+    return {
+        endpoint: `http://127.0.0.1:${address.port}/v1/events/batch`, requests,
+        close: () => new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+    };
+}
 
 function findHtmlFiles(directory) {
     const found = [];
@@ -299,20 +354,25 @@ async function main() {
     }
 
     fs.mkdirSync(resultsRoot, { recursive: true });
-    const profileRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'dashbridge-smoke-'));
+    const smokeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'dashbridge-smoke-'));
+    const profileRoot = path.join(smokeRoot, 'profile');
+    const extensionRoot = path.join(smokeRoot, 'extension');
     const startedAt = new Date().toISOString();
     let context;
+    let analyticsSink;
     let report;
     let cleanupError;
 
     try {
+        analyticsSink = await startAnalyticsSink();
+        stageExtension(extensionRoot, analyticsSink.endpoint);
         context = await chromium.launchPersistentContext(profileRoot, {
             executablePath: chromeExecutable,
             headless: false,
             viewport: { width: 1280, height: 900 },
             args: [
-                `--disable-extensions-except=${projectRoot}`,
-                `--load-extension=${projectRoot}`,
+                `--disable-extensions-except=${extensionRoot}`,
+                `--load-extension=${extensionRoot}`,
                 '--no-first-run',
                 '--no-default-browser-check',
                 '--window-position=-32000,-32000'
@@ -342,9 +402,13 @@ async function main() {
                 passed: pages.filter(page => page.status === 'passed').length + workflows.filter(workflow => workflow.status === 'passed').length,
                 failed: pages.filter(page => page.status === 'failed').length + workflows.filter(workflow => workflow.status === 'failed').length,
                 consoleWarnings: pages.reduce((sum, page) => sum + page.console.filter(item => item.type === 'warning').length, 0),
-                externalRequestFailures: pages.reduce((sum, page) => sum + page.failedRequests.filter(item => !item.url.startsWith(`chrome-extension://${extensionId}/`)).length, 0)
+                externalRequestFailures: pages.reduce((sum, page) => sum + page.failedRequests.filter(item => !item.url.startsWith(`chrome-extension://${extensionId}/`)).length, 0),
+                localAnalyticsRequests: analyticsSink.requests.length
             }
         };
+        if (analyticsSink.requests.length < 1) {
+            throw new Error('Browser smoke did not exercise the loopback analytics sink');
+        }
     } finally {
         if (context) {
             try {
@@ -353,8 +417,15 @@ async function main() {
                 if (!/Target page, context or browser has been closed/.test(error.message)) cleanupError = error;
             }
         }
+        if (analyticsSink) {
+            try {
+                await analyticsSink.close();
+            } catch (error) {
+                cleanupError ||= error;
+            }
+        }
         try {
-            fs.rmSync(profileRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+            fs.rmSync(smokeRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
         } catch (error) {
             cleanupError ||= error;
         }

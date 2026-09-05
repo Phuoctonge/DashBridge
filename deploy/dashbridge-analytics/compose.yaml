@@ -1,14 +1,17 @@
 services:
   analytics:
-    build:
-      context: .
+    image: node:24-alpine
     container_name: dashbridge-analytics
+    working_dir: /app
+    command: ["node", "server.js"]
+    user: "10001:10001"
     restart: unless-stopped
     environment:
       ADMIN_GATEWAY_USER: admin
       RETENTION_DAYS: ${RETENTION_DAYS:-400}
       MAX_DATABASE_MIB: ${MAX_DATABASE_MIB:-512}
     volumes:
+      - ./app:/app:ro
       - ./data:/data
     networks:
       - analytics_private

@@ -166,6 +166,13 @@ checks = {
         and "calculatedTitleOriginalText.delete(title)" in COMMON,
     "Dashboard sends shared command": "action: 'applyPanelTools'" in DASHBOARD,
     "Full reset restores canonical Grafana defaults": "chrome.storage.sync.set(getGrafanaSettingsDefaults())" in DEBUG,
+    "Remote Grafana diagnostics preserve legacy and scene panel markers":
+        "[data-panelid], [data-panel-id], [data-viz-panel-key" in DEBUG
+        and "panelKeyOf" in DEBUG and "identifiers: panelMarkers(panel)" in DEBUG,
+    "Remote Grafana diagnostics expose bounded capture failure stages":
+        "dashbridge-grafana-debug/v2" in DEBUG
+        and "lastCapture: window.__dashbridgeLastPanelCaptureDiagnostic" in DEBUG
+        and "configuredHostMatch" in DEBUG,
     "Grafana menu scope falls back to canonical domains": "chrome.storage.sync.get(getGrafanaSettingsStorageKeys()" in CONTENT
         and "normalizeGrafanaSettings(data)" in CONTENT,
     "Content script loads canonical defaults first": "js/shared/grafana-settings.js" in main_content

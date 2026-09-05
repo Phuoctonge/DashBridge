@@ -55,15 +55,26 @@ document.addEventListener('DOMContentLoaded', () => {
                     return { x: round(box.x), y: round(box.y), width: round(box.width), height: round(box.height) };
                 };
                 const className = (element) => typeof element.className === 'string' ? element.className.slice(0, 240) : '';
+                const elementIdentity = element => element ? {
+                    tag: element.tagName,
+                    id: String(element.id || '').slice(0, 120) || null,
+                    className: className(element),
+                    role: element.getAttribute('role'),
+                    testId: element.getAttribute('data-testid'),
+                    panelId: element.getAttribute('data-panelid') || element.getAttribute('data-panel-id'),
+                    vizPanelKey: element.getAttribute('data-viz-panel-key')
+                } : null;
                 const safeUrl = () => {
                     const url = new URL(location.href);
                     for (const key of [...url.searchParams.keys()]) {
                         if (/(token|auth|password|secret|apikey|api_key)/i.test(key)) url.searchParams.set(key, '[redacted]');
+                        else if (key.startsWith('var-')) url.searchParams.set(key, '[present]');
                     }
                     return url.toString();
                 };
-                const panelSelectors = '[data-panelid], [data-viz-panel-key], .react-grid-item, .panel-container';
-                const panels = Array.from(document.querySelectorAll(panelSelectors));
+                const panelSelectors = '[data-panelid], [data-panel-id], [data-viz-panel-key^="panel-"], .react-grid-item, .panel-container';
+                const panels = Array.from(document.querySelectorAll(panelSelectors))
+                    .map(panel => panel.closest('.react-grid-item, .panel-container') || panel);
                 const uniquePanels = [];
                 const seen = new Set();
                 panels.forEach(panel => {
@@ -76,14 +87,31 @@ document.addEventListener('DOMContentLoaded', () => {
                     const title = panel.querySelector('[data-testid*="title" i], .panel-title, [class*="panel-title" i], h1, h2, h3');
                     return title ? title.textContent.trim().replace(/\s+/g, ' ').slice(0, 240) : '';
                 };
+                const panelMarkers = panel => {
+                    const selector = '[data-panelid], [data-panel-id], [data-viz-panel-key], [id^="panel-"]';
+                    const candidates = [panel, ...panel.querySelectorAll(selector)]
+                        .filter(element => element?.matches?.(selector));
+                    return [...new Set(candidates)].slice(0, 12).map(elementIdentity);
+                };
+                const panelKeyOf = panel => {
+                    const shared = window.DashBridgeGrafanaDom?.panelKey?.(panel);
+                    if (shared) return shared;
+                    const marker = panelMarkers(panel).find(item => item.vizPanelKey || item.panelId || /^panel-/.test(item.id || ''));
+                    const raw = marker?.vizPanelKey || marker?.panelId || marker?.id || '';
+                    return raw ? (String(raw).startsWith('panel-') ? String(raw) : `panel-${raw}`) : null;
+                };
                 const panelInfo = (panel) => {
                     const canvases = Array.from(panel.querySelectorAll('canvas'));
                     const legacy = canvases.some(canvas => canvas.classList.contains('flot-base') || canvas.classList.contains('flot-overlay'));
                     const modern = canvases.some(canvas => !canvas.classList.contains('flot-base') && !canvas.classList.contains('flot-overlay'));
                     const legendRows = Array.from(panel.querySelectorAll('tr[class*="LegendRow"], .graph-legend-series'))
                         .filter(row => row.getBoundingClientRect().width > 1 && row.getBoundingClientRect().height > 1);
+                    const panelKey = panelKeyOf(panel);
                     return {
-                        panelId: panel.getAttribute('data-panelid') || null,
+                        panelId: panel.getAttribute('data-panelid') || panel.getAttribute('data-panel-id')
+                            || (panelKey ? panelKey.replace(/^panel-/, '') : null),
+                        panelKey,
+                        identifiers: panelMarkers(panel),
                         title: titleOf(panel),
                         tag: panel.tagName,
                         className: className(panel),
@@ -92,10 +120,27 @@ document.addEventListener('DOMContentLoaded', () => {
                         chartType: legacy ? 'Flot' : modern ? 'canvas/uPlot-or-plugin' : 'no-canvas',
                         canvasCount: canvases.length,
                         canvas: canvases.slice(0, 6).map(canvas => ({ tag: canvas.tagName, className: className(canvas), rect: rect(canvas), width: canvas.width, height: canvas.height })),
-                        legend: { visibleRows: legendRows.length, sample: legendRows.slice(0, 3).map(row => row.textContent.trim().replace(/\s+/g, ' ').slice(0, 240)) }
+                        legend: {
+                            visibleRows: legendRows.length,
+                            structureSample: legendRows.slice(0, 3).map(row => ({
+                                ...elementIdentity(row), childCount: row.children.length,
+                                textLength: String(row.textContent || '').trim().length
+                            }))
+                        },
+                        dashbridgeMenu: {
+                            hosts: panel.querySelectorAll('.dashbridge-panel-menu-host').length,
+                            captureActions: panel.querySelectorAll('.dashbridge-panel-capture-action').length,
+                            compactToggles: panel.querySelectorAll('.dashbridge-panel-capture-toggle').length
+                        }
                     };
                 };
+                const pageUrl = new URL(location.href);
+                const requestedPanel = pageUrl.searchParams.get('viewPanel') || pageUrl.searchParams.get('panelId');
+                const requestedPanelKey = requestedPanel
+                    ? (requestedPanel.startsWith('panel-') ? requestedPanel : `panel-${requestedPanel}`) : null;
+                const requestedPanelElement = requestedPanelKey && uniquePanels.find(panel => panelKeyOf(panel) === requestedPanelKey);
                 const activePanel = document.querySelector('.react-grid-item--fullscreen, .panel-in-fullscreen, .panel-fullscreen, [class*="fullscreen"]')
+                    || requestedPanelElement
                     || uniquePanels.find(panel => panel.querySelector('canvas'))
                     || null;
                 const graphStructure = () => {
@@ -104,7 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const chain = [];
                     for (let element = canvas; element && chain.length < 10; element = element.parentElement) {
                         const style = getComputedStyle(element);
-                        chain.push({ tag: element.tagName, className: className(element), rect: rect(element), display: style.display, position: style.position, overflow: style.overflow, padding: style.padding });
+                        chain.push({ ...elementIdentity(element), rect: rect(element), display: style.display, position: style.position, overflow: style.overflow, padding: style.padding });
                     }
                     return { panel: panelInfo(activePanel), ancestorChain: chain };
                 };
@@ -116,6 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     readyState: document.readyState,
                     viewport: { width: window.innerWidth, height: window.innerHeight, devicePixelRatio: window.devicePixelRatio },
                     browser: navigator.userAgent,
+                    secureContext: window.isSecureContext,
                     language: navigator.language,
                     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
                     grafana: {
@@ -130,9 +176,42 @@ document.addEventListener('DOMContentLoaded', () => {
                     visiblePanelCount: uniquePanels.filter(panel => panel.getClientRects().length > 0).length,
                     panels: uniquePanels.map(panelInfo)
                 };
+                const selectorInventory = selector => ({
+                    count: document.querySelectorAll(selector).length,
+                    sample: Array.from(document.querySelectorAll(selector)).slice(0, 12).map(elementIdentity)
+                });
                 return {
-                    reportType: 'full',
+                    reportType: 'full', reportSchema: 'dashbridge-grafana-debug/v2',
                     environment,
+                    route: {
+                        pathname: location.pathname,
+                        requestedPanel: requestedPanel || null,
+                        requestedPanelKey,
+                        topLevel: window.top === window,
+                        dashboardRoute: /(?:^|\/)d(?:-solo)?(?:\/|$)/.test(location.pathname),
+                        queryKeys: [...pageUrl.searchParams.keys()].slice(0, 100)
+                    },
+                    dashbridge: {
+                        menuScopeEnabled: document.documentElement.dataset.dashbridgeGrafanaMenuEnabled === 'true',
+                        capturePrepared: document.documentElement.dataset.dashbridgeCapturePrepared === 'true',
+                        captureWidth: Number(document.documentElement.dataset.dashbridgeCaptureWidth) || null,
+                        captureHeight: Number(document.documentElement.dataset.dashbridgeCaptureHeight) || null,
+                        runtimeLoaded: window.__dashbridgePanelToolsRuntimeLoaded === true,
+                        runtimeGeneration: window.__dashbridgePanelToolsRuntimeGeneration || null,
+                        domAdapterAvailable: typeof window.DashBridgeGrafanaDom?.panelKey === 'function',
+                        captureRuntimeAvailable: typeof window.DashBridgeGrafanaPanelCaptureRuntime?.create === 'function',
+                        captureOutputAvailable: typeof window.DashBridgeGrafanaCaptureOutput?.crop === 'function',
+                        lastCapture: window.__dashbridgeLastPanelCaptureDiagnostic || null
+                    },
+                    domInventory: {
+                        reactGridItems: selectorInventory('.react-grid-item'),
+                        panelContainers: selectorInventory('.panel-container, [class*="panel-container"]'),
+                        vizPanelKeys: selectorInventory('[data-viz-panel-key]'),
+                        numericPanelIds: selectorInventory('[data-panelid], [data-panel-id]'),
+                        panelHeaders: selectorInventory('[data-testid*="Panel header"], .panel-header, [class*="panel-header"]'),
+                        fullscreenCandidates: selectorInventory('.react-grid-item--fullscreen, .panel-in-fullscreen, .panel-fullscreen, [class*="fullscreen"]'),
+                        dashbridgeMenuHosts: selectorInventory('.dashbridge-panel-menu-host')
+                    },
                     activePanel: activePanel ? panelInfo(activePanel) : null,
                     dashboard,
                     graph: graphStructure()
@@ -140,7 +219,22 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         if (!results[0] || !results[0].result) throw new Error('Grafana не вернула диагностические данные');
-        return results[0].result;
+        const report = results[0].result;
+        const manifest = chrome.runtime.getManifest();
+        const configured = await chrome.storage.sync.get('grafanaIframeDomains');
+        const activeUrl = new URL(tab.url);
+        const hosts = Array.isArray(configured.grafanaIframeDomains) ? configured.grafanaIframeDomains : [];
+        report.extension = {
+            version: manifest.version,
+            manifestVersion: manifest.manifest_version,
+            incognitoTab: tab.incognito === true,
+            configuredHostMatch: hosts.some(host => {
+                const normalized = String(host || '').trim().toLowerCase();
+                return normalized === activeUrl.host.toLowerCase() || normalized === activeUrl.hostname.toLowerCase();
+            }),
+            configuredHostCount: hosts.length
+        };
+        return report;
     };
 
     fullReportButton?.addEventListener('click', async () => {

@@ -7,12 +7,36 @@
     const CACHE_TTL_MS = 60 * 60 * 1000;
     const REQUEST_TIMEOUT_MS = 6000;
     let localReloadRequired = false;
-    const rememberUpdate = version => chrome.storage.local.set({ [INDICATOR_KEY]: { version } }).catch(() => undefined);
-    const forgetUpdate = () => chrome.storage.local.remove(INDICATOR_KEY).catch(() => undefined);
+    const applyUpdateIndicator = async version => {
+        try {
+            const response = await chrome.runtime.sendMessage({
+                type: 'dashbridge-apply-update-indicator', version
+            });
+            return response?.ok === true && response.applied === true;
+        } catch (_error) {
+            return false;
+        }
+    };
+    const rememberUpdate = async version => {
+        try {
+            await chrome.storage.local.set({ [INDICATOR_KEY]: { version } });
+            return applyUpdateIndicator(version);
+        } catch (_error) {
+            return false;
+        }
+    };
+    const forgetUpdate = async () => {
+        try {
+            await chrome.storage.local.remove(INDICATOR_KEY);
+            await applyUpdateIndicator(chrome.runtime.getManifest().version);
+        } catch (_error) {
+            // Update indication is fail-open for the rest of the popup.
+        }
+    };
 
-    function showLocalReloadNotice(diskVersion, currentVersion) {
+    async function showLocalReloadNotice(diskVersion, currentVersion) {
         localReloadRequired = true;
-        void rememberUpdate(diskVersion);
+        await rememberUpdate(diskVersion);
         const notice = document.getElementById('updateNotice');
         const text = document.getElementById('updateNoticeText');
         const button = document.getElementById('downloadUpdateBtn');
@@ -36,16 +60,16 @@
             const manifest = await response.json();
             if (manifest?.name === 'DashBridge'
                 && DashBridgeUpdateCheck.compareVersions(manifest.version, currentVersion) === 1) {
-                showLocalReloadNotice(manifest.version, currentVersion);
+                await showLocalReloadNotice(manifest.version, currentVersion);
             }
         } catch (_error) {
             // A failed disk check must not affect the normal popup startup.
         }
     }
 
-    function showUpdateNotice(release) {
+    async function showUpdateNotice(release) {
         if (localReloadRequired) return;
-        void rememberUpdate(release.version);
+        await rememberUpdate(release.version);
         const notice = document.getElementById('updateNotice');
         const text = document.getElementById('updateNoticeText');
         const button = document.getElementById('downloadUpdateBtn');
@@ -60,12 +84,12 @@
         notice.hidden = false;
     }
 
-    function useRelease(release) {
+    async function useRelease(release) {
         const currentVersion = chrome.runtime.getManifest().version;
         if (DashBridgeUpdateCheck.compareVersions(release?.version, currentVersion) === 1) {
-            showUpdateNotice(release);
+            await showUpdateNotice(release);
         } else if (!localReloadRequired) {
-            void forgetUpdate();
+            await forgetUpdate();
         }
     }
 
@@ -90,16 +114,16 @@
         const cached = stored[CACHE_KEY];
         const now = Date.now();
         if (cached?.checkedAt && now - cached.checkedAt < CACHE_TTL_MS) {
-            useRelease(cached.release);
+            await useRelease(cached.release);
             return;
         }
         try {
             const release = await fetchLatestRelease();
             await chrome.storage.local.set({ [CACHE_KEY]: { checkedAt: now, release } });
-            useRelease(release);
+            await useRelease(release);
         } catch (_error) {
             // Update availability must never block or add noise to the popup.
-            useRelease(cached?.release);
+            await useRelease(cached?.release);
         }
     }
 

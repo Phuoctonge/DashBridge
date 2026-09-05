@@ -125,14 +125,25 @@
     let panelCaptureInProgress = false;
     document.addEventListener('dashbridgePanelCaptureRequest', async event => {
         const detail = event.detail || {};
-        if (!grafanaMenuScopeAllowed || !hasActiveUserGesture() || panelCaptureInProgress
-            || !['download', 'copy'].includes(detail.action)
-            || typeof detail.requestId !== 'string') return;
+        if (typeof detail.requestId !== 'string') return;
+        const publishResult = result => document.dispatchEvent(new CustomEvent('dashbridgePanelCaptureResult', {
+            detail: { requestId: detail.requestId, ...result }
+        }));
+        const rejectedStage = !grafanaMenuScopeAllowed ? 'scope'
+            : !hasActiveUserGesture() ? 'user-activation'
+                : panelCaptureInProgress ? 'busy'
+                    : !['download', 'copy'].includes(detail.action) ? 'request-validation' : '';
+        if (rejectedStage) {
+            publishResult({ ok: false, stage: rejectedStage, error: `capture-${rejectedStage}-rejected` });
+            return;
+        }
         panelCaptureInProgress = true;
-        let result = { requestId: detail.requestId, ok: false, error: 'capture-failed' };
+        let stage = 'capture-visible-tab';
+        let result = { ok: false, stage, error: 'capture-failed' };
         try {
             const captured = await chrome.runtime.sendMessage({ type: 'dashbridge-capture-visible-tab' });
             if (!captured?.ok || !captured.dataUrl) throw new Error(captured?.error || 'capture-visible-tab-failed');
+            stage = 'crop';
             const outputSize = detail.prepared
                 ? { width: Number(detail.outputWidth) || 1000, height: Number(detail.outputHeight) || 520 }
                 : null;
@@ -141,24 +152,39 @@
                 throw new Error('Модуль обработки снимка Grafana не загрузился. Повторите захват.');
             }
             const image = await captureOutput.crop(captured.dataUrl, detail.rect, outputSize);
-            if (detail.action === 'copy') {
-                // The active Grafana document owns focus after the toolbar click.
-                // An offscreen extension document never does, so Chromium can
-                // reject Clipboard.write there with "Document is not focused".
-                await captureOutput.copy(image.blob);
-            } else {
+            const downloadImage = async () => {
                 const download = await chrome.runtime.sendMessage({
                     type: 'dashbridge-download-panel-capture', dataUrl: image.dataUrl,
                     filename: captureOutput.filename(detail.title)
                 });
                 if (!download?.ok) throw new Error(download?.error || 'capture-download-failed');
+            };
+            if (detail.action === 'copy') {
+                stage = 'clipboard';
+                // The active Grafana document owns focus after the toolbar click.
+                // An offscreen extension document never does, so Chromium can
+                // reject Clipboard.write there with "Document is not focused".
+                try {
+                    await captureOutput.copy(image.blob);
+                } catch (clipboardError) {
+                    stage = 'download';
+                    await downloadImage();
+                    result = {
+                        ok: true, stage: 'complete', fallback: 'download',
+                        clipboardError: clipboardError?.message || String(clipboardError),
+                        insecureContext: globalThis.isSecureContext !== true
+                    };
+                }
+            } else {
+                stage = 'download';
+                await downloadImage();
             }
-            result = { requestId: detail.requestId, ok: true };
+            if (!result.ok) result = { ok: true, stage: 'complete' };
         } catch (error) {
-            result = { requestId: detail.requestId, ok: false, error: error?.message || String(error) };
+            result = { ok: false, stage, error: error?.message || String(error) };
         } finally {
             panelCaptureInProgress = false;
-            document.dispatchEvent(new CustomEvent('dashbridgePanelCaptureResult', { detail: result }));
+            publishResult(result);
             globalThis.DashBridgeAnalytics?.outcome(
                 detail.action === 'copy' ? 'grafana.panel.capture_png_copy' : 'grafana.panel.capture_png_download',
                 result.ok ? 'success' : 'error', { surface: 'direct_grafana', prepared: !!detail.prepared });

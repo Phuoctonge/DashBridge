@@ -117,6 +117,17 @@ const guiCaptureController = DashBridgeBackgroundGuiCapture.create({ zipConstruc
 // Do not replace the branch-specific checks with a single "extension sender" test:
 // content scripts and extension pages intentionally have different authority.
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type === 'dashbridge-apply-update-indicator') {
+        if (!isTrustedExtensionPage(_sender, 'pages/popup/popup.html')
+            || typeof message.version !== 'string' || message.version.length > 32) {
+            sendResponse({ ok: false, error: 'Untrusted update indicator request' });
+            return undefined;
+        }
+        updateIndicator.apply({ version: message.version })
+            .then(applied => sendResponse({ ok: true, applied }))
+            .catch(error => sendResponse({ ok: false, error: error?.message || String(error) }));
+        return true;
+    }
     if (message?.type === 'dashbridge-analytics-track') {
         const trustedExtensionPage = _sender?.id === chrome.runtime.id
             && typeof _sender.url === 'string' && _sender.url.startsWith(chrome.runtime.getURL(''));

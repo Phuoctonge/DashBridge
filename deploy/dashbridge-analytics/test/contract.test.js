@@ -30,6 +30,7 @@ test('server and extension accept exactly the same signals and dimensions', () =
         countBucket: ['1', '2_5', '6_10', '11_plus'], renderer: ['uplot', 'flot', 'unknown'],
         grafanaMajor: ['unknown', '8', '9', '10', '11', '12', '13'],
         source: ['none', 'graph', 'custom', 'cpu_capacity', 'dom', 'response'],
+        failure: ['runtime_dependency_missing', 'visual_verification_failed', 'legend_apply_failed', 'timeout', 'unexpected_exception'],
     };
     const acceptedByServer = (featureId, signal, dimensions) => serverContract.validateBatch({
         schemaVersion: 1, installationId: '00000000-0000-4000-8000-000000000002', droppedAggregates: 0,

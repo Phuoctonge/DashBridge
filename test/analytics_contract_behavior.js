@@ -16,6 +16,11 @@ assert(contract.normalize({ featureId: 'confluence.fix_activated', signal: 'effe
 'the isolated Confluence bridge must be able to route and record effective evidence');
 assert(contract.normalize({ featureId: 'extension.data_migration', signal: 'lifecycle', dimensions: {} }),
     'a successful data migration must pass the analytics contract');
+assert(contract.normalize({ featureId: 'internal.panel_tools_apply', signal: 'outcome',
+    dimensions: { outcome: 'error', surface: 'dashbridge', failure: 'visual_verification_failed' } }),
+'a panel-tools failure must use a fixed diagnostic category instead of raw exception text');
+assert.strictEqual(contract.normalize({ featureId: 'internal.panel_tools_apply', signal: 'outcome',
+    dimensions: { outcome: 'error', surface: 'dashbridge', failure: 'raw secret exception text' } }), null);
 assert.strictEqual(contract.normalize({ featureId: 'grafana.panel.fill_removed', signal: 'changed',
     dimensions: { url: 'https://secret.example' } }), null, 'arbitrary dimensions must be rejected');
 assert.strictEqual(contract.normalize({ featureId: 'unknown.feature', signal: 'used', dimensions: {} }), null);

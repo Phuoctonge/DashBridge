@@ -123,5 +123,15 @@ assert(dashboardCss.includes('.panel-card.dashbridge-panel-capture-active .panel
     && dashboardCss.includes('transition: none !important;'),
     'DashBridge capture must hide its toolbar immediately instead of capturing an opacity transition');
 assert(tools.includes('panelCaptureInProgress') && dashboardCapture.includes('panelCaptureInProgress'), 'both hosts must reject overlapping captures');
+assert(tools.includes("result.fallback === 'download'")
+    && tools.includes("'Буфер изображений недоступен на HTTP — файл сохранён.'")
+    && tools.includes("setTimeout(removeCaptureNotice, 5000)")
+    && tools.includes("notice.setAttribute('role', 'status')")
+    && tools.includes("close.setAttribute('aria-label', 'Закрыть уведомление')")
+    && tools.includes('@media(prefers-reduced-motion:reduce)'),
+    'clipboard fallback must show an accessible bounded notice without a blocking dialog');
+assert(dashboardCapture.includes("fallback: 'download'")
+    && dashboardCapture.includes('await chrome.downloads.download'),
+    'DashBridge iframe capture must preserve the PNG as a download when image clipboard is unavailable');
 
 console.log('PASS Grafana panel capture preserves aspect ratio and restores both hosts');

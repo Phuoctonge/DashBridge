@@ -7,19 +7,53 @@
 клиент отправляет не более одной пачки в час. Панель показывает технические
 счётчики приёма без тел запросов и сетевых идентификаторов.
 
+## Локальная визуальная разработка
+
+Из корня репозитория запустите:
+
+```powershell
+.\scripts\Start-AnalyticsDev.ps1
+```
+
+Скрипт создаёт отдельную `.dev-data/analytics.sqlite` с синтетическими
+агрегатами, открывает `http://127.0.0.1:18080/admin/` и запускает Node watch.
+`-ResetData` пересоздаёт fixtures. Dev bypass административного gateway
+разрешён только вместе с loopback `HOST`, поэтому его нельзя случайно включить
+на публичном интерфейсе. Production SQLite никогда не используется.
+
 ## Установка через Dockge
 
-Скопируйте весь каталог в `/opt/stacks/dashbridge-analytics`, затем на VPS:
+Production-контейнер использует готовый `node:24-alpine` и bind-mounted файлы,
+поэтому при обычной публикации image не собирается. Для первой установки
+скопируйте весь каталог в `/opt/stacks/dashbridge-analytics-bootstrap`, затем:
 
 ```bash
-cd /opt/stacks/dashbridge-analytics
-install -d -o 10001 -g 10001 -m 750 data
-docker network create analytics_private
-docker compose config --quiet
+cd /opt/stacks/dashbridge-analytics-bootstrap
+sudo ./ops/bootstrap-vps.sh dashbridge-deploy
 ```
 
 Добавьте сеть `analytics_private` сервису Caddy в его Compose и пересоздайте
 только Caddy. После этого откройте стек в Dockge и нажмите Deploy.
+
+## Публикация без Docker build
+
+Изменения отправляются из корня Windows-репозитория:
+
+```powershell
+.\scripts\Publish-Analytics.ps1 -RemoteHost analytics.example.com `
+  -IdentityFile .\.deploy-keys\dashbridge-vps-temp
+```
+
+Скрипт прогоняет тесты, загружает только `server.js`,
+`analytics-contract.js` и `public/`, проверяет SHA-256 и вызывает узкий root
+helper. Изменение только `public/` видно после обновления страницы без restart;
+изменение backend вызывает короткий restart контейнера. `data/` не входит в
+release и остаётся подключённым. Перед переключением создаётся backup кода;
+неуспешный health-check автоматически восстанавливает предыдущую версию.
+
+Compose и root helper не принимаются из публикуемого архива: они изменяются
+только отдельной административной процедурой. Это не позволяет ограниченному
+deploy-пользователю расширить собственные sudo/Docker-полномочия.
 
 ## Caddy
 
