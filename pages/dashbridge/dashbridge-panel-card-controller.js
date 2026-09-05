@@ -407,8 +407,10 @@
             const profileId = String(getActiveProfile()?.id || '');
             card.dataset.profileId = profileId;
             card.dataset.dashbridgeScopeId = runtimeScopeId;
-            iframe.dataset.dashbridgeProfileId = profileId;
-            iframe.dataset.dashbridgeScopeId = runtimeScopeId;
+            if (iframe) {
+                iframe.dataset.dashbridgeProfileId = profileId;
+                iframe.dataset.dashbridgeScopeId = runtimeScopeId;
+            }
             if (!panel.paused) {
                 navigateDashboardFrame(iframe, iframe.dataset.src);
                 iframe.removeAttribute('data-src');

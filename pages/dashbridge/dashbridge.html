@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="dashbridge-dialogs.css">
 <link rel="stylesheet" href="dashbridge-interactions.css">
 <link rel="stylesheet" href="dashbridge-report.css">
+<link rel="stylesheet" href="dashbridge-variables.css">
     <!-- theme.js в <head> — применяется до рендера body, исключает мигание темы (FOWT) -->
 <script src="../shared/theme.js"></script>
 </head>
@@ -307,6 +308,7 @@
         </div>
     </header>
 
+    <div id="dashboardVariables" class="dashboard-variables" aria-label="Фильтры Grafana" hidden></div>
     <main class="dashboard-container" id="dashboard"></main>
 
     <!-- Modal for adding new iframe -->
@@ -447,6 +449,8 @@
 <script src="dashbridge-report-test-runner.js"></script>
 <script src="dashbridge-report-controller.js"></script>
 <script src="dashbridge-capture.js"></script>
+<script src="dashbridge-variables-state.js"></script>
+<script src="dashbridge-variables-controller.js"></script>
 <script src="dashbridge.js"></script>
 
 </body>

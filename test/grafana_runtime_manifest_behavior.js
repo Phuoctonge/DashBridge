@@ -11,7 +11,7 @@ vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'shared', 'graf
 vm.runInContext(`${source}\nglobalThis.__runtimeFiles = DASHBRIDGE_GRAFANA_MAIN_RUNTIME_FILES;`, context);
 const files = Array.from(context.__runtimeFiles);
 assert.deepStrictEqual(files, [
-    'js/shared/grafana-panel-bootstrap.js', 'js/content/grafana-refresh-policy.js', 'js/shared/grafana-legend-selection.js', 'js/shared/grafana-capture-output.js', 'js/content/grafana-dom.js', 'js/content/grafana-panel-state.js', 'js/shared/grafana-panel-analysis.js', 'js/content/grafana-series-capture.js',
+    'js/shared/grafana-panel-bootstrap.js', 'js/content/grafana-refresh-policy.js', 'js/content/grafana-variables-runtime.js', 'js/shared/grafana-legend-selection.js', 'js/shared/grafana-capture-output.js', 'js/content/grafana-dom.js', 'js/content/grafana-panel-state.js', 'js/shared/grafana-panel-analysis.js', 'js/content/grafana-series-capture.js',
     'js/content/grafana-panel-definition.js', 'js/content/grafana-unit.js', 'js/content/grafana-table-report.js', 'js/content/grafana-legend-visibility-adapters.js', 'js/content/grafana-legend-visuals.js', 'js/content/grafana-threshold-visuals.js', 'js/content/grafana-report-snapshot.js', 'js/content/grafana-series-styles.js', 'js/content/grafana-visual-engine.js', 'js/content/grafana-compact-layout.js', 'js/shared/grafana-panel-settings-modal.js',
     'js/shared/bounded-journal.js', 'js/content/grafana-network.js', 'js/content/grafana-cpu-capacity-filter.js', 'js/content/grafana-cpu-capacity-legend.js', 'js/content/grafana-panel-capture-runtime.js', 'js/content/grafana-panel-data-transforms.js', 'js/content/grafana-panel-data-runtime.js', 'js/content/grafana-panel-menu-runtime.js', 'js/content/grafana-panel-tools.js'
 ]);

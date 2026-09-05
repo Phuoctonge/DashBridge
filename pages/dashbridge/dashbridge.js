@@ -516,3 +516,14 @@ DashBridgeIframeMessageController.create({
     broadcastCrosshair,
     hideCrosshair,
 }).setup();
+
+window.DashBridgeVariablesController.create({
+    getPanels: () => panels,
+    getActiveProfile,
+    getPanelForIframe,
+    applyPanelParamsToUrl,
+    navigateDashboardFrame,
+    savePanels,
+    invalidate: () => { invalidateActiveProfileRuntime(); closeDashboardPanelAnalysis(); },
+    replacePanelCard: replaceDashboardPanelCard,
+}).start();

@@ -35,7 +35,7 @@ const makeIframe = src => ({
     removeAttribute(name) { this.removed.push(name); delete this.dataset[name.replace(/^data-/, '')]; },
 });
 const makeCard = panel => {
-    const iframe = makeIframe(`prepared:${panel.src}`);
+    const iframe = panel.paused ? null : makeIframe(`prepared:${panel.src}`);
     const actionButton = { dataset: {}, addEventListener() { calls.actions += 1; } };
     const openButton = { dataset: {}, addEventListener() { calls.actions += 1; } };
     const dragHandle = { listeners: {}, addEventListener(type, listener) { this.listeners[type] = listener; } };
@@ -129,6 +129,11 @@ const controller = context.DashBridgePanelCardController.create({
 });
 
 (async () => {
+    const paused = { ...panels[0], id: 'paused-new', paused: true };
+    controller.createPanelCard(paused, dashboard);
+    assert.strictEqual(cards.get('paused-new').iframe, null);
+    assert.strictEqual(navigations.length, 0, 'paused cards have no iframe to initialize or navigate');
+    cards.delete('paused-new');
     await controller.renderDashboard();
     assert.strictEqual(cards.size, 2);
     assert.strictEqual(navigations.length, 2, 'active cards must navigate exactly once during creation');

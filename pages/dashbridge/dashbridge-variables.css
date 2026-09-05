@@ -1,0 +1,18 @@
+.dashboard-variables { padding: .5rem 1rem; display: flex; flex-direction: column; gap: .5rem; }
+.dashboard-variables[hidden], .dashboard-variable-group[hidden] { display: none; }
+.dashboard-variable-group { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; padding: .5rem; border: 1px solid var(--border-color, #888); border-radius: .5rem; }
+.dashboard-variable-group > a { max-width: 20rem; overflow-wrap: anywhere; font-size: .8rem; color: inherit; }
+.dashboard-variable-group > [role="status"] { font-size: .8rem; }
+.dashboard-variable-controls { display: flex; flex-wrap: wrap; gap: .5rem; }
+.dashboard-variable { position: relative; min-width: 8rem; max-width: 24rem; }
+.dashboard-variable summary { cursor: pointer; padding: .4rem .6rem; border: 1px solid var(--border-color, #888); border-radius: .3rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dashboard-variable-options { position: absolute; inset-block-start: 100%; inset-inline-start: 0; z-index: 100; width: min(28rem, 85vw); padding: .6rem; border: 1px solid var(--border-color, #888); border-radius: .4rem; background: var(--bg-color, #fff); color: var(--text-color, #222); box-shadow: 0 .4rem 1.2rem #0003; }
+[data-theme="dark"] .dashboard-variable-options { background: #20242b; color: #eee; }
+.dashboard-variable-options > input { box-sizing: border-box; width: 100%; padding: .4rem; margin-block-end: .4rem; }
+.dashboard-variable-list { max-height: 20rem; overflow: auto; }
+.dashboard-variable-list label { display: flex; align-items: center; gap: .4rem; padding: .35rem; overflow-wrap: anywhere; cursor: pointer; }
+.dashboard-variable-list label:hover { background: #8882; }
+.dashboard-variable-list input { flex-shrink: 0; }
+.dashboard-variable-options button, .dashboard-variable-group > button { padding: .4rem .6rem; cursor: pointer; border: 1px solid var(--border-color, #888); border-radius: .35rem; background: var(--bg-color, #fff); color: var(--text-main, #222); font: inherit; }
+.dashboard-variable-options button { margin: .3rem .3rem 0 0; }
+.dashboard-variable :focus-visible { outline: 2px solid #5794f2; outline-offset: 2px; }

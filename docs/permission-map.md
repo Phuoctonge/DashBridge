@@ -51,3 +51,9 @@ Batch и Test Runner используют аналогичный guard в общ
 capture helper: active tab/URL/window до и после PNG, listeners навигации и
 активации в течение захвата. Web Locks для Batch rules и OPFS не требуют
 нового permission; locks действуют между документами одного extension origin.
+
+Автоматические переменные DashBridge используют существующие host permissions
+и Grafana-сессию iframe. Новый isolated `grafana-variables-bridge.js` не вызывает
+привилегированные Chrome API: только получает собственный extension origin,
+проверяет exact parent/source/origin и передаёт ограниченные correlated снимки
+MAIN runtime. URL, имена и варианты переменных не отправляются в аналитику.

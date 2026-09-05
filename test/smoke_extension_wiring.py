@@ -31,7 +31,8 @@ checks = {
         for entry in MANIFEST["content_scripts"]
     ),
     "Grafana iframe bridge runs in all frames": any(
-        entry["js"][-1:] == ["js/content/grafana-iframe.js"] and entry.get("all_frames")
+        "js/content/grafana-iframe.js" in entry["js"]
+        and "js/content/grafana-variables-bridge.js" in entry["js"] and entry.get("all_frames")
         for entry in MANIFEST["content_scripts"]
     ),
     "Required Chrome capabilities are declared": {"storage", "tabs", "scripting", "downloads"}.issubset(MANIFEST["permissions"]),

@@ -269,6 +269,46 @@ disabled-пункты показывают профили, в которых п�
 
 ### DashBridge
 
+#### Автоматические переменные Grafana
+
+`dashbridge-variables-controller.js` (extension page) создаёт группы полей из
+панелей активного профиля; ключ группы — origin, base path, dashboard UID и
+orgId. `dashbridge-variables-state.js` владеет чистой валидацией снимка и URL
+codec: повторяющиеся `var-*`, All и сохранение остальных параметров. Выбор
+хранится в существующих `panel.src`, поэтому legacy schema и panel JSON export
+не требуют нового хранилища. Варианты остаются в памяти страницы.
+
+`grafana-variables-bridge.js` (isolated, только именованный iframe) принимает
+`dashbridgeVariablesRequest` от exact extension origin + parent, допускает
+один запрос и передаёт correlated `dashbridgeVariablesResponse`. MAIN-модуль
+`grafana-variables-runtime.js` читает живые Scenes objects через ограниченный
+React ancestor traversal либо `@grafana/runtime.getTemplateSrv()`. Он не
+реализует datasource queries и не создаёт дополнительные dashboard iframe.
+Списки ограничены 100 переменными, 5000 вариантами на поле и 2 MB сообщения.
+Все listeners/watchdogs принадлежат документу и очищаются при pagehide.
+
+Изменение выбора сначала вызывает `changeValueTo` живого Scenes variable либо
+навигирует одну legacy-панель, давая Grafana пересчитать зависимости, затем записывает согласованные значения в URL
+панелей группы и пересоздаёт их через штатный card lifecycle. Это необходимо
+для legacy SoloPanel, где location-only update меняет адрес, но не template
+state. Ошибка до commit сохраняет прежние URL; другие профили не меняются.
+Legacy reset удаляет URL-значения транзитивно зависимых переменных, найденных
+по штатным `$name`, `${name:format}`, `[[name:format]]` ссылкам в query,
+datasource, regex и definition. Их новые значения выбирает Grafana при загрузке.
+Обычное чтение не записывает выбранные значения. Явное обновление вариантов
+может изменить недопустимый выбор штатным механизмом Grafana и согласовать
+его с остальными панелями группы.
+Пауза не снимается фильтрами; card creation допускает отсутствие iframe. Новая панель существующей группы наследует её
+выбор; удаление последней панели убирает группу.
+
+Поддерживаются URL-синхронизируемые query, datasource, custom, interval и
+textbox поля. Hidden/constant не показываются. Ad hoc, пользовательские типы
+и skipUrlSync пока представлены как неподдерживаемые с переходом в исходную
+Grafana: их семантика не имитируется. Scenes refresh использует штатный метод,
+legacy refresh — загрузку панели. Списки показывают до 300 совпадений поиска;
+остальные доступны через уточнение поиска. Это граница текущей совместимости,
+а не обещание поддержки всех будущих внутренних API Grafana.
+
 ```text
 dashbridge-profile-store.js
   → dashbridge-profile-controller.js

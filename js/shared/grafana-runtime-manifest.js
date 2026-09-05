@@ -6,6 +6,7 @@
     const files = Object.freeze([
         'js/shared/grafana-panel-bootstrap.js',
         'js/content/grafana-refresh-policy.js',
+        'js/content/grafana-variables-runtime.js',
         'js/shared/grafana-legend-selection.js',
         'js/shared/grafana-capture-output.js',
         'js/content/grafana-dom.js',
