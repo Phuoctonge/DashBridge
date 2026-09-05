@@ -140,7 +140,7 @@
             const draw = () => {
                 list.replaceChildren();
                 const options = variable.options.filter(option => option.text.toLocaleLowerCase().includes(input.value.toLocaleLowerCase()));
-                for (const option of options.slice(0, 300)) {
+                for (const option of options) {
                     const label = documentRef.createElement('label');
                     const control = documentRef.createElement('input');
                     control.type = variable.multi ? 'checkbox' : 'radio';
@@ -154,11 +154,6 @@
                     });
                     label.append(control, documentRef.createTextNode(option.text));
                     list.appendChild(label);
-                }
-                if (options.length > 300) {
-                    const note = documentRef.createElement('p');
-                    note.textContent = `Показано 300 из ${options.length}. Уточните поиск.`;
-                    list.appendChild(note);
                 }
             };
             if (variable.type === 'textbox') {
