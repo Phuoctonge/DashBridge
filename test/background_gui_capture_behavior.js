@@ -5,10 +5,11 @@ const vm = require('vm');
 let messageListener;
 const chrome = {
     tabs: {
-        onRemoved: { addListener() {} },
+        onRemoved: { addListener() {}, removeListener() {} },
+        onActivated: { addListener() {}, removeListener() {} },
         onUpdated: { addListener() {}, removeListener() {} },
         captureVisibleTab: async () => 'data:image/png;base64,AA==',
-        query: async () => [],
+        query: async () => [{ id: 7, windowId: 3, url: 'https://grafana.test/d/uid/name' }],
     },
     scripting: {
         getRegisteredContentScripts: async () => [], registerContentScripts: async () => {},
@@ -108,6 +109,20 @@ const grafanaSender = (url, frameId = 0) => ({
         'capture must restore the isolated image dependency in the requesting document');
     assert.strictEqual(JSON.stringify(chrome.__lastScriptInjection.files),
         JSON.stringify(['js/shared/grafana-capture-output.js']));
+    const originalQuery = chrome.tabs.query;
+    chrome.tabs.query = async () => [{ id: 8, windowId: 3, url: 'https://other.test/' }];
+    await assert.rejects(guiCaptureController.captureVisiblePanel(grafanaSender('https://grafana.test/d/uid/name')),
+        /capture-target-changed/);
+    chrome.tabs.query = originalQuery;
+    const originalCapture = chrome.tabs.captureVisibleTab;
+    chrome.tabs.captureVisibleTab = async () => {
+        chrome.tabs.query = async () => [{ id: 8, windowId: 3, url: 'https://other.test/' }];
+        return 'data:image/png;base64,AA==';
+    };
+    await assert.rejects(guiCaptureController.captureVisiblePanel(grafanaSender('https://grafana.test/d/uid/name')),
+        /capture-target-changed/, 'a tab switch during capture must discard the PNG');
+    chrome.tabs.captureVisibleTab = originalCapture;
+    chrome.tabs.query = originalQuery;
     const indicatorResult = await new Promise(resolve => messageListener(
         { type: 'dashbridge-apply-update-indicator', version: '2.4.3' },
         { id: 'extension-id', url: 'chrome-extension://extension-id/pages/popup/popup.html' }, resolve

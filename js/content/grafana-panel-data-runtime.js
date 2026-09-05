@@ -58,10 +58,6 @@
                 return new Set(queries.map(query => String(query.refId || '')).filter(Boolean));
             }
             if (!signatures.size) return new Set();
-            const getQueryScopeSignature = window.DashBridgeGrafanaVisualEngine?.getQueryScopeSignature;
-            const scopeSignatures = new Set([...signatures].map(signature => {
-                try { return getQueryScopeSignature?.(JSON.parse(signature)) || ''; } catch { return ''; }
-            }).filter(Boolean));
             const configuredQueries = [...signatures].map(signature => {
                 try { return JSON.parse(signature); } catch { return null; }
             }).filter(Boolean);
@@ -71,10 +67,8 @@
                     refId: String(query.refId || ''),
                     alias: query.alias || '',
                     signature: window.DashBridgeGrafanaVisualEngine?.getQuerySignature?.(query) || '',
-                    scopeSignature: getQueryScopeSignature?.(query) || '',
                 }));
                 const matched = candidates.filter(query => signatures.has(query.signature)
-                    || scopeSignatures.has(query.scopeSignature)
                     || configuredQueries.some(configured => window.DashBridgeGrafanaPanelDefinition
                         ?.queryMatchesConfiguredTarget?.(configured, query.raw)));
                 return new Set(matched.map(query => query.refId).filter(Boolean));
@@ -87,18 +81,13 @@
             const queries = getRequestQueries(requestBody);
             const configuredSignatures = new Set(signatures || []);
             if (!configuredSignatures.size) return new Set();
-            const getQueryScopeSignature = window.DashBridgeGrafanaVisualEngine?.getQueryScopeSignature;
-            const scopeSignatures = new Set([...configuredSignatures].map(signature => {
-                try { return getQueryScopeSignature?.(JSON.parse(signature)) || ''; } catch { return ''; }
-            }).filter(Boolean));
             const configuredQueries = [...configuredSignatures].map(signature => {
                 try { return JSON.parse(signature); } catch { return null; }
             }).filter(Boolean);
             try {
                 return new Set(queries.filter(query => {
                     const signature = window.DashBridgeGrafanaVisualEngine?.getQuerySignature?.(query) || '';
-                    const scopeSignature = getQueryScopeSignature?.(query) || '';
-                    return configuredSignatures.has(signature) || scopeSignatures.has(scopeSignature)
+                    return configuredSignatures.has(signature)
                         || configuredQueries.some(configured => window.DashBridgeGrafanaPanelDefinition
                             ?.queryMatchesConfiguredTarget?.(configured, query));
                 }).map(query => String(query.refId || '')).filter(Boolean));
@@ -215,8 +204,6 @@
         const observeCalculatedTitle = () => {
             const observerRequired = !!tools.invertIdle || !!tools.convertMemToUsed
                 || !!tools.cpuCapacityFilterEnabled || !!tools.seriesQueryFilterEnabled;
-            // BUG-B fix: проверяем не только наличие флага, но и активность observer'а.
-            // После suspend/resume браузер может разорвать соединение — тогда observer надо пересоздать.
             const existing = window.__dashbridgeCalculatedTitleObserver;
             if (!observerRequired) {
                 existing?.disconnect();
@@ -236,10 +223,6 @@
             if (calculatedTitleFrame) cancelAnimationFrame(calculatedTitleFrame);
             calculatedTitleFrame = 0;
         });
-        // Monkey-patching (перехват сети): мы подменяем оригинальные window.fetch и XMLHttpRequest.
-        // Это позволяет нам "на лету" перехватывать JSON-ответы от сервера Grafana (/api/ds/query) 
-        // и изменять сырые метрики (например, инвертировать CPU idle в CPU used или считать RAM) 
-        // до того, как они попадут во внутренний стейт дашборда.
         const installDataInterceptor = () => {
             if (window.__dashbridgeCardDataInterceptor) return;
             window.__dashbridgeCardDataInterceptor = true;
@@ -382,14 +365,13 @@
                 const exactTargetRefIds = getTargetQueryRefIds(requestBody);
                 let targetRefIds = exactTargetRefIds;
                 let scope = exactTargetRefIds === null ? 'iframe' : exactTargetRefIds.size ? 'query-signature' : 'none';
-                if (!isDashboardIframe && !targetRefIds.size) {
+                if (!isDashboardIframe && !targetRefIds.size
+                    && (!getRequestQueries(requestBody).length || !tools.targetQuerySignatures?.length)) {
                     targetRefIds = getTargetLegendRefIds(data);
                     if (targetRefIds.size) scope = 'legend-fallback';
                 }
                 const resultRefIds = Object.keys(data.results || {});
-                // A normal Grafana dashboard has many panels sharing the same
-                // datasource endpoint. Never alter a response until it matches
-                // the selected panel's saved query signature.
+                // Never transform a known query belonging to a different panel.
                 if (targetRefIds !== null && !targetRefIds.size) {
                     diagnostics.unmatched += 1;
                     diagnostics.last = { at: Date.now(), scope, resultRefIds, targetRefIds: [] };
@@ -591,10 +573,7 @@
                     try {
                         const requestBody = await requestBodyPromise;
                         archiveRequest(requestId, 'fetch', url, requestBody);
-                        // The transformed response replaces the native one, so consume the
-                        // native body directly. Cloning here tees the stream and leaves the
-                        // original branch unread; repeated Grafana refreshes can then retain
-                        // buffered response bodies until GC and steadily grow tab memory.
+                        // Consume directly: cloning would leave an unread tee buffering the body.
                         originalResponseText = await response.text();
                         const decoded = JSON.parse(originalResponseText);
                         if (analysisCaptureActive && panelAnalysisRequestMatches(analysisCapture, requestBody, requestStartedAt)) {
@@ -620,6 +599,14 @@
             const originalOpen = XMLHttpRequest.prototype.open;
             const originalSend = XMLHttpRequest.prototype.send;
             XMLHttpRequest.prototype.open = function (method, url) {
+                this.__dashbridgeRequestCleanup?.();
+                this.__dashbridgeRequestFinished = false;
+                this.__dashbridgeRequestAborted = false;
+                if (this.__dashbridgeResponseOverridden) {
+                    delete this.responseText;
+                    delete this.response;
+                    this.__dashbridgeResponseOverridden = false;
+                }
                 this.__dashbridgeRequestUrl = url;
                 return originalOpen.apply(this, arguments);
             };
@@ -644,10 +631,13 @@
                     }
                     const requestId = beginRequest('xhr', this.__dashbridgeRequestUrl);
                     if (transformActive) archiveRequest(requestId, 'xhr', this.__dashbridgeRequestUrl, body ?? null);
-                    this.addEventListener('abort', () => { this.__dashbridgeRequestAborted = true; }, { once: true });
-                    this.addEventListener('readystatechange', () => {
+                    const onAbort = () => { this.__dashbridgeRequestAborted = true; };
+                    const onReady = () => {
                         if (this.readyState !== 4 || this.__dashbridgeRequestFinished) return;
                         this.__dashbridgeRequestFinished = true;
+                        this.__dashbridgeRequestCleanup = null;
+                        this.removeEventListener('readystatechange', onReady);
+                        this.removeEventListener('abort', onAbort);
                         const request = { requestId, transport: 'xhr' };
                         pushEvent('response', { ...request, status: this.status, ok: this.status >= 200 && this.status < 300 });
                         archiveResponse(requestId, 'http-response-metadata', null, {
@@ -701,15 +691,25 @@
                             if (decoded.type === 'text') {
                                 Object.defineProperty(this, 'responseText', { configurable: true, value: serialized });
                                 Object.defineProperty(this, 'response', { configurable: true, value: serialized });
+                                this.__dashbridgeResponseOverridden = true;
                             }
                             completeRequest(requestId, 'xhr', json?.results ? 'transformed' : 'decode-error');
                         } catch (error) {
                             pushEvent('decode-error', { ...request, reason: error.message || String(error) });
                             completeRequest(requestId, 'xhr', 'decode-error');
                         }
-                    });
+                    };
+                    this.__dashbridgeRequestCleanup = () => {
+                        this.removeEventListener('readystatechange', onReady);
+                        this.removeEventListener('abort', onAbort);
+                        completeRequest(requestId, 'xhr', 'aborted');
+                        this.__dashbridgeRequestCleanup = null;
+                    };
+                    this.addEventListener('abort', onAbort, { once: true });
+                    this.addEventListener('readystatechange', onReady);
                 }
-                return originalSend.call(this, body);
+                try { return originalSend.call(this, body); }
+                catch (error) { this.__dashbridgeRequestCleanup?.(); throw error; }
             };
         };
         return Object.freeze({ hasDataTransform, markCalculatedTitle, observeCalculatedTitle, installDataInterceptor });

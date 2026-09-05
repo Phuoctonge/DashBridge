@@ -203,8 +203,7 @@
         const shouldSend = state => !!String(config.endpoint || '').trim()
             && !state.inflight.length && state.aggregates.length > 0
             && now() >= Number(state.nextRetryAt || 0)
-            && (state.aggregates.length >= 50
-                || now() - Number(state.lastSendAttemptAt || 0) >= Number(config.minimumSendIntervalMs || 900_000));
+            && now() - Number(state.lastSendAttemptAt || 0) >= Number(config.minimumSendIntervalMs ?? 900_000);
         const sendNow = async () => {
             const state = await load();
             if (!shouldSend(state)) return { sent: 0, reason: 'not-due' };

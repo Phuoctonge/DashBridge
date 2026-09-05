@@ -84,6 +84,15 @@ chrome.tabs.onRemoved.addListener(tabId => {
         .catch(error => console.warn('Failed to remove Grafana iframe tab rules:', error));
 });
 
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+    void grafanaInfrastructure.handleTabNavigation(tabId, changeInfo)
+        .catch(error => console.warn('Failed to update Grafana iframe navigation rules:', error));
+});
+chrome.tabs.onReplaced?.addListener(() => {
+    void grafanaInfrastructure.queueRulesSync()
+        .catch(error => console.warn('Failed to update replaced Grafana iframe tab rules:', error));
+});
+
 chrome.runtime.onInstalled.addListener(details => {
     void ensureAnalyticsAlarm().catch(() => undefined);
     if (details?.reason === 'install' || details?.reason === 'update') {
@@ -150,7 +159,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }
     if (message?.type === 'dashbridge-capture-visible-tab') {
         (async () => {
-            if (!await grafanaInfrastructure.isTrustedContentSender(_sender) || !_sender.tab?.windowId) {
+            const dashboardPage = isTrustedExtensionPage(_sender, 'pages/dashbridge/dashbridge.html');
+            if ((!dashboardPage && !await grafanaInfrastructure.isTrustedContentSender(_sender)) || !_sender.tab?.windowId) {
                 throw new Error('Недоверенный запрос снимка Grafana.');
             }
             // An open Grafana document can keep an older isolated content-script
@@ -160,7 +170,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             const target = typeof _sender.documentId === 'string'
                 ? { tabId: _sender.tab.id, documentIds: [_sender.documentId] }
                 : { tabId: _sender.tab.id, frameIds: [_sender.frameId] };
-            await chrome.scripting.executeScript({
+            if (!dashboardPage) await chrome.scripting.executeScript({
                 target, world: 'ISOLATED', files: ['js/shared/grafana-capture-output.js']
             });
             return guiCaptureController.captureVisiblePanel(_sender);
@@ -207,8 +217,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         return true;
     }
     if (message && message.type === 'dashbridge-ensure-iframe-rules' && _sender.tab) {
-        const expectedUrl = chrome.runtime.getURL('pages/dashbridge/dashbridge.html');
-        if (typeof _sender.tab.url !== 'string' || !_sender.tab.url.startsWith(expectedUrl)) {
+        if (!isTrustedExtensionPage(_sender, 'pages/dashbridge/dashbridge.html')
+            || !grafanaInfrastructure.isDashBridgeUrl(_sender.tab.url)) {
             sendResponse({ ok: false, error: 'Unexpected sender' });
             return undefined;
         }

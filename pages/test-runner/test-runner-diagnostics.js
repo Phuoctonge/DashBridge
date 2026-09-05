@@ -255,6 +255,11 @@ const DIAGNOSTIC_CAPTURE_MODES = Object.freeze({
     FORENSIC: 'forensic',
 });
 
+let diagnosticScreenshotsEnabled = true;
+function setDiagnosticScreenshotsEnabled(enabled) {
+    diagnosticScreenshotsEnabled = enabled !== false;
+}
+
 function normalizeDiagnosticCaptureMode(mode) {
     return Object.values(DIAGNOSTIC_CAPTURE_MODES).includes(mode)
         ? mode : DIAGNOSTIC_CAPTURE_MODES.FORENSIC;
@@ -445,7 +450,7 @@ async function captureRuntimeDiagnostic(tabId, panelId, {
     // for every canvas made long matrix scenarios retain equivalent images
     // until the whole test could be spooled to OPFS. Only canvas mode needs
     // the raw canvas PNG; every mode keeps a sampled pixel hash/statistics.
-    const includeCanvasImages = mode === DIAGNOSTIC_CAPTURE_MODES.CANVAS;
+    const includeCanvasImages = diagnosticScreenshotsEnabled && mode === DIAGNOSTIC_CAPTURE_MODES.CANVAS;
     const retainFullDom = mode === DIAGNOSTIC_CAPTURE_MODES.FORENSIC;
     const retainFullResources = mode === DIAGNOSTIC_CAPTURE_MODES.FORENSIC;
     const diagnostic = await execMain(tabId, (pid, visualOptions) => {
@@ -974,6 +979,13 @@ async function captureRuntimeDiagnostic(tabId, panelId, {
         };
     }, [panelId, { includeCanvasImages, retainFullDom, retainFullResources }]);
     const visualStateRef = `visual-state-${runtimeVisualReuseHash(diagnostic)}`;
+    if (!diagnosticScreenshotsEnabled) {
+        diagnostic.visualCapture = {
+            mode: 'hash-only', requestedMode: mode, reason: 'screenshots-disabled',
+            screenshotsEnabled: false, visualStateRef,
+        };
+        return diagnostic;
+    }
     if (canReuseRuntimeVisual(diagnostic, reuseVisualFrom, mode)) {
         if (mode === DIAGNOSTIC_CAPTURE_MODES.PANEL || mode === DIAGNOSTIC_CAPTURE_MODES.FORENSIC) {
             diagnostic.panelImage = reuseVisualFrom.panelImage;

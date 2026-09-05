@@ -388,7 +388,9 @@ legacy memory-панелей. Исходное состояние один ра�
 остаётся явным долговременным способом полностью исключить iframe и запросы.
 
 DNR создаётся только для открытых вкладок `pages/dashbridge/dashbridge.html` и разрешённых
-Grafana-хостов. Закрытие вкладки удаляет её session rules.
+Grafana-хостов. Правила дополнительно требуют extension initiator. Закрытие,
+замена вкладки и навигация с DashBridge запускают пересинхронизацию session
+rules; вкладки с чужим pendingUrl не включаются в новый набор.
 
 ### Фильтр Load Average по vCPU
 
@@ -489,6 +491,12 @@ Prepared mode сохраняет пропорции и вписывается в
 
 Copy выполняется максимально близко к клику из сфокусированного Grafana
 document. Ошибка capture/crop/download/clipboard также проходит восстановление.
+
+Direct Grafana и DashBridge обращаются к общей очереди background capture.
+Broker проверяет активную вкладку и URL отправителя до и после ожидания и
+снимка; переключение вкладки, навигация или закрытие во время операции
+отменяют выдачу изображения с `capture-target-changed`. Слушатели снимаются
+в `finally`.
 Перед `captureVisibleTab` service worker после повторной проверки отправителя
 идемпотентно восстанавливает `grafana-capture-output.js` в isolated world именно
 запросившего document. Это закрывает рассинхронизацию поколений MAIN/isolated
@@ -555,6 +563,11 @@ Batch использует отдельное окно, ждёт нужную п
 - Внешние строки назначаются через DOM API/`textContent` либо экранируются.
 
 ### Traffic Recorder
+
+Network capture применяет maxRequests также к ранним ExtraInfo placeholders
+и redirect-записям. Бюджет тел резервируется до асинхронного SHA-256, чтобы
+параллельные ответы не превышали общий cap. Ошибка или завершение сессии
+отменяет незавершённую запись; резерв возвращается только своей сессии.
 
 `pages/recorder/recorder.html` загружает session transport, который владеет
 контролируемой вкладкой и CDP attach/detach.
@@ -623,6 +636,19 @@ Request/response body ограничены 5 МиБ на запрос и 100 М�
 password values и auth/cookie headers открыто и исключён из Git.
 
 ## Storage и состояние
+
+Panel data runtime сопоставляет structured queries по полной сигнатуре либо
+совпадению с шаблоном сохранённого target. Совпадения datasource/refId и легенды
+недостаточно при явном несовпадении запросов. Dashboard-definition fetch
+сохраняет base path Grafana; `/d-solo/`, включая подпапки, не вызывает этот API.
+Повторный `open()` одного XHR очищает предыдущие слушатели, флаги завершения
+и собственные response overrides; DONE и синхронная ошибка send завершают cleanup.
+
+MAIN panel-state хранится в памяти с ключом из origin, base path, dashboard
+UID, orgId и panel ID. Переход SPA на другой dashboard не применяет настройки
+одноимённой панели. Публичный `keyFor` сохраняет renderer-контракт `panel-N`;
+внутренний Map ограничен 500 записями с вытеснением старейшей записи по времени
+записи.
 
 | Область | Данные | Контракт |
 |---|---|---|
@@ -738,6 +764,14 @@ evidence и диагностика проваленных тестов без и
 Снимок создаётся только при фатальной ошибке внешнего запуска.
 
 UI Test Runner координирует запуск и таблицу в `test-runner-ui.js`.
+Галочка «Сохранять скриншоты» включена по умолчанию и хранится в
+`storage.local.trScreenshotsEnabled`. Значение фиксируется на запуск (во время
+работы галочка отключена) и экспортируется как `screenshotsEnabled`.
+При false diagnostics не создаёт canvas/panel/viewport PNG и не переиспользует
+изображения; хеши, pixel statistics, DOM и семантические проверки сохраняются.
+Поэтому OPFS, просмотр диагностики и JSON этого запуска не содержат снимков.
+Изменение галочки после завершения относится к следующему запуску и не удаляет
+изображения уже собранного отчёта.
 `test-runner-diagnostic-viewer.js` владеет отдельными окнами описания/diagnostics,
 theme listener и Blob URL одного теста; `test-runner-export-controller.js` владеет
 Markdown/clipboard и потоковой записью полного OPFS diagnostic export.
@@ -845,7 +879,8 @@ layout или visibility.
 ## Выпуски и уведомления об обновлениях
 
 Push тега `vX.Y.Z` запускает `.github/workflows/release.yml`. Workflow выполняет
-полный набор тестов, требует совпадения тега с версией `manifest.json`, собирает
+Node/Python-тесты, ESLint и Chromium browser smoke под Xvfb, требует
+совпадения тега с версией `manifest.json`, собирает
 ZIP расширения, Windows installer и SHA-256 через `scripts/build-release.ps1`,
 затем публикует GitHub Release с автоматически сформированными notes.
 

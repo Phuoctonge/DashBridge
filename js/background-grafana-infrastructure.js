@@ -113,10 +113,17 @@
             return { scannedTabs, injectedFrames, failedTabs };
         };
 
+        const isDashBridgeUrl = value => {
+            try {
+                const actual = new URL(value);
+                const expected = new URL(chromeRef.runtime.getURL('pages/dashbridge/dashbridge.html'));
+                return actual.origin === expected.origin && actual.pathname === expected.pathname;
+            } catch { return false; }
+        };
         const getDashBridgeTabIds = async () => {
-            const dashbridgeUrl = chromeRef.runtime.getURL('pages/dashbridge/dashbridge.html');
             const tabs = await chromeRef.tabs.query({});
-            return tabs.filter(tab => typeof tab.url === 'string' && tab.url.startsWith(dashbridgeUrl))
+            return tabs.filter(tab => isDashBridgeUrl(tab.url)
+                && (!tab.pendingUrl || isDashBridgeUrl(tab.pendingUrl)))
                 .map(tab => tab.id).filter(Number.isInteger);
         };
 
@@ -140,6 +147,7 @@
                 .map(rule => rule.id);
             const plan = dnrRules.planSessionRules(hosts, tabIds, {
                 startId: SESSION_RULE_ID_START, maxRules: SESSION_RULE_LIMIT,
+                initiatorDomain: chromeRef.runtime.id,
             });
             await chromeRef.declarativeNetRequest.updateSessionRules({ removeRuleIds, addRules: plan.rules });
             await removeLegacyRules();
@@ -155,6 +163,15 @@
             return rulesQueue;
         };
 
+        const handleTabNavigation = async (tabId, changeInfo) => {
+            if (!changeInfo?.url && changeInfo?.status !== 'loading') return;
+            const rules = await chromeRef.declarativeNetRequest.getSessionRules();
+            if (isDashBridgeUrl(changeInfo.url) || rules.some(rule => rule.id >= SESSION_RULE_ID_START
+                && rule.id < SESSION_RULE_ID_START + SESSION_RULE_LIMIT && rule.condition?.tabIds?.includes(tabId))) {
+                await queueRulesSync();
+            }
+        };
+
         const sync = async ({ backfillOpenFrames: shouldBackfill = false } = {}) => {
             const registration = await queueRegistrationSync();
             const backfill = shouldBackfill
@@ -164,7 +181,7 @@
             return { registration, backfill, rules };
         };
 
-        return Object.freeze({ getHosts, isTrustedContentSender, queueRulesSync, sync });
+        return Object.freeze({ getHosts, isTrustedContentSender, isDashBridgeUrl, handleTabNavigation, queueRulesSync, sync });
     }
 
     root.DashBridgeBackgroundGrafanaInfrastructure = Object.freeze({ create });

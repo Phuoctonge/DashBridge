@@ -104,6 +104,18 @@ const createContext = ({ pathname = '/d/dashboard-uid/name', search = '?viewPane
         throw new Error('d-solo must not fetch the dashboard API');
     } });
     assert.strictEqual(await solo.DashBridgeGrafanaPanelDefinition.getPanelDefinition(), null);
+    const nested = createContext({ pathname: '/grafana/d/dashboard-uid/name', fetchImpl: async url => {
+        assert.strictEqual(url, '/grafana/api/dashboards/uid/dashboard-uid');
+        return { ok: true, json: async () => payload };
+    } });
+    assert.strictEqual((await nested.DashBridgeGrafanaPanelDefinition.getPanelDefinition()).id, 2);
+    const nestedSolo = createContext({ pathname: '/grafana/d-solo/dashboard-uid/name', fetchImpl: async () => {
+        assert.fail('nested public solo must not request definitions');
+    } });
+    assert.strictEqual(await nestedSolo.DashBridgeGrafanaPanelDefinition.getPanelDefinition(), null);
+    const sql = { refId: 'A', datasource: { uid: 'sql' }, rawSql: 'SELECT cpu FROM metrics_${project}' };
+    assert.strictEqual(api.queryMatchesConfiguredTarget(sql, { ...sql, rawSql: 'SELECT cpu FROM metrics_prod' }), true);
+    assert.strictEqual(api.queryMatchesConfiguredTarget(sql, { ...sql, rawSql: 'SELECT ram FROM metrics_prod' }), false);
 
     let retryCount = 0;
     const retry = createContext({ fetchImpl: async () => {

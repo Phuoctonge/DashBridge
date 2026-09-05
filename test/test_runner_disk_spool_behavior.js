@@ -118,6 +118,19 @@ vm.runInContext(`${uiSource.slice(serializerStart, serializerEnd)}\n${uiSource.s
     assert.strictEqual(report.results[0].tests.length, 2);
     assert(!JSON.stringify(report.results).includes(dataUrl),
         'streamed compact results must reference rather than duplicate image payloads');
+    await spool.clear();
+    spool.directory = new MemoryDirectory();
+    const noImage = await spool.persistTest({ id: 'N1', name: 'No screenshots', pass: true,
+        diagnostic: { before: { canvas: [{ hash: 'pixels', pixelStats: { mean: 12 } }],
+            visualCapture: { mode: 'hash-only', reason: 'screenshots-disabled' } } } }, 0, 0, 'https://grafana.example/d/test');
+    const noImageUrl = await spool.persistUrl({ url: 'https://grafana.example/d/test', tests: [noImage] }, 0);
+    const noImageChunks = [];
+    await context.serializeSpoolArtifact({ ...snapshot, screenshotsEnabled: false, results: [noImageUrl] }, spool, {},
+        chunk => { noImageChunks.push(chunk); });
+    const noImageReport = JSON.parse(await new Blob(noImageChunks).text());
+    assert.equal(noImageReport.assets.retainedImages, 0);
+    assert.equal(Object.keys(noImageReport.assets.images).length, 0);
+    assert(!JSON.stringify(noImageReport).includes('data:image'));
     console.log('PASS test runner disk spool deduplicates and lazily hydrates evidence');
 })().catch(error => {
     console.error(error);

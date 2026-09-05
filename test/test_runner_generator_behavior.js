@@ -153,7 +153,7 @@ const reportCode = [
     'viewportImage:',
     'outerHTMLHash:',
     'readNetworkDiagnosticArchive',
-    'const includeCanvasImages = mode === DIAGNOSTIC_CAPTURE_MODES.CANVAS;',
+    'const includeCanvasImages = diagnosticScreenshotsEnabled && mode === DIAGNOSTIC_CAPTURE_MODES.CANVAS;',
     'const retainFullDom = mode === DIAGNOSTIC_CAPTURE_MODES.FORENSIC;',
     'const retainFullResources = mode === DIAGNOSTIC_CAPTURE_MODES.FORENSIC;',
     "allResourceEntries.slice(-25)",

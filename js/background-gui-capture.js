@@ -166,11 +166,42 @@
             finally { captureInProgress = false; }
         };
 
-        const captureVisiblePanel = async sender => {
-            const waitMs = Math.max(0, 600 - (now() - lastPanelVisibleCaptureAt));
-            if (waitMs) await wait(waitMs);
-            lastPanelVisibleCaptureAt = now();
-            return chromeRef.tabs.captureVisibleTab(sender.tab.windowId, { format: 'png' });
+        let visibleCaptureQueue = Promise.resolve();
+        const captureVisiblePanel = sender => {
+            const run = async () => {
+                const { id: tabId, windowId } = sender.tab;
+                let invalidated = false;
+                const onActivated = info => { if (info.windowId === windowId) invalidated = true; };
+                const onUpdated = (id, change) => {
+                    if (id === tabId && (change.url || change.status === 'loading')) invalidated = true;
+                };
+                const onRemoved = id => { if (id === tabId) invalidated = true; };
+                const assertTarget = async () => {
+                    const [active] = await chromeRef.tabs.query({ active: true, windowId });
+                    if (invalidated || active?.id !== tabId || active.pendingUrl
+                        || active.url !== sender.url) throw new Error('capture-target-changed');
+                };
+                chromeRef.tabs.onActivated.addListener(onActivated);
+                chromeRef.tabs.onUpdated.addListener(onUpdated);
+                chromeRef.tabs.onRemoved.addListener(onRemoved);
+                try {
+                    await assertTarget();
+                    const waitMs = Math.max(0, 600 - (now() - lastPanelVisibleCaptureAt));
+                    if (waitMs) await wait(waitMs);
+                    await assertTarget();
+                    lastPanelVisibleCaptureAt = now();
+                    const dataUrl = await chromeRef.tabs.captureVisibleTab(windowId, { format: 'png' });
+                    await assertTarget();
+                    return dataUrl;
+                } finally {
+                    chromeRef.tabs.onActivated.removeListener(onActivated);
+                    chromeRef.tabs.onUpdated.removeListener(onUpdated);
+                    chromeRef.tabs.onRemoved.removeListener(onRemoved);
+                }
+            };
+            const result = visibleCaptureQueue.catch(() => undefined).then(run);
+            visibleCaptureQueue = result;
+            return result;
         };
 
         return Object.freeze({ collect, captureVisiblePanel, waitForReady, markReady });

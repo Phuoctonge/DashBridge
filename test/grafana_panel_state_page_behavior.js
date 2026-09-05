@@ -10,7 +10,7 @@ const createContext = () => {
             panelKey: panel => panel?.dataset?.vizPanelKey || panel?.dataset?.panelid || null
         }
     };
-    const context = { window };
+    const context = { window, URLSearchParams, location: { origin: 'https://grafana.test', pathname: '/d/a/name', search: '' } };
     vm.createContext(context);
     vm.runInContext(source, context);
     return context;
@@ -28,6 +28,12 @@ assert.strictEqual(
 );
 
 const refreshedDocument = createContext();
+currentDocument.location.pathname = '/d/b/name';
+assert.strictEqual(currentDocument.window.DashBridgeGrafanaPanelState.get(panel('panel-12')), undefined);
+currentDocument.location.pathname = '/d/a/renamed';
+assert.strictEqual(currentDocument.window.DashBridgeGrafanaPanelState.get(panel('panel-12')).convertMemToUsed, true);
+currentDocument.location.search = '?orgId=2';
+assert.strictEqual(currentDocument.window.DashBridgeGrafanaPanelState.get(panel('panel-12')), undefined);
 assert.strictEqual(
     refreshedDocument.window.DashBridgeGrafanaPanelState.get(panel('panel-12')),
     undefined,

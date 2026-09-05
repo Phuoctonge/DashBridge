@@ -149,7 +149,9 @@ globalThis.DashBridgeCapture = (() => {
                 const throttleWait = Math.max(0, 600 - (Date.now() - lastPanelCaptureAt));
                 if (throttleWait) await new Promise(resolve => setTimeout(resolve, throttleWait));
                 lastPanelCaptureAt = Date.now();
-                const source = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'png' });
+                const captured = await chrome.runtime.sendMessage({ type: 'dashbridge-capture-visible-tab' });
+                if (!captured?.ok) throw new Error(captured?.error || 'capture-visible-tab-failed');
+                const source = captured.dataUrl;
                 if (!source) throw new Error('capture-visible-tab-failed');
                 const outputSize = prepared ? {
                     width: Number(request.outputWidth) || 1000,

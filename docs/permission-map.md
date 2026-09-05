@@ -40,3 +40,9 @@ password inputs. Manifest фиксирует лимиты и неполноту 
 Фиксированный HTTPS endpoint покрывается существующим `<all_urls>` host access;
 запрос выполняется без credentials/referrer, а сервер не хранит IP/access logs.
 Контракт данных описан в `docs/analytics.md`.
+
+DNR дополнительно ограничен initiator расширения; при навигации с DashBridge
+или замене вкладки service worker пересинхронизирует правила. Вкладка с чужим
+pendingUrl исключается. Общий broker снимков direct Grafana и DashBridge
+проверяет активную вкладку и URL до и после capture и отклоняет результат при
+переключении или навигации. Новых permissions эти проверки не требуют.

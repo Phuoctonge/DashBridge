@@ -1,4 +1,5 @@
 'use strict';
+/* global chrome, document */
 
 const fs = require('node:fs');
 const http = require('node:http');
@@ -30,6 +31,11 @@ function stageExtension(directory, analyticsEndpoint) {
 async function startAnalyticsSink() {
     const requests = [];
     const server = http.createServer((request, response) => {
+        if (request.method === 'GET' && request.url.startsWith('/fixture/')) {
+            response.writeHead(200, { 'content-type': 'text/html', 'x-frame-options': 'DENY',
+                'content-security-policy': "frame-ancestors 'none'" });
+            response.end('<html><body>boundary fixture</body></html>'); return;
+        }
         if (request.method === 'OPTIONS') {
             response.writeHead(204, {
                 'access-control-allow-origin': '*',
@@ -345,6 +351,51 @@ async function inspectPanelUnitWorkflow(context) {
     return result;
 }
 
+async function inspectSecurityBoundaries(context, extensionId, endpoint) {
+    const result = { name: 'DNR navigation and capture tab isolation', status: 'passed', checks: [] };
+    const dashboard = await context.newPage();
+    const control = await context.newPage();
+    const base = new URL(endpoint).origin;
+    try {
+        await control.goto(`chrome-extension://${extensionId}/pages/options/options.html`);
+        await control.evaluate(async host => chrome.storage.sync.set({ grafanaIframeDomains: [host] }), new URL(base).host);
+        const dashboardUrl = `chrome-extension://${extensionId}/pages/dashbridge/dashbridge.html`;
+        await dashboard.goto(dashboardUrl);
+        await dashboard.evaluate(() => chrome.runtime.sendMessage({ type: 'dashbridge-ensure-iframe-rules' }));
+        await dashboard.evaluate(base => {
+            const frame = document.createElement('iframe'); frame.id = 'boundary-test-frame';
+            frame.src = `${base}/fixture/protected`; document.body.append(frame);
+        }, base);
+        await dashboard.frameLocator('#boundary-test-frame').getByText('boundary fixture', { exact: true }).waitFor();
+        result.checks.push('configured iframe loads with initiator guard');
+        await control.bringToFront();
+        const denied = await dashboard.evaluate(() => chrome.runtime.sendMessage({ type: 'dashbridge-capture-visible-tab' }));
+        if (denied.ok || denied.error !== 'capture-target-changed') throw new Error('Inactive capture was not rejected');
+        await dashboard.bringToFront();
+        const captured = await dashboard.evaluate(() => chrome.runtime.sendMessage({ type: 'dashbridge-capture-visible-tab' }));
+        if (!captured.ok || !captured.dataUrl.startsWith('data:image/png')) throw new Error('Active capture failed');
+        result.checks.push('inactive capture rejects; active capture succeeds');
+        await dashboard.goto(`${base}/fixture/unrelated`);
+        await control.waitForFunction(async () => (await chrome.declarativeNetRequest.getSessionRules()).length === 0);
+        await dashboard.evaluate(base => {
+            const frame = document.createElement('iframe'); frame.id = 'boundary-test-frame';
+            frame.src = `${base}/fixture/protected`; document.body.append(frame);
+        }, base);
+        await dashboard.waitForTimeout(300);
+        const leaked = await dashboard.evaluate(() => {
+            try { return document.querySelector('iframe')?.contentDocument?.body?.textContent === 'boundary fixture'; }
+            catch { return false; }
+        });
+        if (leaked) throw new Error('DNR escaped extension navigation scope');
+        result.checks.push('navigation removes rules and protected website iframe remains blocked');
+    } catch (error) {
+        result.status = 'failed'; result.error = serializeError(error);
+    } finally {
+        await dashboard.close(); await control.close();
+    }
+    return result;
+}
+
 async function main() {
     if (!fs.existsSync(chromeExecutable)) {
         throw new Error(`Chrome executable not found: ${chromeExecutable}`);
@@ -386,7 +437,8 @@ async function main() {
         }
         const workflows = [
             await inspectTestSelectionWorkflow(context, extensionId),
-            await inspectPanelUnitWorkflow(context)
+            await inspectPanelUnitWorkflow(context),
+            await inspectSecurityBoundaries(context, extensionId, analyticsSink.endpoint)
         ];
 
         report = {

@@ -66,7 +66,7 @@
         // Public d-solo embeds can render a panel without granting access to
         // the dashboard-definition API.  Avoid a guaranteed 404 there; the
         // chart axis remains the source for threshold units in this mode.
-        if (!uid || !panelId || location.pathname.startsWith('/d-solo/')) return null;
+        if (!uid || !panelId || /\/d-solo\//.test(location.pathname)) return null;
         const key = `${uid}:${panelId}`;
         const cached = panelDefinitionCache.get(key);
         if (cached && Date.now() - cached.accessedAt <= PANEL_DEFINITION_CACHE_TTL_MS) {
@@ -77,7 +77,8 @@
 
         const entry = { value: null, promise: null, accessedAt: Date.now() };
         touchPanelDefinitionCache(key, entry);
-        entry.promise = fetch(`/api/dashboards/uid/${encodeURIComponent(uid)}`)
+        const basePath = location.pathname.split(/\/d(?:-solo)?\//)[0];
+        entry.promise = fetch(`${basePath}/api/dashboards/uid/${encodeURIComponent(uid)}`)
             .then(response => response.ok ? response.json() : null)
             .then(data => flattenPanels(data?.dashboard?.panels)
                 .find(panel => String(panel?.id) === panelId) || null)

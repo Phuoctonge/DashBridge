@@ -13,6 +13,7 @@
 
 let elUrlInput = null;  // <textarea id="trUrlInput">
 let elRunMode = null;  // <select id="trRunMode">
+let elScreenshotsEnabled = null;
 let elSelectTestsBtn = null;
 let elSelectionSummary = null;
 let elRunBtn = null;  // <button id="trRunBtn">
@@ -281,6 +282,7 @@ function renderSummary(snapshot) {
 }
 
 function setButtonState(running) {
+    if (elScreenshotsEnabled) elScreenshotsEnabled.disabled = running;
     if (elRunBtn) {
         elRunBtn.disabled = running;
         const label = elRunBtn.querySelector('.tr-btn-label');
@@ -482,6 +484,7 @@ async function handleRun() {
     // Open the always-on-top view while the Run click still carries user
     // activation. All validation that can reject without async work is above.
     const progressWindowPromise = openOperationProgressWindow(mode);
+    const screenshotsEnabled = elScreenshotsEnabled?.checked !== false;
     // Сохраняем ввод и выбранный профиль для следующего запуска.
     try { await chrome.storage.local.set({ trLastUrls: cleanedUrls, trRunMode: mode, trTestSelection: testSelection }); } catch (_) { }
 
@@ -516,6 +519,7 @@ async function handleRun() {
     try {
         await DashBridgeTestRunner.run(urls, {
             mode,
+            screenshotsEnabled,
             selectedTestIds,
             async onTestFinalized(testResult, context) {
                 return diagnosticSpool.persistTest(testResult, context.urlIndex, context.testIndex, context.url);
@@ -604,6 +608,7 @@ function handleClear() {
 async function initTestRunnerUI() {
     elUrlInput = document.getElementById('trUrlInput');
     elRunMode = document.getElementById('trRunMode');
+    elScreenshotsEnabled = document.getElementById('trScreenshotsEnabled');
     elSelectTestsBtn = document.getElementById('trSelectTestsBtn');
     elSelectionSummary = document.getElementById('trSelectionSummary');
     elRunBtn = document.getElementById('trRunBtn');
@@ -668,7 +673,8 @@ async function initTestRunnerUI() {
 
     // Восстанавливаем последний список URL
     try {
-        const stored = await chrome.storage.local.get(['trLastUrls', 'trRunMode', 'trTestSelection']);
+        const stored = await chrome.storage.local.get(['trLastUrls', 'trRunMode', 'trTestSelection', 'trScreenshotsEnabled']);
+        if (elScreenshotsEnabled) elScreenshotsEnabled.checked = stored.trScreenshotsEnabled !== false;
         if (stored.trLastUrls && elUrlInput && !elUrlInput.value.trim()) {
             elUrlInput.value = stored.trLastUrls;
         }
@@ -689,6 +695,9 @@ async function initTestRunnerUI() {
         updateSelectionSummary();
     });
     elAbortBtn?.addEventListener('click', handleAbort);
+    elScreenshotsEnabled?.addEventListener('change', () => {
+        void chrome.storage.local.set({ trScreenshotsEnabled: elScreenshotsEnabled.checked }).catch(() => undefined);
+    });
     elCopyBtn?.addEventListener('click', exportController.copyReport);
     elCopyFailBtn?.addEventListener('click', exportController.copyFailureReport);
     elExportDiagnosticsBtn?.addEventListener('click', exportController.exportDiagnostics);

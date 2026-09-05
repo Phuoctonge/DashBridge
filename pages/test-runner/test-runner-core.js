@@ -6,6 +6,7 @@
 // Зависит от: test-runner-probe.js (dashbridgeRunProbe), test-runner-suite.js (DASHBRIDGE_TEST_SUITE).
 
 'use strict';
+/* global setDiagnosticScreenshotsEnabled */
 
 // --- Константы ---
 
@@ -425,6 +426,7 @@ function getRunnerSnapshot() {
         startedAt: runnerState.startedAt || null,
         finishedAt: runnerState.finishedAt || null,
         mode: runnerState.mode || 'fast',
+        screenshotsEnabled: runnerState.screenshotsEnabled !== false,
         selection: runnerState.selection || { scope: 'all', ids: [] },
         total: runnerState.total,
         done: runnerState.done,
@@ -518,6 +520,7 @@ async function runTestsForUrls(urls, {
     keepTab = false,
     mode = 'fast',
     selectedTestIds = null,
+    screenshotsEnabled = true,
 } = {}) {
     if (runnerState.running) throw new Error('Тест-раннер уже запущен');
 
@@ -551,9 +554,13 @@ async function runTestsForUrls(urls, {
     if (!totalCount) throw new Error('В выбранном профиле нет отмеченных E2E-тестов');
 
     // Инициализация состояния
+    if (typeof setDiagnosticScreenshotsEnabled === 'function') {
+        setDiagnosticScreenshotsEnabled(screenshotsEnabled);
+    }
     runnerState = {
         running: true,
         mode,
+        screenshotsEnabled: screenshotsEnabled !== false,
         selection: selectedIds ? { scope: 'selected', ids: [...selectedIds] } : { scope: 'all', ids: [] },
         aborted: false,
         runId: `run_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,

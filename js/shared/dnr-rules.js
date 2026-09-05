@@ -19,7 +19,8 @@
                         { header: 'x-frame-options', operation: 'remove' },
                         { header: 'content-security-policy', operation: 'remove' }
                     ] },
-                    condition: { urlFilter: `||${host}/`, resourceTypes: ['sub_frame'], tabIds: [tabId] }
+                    condition: { urlFilter: `||${host}/`, resourceTypes: ['sub_frame'], tabIds: [tabId],
+                        ...(options.initiatorDomain ? { initiatorDomains: [options.initiatorDomain] } : {}) }
                 });
             }
             if (rules.length >= maxRules) break;

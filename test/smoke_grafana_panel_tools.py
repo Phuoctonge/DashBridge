@@ -361,7 +361,7 @@ checks = {
     "Grafana 12 visual commands retain the normalized panel key": COMMON.count("panelId: getPanelStateKey(targetPanel) || tools.targetPanelId || null") >= 4
         and "panelId: targetPanel?.getAttribute?.('data-panelid') || targetPanel?.dataset?.panelid || null" not in COMMON,
     "Threshold unit lookup accepts the selected panel root": "const getThresholdUnit = (root = document) =>" in VISUAL_ENGINE,
-    "Solo panels do not call the dashboard API that is unavailable to public embeds": "location.pathname.startsWith('/d-solo/')" in PANEL_DEFINITION,
+    "Solo panels do not call the dashboard API that is unavailable to public embeds": r"/\/d-solo\//.test(location.pathname)" in PANEL_DEFINITION,
     "Threshold calculation accepts the selected panel root": "const setThreshold = ({ root = document," in VISUAL_ENGINE,
     "Flot threshold uses the drawable plot area": "plot.getPlotOffset?.()" in VISUAL_ENGINE and "plot.height?.()" in VISUAL_ENGINE,
     "Flot threshold follows View layout changes": "const watchThresholdLayoutChanges" in VISUAL_ENGINE and "watchThresholdLayoutChanges(plotHost)" in VISUAL_ENGINE,

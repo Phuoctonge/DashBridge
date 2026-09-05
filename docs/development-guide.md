@@ -164,7 +164,8 @@ npm run test:all
 ```
 
 Он последовательно запускает ESLint, канонические Node/Python-тесты и browser
-smoke. Browser smoke использует отдельный временный профиль, собирает console,
+smoke. Эти же три проверки обязательны в release workflow; Chromium там
+работает под Xvfb. Browser smoke использует отдельный временный профиль, собирает console,
 page и network diagnostics в `test-results/extension-smoke.json`, а снимки
 создаёт только для упавших страниц. Путь к другому тестовому Chromium можно
 явно задать через `DASHBRIDGE_CHROME_PATH`.

@@ -23,4 +23,7 @@ assert.strictEqual(plan.truncated, true);
 assert.strictEqual(plan.rules[0].condition.urlFilter, '||a.test/');
 assert.deepStrictEqual(Array.from(plan.rules[0].condition.tabIds), [1]);
 assert.strictEqual(context.DashBridgeDnrRules.planSessionRules([], [1]).truncated, false);
+const guarded = context.DashBridgeDnrRules.buildSessionRules(['grafana.test'], [17], { initiatorDomain: 'extension-id' });
+assert.deepStrictEqual(Array.from(guarded[0].condition.initiatorDomains), ['extension-id'],
+    'rules must reject website initiators even before navigation cleanup finishes');
 console.log('PASS Grafana DNR rules are session-scoped to DashBridge tab IDs');

@@ -25,6 +25,7 @@
             const activeKey = state.activeRequests.get(requestId) || requestId;
             let request = state.requests.get(activeKey);
             if (!request) {
+                if (state.requests.size >= maxRequests) return null;
                 request = {
                     requestId: activeKey, cdpRequestId: requestId, stepId: state.activeStepId,
                     requestBodyCapture: { status: 'none' },
@@ -72,13 +73,13 @@
             const earlyPlaceholder = state.requests.get(candidateKey);
             const reusePlaceholder = Boolean(earlyPlaceholder && !earlyPlaceholder.url);
             const key = reusePlaceholder ? earlyPlaceholder.requestId : candidateKey;
-            state.redirectCounts.set(cdpId, Math.max(redirectIndex + 1, 1));
-            if (!previous && state.requests.size >= maxRequests) {
+            if (!state.requests.has(key) && state.requests.size >= maxRequests) {
                 setStatus(`Достигнут лимит ${maxRequests} запросов; новые записи пропускаются`, true);
                 state.completeness.droppedRequests += 1;
-                state.ignoredRequests.add(cdpId);
+                if (state.ignoredRequests.size < maxRequests) state.ignoredRequests.add(cdpId);
                 return { requestId: key, cdpRequestId: cdpId, dropped: true };
             }
+            state.redirectCounts.set(cdpId, Math.max(redirectIndex + 1, 1));
             const request = reusePlaceholder ? earlyPlaceholder : {
                 requestId: key, cdpRequestId: cdpId, stepId: state.activeStepId,
                 requestBodyCapture: { status: 'none' },
@@ -99,6 +100,7 @@
             if (!chain[index]) {
                 const key = index ? `${requestId}:redirect-${index}` : requestId;
                 if (!state.requests.has(key)) {
+                    if (state.requests.size >= maxRequests) return null;
                     state.requests.set(key, {
                         requestId: key, cdpRequestId: requestId, stepId: state.activeStepId,
                         requestBodyCapture: { status: 'none' },
@@ -195,6 +197,8 @@
                 return;
             }
             request.bodyCaptured = true;
+            let reservedBytes = 0;
+            const sessionRequests = state.requests;
             try {
                 const result = await sendCdp('Network.getResponseBody', {
                     requestId: request.cdpRequestId || request.requestId,
@@ -211,15 +215,28 @@
                     setResponseBodyStatus(request, 'skipped', 'total-limit');
                     return;
                 }
+                state.totalBodyBytes += bodyLength;
+                reservedBytes = bodyLength;
                 request.responseBody = String(result.body || '');
                 request.bodyBase64 = result.base64Encoded === true;
                 request.bodyBytes = bodyLength;
                 request.bodySha256 = await sha256(bodyBytes(request));
-                state.totalBodyBytes += bodyLength;
+                if (request.responseBodyCapture?.status !== 'pending' || state.requests !== sessionRequests
+                    || state.requests.get(request.requestId) !== request) return;
                 setResponseBodyStatus(request, bodyLength ? 'captured' : 'empty');
+                reservedBytes = 0;
             } catch (error) {
                 request.bodyError = error?.message || String(error);
                 setResponseBodyStatus(request, 'failed', 'cdp-error');
+            } finally {
+                if (reservedBytes) {
+                    if (state.requests === sessionRequests && state.requests.get(request.requestId) === request) {
+                        state.totalBodyBytes = Math.max(0, state.totalBodyBytes - reservedBytes);
+                    }
+                    delete request.responseBody;
+                    delete request.bodySha256;
+                    delete request.bodyBytes;
+                }
             }
             scheduleRender();
         };
@@ -324,6 +341,7 @@
                 const request = requestForExtraInfo(
                     params.requestId, state.requestExtraInfoIndexes,
                 );
+                if (!request) return;
                 request.requestHeaders = params.headers || request.requestHeaders || {};
                 request.associatedCookies = params.associatedCookies || [];
                 request.requestHeadersText = params.headersText || null;
@@ -332,6 +350,7 @@
                 markMultipartRequestBody(request);
             } else if (method === 'Network.responseReceived') {
                 const request = ensureRequest(params.requestId);
+                if (!request) return;
                 Object.assign(request, {
                     status: params.response?.status,
                     statusText: params.response?.statusText,
@@ -356,6 +375,7 @@
                 const request = requestForExtraInfo(
                     params.requestId, state.responseExtraInfoIndexes,
                 );
+                if (!request) return;
                 request.responseHeaders = params.headers || request.responseHeaders || {};
                 request.responseHeadersText = params.headersText || null;
                 request.blockedCookies = params.blockedCookies || [];
@@ -364,23 +384,29 @@
                 if (Number.isFinite(params.statusCode)) request.status = params.statusCode;
             } else if (method === 'Network.dataReceived') {
                 const request = ensureRequest(params.requestId);
+                if (!request) return;
                 request.decodedDataLength += Number(params.dataLength) || 0;
                 request.dataEncodedLength += Number(params.encodedDataLength) || 0;
             } else if (method === 'Network.requestServedFromCache') {
-                ensureRequest(params.requestId).servedFromCache = true;
+                const request = ensureRequest(params.requestId);
+                if (!request) return;
+                request.servedFromCache = true;
             } else if (method === 'Network.resourceChangedPriority') {
                 const request = ensureRequest(params.requestId);
+                if (!request) return;
                 (request.priorityChanges ||= []).push({
                     priority: params.newPriority, timestamp: params.timestamp,
                 });
             } else if (method === 'Network.loadingFinished') {
                 const request = ensureRequest(params.requestId);
+                if (!request) return;
                 request.finishedMonotonic = params.timestamp;
                 request.encodedDataLength = params.encodedDataLength;
                 state.inFlight.delete(params.requestId);
                 queueResponseBodyCapture(request);
             } else if (method === 'Network.loadingFailed') {
                 const request = ensureRequest(params.requestId);
+                if (!request) return;
                 request.finishedMonotonic = params.timestamp;
                 request.failed = true;
                 request.errorText = params.errorText;

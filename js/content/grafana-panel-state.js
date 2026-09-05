@@ -5,6 +5,14 @@
 
     const states = window.__dashbridgeVisualPanelStates
         || (window.__dashbridgeVisualPanelStates = new Map());
+    const storageKey = panel => {
+        const key = keyFor(panel);
+        if (!key) return null;
+        const current = globalThis.location;
+        const route = String(current?.pathname || '').match(/^(.*?)\/d(?:-solo)?\/([^/]+)/);
+        const org = new URLSearchParams(current?.search || '').get('orgId') || '';
+        return JSON.stringify([current?.origin || '', route?.[1] || '', route?.[2] || '', org, key]);
+    };
     const keyFor = panel => window.DashBridgeGrafanaDom?.panelKey(panel)
         || panel?.dataset?.vizPanelKey
         || panel?.dataset?.panelid
@@ -14,13 +22,17 @@
 
     window.DashBridgeGrafanaPanelState = {
         get: panel => {
-            const key = keyFor(panel);
+            const key = storageKey(panel);
             return key ? states.get(key) : undefined;
         },
         set: (panel, state) => {
-            const key = keyFor(panel);
-            if (key) states.set(key, state);
-            return key;
+            const key = storageKey(panel);
+            if (key) {
+                states.delete(key);
+                states.set(key, state);
+                while (states.size > 500) states.delete(states.keys().next().value);
+            }
+            return keyFor(panel);
         },
         keyFor,
         states
