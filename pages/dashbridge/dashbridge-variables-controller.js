@@ -102,6 +102,7 @@
             const details = documentRef.createElement('details');
             details.className = 'dashboard-variable';
             const summary = documentRef.createElement('summary');
+            summary.className = 'btn btn-outline';
             const fullText = variable.texts.join(' + ') || variable.values.join(' + ') || '—';
             summary.textContent = `${variable.hide === 1 ? '' : variable.label + ': '}${variable.values.length > 2 ? `Выбрано: ${variable.values.length}` : fullText}`;
             summary.title = `${variable.label}: ${fullText}`;
@@ -126,6 +127,7 @@
                 reload(group, group.snapshot.variables.map(item => item.name === variable.name ? { ...item, values } : item), variable.name);
             };
             const input = documentRef.createElement('input');
+            input.className = 'form-input';
             input.type = variable.type === 'textbox' ? 'text' : 'search';
             input.setAttribute('aria-label', variable.type === 'textbox' ? variable.label : `Поиск: ${variable.label}`);
             input.placeholder = variable.type === 'textbox' ? variable.label : 'Поиск вариантов';
@@ -166,11 +168,13 @@
             } else { input.addEventListener('input', draw); draw(); }
             if (variable.multi || variable.type === 'textbox') {
                 const button = documentRef.createElement('button');
+                button.className = 'btn btn-primary';
                 button.type = 'button'; button.textContent = 'Применить';
                 button.addEventListener('click', apply); body.appendChild(button);
             }
             if (variable.allowCustomValue && variable.type !== 'textbox') {
                 const custom = documentRef.createElement('button');
+                custom.className = 'btn btn-outline';
                 custom.type = 'button'; custom.textContent = 'Использовать введённое значение';
                 custom.addEventListener('click', () => {
                     if (!input.value) return;
@@ -180,6 +184,7 @@
                 body.appendChild(custom);
             }
             const update = documentRef.createElement('button');
+            update.className = 'btn btn-outline';
             update.type = 'button'; update.textContent = 'Обновить варианты';
             update.addEventListener('click', () => refresh(group, variable.name));
             body.appendChild(update);
@@ -218,6 +223,7 @@
             const controls = documentRef.createElement('div'); controls.className = 'dashboard-variable-controls';
             const message = documentRef.createElement('span'); message.setAttribute('role', 'status');
             const button = documentRef.createElement('button'); button.type = 'button'; button.textContent = 'Обновить поля';
+            button.className = 'btn btn-outline';
             const group = { key, id: crypto.randomUUID(), element, controls, status: message, updatedAt: 0, ids: new Set() };
             button.addEventListener('click', () => refresh(group));
             element.append(title, controls, button, message); host.appendChild(element);
