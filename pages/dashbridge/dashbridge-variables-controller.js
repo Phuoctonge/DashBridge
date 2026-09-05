@@ -28,7 +28,7 @@
             cancel(group);
             if (group.transaction) {
                 const { frame, panel } = group.transaction;
-                if (frame.isConnected) navigateDashboardFrame(frame, applyPanelParamsToUrl(panel));
+                if (frame.isConnected) replacePanelCard(panel.id);
                 group.transaction = null;
             }
             group.failed = true;
@@ -76,7 +76,15 @@
             group.controls.querySelectorAll('button, input').forEach(control => { control.disabled = true; });
             status(group, 'Grafana обновляет значения и зависимые поля…');
             group.timer = setTimeout(() => fail(group, 'Grafana не завершила обновление. Предыдущий выбор сохранён.'), 35000);
-            navigateDashboardFrame(frame, next);
+            if (!changedName) {
+                // Assigning an unchanged URL containing a fragment can be a
+                // same-document navigation: no new ready event will arrive.
+                // Recreate through the card owner to retain action bindings.
+                replacePanelCard(panel.id);
+                group.transaction.frame = frameFor(panel);
+            } else {
+                navigateDashboardFrame(frame, next);
+            }
         }
         function refresh(group, name = '') {
             if (group.pending || group.reloading) return;
