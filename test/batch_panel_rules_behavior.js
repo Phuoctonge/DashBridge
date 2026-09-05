@@ -6,6 +6,7 @@ const path = require('path');
 const root = path.resolve(__dirname, '..');
 const storage = {};
 const context = {
+    navigator: { locks: { request: (_, callback) => callback() } },
     console,
     URL,
     chrome: {

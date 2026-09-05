@@ -4,7 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const signatures = [JSON.stringify({ refId: 'A', alias: '' }), JSON.stringify({ refId: 'B', alias: '' })];
+const signatures = [JSON.stringify({ refId: 'A', alias: '', datasource: { uid: 'prom-a' }, expr: 'rate($metric)' }),
+    JSON.stringify({ refId: 'B', alias: '', datasource: { uid: 'prom-b' } })];
 const params = new URLSearchParams({
     dashbridgeSeriesCapture: 'test-token',
     dashbridgeSeriesTargets: JSON.stringify(signatures)
@@ -33,12 +34,17 @@ const context = {
 };
 context.window = context;
 vm.createContext(context);
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js/content/grafana-panel-definition.js'), 'utf8'), context);
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js/content/grafana-series-capture.js'), 'utf8'), context);
 
 const frame = names => ({ frames: [{ schema: { fields: [{ name: 'Time', type: 'time' }, ...names.map(name => ({ name, type: 'number' }))] } }] });
 (async () => {
-    responses.push({ results: { A: frame(['same', 'same']) } });
-    await context.fetch('/api/ds/query', { body: JSON.stringify({ queries: [{ refId: 'A', datasource: { uid: 'prom-a' } }] }) });
+    responses.push({ results: { A: frame(['WRONG']) } });
+    await context.fetch('/api/ds/query', { body: JSON.stringify({ queries: [{ refId: 'A', datasource: { uid: 'other' }, expr: 'rate(x)' }] }) });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.strictEqual(context.__dashBridgeSeriesCapture.names, null);
+    responses.push({ results: { A: frame(['same', 'same']), X: frame(['FOREIGN']) } });
+    await context.fetch('/api/ds/query', { body: JSON.stringify({ queries: [{ refId: 'A', datasource: { uid: 'prom-a' }, expr: 'rate(x)' }, { refId: 'X' }] }) });
     await new Promise(resolve => setTimeout(resolve, 0));
     responses.push({ results: { B: frame(['other']) } });
     await context.fetch('/api/ds/query', { body: JSON.stringify({ queries: [{ refId: 'B', datasource: { uid: 'prom-b' } }] }) });

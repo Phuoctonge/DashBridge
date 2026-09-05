@@ -30,6 +30,13 @@
         const panelId = params.get('viewPanel') || params.get('panelId') || '';
         return { uid, panelId: normalizePanelId(panelId) };
     };
+    const getDefinitionContext = () => ({ ...getPanelLocation(),
+        basePath: location.pathname.split(/\/d(?:-solo)?\//)[0],
+        orgId: new URLSearchParams(location.search).get('orgId') || ''
+    });
+    const cacheKey = (context, panelId) => JSON.stringify([
+        location.origin || '', context.basePath, context.orgId, context.uid, panelId
+    ]);
 
     const flattenPanels = panels => (panels || []).flatMap(panel => [
         panel,
@@ -42,7 +49,7 @@
     const getCachedPanelDefinition = () => {
         const { uid, panelId } = getPanelLocation();
         if (!uid || !panelId) return null;
-        const key = `${uid}:${panelId}`;
+        const key = cacheKey(getDefinitionContext(), panelId);
         const entry = panelDefinitionCache.get(key);
         if (!entry || Date.now() - entry.accessedAt > PANEL_DEFINITION_CACHE_TTL_MS) {
             panelDefinitionCache.delete(key);
@@ -67,7 +74,8 @@
         // the dashboard-definition API.  Avoid a guaranteed 404 there; the
         // chart axis remains the source for threshold units in this mode.
         if (!uid || !panelId || /\/d-solo\//.test(location.pathname)) return null;
-        const key = `${uid}:${panelId}`;
+        const context = getDefinitionContext();
+        const key = cacheKey(context, panelId);
         const cached = panelDefinitionCache.get(key);
         if (cached && Date.now() - cached.accessedAt <= PANEL_DEFINITION_CACHE_TTL_MS) {
             touchPanelDefinitionCache(key, cached);
@@ -78,7 +86,8 @@
         const entry = { value: null, promise: null, accessedAt: Date.now() };
         touchPanelDefinitionCache(key, entry);
         const basePath = location.pathname.split(/\/d(?:-solo)?\//)[0];
-        entry.promise = fetch(`${basePath}/api/dashboards/uid/${encodeURIComponent(uid)}`)
+        const orgQuery = context.orgId ? `?orgId=${encodeURIComponent(context.orgId)}` : '';
+        entry.promise = fetch(`${basePath}/api/dashboards/uid/${encodeURIComponent(uid)}${orgQuery}`)
             .then(response => response.ok ? response.json() : null)
             .then(data => flattenPanels(data?.dashboard?.panels)
                 .find(panel => String(panel?.id) === panelId) || null)

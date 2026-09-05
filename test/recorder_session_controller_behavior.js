@@ -93,7 +93,9 @@ const controller = context.DashBridgeRecorderSessionController.create({
 });
 
 (async () => {
-    await controller.start();
+    await Promise.all([controller.start(), controller.start()]);
+    assert.strictEqual(calls.filter(call => call[0] === 'createTab').length, 1,
+        'concurrent starts must own exactly one controlled tab');
     assert.strictEqual(resetCount, 1);
     assert.strictEqual(ui.startUrl.value, 'https://site.example/path');
     assert.strictEqual(state.mode, 'recording');
@@ -140,6 +142,17 @@ const controller = context.DashBridgeRecorderSessionController.create({
         && call[1].status === 'error'));
     assert(calls.some(call => call[0] === 'removeWindow' && call[1] === 40));
 
+    ui.startUrl.value = 'bad';
+    const createdBeforeCancel = calls.filter(call => call[0] === 'createTab').length;
+    ui.startUrl.value = 'site.example';
+    let grantPermission;
+    transport.ensureDebuggerPermission = () => new Promise(resolve => { grantPermission = resolve; });
+    const cancelledStart = controller.start();
+    await Promise.resolve();
+    await controller.stop();
+    grantPermission(); await cancelledStart;
+    assert.strictEqual(calls.filter(call => call[0] === 'createTab').length, createdBeforeCancel);
+    assert.strictEqual(state.starting, false);
     ui.startUrl.value = 'bad';
     await controller.start();
     assert(statuses.some(call => call[0].startsWith('Введите корректный адрес') && call[1] === true));

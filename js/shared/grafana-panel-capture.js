@@ -1,5 +1,35 @@
 // Shared capture primitive.  It deliberately returns an image instead of
 // downloading it, so Popup and Batch can choose their own output workflow.
+async function captureGrafanaVisibleTab(tabId, expectedUrl) {
+    const initial = await chrome.tabs.get(tabId);
+    let invalidated = false;
+    const onActivated = info => { if (info.windowId === initial.windowId) invalidated = true; };
+    const onUpdated = (id, change) => { if (id === tabId && (change.url || change.status === 'loading')) invalidated = true; };
+    const onRemoved = id => { if (id === tabId) invalidated = true; };
+    const check = async () => {
+        const tab = await chrome.tabs.get(tabId);
+        const active = await chrome.tabs.query({ active: true, windowId: tab.windowId });
+        if (invalidated || tab.windowId !== initial.windowId || active[0]?.id !== tabId
+            || tab.pendingUrl || !expectedUrl || tab.url !== expectedUrl) {
+            throw new Error('capture-target-changed');
+        }
+        return tab;
+    };
+    chrome.tabs.onActivated.addListener(onActivated);
+    chrome.tabs.onUpdated.addListener(onUpdated);
+    chrome.tabs.onRemoved.addListener(onRemoved);
+    try {
+        const tab = await check();
+        const source = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'png' });
+        await check();
+        return source;
+    } finally {
+        chrome.tabs.onActivated.removeListener(onActivated);
+        chrome.tabs.onUpdated.removeListener(onUpdated);
+        chrome.tabs.onRemoved.removeListener(onRemoved);
+    }
+}
+
 async function scrollGrafanaPanelIntoView({ tabId, panelId = null, title = '', type = 'active' }) {
     await chrome.scripting.executeScript({
         target: { tabId },
@@ -43,6 +73,7 @@ async function captureGrafanaPanelImage({
         height: Math.min(4096, Math.max(100, Math.round(Number(outputHeight) || 520)))
     } : null;
     try {
+        const expectedUrl = (await chrome.tabs.get(tabId)).url;
         if (prepared) {
             if (typeof ensureGrafanaRuntime !== 'function') return null;
             // Applying Batch panel tools already installs the MAIN-world runtime.
@@ -95,7 +126,7 @@ async function captureGrafanaPanelImage({
             if (!rect) return null;
         }
         await new Promise(resolve => setTimeout(resolve, settleMs));
-        const source = await chrome.tabs.captureVisibleTab(windowId, { format: 'png' });
+        const source = await captureGrafanaVisibleTab(tabId, expectedUrl);
         if (!source) return null;
         const dataUrl = await new Promise(resolve => {
             const image = new Image();

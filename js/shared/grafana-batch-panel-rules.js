@@ -44,6 +44,12 @@ window.BatchPanelRules = (() => {
     };
 
     const save = async (url, rules) => {
+        // Web Locks serialize writers across Batch documents of this extension.
+        // Do not silently fall back to a page-local queue: it loses other tabs' writes.
+        if (!globalThis.navigator?.locks?.request) throw new Error('Браузер не поддерживает безопасное сохранение Batch rules');
+        return navigator.locks.request(STORAGE_KEY, () => saveLocked(url, rules));
+    };
+    const saveLocked = async (url, rules) => {
         const key = dashboardKey(url);
         if (!key) throw new Error('Введите корректный URL дашборда Grafana');
         const stored = await chrome.storage.local.get(STORAGE_KEY);

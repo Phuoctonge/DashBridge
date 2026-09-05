@@ -64,7 +64,7 @@ const extensionRuntimeGlobals = readonly([
     'activeSetInvariant', 'applyGrafanaCompleteHideSelection', 'applyPanelTools',
     'applySharedGrafanaPanelTools',
     'buildGrafanaPanelUrl', 'buildGrafanaSoloPanelUrl',
-    'buildRuntimeDiagnosticDiff', 'captureGrafanaPanelImage',
+    'buildRuntimeDiagnosticDiff', 'captureGrafanaPanelImage', 'captureGrafanaVisibleTab',
     'captureRuntimeDiagnostic', 'createBatchCaptureWindowRunner', 'createChunkedJsonBlob',
     'createBatchPanelLoader', 'createDashBridgeCrosshair',
     'createRollingZipArchive', 'dashbridgeRunProbe', 'detectGrafanaTimeFormat',

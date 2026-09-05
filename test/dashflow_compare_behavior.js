@@ -40,6 +40,12 @@ const missingReplayBody = compare.build(
 )[0];
 assert.strictEqual(missingReplayBody.status, 'changed', 'a missing replay body must not produce a false unchanged result');
 assert.deepStrictEqual(Array.from(missingReplayBody.differences), ['body capture']);
+const unavailable = request('https://site.test/missing', { bodySha256: null, responseBodyCapture: { status: 'failed' } });
+const unknownBodies = compare.build([unavailable], [{ ...unavailable }])[0];
+assert.notStrictEqual(unknownBodies.status, 'unchanged');
+assert.match(unknownBodies.differences[0], /comparison incomplete/);
+const empty = { ...unavailable, responseBodyCapture: { status: 'empty' } };
+assert.strictEqual(compare.build([empty], [empty])[0].status, 'unchanged');
 
 const perStep = compare.build(
     [request('https://site.test/repeated', { stepId: 1 }), request('https://site.test/repeated', { stepId: 2 })],

@@ -35,6 +35,7 @@
     } = {}) {
         const data = JSON.parse(text);
         if (!Array.isArray(data?.panels)) throw invalidPanelsError();
+        if (data.panels.length > 500) throw new Error('Импорт ограничен 500 панелями.');
 
         const profileName = String(data.profileName || String(fallbackProfileName).replace('.json', ''))
             .trim().slice(0, 120) || 'Imported';

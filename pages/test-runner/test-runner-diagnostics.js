@@ -287,6 +287,7 @@ function diagnosticCaptureModeForTransition(settings, activeIds = [], changedIds
 }
 
 async function capturePanelDiagnosticImage(tabId, panelId, { retainViewport = true } = {}) {
+    const expectedUrl = (await chrome.tabs.get(tabId)).url;
     // Chrome throttles captureVisibleTab to roughly two calls per second.
     // Keep every transition screenshot instead of silently losing fast calls.
     const throttleWaitMs = Math.max(0, 600 - (Date.now() - lastPanelDiagnosticCaptureAt));
@@ -312,8 +313,7 @@ async function capturePanelDiagnosticImage(tabId, panelId, { retainViewport = tr
     }
 
     try {
-        const tab = await chrome.tabs.get(tabId);
-        const source = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'png' });
+        const source = await captureGrafanaVisibleTab(tabId, expectedUrl);
         if (!source) return { dataUrl: null, error: 'captureVisibleTab-empty-result', capturedAt: Date.now(), throttleWaitMs };
         return await new Promise(resolve => {
             const image = new Image();

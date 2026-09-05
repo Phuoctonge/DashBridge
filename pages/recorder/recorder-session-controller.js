@@ -25,7 +25,16 @@
             throw new TypeError('Recorder session controller dependencies are incomplete');
         }
 
-        const stop = async (showStatus = true) => {
+        let starting = false;
+        let stopping = null;
+        let cancelStart = false;
+        const stop = (showStatus = true) => {
+            if (starting && showStatus) { cancelStart = true; return Promise.resolve(); }
+            if (stopping) return stopping;
+            stopping = stopSession(showStatus).finally(() => { stopping = null; });
+            return stopping;
+        };
+        const stopSession = async (showStatus = true) => {
             if (!['recording', 'replaying'].includes(state.mode) && !state.attached) return;
             const stoppedMode = state.mode;
             if (showStatus) state.stopRequested = true;
@@ -111,19 +120,24 @@
         };
 
         const start = async () => {
+            if (starting || stopping || state.importing || ['recording', 'replaying'].includes(state.mode)) return;
             const startUrl = schema.normalizeHttpUrl(ui.startUrl.value);
             if (!startUrl) {
                 setStatus('Введите корректный адрес сайта, например site.ru', true);
                 return;
             }
             ui.startUrl.value = startUrl;
+            starting = true; cancelStart = false; state.starting = true;
+            updateControls();
             try {
                 await getProgressController()?.openPictureInPicture({
                     title: 'Traffic Recorder', phase: 'Запись трафика', width: 390, height: 300,
                 });
                 void saveSettings().catch(() => undefined);
                 await transport.ensureDebuggerPermission();
+                if (cancelStart) return;
                 await stop(false);
+                if (cancelStart) return;
                 resetSession();
                 state.sessionOptions = {
                     disableCache: ui.disableCache.checked,
@@ -138,6 +152,7 @@
                 const layout = transport.buildWindowLayout();
                 const tabId = await transport.createControlledTab(layout);
                 await transport.attachNetwork(tabId);
+                if (cancelStart) { await stop(false); return; }
                 addNavigateStep(startUrl);
                 setStatus('Запись активна. Выполняйте сценарий в открывшейся вкладке.');
                 await chromeRef.tabs.update(tabId, { url: startUrl });
@@ -150,6 +165,14 @@
                 });
                 setStatus(`Не удалось начать запись: ${error?.message || error}`, true);
                 root.DashBridgeAnalytics?.outcome('recorder.record_started', 'error');
+            } finally {
+                if (cancelStart) {
+                    await stop(false);
+                    getProgressController()?.cancel();
+                    setStatus('Запуск записи отменён.');
+                }
+                starting = false; state.starting = false;
+                updateControls();
             }
         };
 

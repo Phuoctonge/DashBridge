@@ -81,6 +81,17 @@ function createContext(overrides = {}) {
     }
 
     console.log('PASS Jira transfer validates origin and reports partial move accurately');
+    {
+        const fixture = createContext({ prompts: ['', 'DST-2'], confirms: [true, false], fetchResponses: [
+            { ok: true, json: async () => ({ startAt: 0, total: 2, worklogs: [{ id: '1' }] }) },
+            { ok: true, json: async () => ({ startAt: 1, total: 2, worklogs: [{ id: '2' }] }) },
+            { ok: true }, { ok: true }
+        ] });
+        const result = await fixture.context.dashbridgeTransferJiraWorklogs('https://jira.example.test');
+        assert.equal(result.copied, 2);
+        assert(fixture.fetchCalls[1].url.includes('startAt=1'));
+        assert.deepStrictEqual(fixture.fetchCalls.map(call => call.method), ['GET', 'GET', 'POST', 'POST']);
+    }
 })().catch(error => {
     console.error(error);
     process.exit(1);

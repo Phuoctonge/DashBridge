@@ -46,3 +46,8 @@ DNR дополнительно ограничен initiator расширения
 pendingUrl исключается. Общий broker снимков direct Grafana и DashBridge
 проверяет активную вкладку и URL до и после capture и отклоняет результат при
 переключении или навигации. Новых permissions эти проверки не требуют.
+
+Batch и Test Runner используют аналогичный guard в общем extension-page
+capture helper: active tab/URL/window до и после PNG, listeners навигации и
+активации в течение захвата. Web Locks для Batch rules и OPFS не требуют
+нового permission; locks действуют между документами одного extension origin.

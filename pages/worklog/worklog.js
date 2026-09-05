@@ -29,6 +29,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const authText = document.getElementById("authText");
 
     let worklogs = [];
+    let sendingWorklogs = false;
+    for (const type of ['click', 'input', 'change', 'keydown']) {
+        document.addEventListener(type, event => {
+            if (!sendingWorklogs) return;
+            event.preventDefault(); event.stopImmediatePropagation();
+        }, true);
+    }
     let issueCache = {};
     let sortOrder = 'desc';
     let historyStack = [];
@@ -553,6 +560,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     sendAllBtn.onclick = async () => {
+        if (sendingWorklogs) return;
         let hasErrors = false;
         for (let l of worklogs) { if (l.status !== 'sent' && (!l.issueId || !l.timeSpent || !l.dateStarted)) { hasErrors = true; l.status = 'error'; } }
         if (hasErrors) {
@@ -560,12 +568,19 @@ document.addEventListener("DOMContentLoaded", () => {
             renderTable(); alert("Заполните обязательные поля!"); return;
         }
         sendAllBtn.disabled = true;
+        sendingWorklogs = true;
+        const lockedControls = new Map([...document.querySelectorAll('button,input,select,textarea')]
+            .map(control => [control, control.disabled]));
+        lockedControls.forEach((_, control) => { control.disabled = true; });
+        const batch = worklogs.filter(log => log.status !== 'sent').map(log => ({ ...log }));
         let attempted = 0;
         let succeeded = 0;
-        for (let i = 0; i < worklogs.length; i++) {
-            if (worklogs[i].status === 'sent') continue;
-            const log = worklogs[i], key = log.issueKey || log.issueId;
+        let persistenceFailed = false;
+        try {
+        for (const log of batch) {
+            const key = log.issueKey || log.issueId;
             attempted += 1;
+            let status = 'error';
             try {
                 const d = parseDate(log.dateStarted);
                 if (isNaN(d.getTime())) throw new Error("Invalid date");
@@ -578,19 +593,24 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (!result.ok) {
                     console.error(`[Jira Error] ${result.status}: ${result.errorText}`);
                 }
-                worklogs[i].status = result.ok ? 'sent' : 'error';
+                status = result.ok ? 'sent' : 'error';
                 if (result.ok) succeeded += 1;
             } catch (e) {
                 console.error("[Worklog Error]", e);
-                worklogs[i].status = 'error';
+                status = 'error';
             }
+            const current = worklogs.find(item => item.id === log.id);
+            if (current) current.status = status;
+            // Commit each acknowledged POST before starting another one. A failed
+            // local commit stops the batch; it must not silently invite a retry.
+            await worklogWriter.write({ jiraWorklogs: worklogs, jiraSortOrder: sortOrder, jiraIssueCache: issueCache });
 
             // Обновляем только статус конкретной строки без полной перерисовки таблицы
             const row = findWorklogRow(log.id);
             if (row) {
                 const statusCell = row.querySelector('.col-status');
                 if (statusCell) {
-                    const st = worklogs[i].status;
+                    const st = status;
                     statusCell.innerHTML = `<span class="status-badge status-${st}">${getStatusText(st)}</span>`;
                 }
             }
@@ -599,9 +619,16 @@ document.addEventListener("DOMContentLoaded", () => {
             await new Promise(r => setTimeout(r, 600));
         }
         // Одна полная перерисовка по завершении для корректной группировки и анимации
-        renderTable();
-        saveToStorage(); sendAllBtn.disabled = false;
-        DashBridgeAnalytics?.outcome('jira.batch_send', !attempted ? 'no_data'
+        } catch (error) {
+            persistenceFailed = true;
+            console.error('Worklog batch persistence failed:', error);
+            alert('Отправка остановлена: не удалось сохранить результат локально. Проверьте записи в Jira перед повторной отправкой.');
+        } finally {
+            sendingWorklogs = false;
+            lockedControls.forEach((disabled, control) => { control.disabled = disabled; });
+            renderTable(); updateStats(); sendAllBtn.disabled = false;
+        }
+        DashBridgeAnalytics?.outcome('jira.batch_send', persistenceFailed ? (succeeded ? 'partial' : 'error') : !attempted ? 'no_data'
             : (succeeded === attempted ? 'success' : (succeeded ? 'partial' : 'error')),
         { countBucket: DashBridgeAnalyticsContract?.bucket?.(attempted) || (attempted > 10 ? '11_plus' : '1') });
     };

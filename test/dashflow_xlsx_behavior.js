@@ -19,6 +19,10 @@ const JSZip = require('../vendor/jszip.min.js');
         ],
         items: [
             {
+                stepId: 2, status: 'incomplete', method: 'GET', url: 'https://api.russpass.ru/missing',
+                baseline: {}, current: {}, differences: ['body unavailable (comparison incomplete)'],
+            },
+            {
                 stepId: 2, status: 'changed', method: 'GET', url: 'https://api.russpass.ru/a?x=1&y=<2>',
                 baseline: { status: 200, mimeType: 'application/json', bodySha256: 'old' },
                 current: { status: 201, mimeType: 'application/json', bodySha256: 'new' }, differences: ['status', 'body hash'],
@@ -42,7 +46,9 @@ const JSZip = require('../vendor/jszip.min.js');
     assert(summary.includes('COUNTIF(') && summary.includes('COUNTIFS(') && summary.includes('Различия'), 'summary must use auditable formulas');
     assert(summary.includes('Фильтр URL') && summary.includes('russpass'), 'summary must describe the applied URL filter');
     assert(details.includes('https://api.russpass.ru/a?x=1&amp;y=&lt;2&gt;'), 'URLs must be XML-escaped without losing content');
-    assert(details.includes('<autoFilter ref="A3:J5"/>') && details.includes('state="frozen"'), 'details must provide filters and frozen headers');
+    assert(details.includes('<autoFilter ref="A3:J6"/>') && details.includes('state="frozen"'), 'details must provide filters and frozen headers');
+    assert(details.includes('Недостаточно данных') && summary.includes('SUM(D13:H13)'),
+        'incomplete comparison must be visible and included in totals');
     assert(details.indexOf('<autoFilter ') < details.indexOf('<mergeCells '), 'OOXML requires autoFilter before mergeCells for Microsoft Excel compatibility');
     assert(!details.includes('Baseline SHA-256') && technical.includes('Baseline SHA-256') && technical.includes('old'), 'full SHA-256 values must move to a dedicated technical sheet');
     console.log('PASS DashFlow comparison exports a structured local XLSX report');

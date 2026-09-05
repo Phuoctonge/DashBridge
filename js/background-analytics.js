@@ -21,6 +21,12 @@
         let loadPromise = null;
         let operation = Promise.resolve();
         let sendScheduled = false;
+        let activeSend = null;
+        const enqueue = task => {
+            const result = operation.then(task);
+            operation = result.catch(() => undefined);
+            return result;
+        };
 
         const validInstallationId = value => typeof value === 'string' && /^[a-zA-Z0-9-]{16,80}$/.test(value);
         const freshState = (installationId = randomUUID()) => ({
@@ -61,8 +67,8 @@
                     : freshState(installationId);
                 state.aggregates = Array.isArray(state.aggregates) ? state.aggregates.map(sanitizeRecord).filter(Boolean) : [];
                 state.inflight = Array.isArray(state.inflight) ? state.inflight.map(sanitizeRecord).filter(Boolean) : [];
-                if (state.inflight.length) state.aggregates.unshift(...state.inflight);
-                state.inflight = [];
+                // Retry the immutable batch with the same IDs after restart.
+                // Merging it into aggregates could change already acknowledged counts.
                 cachedState = state;
                 return state;
             })().finally(() => { loadPromise = null; });
@@ -100,7 +106,7 @@
                 extensionVersion: runtimeApi.getManifest().version,
             };
             state.aggregates.push(record);
-            const limit = Math.max(100, Number(config.queueLimit) || 2000);
+            const limit = Math.max(100, Number(config.queueLimit) || 2000) - state.inflight.length;
             if (state.aggregates.length > limit) {
                 const removed = state.aggregates.length - limit;
                 state.aggregates.splice(0, removed);
@@ -125,7 +131,13 @@
                 state.lastHeartbeatDay = day;
             }
             if (state.lastSnapshotDay === day) return;
-            const [local, sync] = await Promise.all([storageArea.get(null), syncStorageArea.get(null)]);
+            const [local, sync] = await Promise.all([
+                storageArea.get(['dashbridge_profiles', 'dashbridgeRecorderSettings']),
+                syncStorageArea.get(['grafanaCompactScreenshot', 'module_grafana', 'module_grafana_links',
+                    'module_grafana_batch', 'module_grafana_debug', 'module_recorder', 'module_jira',
+                    'module_tdm', 'confluenceScrollFixEnabled', 'tdmSavePhotosDefault',
+                    'tdmExcludeUserDefault', 'tdmRememberDate'])
+            ]);
             const profiles = Array.isArray(local.dashbridge_profiles) ? local.dashbridge_profiles : [];
             const panels = profiles.flatMap(profile => Array.isArray(profile?.panels) ? profile.panels : []);
             const tools = [
@@ -201,51 +213,65 @@
         };
 
         const shouldSend = state => !!String(config.endpoint || '').trim()
-            && !state.inflight.length && state.aggregates.length > 0
+            && (state.inflight.length > 0 || state.aggregates.length > 0)
             && now() >= Number(state.nextRetryAt || 0)
             && now() - Number(state.lastSendAttemptAt || 0) >= Number(config.minimumSendIntervalMs ?? 900_000);
         const sendNow = async () => {
-            const state = await load();
-            if (!shouldSend(state)) return { sent: 0, reason: 'not-due' };
-            const size = Math.max(1, Math.min(100, Number(config.batchSize) || 100));
-            state.inflight = state.aggregates.splice(0, size);
-            state.lastSendAttemptAt = now();
-            await persist(state);
+            const batch = await enqueue(async () => {
+                const state = await load();
+                if (!shouldSend(state)) return null;
+                const size = Math.max(1, Math.min(100, Number(config.batchSize) || 100));
+                if (!state.inflight.length) state.inflight = state.aggregates.splice(0, size);
+                state.lastSendAttemptAt = now();
+                await persist(state);
+                return { schemaVersion: STATE_VERSION, installationId: state.installationId,
+                    droppedAggregates: Math.max(0, Number(state.droppedAggregates) || 0), events: state.inflight };
+            });
+            if (!batch) return { sent: 0, reason: 'not-due' };
+            const controller = new AbortController();
+            let timer;
+            let succeeded = false;
             try {
-                const response = await fetchFn(config.endpoint, {
-                    method: 'POST', headers: { 'content-type': 'application/json' },
-                    body: JSON.stringify({ schemaVersion: STATE_VERSION, installationId: state.installationId,
-                        droppedAggregates: Math.max(0, Number(state.droppedAggregates) || 0), events: state.inflight }),
-                    cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer',
+                const deadline = new Promise((_, reject) => {
+                    timer = setTimeout(() => {
+                        controller.abort(); reject(new Error('analytics-timeout'));
+                    }, Math.min(25_000, Math.max(1000, Number(config.requestTimeoutMs) || 15_000)));
                 });
+                const response = await Promise.race([deadline, fetchFn(config.endpoint, {
+                    method: 'POST', headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify(batch), signal: controller.signal,
+                    cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer',
+                })]);
                 if (!response?.ok) throw new Error(`analytics-http-${Number(response?.status) || 0}`);
-                const sent = state.inflight.length;
-                state.inflight = [];
-                state.droppedAggregates = 0;
-                state.retryCount = 0;
-                state.nextRetryAt = 0;
+                succeeded = true;
+            } catch { /* Retry retains the original event IDs and counts. */ }
+            finally { clearTimeout(timer); }
+            return enqueue(async () => {
+                const state = await load();
+                if (succeeded) {
+                    state.inflight = [];
+                    state.droppedAggregates = Math.max(0, state.droppedAggregates - batch.droppedAggregates);
+                    state.retryCount = 0; state.nextRetryAt = 0;
+                } else {
+                    state.retryCount = Math.min(8, Number(state.retryCount || 0) + 1);
+                    state.nextRetryAt = now() + Math.min(6 * 3_600_000, 60_000 * (2 ** state.retryCount));
+                }
                 await persist(state);
-                return { sent };
-            } catch (_error) {
-                state.aggregates.unshift(...state.inflight);
-                state.inflight = [];
-                state.retryCount = Math.min(8, Number(state.retryCount || 0) + 1);
-                state.nextRetryAt = now() + Math.min(6 * 3_600_000, 60_000 * (2 ** state.retryCount));
-                await persist(state);
-                return { sent: 0, reason: 'network-error' };
-            }
+                return succeeded ? { sent: batch.events.length } : { sent: 0, reason: 'network-error' };
+            });
         };
         const scheduleSend = () => {
             if (sendScheduled) return;
             sendScheduled = true;
             setTimeout(() => {
                 sendScheduled = false;
-                operation = operation.then(sendNow).catch(() => ({ sent: 0, reason: 'internal-error' }));
+                void send();
             }, 0);
         };
         const send = () => {
-            operation = operation.then(sendNow).catch(() => ({ sent: 0, reason: 'internal-error' }));
-            return operation;
+            if (!activeSend) activeSend = sendNow().catch(() => ({ sent: 0, reason: 'internal-error' }))
+                .finally(() => { activeSend = null; });
+            return activeSend;
         };
         const track = input => {
             operation = operation.then(async () => {

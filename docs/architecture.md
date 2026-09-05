@@ -620,8 +620,10 @@ Replay принимает только v2, открывает новое окн�
 Импортированный `network.json` остаётся baseline, а replay собирается в отдельную карту.
 Comparator сопоставляет occurrence запросов по step + method + полному URL и
 классифицирует unchanged/changed/added/removed по status, MIME и SHA-256 body.
-Отсутствие сопоставимого body capture считается отличием, а не ложным
-`unchanged`. Отличия показываются цветной таблицей.
+Отсутствие body в обоих ответах без иных отличий даёт `incomplete`
+(«Недостаточно данных»), а не `unchanged`. Если доступность capture изменилась,
+сохраняется `changed` с причиной `body capture`. Два явно пустых тела сравнимы.
+Новый статус учитывается в UI-фильтре, счётчиках и формулах XLSX.
 Replay ожидает `navigationUrl` клика и до 15 секунд ищет DOM target в записанном
 frame URL. Recorder отменяет отложенный input snapshot на нативном change и
 выбирает узкий интерактивный элемент из composed path.
@@ -954,6 +956,37 @@ Grafana и Confluence. Полный контракт и запрет данны�
 `dashbridge.js` или Popup.
 
 ## Намеренные ограничения
+
+### Контракты исправлений помодульного аудита
+
+- MAIN registration сравнивает JS в исходном порядке; matches остаются набором.
+- Batch Series использует `queryMatchesConfiguredTarget` из panel-definition
+  (в callback ответа, после загрузки runtime) и извлекает только совпавшие refs.
+  Ошибочные bootstrap JSON не устанавливают transport; пустой список targets
+  не разрешает захват произвольного datasource. Пустой отсутствующий alias
+  нормализуется для совместимости с Grafana.
+- Definition cache разделён по origin/base path/org/UID/panel; API получает orgId.
+  Публичный `getPanelLocation` и solo-ограничение сохранены.
+- Batch rules сериализуются через Web Lock `batchPanelToolRules` между страницами.
+  Без Web Locks запись отклоняется, а не выполняется с небезопасной локальной очередью.
+- Test Runner держит Web Lock `dashbridge-spool:<directory>` до очистки или
+  уничтожения документа, включая время просмотра/экспорта завершённого запуска.
+  Уборка OPFS удаляет только run directories без живого lease; при отсутствии
+  Web Locks уборка ничего не удаляет, новый запуск сообщает ошибку.
+- Общий extension-page helper `captureGrafanaVisibleTab` в `grafana-panel-capture.js`
+  проверяет активную вкладку, URL, pending navigation и принадлежность окну до/после
+  снимка. Event guards снимаются в finally. Его используют Batch и Test Runner;
+  переключение вкладок в других окнах не отменяет захват.
+- Worklog блокирует конфликтующий ввод во время batch, отправляет snapshot по
+  stable ID и ожидает storage commit каждого результата до следующего POST.
+  Ошибка локальной записи останавливает batch с предупреждением о проверке Jira.
+  Атомарности между Jira POST и локальным storage нет: авария ровно между ними
+  требует сверки сервера перед повтором. Перенос Jira собирает pagination до
+  подтверждения, отклоняет повторяющиеся ID/непродвигающуюся страницу и >50000 записей.
+- Recorder синхронно блокирует повторный start до PiP/permission await, сериализует
+  stop; cancel во время starting откладывает cleanup до окончания шага старта.
+- Импорт panels ограничен 16 МиБ до FileReader и 500 записями до нормализации.
+  Это новый ограничитель входного импорта, не удаление уже сохранённых профилей.
 
 - Plans и копии проекта не являются runtime dependency.
 - Popup, panel и Batch capture делят helpers, но не lifecycle controller.

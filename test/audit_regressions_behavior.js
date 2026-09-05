@@ -44,7 +44,7 @@ async function recorderBudgets() {
 }
 
 async function analyticsRate() {
-    const context = vm.createContext({ setTimeout: () => 0 });
+    const context = vm.createContext({ setTimeout: () => 0, clearTimeout, AbortController });
     vm.runInContext(read('js/shared/analytics-contract.js'), context);
     vm.runInContext(read('js/background-analytics.js'), context);
     let timestamp = Date.parse('2026-09-05T10:00:00Z');

@@ -99,6 +99,8 @@ assert.strictEqual(hostileSettings.panels.length, 0);
 assert.strictEqual(hostileSettings.warnings.length, 1, 'schema rejection must remain diagnosable');
 
 const html = fs.readFileSync('pages/dashbridge/dashbridge.html', 'utf8');
+assert.throws(() => transfer.parsePanelImportText(JSON.stringify({ panels: Array(501).fill(null) }),
+    { randomUUID: () => assert.fail('oversized array must fail before normalization') }), /500/);
 assert(html.indexOf('dashbridge-panel-transfer.js') < html.indexOf('dashbridge.js'),
     'panel transfer owner must load before the DashBridge controller');
 const controller = fs.readFileSync('pages/dashbridge/dashbridge.js', 'utf8');

@@ -38,11 +38,28 @@ async function dashbridgeTransferJiraWorklogs(expectedOrigin, expectedBasePath =
 
     let worklogsToTransfer = [];
     try {
-        const res = await fetch(`${basePath}/rest/api/2/issue/${encodeURIComponent(currentIssueKey)}/worklog`, {
-            headers: { 'Accept': 'application/json', 'X-Atlassian-Token': 'no-check' }
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
+        const data = { worklogs: [] };
+        const seenIds = new Set();
+        let startAt = 0;
+        for (;;) {
+            const pagination = startAt ? `?startAt=${startAt}&maxResults=100` : '';
+            const res = await fetch(`${basePath}/rest/api/2/issue/${encodeURIComponent(currentIssueKey)}/worklog${pagination}`, {
+                headers: { 'Accept': 'application/json', 'X-Atlassian-Token': 'no-check' }
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const page = await res.json();
+            if (!Array.isArray(page.worklogs)) throw new Error('Invalid worklog page');
+            if (startAt && page.startAt !== undefined && Number(page.startAt) !== startAt) throw new Error('Pagination did not advance');
+            for (const entry of page.worklogs) {
+                if (entry.id && seenIds.has(String(entry.id))) throw new Error('Worklog list changed during pagination; retry');
+                if (entry.id) seenIds.add(String(entry.id));
+                data.worklogs.push(entry);
+            }
+            startAt += page.worklogs.length;
+            if (startAt > 50_000) throw new Error('Worklog selection exceeds safe limit');
+            if (page.total === undefined || startAt >= Number(page.total)) break;
+            if (!Number.isSafeInteger(Number(page.total)) || !page.worklogs.length) throw new Error('Incomplete worklog page');
+        }
         if (!Array.isArray(data.worklogs) || data.worklogs.length === 0) {
             alert('В текущей задаче нет ни одной записи времени.');
             return { status: 'empty' };

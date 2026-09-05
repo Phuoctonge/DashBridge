@@ -32,6 +32,7 @@
                 return ['captured', 'empty'].includes(status) ? status : status ? 'unavailable' : 'unknown';
             };
             if (oldHash || newHash || bodyState(oldRequest) !== bodyState(newRequest)) result.push('body capture');
+            else if (bodyState(oldRequest) !== 'empty') result.push('body unavailable (comparison incomplete)');
         }
         return result;
     }
@@ -46,14 +47,18 @@
                 const source = oldRequest || newRequest; let status; let changed = [];
                 if (!oldRequest) status = 'added';
                 else if (!newRequest) status = 'removed';
-                else { changed = differences(oldRequest, newRequest); status = changed.length ? 'changed' : 'unchanged'; }
+                else {
+                    changed = differences(oldRequest, newRequest);
+                    status = changed.length === 1 && changed[0] === 'body unavailable (comparison incomplete)'
+                        ? 'incomplete' : changed.length ? 'changed' : 'unchanged';
+                }
                 result.push({
                     status, differences: changed, baseline: oldRequest, current: newRequest,
                     stepId: Number(source.stepId) || null, method: source.method || '', url: source.url || ''
                 });
             }
         }
-        const order = { changed: 0, added: 1, removed: 2, unchanged: 3 };
+        const order = { changed: 0, incomplete: 1, added: 2, removed: 3, unchanged: 4 };
         return result.sort((left, right) => order[left.status] - order[right.status] || left.url.localeCompare(right.url));
     }
 

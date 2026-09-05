@@ -13,10 +13,7 @@ const sync = { module_grafana: true, module_jira: false, confluenceScrollFixEnab
 const localArea = {
     async get(keys) {
         if (keys === null) return clone(local);
-        return {
-            dashbridgeAnalyticsState: clone(local.dashbridgeAnalyticsState),
-            dashbridgeInstallationId: local.dashbridgeInstallationId,
-        };
+        return Object.fromEntries(keys.map(key => [key, clone(local[key])]));
     },
     async set(values) { local = { ...local, ...clone(values) }; }
 };
@@ -29,7 +26,7 @@ const context = {
     chrome: { storage: { local: localArea, sync: syncArea }, runtime: { getManifest: () => ({ version: '2.4.2' }) } },
     crypto: { randomUUID: () => `00000000-0000-4000-8000-${String(++sequence).padStart(12, '0')}` },
     fetch: async (...args) => { requests.push(args); return { ok: true, status: 200 }; },
-    setTimeout,
+    setTimeout, clearTimeout, AbortController,
 };
 context.globalThis = context;
 vm.createContext(context);

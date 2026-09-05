@@ -14,6 +14,7 @@ class DiagnosticSpool {
         this.retainedImageBytes = 0;
         this.spoolBytes = 0;
         this.storageEstimate = null;
+        this.releaseLease = null;
     }
 
     async begin(runId) {
@@ -23,14 +24,21 @@ class DiagnosticSpool {
         }
         this.root = await navigator.storage.getDirectory();
         this.baseDirectory = await this.root.getDirectoryHandle('dashbridge-e2e-spool', { create: true });
-        // OPFS survives closing the runner page. Remove stale *DashBridge-only*
-        // sessions here so multi-gigabyte evidence from an interrupted old run
-        // cannot silently consume the browser quota forever.
-        for await (const [name] of this.baseDirectory.entries()) {
-            await this.baseDirectory.removeEntry(name, { recursive: true });
-        }
+        await DiagnosticSpool.clearStaleSessions();
         const name = `dashbridge-e2e-run-${String(runId || Date.now()).replace(/[^a-z0-9_-]/gi, '-')}`;
-        this.directory = await this.baseDirectory.getDirectoryHandle(name, { create: true });
+        if (!navigator.locks?.request) throw new Error('Chrome не предоставляет Web Locks для безопасного хранения диагностики');
+        await new Promise((resolve, reject) => {
+            navigator.locks.request(`dashbridge-spool:${name}`, { ifAvailable: true }, async lock => {
+                if (!lock) throw new Error('Диагностика этого запуска уже открыта');
+                await new Promise(release => { this.releaseLease = release; resolve(); });
+            }).catch(reject);
+        });
+        try {
+            this.directory = await this.baseDirectory.getDirectoryHandle(name, { create: true });
+        } catch (error) {
+            this.releaseLease?.(); this.releaseLease = null;
+            throw error;
+        }
         this.entries = [];
         this.assets.clear();
         Object.values(this.assetsByCategory).forEach(store => store.clear());
@@ -42,11 +50,16 @@ class DiagnosticSpool {
     }
 
     static async clearStaleSessions() {
-        if (typeof navigator.storage?.getDirectory !== 'function') return;
+        if (typeof navigator.storage?.getDirectory !== 'function' || !navigator.locks?.request) return;
         const root = await navigator.storage.getDirectory();
         const base = await root.getDirectoryHandle('dashbridge-e2e-spool', { create: true });
         for await (const [name] of base.entries()) {
-            await base.removeEntry(name, { recursive: true });
+            if (!name.startsWith('dashbridge-e2e-run-')) continue;
+            // A live page holds the lease through viewing/export, not just execution.
+            // Chrome releases it on document destruction, allowing orphan cleanup.
+            await navigator.locks.request(`dashbridge-spool:${name}`, { ifAvailable: true }, async lock => {
+                if (lock) await base.removeEntry(name, { recursive: true });
+            });
         }
     }
 
@@ -67,6 +80,7 @@ class DiagnosticSpool {
         if (root && baseDirectory && directory) {
             await baseDirectory.removeEntry(directory.name, { recursive: true }).catch(() => {});
         }
+        this.releaseLease?.(); this.releaseLease = null;
     }
 
     async writeJson(name, value) {
@@ -300,4 +314,3 @@ class DiagnosticSpool {
 }
 
 // --- Утилиты ---
-

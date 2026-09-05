@@ -49,7 +49,8 @@
             const current = existing[0];
             const sameList = (left, right) => JSON.stringify([...(left || [])].sort())
                 === JSON.stringify([...(right || [])].sort());
-            if (current && sameList(current.matches, matches) && sameList(current.js, runtimeFiles)
+            if (current && sameList(current.matches, matches)
+                && JSON.stringify(current.js || []) === JSON.stringify(runtimeFiles)
                 && current.allFrames === true && current.runAt === 'document_start' && current.world === 'MAIN') {
                 return { matchCount: matches.length, unchanged: true };
             }

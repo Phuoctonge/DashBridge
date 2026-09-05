@@ -29,7 +29,14 @@ const context = {
                 return [{ result: true }];
             }
         },
-        tabs: { captureVisibleTab: async () => 'data:image/png;base64,source' }
+        tabs: {
+            get: async () => ({ id: 42, windowId: 7, url: 'https://grafana.test/d/a' }),
+            query: async () => [{ id: 42 }],
+            onActivated: { addListener() {}, removeListener() {} },
+            onUpdated: { addListener() {}, removeListener() {} },
+            onRemoved: { addListener() {}, removeListener() {} },
+            captureVisibleTab: async () => 'data:image/png;base64,source'
+        }
     },
     ensureGrafanaRuntime: async () => {
         ensureRuntimeCalls++;

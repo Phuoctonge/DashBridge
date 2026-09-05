@@ -96,7 +96,7 @@
 
     function updateControls() {
         const active = ['recording', 'replaying'].includes(state.mode);
-        const controlsLocked = active || state.importing;
+        const controlsLocked = active || state.importing || state.starting;
         ui.start.disabled = controlsLocked;
         ui.stop.disabled = !active;
         ui.save.disabled = controlsLocked || (!state.steps.length && !state.requests.size);

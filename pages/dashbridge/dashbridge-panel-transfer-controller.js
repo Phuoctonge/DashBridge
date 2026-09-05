@@ -44,7 +44,12 @@
         };
 
         const importPanels = async file => {
+            if (file.size > 16 * 1024 * 1024) {
+                await showAlert('Файл превышает ограничение импорта 16 МиБ.');
+                return;
+            }
             const reader = fileReaderFactory();
+            reader.onerror = () => { void showAlert('Не удалось прочитать файл импорта.'); };
             reader.onload = async event => {
                 try {
                     const imported = transfer.parsePanelImportText(event.target.result, {

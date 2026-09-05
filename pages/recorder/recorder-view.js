@@ -226,9 +226,9 @@
             function renderComparison() {
                 if (!state.comparison.length) { ui.comparisonPanel.hidden = true; return; }
                 ui.comparisonPanel.hidden = false;
-                const counts = Object.fromEntries(['unchanged', 'changed', 'added', 'removed'].map(status => [status, state.comparison.filter(item => item.status === status).length]));
+                const counts = Object.fromEntries(['unchanged', 'changed', 'added', 'removed', 'incomplete'].map(status => [status, state.comparison.filter(item => item.status === status).length]));
                 const visible = filteredComparisonItems();
-                ui.comparisonSummary.textContent = `Без изменений: ${counts.unchanged} · Изменено: ${counts.changed} · Добавлено: ${counts.added} · Удалено: ${counts.removed} · Показано: ${visible.length}`;
+                ui.comparisonSummary.textContent = `Без изменений: ${counts.unchanged} · Изменено: ${counts.changed} · Добавлено: ${counts.added} · Удалено: ${counts.removed} · Недостаточно данных: ${counts.incomplete} · Показано: ${visible.length}`;
                 ui.comparisonBody.textContent = '';
                 if (!visible.length) {
                     const row = document.createElement('tr'); const cell = document.createElement('td');

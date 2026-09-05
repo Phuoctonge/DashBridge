@@ -110,6 +110,8 @@ const controller = context.DashBridgePanelTransferController.create({
     assert.strictEqual(revoked.at(-1), 'blob:dashbridge-export');
 
     nextText = 'replace';
+    await controller.importPanels({ name: 'large.json', size: 16 * 1024 * 1024 + 1 });
+    assert.match(alerts.pop(), /16 МиБ/);
     confirmChoice = true;
     await controller.importPanels({ name: 'replace.json' });
     await readComplete;

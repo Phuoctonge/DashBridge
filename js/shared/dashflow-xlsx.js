@@ -42,7 +42,7 @@
     }
 
     function statusLabel(status) {
-        return ({ unchanged: 'Без изменений', changed: 'Изменено', added: 'Добавлено', removed: 'Удалено' })[status] || status || '—';
+        return ({ unchanged: 'Без изменений', changed: 'Изменено', added: 'Добавлено', removed: 'Удалено', incomplete: 'Недостаточно данных' })[status] || status || '—';
     }
 
     function worksheet({ columns, rows, merge, autoFilter, freezeRows = 0 }) {
@@ -74,14 +74,14 @@ ${merges.length ? `<mergeCells count="${merges.length}">${merges.map(reference =
         rows.push(rowXml(6, [textCell(6, 0, 'Фильтр результата', 3), textCell(6, 1, report.statusFilter === 'all' ? 'Все результаты' : statusLabel(report.statusFilter))]));
         const detailLastRow = Math.max(4, items.length + 3);
         const statusCells = []; const countCells = [];
-        ['unchanged', 'changed', 'added', 'removed'].forEach((status, index) => {
+        ['unchanged', 'changed', 'added', 'removed', 'incomplete'].forEach((status, index) => {
             const column = index * 2; const count = items.filter(item => item.status === status).length;
             statusCells.push(textCell(8, column, statusLabel(status), resultStyle(status)));
             countCells.push(formulaCell(9, column, `COUNTIF('Различия'!$C$4:$C$${detailLastRow},"${statusLabel(status)}")`, count, 10));
         });
         rows.push(rowXml(8, statusCells, 22));
         rows.push(rowXml(9, countCells, 30));
-        rows.push(rowXml(12, ['Шаг', 'Действие', 'Переход', 'Без изменений', 'Изменено', 'Добавлено', 'Удалено', 'Всего']
+        rows.push(rowXml(12, ['Шаг', 'Действие', 'Переход', 'Без изменений', 'Изменено', 'Добавлено', 'Удалено', 'Недостаточно данных', 'Всего']
             .map((value, column) => textCell(12, column, value, 2)), 24));
         const grouped = new Map();
         for (const item of items) {
@@ -96,17 +96,17 @@ ${merges.length ? `<mergeCells count="${merges.length}">${merges.map(reference =
                 numberCell(row, 0, stepId, 11), textCell(row, 1, step.action || 'Без шага', 9),
                 textCell(row, 2, step.navigationUrl || '', 9),
             ];
-            ['unchanged', 'changed', 'added', 'removed'].forEach((status, statusIndex) => {
+            ['unchanged', 'changed', 'added', 'removed', 'incomplete'].forEach((status, statusIndex) => {
                 const count = stepItems.filter(item => item.status === status).length;
                 cells.push(formulaCell(row, 3 + statusIndex,
                     `COUNTIFS('Различия'!$A$4:$A$${rangeEnd},A${row},'Различия'!$C$4:$C$${rangeEnd},"${statusLabel(status)}")`, count));
             });
-            cells.push(formulaCell(row, 7, `SUM(D${row}:G${row})`, stepItems.length));
+            cells.push(formulaCell(row, 8, `SUM(D${row}:H${row})`, stepItems.length));
             rows.push(rowXml(row, cells, 34));
         });
         return worksheet({
-            columns: [18, 36, 42, 17, 14, 14, 14, 11], rows,
-            merge: ['A1:H1', 'B3:H3', 'B4:H4', 'B5:H5', 'B6:H6', 'A8:B8', 'C8:D8', 'E8:F8', 'G8:H8', 'A9:B9', 'C9:D9', 'E9:F9', 'G9:H9'],
+            columns: [18, 36, 42, 17, 14, 14, 14, 24, 16, 12], rows,
+            merge: ['A1:J1', 'B3:J3', 'B4:J4', 'B5:J5', 'B6:J6', 'A8:B8', 'C8:D8', 'E8:F8', 'G8:H8', 'I8:J8', 'A9:B9', 'C9:D9', 'E9:F9', 'G9:H9', 'I9:J9'],
             freezeRows: 12,
         });
     }

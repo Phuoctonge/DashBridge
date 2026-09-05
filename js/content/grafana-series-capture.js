@@ -9,11 +9,14 @@
     if (window.__dashBridgeSeriesCaptureToken === token) return;
     window.__dashBridgeSeriesCaptureToken = token;
 
-    const expected = new Set(JSON.parse(params.get('dashbridgeSeriesTargets') || '[]'));
+    let configured;
+    try {
+        const parsed = JSON.parse(params.get('dashbridgeSeriesTargets') || '[]');
+        if (!Array.isArray(parsed) || parsed.length > 1000) return;
+        configured = parsed.map(value => JSON.parse(value));
+    } catch { return; }
     const identity = query => `${query?.refId || ''}\u0000${query?.alias || ''}`;
-    const expectedIdentities = new Set([...expected].map(serialized => {
-        try { return identity(JSON.parse(serialized)); } catch { return ''; }
-    }).filter(Boolean));
+    const expectedIdentities = new Set(configured.map(identity));
     const namesFrom = data => {
         const names = [];
         Object.values(data?.results || {}).forEach(result => {
@@ -43,12 +46,18 @@
         const queries = body?.queries || [];
         const state = window.__dashBridgeSeriesCapture;
         state.debug.requests++;
-        const matchingIdentities = queries.map(identity).filter(value => !expectedIdentities.size || expectedIdentities.has(value));
-        if (expectedIdentities.size && !matchingIdentities.length) return;
+        const matcher = window.DashBridgeGrafanaPanelDefinition?.queryMatchesConfiguredTarget;
+        const matchedQueries = queries.filter(query => typeof matcher === 'function'
+            && configured.some(target => matcher(target, { ...query, alias: query.alias ?? '' })));
+        const matchingIdentities = matchedQueries.map(identity);
+        if (!matchingIdentities.length) return;
         state.debug.matched++;
         const datasourceKeys = queries.map(query => String(query?.datasource?.uid || query?.datasource?.type || query?.datasourceId || '')).sort();
         const batchKey = JSON.stringify([matchingIdentities.sort(), datasourceKeys]);
-        state.batches[batchKey] = namesFrom(data);
+        const refs = new Set(matchedQueries.map(query => String(query.refId)));
+        state.batches[batchKey] = namesFrom({ results: Object.fromEntries(
+            Object.entries(data?.results || {}).filter(([ref]) => refs.has(ref))
+        ) });
         state.matchedIdentities = [...new Set([...state.matchedIdentities, ...matchingIdentities])];
         state.names = Object.keys(state.batches).sort().flatMap(key => state.batches[key]);
         state.lastMatchAt = Date.now();
@@ -63,7 +72,10 @@
     window.fetch = async (...args) => {
         const [input, init] = args;
         const url = typeof input === 'string' ? input : input?.url || '';
-        const requestBody = init?.body ?? (input instanceof Request ? await input.clone().text() : '');
+        let requestBody = '';
+        if (url.includes('api/ds/query')) {
+            try { requestBody = init?.body ?? (input instanceof Request ? await input.clone().text() : ''); } catch { /* Native fetch owns body errors. */ }
+        }
         const response = await originalFetch(...args);
         if (url.includes('api/ds/query')) response.clone().json().then(data => capture(parseBody(requestBody), data)).catch(() => undefined);
         return response;
