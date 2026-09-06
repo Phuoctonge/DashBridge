@@ -570,8 +570,12 @@
                     <option value="fast" selected>Быстрый</option>
                     <option value="full">Полный</option>
                 </select>
-                <label class="tr-input-label" title="Сохранять изображения в диагностике и JSON следующего запуска">
-                    <input id="trScreenshotsEnabled" type="checkbox" checked> Сохранять скриншоты
+                <label class="tr-screenshot-toggle" title="Сохранять изображения в диагностике и JSON следующего запуска">
+                    <span class="switch">
+                        <input id="trScreenshotsEnabled" type="checkbox" role="switch" checked>
+                        <span class="slider" aria-hidden="true"></span>
+                    </span>
+                    <span>Сохранять скриншоты</span>
                 </label>
                 <button id="trSelectTestsBtn" class="tr-btn tr-btn-secondary" type="button" title="Выбрать конкретные сценарии или последние ошибки">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/><path d="m7 4-2 2 2 2m0 2-2 2 2 2m0 2-2 2 2 2"/></svg>
@@ -591,7 +595,8 @@
                     </svg>
                     Стоп
                 </button>
-                <span class="tr-toolbar-spacer"></span>
+            </div>
+            <div class="tr-toolbar tr-report-actions" role="group" aria-label="Действия с отчётом">
                 <button id="trCopyBtn" class="tr-btn tr-btn-secondary" disabled>
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                         stroke-linecap="round" stroke-linejoin="round">

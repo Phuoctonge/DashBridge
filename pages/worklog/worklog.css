@@ -10,15 +10,15 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 25px;
-            background: var(--header-grad);
-            padding: 1.5rem clamp(1rem, 3vw, 2.5rem);
+            margin-bottom: 1rem;
+            background: var(--header-bg);
+            padding: .875rem 1rem;
             gap: 1rem;
             flex-wrap: wrap;
             border-bottom-left-radius: var(--radius-lg);
             border-bottom-right-radius: var(--radius-lg);
             box-shadow: var(--shadow);
-            color: white;
+            color: var(--text-main);
             position: sticky;
             top: 0;
             z-index: 1000;
@@ -51,23 +51,23 @@
         }
 
         .btn-outline {
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            color: white;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-main);
             padding: 4px 12px;
             border-radius: var(--radius-md);
             transition: all 0.2s;
         }
 
         .btn-outline:hover {
-            background: rgba(255, 255, 255, 0.2);
-            border-color: white;
+            background: var(--tab-hover-bg);
+            border-color: var(--primary);
         }
 
         h1 {
             margin: 0;
             font-size: var(--font-size-page-title);
-            color: #fff;
+            color: var(--primary);
             font-weight: var(--font-weight-page-title);
         }
 

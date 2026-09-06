@@ -385,17 +385,17 @@
         h1 {
             margin: 0;
             font-size: var(--font-size-page-title);
-            color: #fff;
+            color: var(--primary);
             font-weight: var(--font-weight-page-title);
         }
 
         .header {
-            background: var(--header-grad);
-            padding: 1.875rem clamp(1rem, 3vw, 2.5rem);
-            color: white;
+            background: var(--header-bg);
+            padding: .875rem var(--page-gutter);
+            color: var(--text-main);
             text-align: center;
             box-shadow: var(--shadow);
-            margin-bottom: 40px;
+            margin-bottom: 1rem;
             width: 100%;
             display: flex;
             justify-content: center;

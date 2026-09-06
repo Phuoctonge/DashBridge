@@ -106,6 +106,22 @@ body {
 .tr-toolbar { gap: 0.5625rem; margin-top: 1rem; }
 .tr-toolbar-spacer { display: none; }
 .tr-toolbar .tr-input-label { margin-bottom: 0; }
+.tr-screenshot-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: .625rem;
+    margin: 0;
+    color: var(--text-main);
+    font-size: .875rem;
+    cursor: pointer;
+}
+.tr-screenshot-toggle input:focus-visible + .slider {
+    outline: 2px solid var(--primary);
+    outline-offset: 3px;
+}
+.tr-screenshot-toggle:has(input:disabled) { opacity: .55; cursor: wait; }
+.tr-screenshot-toggle input:disabled + .slider { cursor: wait; }
+.tr-report-actions { padding-top: .875rem; border-top: 1px solid var(--border); }
 
 .tr-btn,
 .tr-diagnostic-btn {
