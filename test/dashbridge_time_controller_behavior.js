@@ -9,6 +9,7 @@ const makeElement = (extra = {}) => ({
     value: '', textContent: '', innerHTML: '', style: {}, dataset: {}, isConnected: true,
     addEventListener(type, listener) { (this.listeners ||= {})[type] = listener; },
     click() { this.listeners?.click?.({ target: this, currentTarget: this, stopPropagation() {}, preventDefault() {} }); },
+    focus() { this.focused = true; },
     hasAttribute(name) { return name === 'data-refresh' && Object.hasOwn(this.dataset, 'refresh'); },
     querySelector() { return { style: {} }; },
     replaceChildren(...children) { this.children = children; },
@@ -18,7 +19,7 @@ const makeElement = (extra = {}) => ({
 const elements = Object.fromEntries([
     'timePickerBtn', 'refreshPickerBtn', 'timePopover', 'refreshPopover', 'profileDropdown',
     'absTimeFrom', 'absTimeTo', 'quickRangeSearch', 'copyTimeBtn', 'pasteTimeBtn',
-    'applyAbsoluteTime', 'forceRefreshBtn', 'timePickerLabel', 'refreshPickerLabel'
+    'applyAbsoluteTime', 'forceRefreshBtn', 'timePickerLabel', 'refreshPickerLabel', 'closeTimePopover'
 ].map(id => [id, makeElement()]));
 const refreshOff = makeElement({ dataset: { refresh: '' } });
 const loadedFrame = makeElement({
@@ -35,6 +36,7 @@ const deferredFrame = makeElement({
 });
 let frames = [loadedFrame, deferredFrame];
 const documentRef = {
+    addEventListener(type, listener) { listeners.set(`document:${type}`, listener); },
     documentElement: { getAttribute: () => 'dark' },
     getElementById: id => elements[id] || null,
     querySelectorAll(selector) {
@@ -135,6 +137,14 @@ assert.strictEqual(deferredUrl.searchParams.get('theme'), 'light');
 assert.strictEqual(JSON.parse(deferredUrl.searchParams.get('dashbridgeCpuCapacityFilter')).coefficient, 0.8);
 
 controller.setupControls();
+elements.timePickerBtn.click();
+assert.equal(elements.timePopover.style.display, 'flex');
+listeners.get('document:keydown')({ key: 'Escape' });
+assert.equal(elements.timePopover.style.display, 'none');
+assert.equal(elements.timePickerBtn.focused, true);
+elements.timePickerBtn.click();
+elements.closeTimePopover.click();
+assert.equal(elements.timePopover.style.display, 'none');
 assert.strictEqual(elements.absTimeFrom.value, 'now-6h');
 assert.strictEqual(elements.timePickerLabel.textContent, 'Last 6h');
 assert.strictEqual(elements.timePickerBtn.title, 'Выбрать время: Last 6h');

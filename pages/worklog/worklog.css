@@ -144,6 +144,11 @@
 
         .col-actions {
             width: 6.25rem;
+            position: sticky;
+            right: 0;
+            z-index: 1;
+            background: var(--card);
+            box-shadow: -1px 0 var(--border);
         }
 
         input,

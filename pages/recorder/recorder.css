@@ -5,7 +5,7 @@ button, input, select { font: inherit; }
 .recorder-header { display: flex; align-items: center; justify-content: space-between; gap:1rem; flex-wrap:wrap; padding: .875rem var(--page-gutter); color: var(--text-main); background: var(--header-bg); border-bottom: 1px solid var(--border); }
 .recorder-header h1 { margin: 0; font-size: var(--font-size-page-title); color: var(--primary); }
 .recorder-header p { margin: .25rem 0 0; opacity: .72; font-size: .75rem; }
-main { padding: 1.25rem var(--page-gutter) 2rem; }
+main { padding: 1.25rem var(--page-gutter) 2rem; container: recorder / inline-size; }
 .control-card, .workspace, .metrics > div { background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow-sm); }
 .control-card {
     padding: 1.25rem;
@@ -182,6 +182,11 @@ td.url { font-family: ui-monospace, monospace; }
     .workspace aside { max-height: 260px; border-right: 0; border-bottom: 1px solid var(--border); }
     .table-wrap { padding-inline: 10px; }
     .request-details-zone { padding-inline: 10px; }
+}
+@container recorder (max-width: 60rem) {
+    .control-card { grid-template-columns: minmax(0, 1fr); }
+    .settings-section { grid-column: 1; grid-row: 3; }
+    .file-section { grid-column: 1; grid-row: 2; }
 }
 @media (max-width: 520px) {
     .url-row > :not(.sr-only) { width: 100%; }

@@ -189,6 +189,14 @@
             const timePopover = documentRef.getElementById('timePopover');
             const refreshPopover = documentRef.getElementById('refreshPopover');
             if (!timeButton) return;
+            const closeTimePopover = () => {
+                timePopover.style.display = 'none';
+                timeButton.focus();
+            };
+            documentRef.getElementById('closeTimePopover')?.addEventListener('click', closeTimePopover);
+            documentRef.addEventListener('keydown', event => {
+                if (event.key === 'Escape' && timePopover.style.display === 'flex') closeTimePopover();
+            });
 
             timeButton.addEventListener('click', event => {
                 event.stopPropagation();

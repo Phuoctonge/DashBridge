@@ -15,6 +15,25 @@
         const members = group => getPanels().filter(panel => codec.scope(panel.src) === group.key);
         const alive = group => !stopped && groups.get(group.key) === group && profileId === String(getActiveProfile()?.id || '');
         const status = (group, text) => { group.status.textContent = text; };
+        function positionOptions() {
+            const details = host.querySelector('.dashboard-variable[open]');
+            if (!details?.getBoundingClientRect) return;
+            const body = details.querySelector('.dashboard-variable-options');
+            const rect = details.getBoundingClientRect();
+            const width = documentRef.documentElement.clientWidth;
+            const height = windowRef.innerHeight;
+            const gap = 12;
+            if (rect.bottom < 0 || rect.top > height) { details.open = false; return; }
+            body.style.maxHeight = `${Math.max(0, height - 2 * gap)}px`;
+            const size = body.getBoundingClientRect();
+            const below = height - rect.bottom - gap;
+            const above = rect.top - gap;
+            const upwards = below < Math.min(size.height, 240) && above > below;
+            const available = Math.max(0, upwards ? above - 6 : below - 6);
+            body.style.maxHeight = `${available}px`;
+            body.style.left = `${Math.max(gap, Math.min(rect.left, width - size.width - gap))}px`;
+            body.style.top = `${upwards ? Math.max(gap, rect.top - Math.min(size.height, available) - 6) : Math.max(gap, rect.bottom + 6)}px`;
+        }
         const cancel = group => {
             clearTimeout(group.timer);
             group.pending = null;
@@ -167,6 +186,7 @@
                     label.append(control, documentRef.createTextNode(option.text));
                     list.appendChild(label);
                 }
+                if (details.open) positionOptions();
             };
             if (variable.type === 'textbox') {
                 input.value = variable.values[0] || '';
@@ -196,6 +216,7 @@
             update.addEventListener('click', () => refresh(group, variable.name));
             body.appendChild(update);
             details.addEventListener('toggle', () => {
+                if (details.open) positionOptions();
                 if (details.open && Date.now() - group.updatedAt > 60000) refresh(group, variable.name);
             });
             details.addEventListener('keydown', event => {
@@ -337,6 +358,8 @@
             observer.observe(documentRef.getElementById('dashboard'), { childList: true });
             windowRef.addEventListener('message', onMessage);
             windowRef.addEventListener('pagehide', stop, { once: true });
+            windowRef.addEventListener('resize', positionOptions);
+            windowRef.addEventListener('scroll', positionOptions, true);
             sync();
         }
         function stop() {
@@ -344,6 +367,8 @@
             delayed.forEach(clearTimeout); delayed.clear();
             observer.disconnect(); windowRef.removeEventListener('message', onMessage);
             windowRef.removeEventListener('pagehide', stop); host.replaceChildren();
+            windowRef.removeEventListener('resize', positionOptions);
+            windowRef.removeEventListener('scroll', positionOptions, true);
         }
         return Object.freeze({ start, stop, sync });
     }

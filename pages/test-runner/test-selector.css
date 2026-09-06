@@ -1,13 +1,13 @@
 :root { color-scheme: light dark; }
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 42rem; background: var(--bg); color: var(--text-main); font: 0.875rem/1.45 Inter, system-ui, sans-serif; }
+body { margin: 0; min-width: 0; background: var(--bg); color: var(--text-main); font: 0.875rem/1.45 Inter, system-ui, sans-serif; }
 button, input { font: inherit; }
-.selector-header { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); background: var(--surface); }
+.selector-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); background: var(--surface); }
 h1 { margin: 0; font-size: 1.25rem; }
 .selector-header p { margin: 0.2rem 0 0; color: var(--text-muted); }
 .selector-icon-btn { width: 2rem; height: 2rem; border: 0; border-radius: 0.45rem; background: transparent; color: var(--text-main); font-size: 1.5rem; cursor: pointer; }
 main { padding: 1rem 1.25rem 5rem; }
-.selector-controls { position: sticky; top: 4.25rem; z-index: 2; padding: 0.75rem; border: 1px solid var(--border); border-radius: 0.65rem; background: var(--surface); box-shadow: var(--shadow); }
+.selector-controls { position: sticky; top: 0; z-index: 2; padding: 0.75rem; border: 1px solid var(--border); border-radius: 0.65rem; background: var(--surface); box-shadow: var(--shadow); }
 #selectorSearch { width: 100%; padding: 0.65rem 0.75rem; border: 1px solid var(--border); border-radius: 0.45rem; background: var(--bg-elevated); color: var(--text-main); }
 .selector-presets { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 0.65rem; }
 .selector-presets button, footer button { padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: 0.45rem; background: var(--bg-elevated); color: var(--text-main); cursor: pointer; }

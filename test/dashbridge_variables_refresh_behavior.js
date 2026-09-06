@@ -112,5 +112,7 @@ const tick = delay => {
     assert.equal(navigations, 1, 'only legacy apply needs a document navigation');
     controller.stop();
     assert.equal(timers.size, 0);
+    assert.equal(listeners.resize, undefined, 'menu resize listener must be released');
+    assert.equal(listeners.scroll, undefined, 'menu scroll listener must be released');
     console.log('Repeated unchanged-URL refresh replaces frame, rejects stale ready and clears watchdog: PASS');
 })().catch(error => { console.error(error); process.exitCode = 1; });

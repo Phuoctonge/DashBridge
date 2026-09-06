@@ -15,6 +15,14 @@
     padding: 1.5rem;
     border-right: 1px solid var(--border-color);
 }
+.time-picker-close { float: right; margin: 0 0 .75rem .75rem; }
+.grafana-time-picker {
+    position: fixed !important;
+    left: clamp(var(--page-gutter), 20vw, calc(100vw - 38rem - var(--page-gutter))) !important;
+    top: var(--page-gutter) !important;
+    max-height: calc(100dvh - 2 * var(--page-gutter));
+    overflow: auto;
+}
 
 .gtp-left h4 {
     margin-top: 0;
@@ -157,11 +165,16 @@
 @media (max-width: 90rem) {
     header > .controls {
         flex: 1 0 100%;
-        justify-content: flex-end;
+        justify-content: flex-start;
     }
 }
 
 @media (max-width: 64rem) {
+    .grafana-time-picker {
+        position: fixed !important;
+        left: var(--page-gutter) !important;
+        top: var(--page-gutter) !important;
+    }
     header {
         align-items: flex-start;
     }
@@ -417,4 +430,3 @@
     color: #e24d42;
     font-weight: 700;
 }
-
