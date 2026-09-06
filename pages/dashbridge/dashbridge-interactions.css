@@ -109,10 +109,11 @@
     display: flex;
     flex-direction: column;
     overflow-y: auto;
-    max-height: 400px;
+    flex-shrink: 0;
 }
 
 .quick-range-btn {
+    flex-shrink: 0;
     background: transparent;
     border: none;
     color: var(--text-main);
