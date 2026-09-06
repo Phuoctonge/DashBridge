@@ -23,7 +23,7 @@ main { padding: 1.25rem var(--page-gutter) 2rem; }
     display: flex;
     flex-direction: column;
     justify-content: center;
-    text-align: center;
+    text-align: left;
 }
 .settings-section, .file-section {
     min-width: 0;
@@ -34,7 +34,7 @@ main { padding: 1.25rem var(--page-gutter) 2rem; }
 }
 .settings-section h2, .file-section h2 { font-size: .9375rem; margin-bottom: .625rem; }
 .section-description { font-size: .8125rem; line-height: 1.5; color: var(--text-muted); }
-.file-section .import-row { align-items: flex-start; justify-content: center; gap: .625rem; margin-top: 1rem; }
+.file-section .import-row { align-items: flex-start; justify-content: flex-start; gap: .625rem; margin-top: 1rem; }
 .session-strip { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; padding: .875rem 1rem; background: var(--tab-active-bg); border-radius: var(--radius-md); }
 .session-strip .session-status, .session-strip .network-mode { margin: 0; }
 .control-card > .warning { margin: 0; border-inline-start: 3px solid var(--warning); line-height: 1.5; }
