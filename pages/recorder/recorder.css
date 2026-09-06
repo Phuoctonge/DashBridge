@@ -43,7 +43,7 @@ main { padding: 1.25rem var(--page-gutter) 2rem; }
 .control-card > .warning { margin: 0; border-inline-start: 3px solid var(--warning); line-height: 1.5; }
 .url-row, .import-row { display: flex; flex-wrap: wrap; gap: 10px; }
 .import-row { margin-top: 10px; }
-.network-switches { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); align-items: start; gap: .75rem; margin-top: 0; }
+.network-switches { display: grid; grid-template-columns: minmax(0,1fr); align-items: start; gap: .75rem; margin-top: 0; }
 .network-switch-card { padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-elevated); }
 .network-switch-card > label { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; align-items: center; cursor: pointer; }
 .network-switches input { grid-row: 1 / span 2; width: 17px; height: 17px; accent-color: var(--primary); }
