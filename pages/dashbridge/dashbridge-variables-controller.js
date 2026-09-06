@@ -305,7 +305,7 @@
                 if (!alive(group)) return;
                 if (result?.error) { status(group, 'Выбор применён, но профиль не сохранён. Повторите сохранение.'); render(group); return; }
             }
-            status(group, `Панелей: ${members(group).length}`);
+            status(group, '');
             render(group);
         }
         function onMessage(event) {
