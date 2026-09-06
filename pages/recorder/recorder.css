@@ -10,22 +10,25 @@ main { padding: 1.25rem var(--page-gutter) 2rem; }
 .control-card {
     padding: 1.25rem;
     display: grid;
-    grid-template-columns: minmax(0, 1.6fr) minmax(18rem, 1fr);
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
     gap: 1rem 1.25rem;
 }
-.control-title, .control-card > .url-row, .control-card > .warning, .session-strip { grid-column: 1 / -1; }
+.control-card > .warning, .session-strip { grid-column: 1 / -1; }
 .control-title { margin: 0; font-size: 1rem; }
-.settings-section { grid-column: 1; grid-row: 3; }
+.record-section { grid-column: 1; grid-row: 1; }
+.record-section .url-row { margin-top: 1rem; }
+.record-section input[type="url"] { flex-basis: 100%; }
+.settings-section { grid-column: 1 / -1; grid-row: 2; }
 .file-section {
     grid-column: 2;
-    grid-row: 3;
+    grid-row: 1;
     align-self: stretch;
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: flex-start;
     text-align: left;
 }
-.settings-section, .file-section {
+.record-section, .settings-section, .file-section {
     min-width: 0;
     padding: 1rem;
     background: var(--surface-raised);
@@ -40,7 +43,7 @@ main { padding: 1.25rem var(--page-gutter) 2rem; }
 .control-card > .warning { margin: 0; border-inline-start: 3px solid var(--warning); line-height: 1.5; }
 .url-row, .import-row { display: flex; flex-wrap: wrap; gap: 10px; }
 .import-row { margin-top: 10px; }
-.network-switches { display: grid; grid-template-columns: minmax(0,1fr); align-items: start; gap: .75rem; margin-top: 0; }
+.network-switches { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); align-items: start; gap: .75rem; margin-top: 0; }
 .network-switch-card { padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-elevated); }
 .network-switch-card > label { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; align-items: center; cursor: pointer; }
 .network-switches input { grid-row: 1 / span 2; width: 17px; height: 17px; accent-color: var(--primary); }
@@ -170,7 +173,7 @@ td.url { font-family: ui-monospace, monospace; }
 @media (max-width: 820px) {
     .control-card { grid-template-columns: minmax(0, 1fr); padding: 1rem; }
     .settings-section { grid-column: 1; grid-row: 3; }
-    .file-section { grid-column: 1; grid-row: 4; }
+    .file-section { grid-column: 1; grid-row: 2; }
     main { padding: 14px 14px 24px; }
     .recorder-header { padding: 16px; }
     .network-switches { grid-template-columns: 1fr; }

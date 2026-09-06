@@ -114,8 +114,9 @@ assert(recorderCss.includes('th { position: sticky; top: 0; z-index: 3;') && rec
     'sticky traffic column headers must be opaque above sticky step headings');
 assert(recorderCss.includes('.comparison-controls > :not(.sr-only) { flex: 1 1 100%'),
     'comparison controls must fill narrow layouts without overflow');
-assert(recorderCss.includes('.network-switches { display: grid; grid-template-columns: minmax(0,1fr);'),
-    'cache and cookie switches must be arranged vertically');
+assert(recorderCss.includes('.network-switches { display: grid; grid-template-columns: repeat(2,minmax(0,1fr));')
+    && recorderCss.includes('.network-switches { grid-template-columns: 1fr; }'),
+    'cache and cookie switches must share a row and stack in narrow windows');
 for (const asset of ['vendor/jszip.min.js', 'js/shared/dashflow-schema.js', 'js/shared/dashflow-compare.js', 'js/shared/dashflow-xlsx.js', '../shared/operation-progress-window.js', 'recorder-dashflow-export.js', 'recorder-dashflow-io.js', 'recorder-view.js', 'recorder-replay.js', 'recorder-session-transport.js', 'recorder-network-capture.js', 'recorder-session-controller.js', 'recorder-dashflow-controller.js', 'recorder.js']) {
     assert(html.includes(asset), `recorder page must load ${asset}`);
 }
