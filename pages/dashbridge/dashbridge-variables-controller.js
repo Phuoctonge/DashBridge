@@ -101,6 +101,9 @@
         function field(group, variable) {
             const details = documentRef.createElement('details');
             details.className = 'dashboard-variable';
+            // Native exclusive details also handles keyboard activation and
+            // closes the previous field synchronously before toggle events.
+            details.setAttribute('name', 'dashbridge-variable-picker');
             const summary = documentRef.createElement('summary');
             const fullText = variable.texts.join(' + ') || variable.values.join(' + ') || '—';
             if (variable.hide !== 1) {

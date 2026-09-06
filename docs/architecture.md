@@ -277,6 +277,8 @@ orgId. `dashbridge-variables-state.js` владеет чистой валида�
 codec: повторяющиеся `var-*`, All и сохранение остальных параметров. Выбор
 хранится в существующих `panel.src`, поэтому legacy schema и panel JSON export
 не требуют нового хранилища. Варианты остаются в памяти страницы.
+Поля используют общую именованную группу HTML details: одновременно открыт
+только один список переменных, включая открытие с клавиатуры.
 
 `grafana-variables-bridge.js` (isolated, только именованный iframe) принимает
 `dashbridgeVariablesRequest` от exact extension origin + parent, допускает
