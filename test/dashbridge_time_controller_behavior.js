@@ -19,7 +19,8 @@ const makeElement = (extra = {}) => ({
 const elements = Object.fromEntries([
     'timePickerBtn', 'refreshPickerBtn', 'timePopover', 'refreshPopover', 'profileDropdown',
     'absTimeFrom', 'absTimeTo', 'quickRangeSearch', 'copyTimeBtn', 'pasteTimeBtn',
-    'applyAbsoluteTime', 'forceRefreshBtn', 'timePickerLabel', 'refreshPickerLabel', 'closeTimePopover'
+    'applyAbsoluteTime', 'forceRefreshBtn', 'timePickerLabel', 'refreshPickerLabel', 'closeTimePopover',
+    'recentTimeRanges', 'recentTimeRangesEmpty', 'timeRangeError'
 ].map(id => [id, makeElement()]));
 const refreshOff = makeElement({ dataset: { refresh: '' } });
 const loadedFrame = makeElement({
@@ -47,7 +48,11 @@ const documentRef = {
     createElement: () => makeElement(),
     createTextNode: text => ({ textContent: text })
 };
-const windowRef = { addEventListener(type, listener) { listeners.set(type, listener); } };
+const storage = new Map();
+const windowRef = {
+    localStorage: { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) },
+    addEventListener(type, listener) { listeners.set(type, listener); }
+};
 const profile = { id: 'profile-1', timeState: { from: 'now-6h', to: 'now', refresh: '10s' } };
 const panels = [
     { id: 'panel-1', src: loadedFrame.src, grafanaTheme: 'follow' },
@@ -172,3 +177,52 @@ assert.strictEqual(navigated.length, 3, 'follow-theme iframe navigates on theme 
 assert.deepStrictEqual(new URL(navigated[2].url).searchParams.getAll('var-instance'), ['selected', 'second']);
 
 console.log('PASS DashBridge time controller owns profile state, URL policy and iframe lifecycle');
+
+const historyKey = 'dashbridge.timepicker.history';
+const applyRange = (from, to) => {
+    elements.absTimeFrom.value = from;
+    elements.absTimeTo.value = to;
+    elements.applyAbsoluteTime.click();
+};
+const openHistory = () => {
+    elements.timePopover.style.display = 'none';
+    elements.timePickerBtn.click();
+    return elements.recentTimeRanges.children;
+};
+assert.equal(JSON.parse(storage.get(historyKey)).length, 1);
+for (let day = 1; day <= 5; day++) applyRange(`2025-05-0${day}T10:00:00.123Z`, `2025-05-0${day}T11:00:00.456Z`);
+let history = JSON.parse(storage.get(historyKey));
+assert.equal(history.length, 4, 'history is bounded to four unique ranges');
+assert.equal(history[0].from, String(Date.parse('2025-05-05T10:00:00.123Z')));
+const selected = history[2];
+const beforeReplay = navigated.length;
+openHistory()[2].click();
+assert.equal(navigated.length, beforeReplay + 1, 'history click navigates the one active frame exactly once');
+assert.equal(controller.getState().from, selected.from, 'history preserves milliseconds');
+assert.equal(JSON.parse(storage.get(historyKey))[0].from, selected.from, 'reused range moves to front');
+assert.equal(JSON.parse(storage.get(historyKey)).length, 4, 'reused range does not duplicate');
+const beforeRelative = storage.get(historyKey);
+applyRange('now-5m', 'now');
+assert.equal(storage.get(historyKey), beforeRelative, 'relative quick ranges do not enter history');
+applyRange('2025-05-01T10:00:00Z', 'now');
+assert.equal(JSON.parse(storage.get(historyKey))[0].to, 'now', 'mixed range retains relative endpoint');
+const beforeInvalid = JSON.stringify(controller.getState());
+const navigationBeforeInvalid = navigated.length;
+applyRange('broken', '2025-05-01T10:00:00Z');
+assert.equal(JSON.stringify(controller.getState()), beforeInvalid);
+applyRange('2025-05-02T10:00:00Z', '2025-05-01T10:00:00Z');
+assert.equal(navigated.length, navigationBeforeInvalid, 'invalid/reversed range cannot reload frames');
+assert.equal(elements.timeRangeError.hidden, false);
+storage.set(historyKey, JSON.stringify([{}, { from: '<script>', to: 'now' }, selected, selected]));
+assert.equal(openHistory().length, 1, 'hostile and duplicate stored entries are ignored');
+storage.set(historyKey, '{}');
+assert.equal(openHistory().length, 0, 'wrong storage shape becomes empty history');
+storage.set(historyKey, 'x'.repeat(4097));
+assert.equal(openHistory().length, 0, 'oversized storage does not render');
+storage.set(historyKey, '{');
+assert.doesNotThrow(openHistory, 'broken JSON cannot break picker');
+windowRef.localStorage = { getItem() { throw Error('denied'); }, setItem() { throw Error('quota'); } };
+assert.doesNotThrow(() => applyRange(selected.from, selected.to));
+assert.equal(controller.getState().from, selected.from, 'storage error cannot block time apply');
+assert.equal(openHistory().length, 1, 'history survives in memory when storage fails');
+console.log('PASS recent time ranges: cap, deduplication, exact replay, mixed/relative, invalid/storage failure');

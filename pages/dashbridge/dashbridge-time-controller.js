@@ -5,6 +5,8 @@
     const LEGEND_SELECTION_PARAM = 'dashbridgeLegendSelection';
     const SERIES_QUERY_FILTER_PARAM = 'dashbridgeSeriesQueryFilter';
     const CPU_CAPACITY_FILTER_PARAM = 'dashbridgeCpuCapacityFilter';
+    const TIME_HISTORY_KEY = 'dashbridge.timepicker.history';
+    const MAX_HISTORY_ITEMS = 4;
 
     function create({ timeState, getActiveProfile, saveProfiles, getPanels, getPanelTools,
         legendSelection, panelBootstrap, getTransformSettings, postToDashboardFrame,
@@ -21,6 +23,73 @@
         }
 
         let state = timeState.defaults();
+        let recentRanges = [];
+
+        const parseTimeInput = value => {
+            if (typeof value !== 'string' || !value || value.length > 100) return null;
+            if (/^now(?:[+-]\d+[smhdwMy]|\/(?:[smhdwMy]|fy))*$/.test(value)) return value;
+            const milliseconds = /^-?\d+$/.test(value) ? Number(value) : Date.parse(value);
+            return Number.isFinite(milliseconds) && Number.isFinite(new Date(milliseconds).getTime())
+                ? String(milliseconds) : null;
+        };
+
+        const normalizeHistoryRange = value => {
+            const from = parseTimeInput(value?.from);
+            const to = parseTimeInput(value?.to);
+            if (from === null || to === null || (from.startsWith('now') && to.startsWith('now'))) return null;
+            if (!from.startsWith('now') && !to.startsWith('now') && Number(from) > Number(to)) return null;
+            return { from, to };
+        };
+
+        const readRecentRanges = () => {
+            try {
+                if (!windowRef.localStorage) return recentRanges;
+                const raw = windowRef.localStorage.getItem(TIME_HISTORY_KEY);
+                if (raw == null) { recentRanges = []; return recentRanges; }
+                const values = raw.length <= 4096 ? JSON.parse(raw) : [];
+                const seen = new Set();
+                recentRanges = (Array.isArray(values) ? values.slice(0, 32) : [])
+                    .map(normalizeHistoryRange).filter(value => {
+                        if (!value) return false;
+                        const key = `${value.from}|${value.to}`;
+                        if (seen.has(key)) return false;
+                        seen.add(key);
+                        return true;
+                    }).slice(0, MAX_HISTORY_ITEMS);
+            } catch (_) { /* Unavailable storage must not block applying time. */ }
+            return recentRanges;
+        };
+
+        const rememberRange = () => {
+            const range = normalizeHistoryRange(state);
+            if (!range) return;
+            recentRanges = [range, ...readRecentRanges().filter(item => item.from !== range.from || item.to !== range.to)]
+                .slice(0, MAX_HISTORY_ITEMS);
+            try { windowRef.localStorage?.setItem(TIME_HISTORY_KEY, JSON.stringify(recentRanges)); }
+            catch (_) { /* Keep this tab's history when storage is unavailable. */ }
+        };
+
+        const renderRecentRanges = () => {
+            const list = documentRef.getElementById('recentTimeRanges');
+            if (!list) return;
+            const ranges = readRecentRanges();
+            documentRef.getElementById('recentTimeRangesEmpty').hidden = ranges.length > 0;
+            list.replaceChildren(...ranges.map(range => {
+                const button = documentRef.createElement('button');
+                button.type = 'button';
+                button.className = 'recent-time-range';
+                button.textContent = `${timeState.formatForInput(range.from)} — ${timeState.formatForInput(range.to)}`;
+                button.addEventListener('click', () => {
+                    // Use exact stored instants; formatting the inputs would discard milliseconds.
+                    documentRef.getElementById('absTimeFrom').value = range.from;
+                    documentRef.getElementById('absTimeTo').value = range.to;
+                    documentRef.getElementById('applyAbsoluteTime').click();
+                    syncControls();
+                    documentRef.getElementById('timePickerBtn').focus();
+                });
+                return button;
+            }));
+        };
 
         const getState = () => ({ ...state });
 
@@ -204,6 +273,7 @@
             timeButton.addEventListener('click', event => {
                 event.stopPropagation();
                 const showing = timePopover.style.display === 'flex';
+                if (!showing) renderRecentRanges();
                 timePopover.style.display = showing ? 'none' : 'flex';
                 refreshPopover.style.display = 'none';
                 documentRef.getElementById('profileDropdown').style.display = 'none';
@@ -279,10 +349,16 @@
                 const fromValue = documentRef.getElementById('absTimeFrom').value.trim();
                 const toValue = documentRef.getElementById('absTimeTo').value.trim();
                 if (!fromValue || !toValue) return;
-                const parse = value => value.startsWith('now')
-                    ? value : (isNaN(Date.parse(value)) ? value : Date.parse(value).toString());
-                state = { ...state, from: parse(fromValue), to: parse(toValue) };
+                const from = parseTimeInput(fromValue);
+                const to = parseTimeInput(toValue);
+                const error = documentRef.getElementById('timeRangeError');
+                const invalid = from === null || to === null
+                    || (!from.startsWith('now') && !to.startsWith('now') && Number(from) > Number(to));
+                if (error) error.hidden = !invalid;
+                if (invalid) return;
+                state = { ...state, from, to };
                 saveProfileState();
+                rememberRange();
                 updateLabels();
                 timePopover.style.display = 'none';
                 const requiresNavigation = !state.from.toString().startsWith('now')

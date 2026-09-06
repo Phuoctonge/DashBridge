@@ -149,6 +149,12 @@
                             </button>
                             <button id="applyAbsoluteTime" class="btn btn-primary gtp-apply-btn">Применить диапазон</button>
                         </div>
+                        <p id="timeRangeError" class="time-range-error" role="alert" hidden>Проверьте даты: начало диапазона не должно быть позже окончания.</p>
+                        <section class="recent-time-ranges" aria-labelledby="recentTimeRangesTitle">
+                            <h4 id="recentTimeRangesTitle">Недавние абсолютные диапазоны</h4>
+                            <p id="recentTimeRangesEmpty">Здесь появятся последние применённые диапазоны с фиксированной датой.</p>
+                            <div id="recentTimeRanges"></div>
+                        </section>
                     </div>
 
                     <div class="gtp-right">

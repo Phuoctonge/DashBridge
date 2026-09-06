@@ -83,6 +83,33 @@
     white-space: nowrap;
 }
 
+.recent-time-ranges {
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.recent-time-ranges h4 { font-size: .875rem; margin-bottom: .5rem; }
+.recent-time-ranges p { color: var(--text-muted); font-size: .875rem; margin: 0; }
+.recent-time-range {
+    display: block;
+    width: 100%;
+    padding: .625rem .5rem;
+    border: 0;
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--text-main);
+    font: inherit;
+    font-size: .875rem;
+    line-height: 1.5;
+    text-align: left;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+}
+.recent-time-range:hover { background: var(--bg-color); }
+.recent-time-range:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.time-range-error { color: var(--danger); font-size: .875rem; }
+
 .gtp-right {
     width: 250px;
     display: flex;

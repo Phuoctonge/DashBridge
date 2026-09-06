@@ -349,6 +349,16 @@ grafana-iframe.js (isolated) ↔ grafana-panel-tools.js (MAIN)
 Абсолютный диапазон в header отображается компактно до минут; редактор и tooltip
 сохраняют секунды. DashBridge не вводит собственный timezone профиля и не
 удаляет существующий параметр `timezone` из URL панелей.
+История выбора времени принадлежит `dashbridge-time-controller.js`: четыре
+последних уникальных диапазона с хотя бы одной абсолютной границей, новые
+сверху. Клик применяет диапазон штатным путём один раз. Локальный ключ
+`dashbridge.timepicker.history` общий для профилей этой установки, не входит
+в экспорт профиля и перечитывается при открытии picker. Epoch milliseconds
+сохраняют точный момент; подписи используют часовой пояс браузера. Относительные
+границы смешанного диапазона остаются выражениями `now`. Ошибка хранения не
+блокирует время; чтение ограничено 4 КиБ, записи валидируются и дедуплицируются.
+Образец поведения — Grafana v12.1.0 `TimePickerWithHistory.tsx` и
+`TimePickerContent.tsx`; код компонента Grafana не включён в расширение.
 Кнопка «Переменные дашборда» раскрывает область под шапкой, по умолчанию
 закрытую. Контроллер хранит раскрытие отдельно для профилей только в памяти
 текущей вкладки; скрытие не останавливает transport и синхронизацию. Индикатор
@@ -719,7 +729,7 @@ UID, orgId и panel ID. Переход SPA на другой dashboard не пр
 | `storage.sync` | Grafana/Options, домены, compact capture, Popup, тема | Небольшие настройки; частые inputs debounce + flush. |
 | `storage.local` | Profiles, backups, Worklog/cache, Batch, diagnostics/status, `dashbridgeUpdateIndicator`, `dashbridgeInstallationId` | Долговечные/объёмные данные, отдельный псевдоним аналитики и служебная версия доступного обновления. |
 | `storage.session` | `grafanaVisualState:<tabId>` | Служебное состояние вкладки, удаляется при закрытии. |
-| `localStorage` | Тема page | Синхронно до paint, затем sync reconciliation. |
+| `localStorage` | Тема page, `dashbridge.timepicker.history` | Тема до paint с sync reconciliation; история времени локальная, до четырёх диапазонов. |
 | MAIN `Map` | Live state по `panelKey` | Только document, переживает React DOM repair. |
 
 Profile Store сериализует записи через `storage-writer.js`. Повреждённые записи
