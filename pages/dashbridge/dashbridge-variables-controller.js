@@ -5,6 +5,28 @@
         documentRef = document, windowRef = window }) {
         const codec = root.DashBridgeVariablesState;
         const host = documentRef.getElementById('dashboardVariables');
+        const toggle = documentRef.getElementById('dashboardVariablesToggle');
+        const expandedProfiles = new Set();
+        function updateVisibility() {
+            const available = [...groups.values()].some(group => !group.snapshot || !group.element.hidden);
+            const expanded = expandedProfiles.has(profileId);
+            if (toggle) {
+                toggle.hidden = !available;
+                toggle.setAttribute('aria-expanded', String(available && expanded));
+                const error = [...groups.values()].some(group => group.failed);
+                const busy = [...groups.values()].some(group => group.pending || group.reloading || !group.snapshot);
+                toggle.dataset.state = error ? 'error' : busy ? 'loading' : 'ready';
+                toggle.title = error ? 'Переменные дашборда: ошибка обновления' : busy ? 'Переменные дашборда: ожидание Grafana' : 'Показать или скрыть переменные дашборда';
+            }
+            host.hidden = !available || !expanded;
+        }
+        function toggleVisibility() {
+            if (expandedProfiles.has(profileId)) {
+                expandedProfiles.delete(profileId);
+                host.querySelectorAll('.dashboard-variable[open]').forEach(details => { details.open = false; });
+            } else expandedProfiles.add(profileId);
+            updateVisibility();
+        }
         let profileId = '';
         let stopped = false;
         let syncTimer;
@@ -14,7 +36,7 @@
         const frameFor = panel => frames().find(frame => getPanelForIframe(frame)?.id === panel.id);
         const members = group => getPanels().filter(panel => codec.scope(panel.src) === group.key);
         const alive = group => !stopped && groups.get(group.key) === group && profileId === String(getActiveProfile()?.id || '');
-        const status = (group, text) => { group.status.textContent = text; };
+        const status = (group, text) => { group.status.textContent = text; updateVisibility(); };
         function positionOptions() {
             const details = host.querySelector('.dashboard-variable[open]');
             if (!details?.getBoundingClientRect) return;
@@ -65,6 +87,7 @@
             }
             const id = crypto.randomUUID();
             group.pending = { id, frame };
+            updateVisibility();
             group.element.setAttribute('aria-busy', 'true');
             group.timer = setTimeout(() => fail(group, 'Нет ответа Grafana. Нажмите «Обновить поля».'), 27000);
             frame.contentWindow.postMessage({ action: 'dashbridgeVariablesRequest', requestId: id, operation, name, values },
@@ -237,6 +260,7 @@
                 if (variable.hide !== 2 && variable.type !== 'constant') group.controls.appendChild(field(group, variable));
             }
             group.element.hidden = group.snapshot.variables.every(variable => variable.hide === 2 || variable.type === 'constant');
+            updateVisibility();
         }
         function makeGroup(key, panel) {
             const element = documentRef.createElement('section');
@@ -287,7 +311,7 @@
                 group.ids = new Set(members(group).map(panel => panel.id));
                 if (!group.snapshot && !group.failed) request(group);
             }
-            host.hidden = groups.size === 0;
+            updateVisibility();
         }
         async function accept(group, data) {
             const snapshot = codec.normalize(data);
@@ -355,6 +379,7 @@
         }
         const observer = new MutationObserver(schedule);
         function start() {
+            toggle?.addEventListener('click', toggleVisibility);
             observer.observe(documentRef.getElementById('dashboard'), { childList: true });
             windowRef.addEventListener('message', onMessage);
             windowRef.addEventListener('pagehide', stop, { once: true });
@@ -363,6 +388,8 @@
             sync();
         }
         function stop() {
+            toggle?.removeEventListener('click', toggleVisibility);
+            if (toggle) { toggle.hidden = true; toggle.setAttribute('aria-expanded', 'false'); }
             stopped = true; clearTimeout(syncTimer); groups.forEach(cancel); groups.clear();
             delayed.forEach(clearTimeout); delayed.clear();
             observer.disconnect(); windowRef.removeEventListener('message', onMessage);

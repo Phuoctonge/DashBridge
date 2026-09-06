@@ -562,3 +562,9 @@ iframe {
     border: none;
     display: block;
 }
+header :is(#profilePickerBtn, #timePickerBtn, #forceRefreshBtn, #refreshPickerBtn, #dashboardVariablesToggle, #reportMenuBtn, #dataMenuBtn, #addPanelBtn, #addPanelMenuBtn, #capturePreparedToggleBtn, #captureAllPanelsBtn, #crosshairMenuBtn) { min-height: 3rem; justify-content: center; }
+.header-button-label { display: inline-block; text-align: center; line-height: 1.15; }
+#dashboardVariablesToggle[hidden] { display: none; }
+.variables-indicator { display: none; width: .45rem; height: .45rem; border-radius: 50%; flex-shrink: 0; }
+#dashboardVariablesToggle[data-state="loading"] .variables-indicator { display: block; background: var(--primary); }
+#dashboardVariablesToggle[data-state="error"] .variables-indicator { display: block; background: var(--danger); }

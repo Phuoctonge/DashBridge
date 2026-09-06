@@ -14,7 +14,7 @@ assert(html.includes('id="quickAddPanelsBtn"')
     && html.includes('id="discoverDashboardPanelsBtn"')
     && html.includes('id="dashboardPanelPickerOverlay"'),
     'dashboard discovery must be an additional action and keep the existing ID-based flow');
-assert(html.includes('Добавить панели')
+assert(html.replace(/<br\s*\/?>/g, ' ').includes('Добавить панели')
     && html.includes('Указать ID вручную')
     && html.includes('Выбрать из дашборда'),
     'panel addition actions must use distinct user-facing names');

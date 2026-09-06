@@ -210,6 +210,10 @@
             </div>
         </div>
         <div class="controls">
+            <button id="dashboardVariablesToggle" class="btn btn-outline" type="button" aria-controls="dashboardVariables" aria-expanded="false" hidden>
+                <span class="header-button-label">Переменные<br>дашборда</span>
+                <span class="variables-indicator" aria-hidden="true"></span>
+            </button>
             <div class="header-menu report-menu">
                 <button id="reportMenuBtn" class="btn btn-outline header-menu-trigger" type="button"
                     aria-expanded="false">Сообщение ▾</button>
@@ -235,7 +239,7 @@
                         stroke-linecap="round" stroke-linejoin="round">
                         <line x1="12" y1="5" x2="12" y2="19" />
                         <line x1="5" y1="12" x2="19" y2="12" />
-                    </svg> Добавить панели
+                    </svg> <span class="header-button-label">Добавить<br>панели</span>
                 </button>
                 <button id="addPanelMenuBtn" class="btn btn-primary add-panel-menu-trigger" type="button"
                     aria-label="Дополнительные способы добавить панели" aria-expanded="false">▾</button>
@@ -266,7 +270,7 @@
                     <path d="M12 10v5.5" />
                     <path d="m9.5 13 2.5 2.5 2.5-2.5" />
                 </svg>
-                <span>Скачать снимки</span>
+                <span class="header-button-label">Скачать<br>снимки</span>
             </button>
             </div>
             <div class="header-menu-container" style="position: relative;">
@@ -281,7 +285,7 @@
                         <line x1="12" y1="6" x2="12" y2="2" />
                         <line x1="12" y1="22" x2="12" y2="18" />
                     </svg>
-                    <span>Умный курсор</span>
+                    <span class="header-button-label">Умный<br>курсор</span>
                     <span style="font-size: 10px; margin-left: 2px;">▼</span>
                 </button>
                 <div id="crosshairDropdown" class="header-menu-dropdown"
@@ -308,7 +312,7 @@
         </div>
     </header>
 
-    <div id="dashboardVariables" class="dashboard-variables" aria-label="Фильтры Grafana" hidden></div>
+    <div id="dashboardVariables" class="dashboard-variables" aria-label="Переменные дашборда" hidden></div>
     <main class="dashboard-container" id="dashboard"></main>
 
     <!-- Modal for adding new iframe -->

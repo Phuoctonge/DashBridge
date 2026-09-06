@@ -10,12 +10,14 @@ class Element {
     setAttribute(name, value) { this[name] = value; }
     removeAttribute(name) { delete this[name]; }
     addEventListener(name, fn) { this.events[name] = fn; }
+    removeEventListener(name) { delete this.events[name]; }
     querySelector(name) { return this.children.find(child => child.tag === name); }
     querySelectorAll() { return []; }
     remove() {}
 }
 const host = new Element('div');
 const dashboard = new Element('main');
+const toggle = new Element('button');
 const listeners = {};
 const timers = new Map();
 let timerId = 0;
@@ -50,7 +52,7 @@ const controller = context.DashBridgeVariablesController.create({
         assert.equal(options.reloadFrame, false);
         updates++;
     },
-    documentRef: { getElementById: name => name === 'dashboardVariables' ? host : dashboard,
+    documentRef: { getElementById: name => name === 'dashboardVariables' ? host : name === 'dashboardVariablesToggle' ? toggle : dashboard,
         querySelectorAll: () => [currentFrame], createElement: tag => new Element(tag) },
     windowRef: { addEventListener: (name, fn) => { listeners[name] = fn; }, removeEventListener: name => { delete listeners[name]; } },
 });
@@ -63,6 +65,13 @@ const tick = delay => {
 };
 (async () => {
     controller.start();
+    assert.equal(host.hidden, true, 'variables start collapsed without blocking requests');
+    assert.equal(toggle.hidden, false);
+    toggle.events.click();
+    assert.equal(host.hidden, false);
+    assert.equal(toggle['aria-expanded'], 'true');
+    toggle.events.click();
+    assert.equal(host.hidden, true);
     respond(currentFrame.contentWindow, { ...snapshot, requestId: messages.at(-1).requestId });
     await Promise.resolve();
     const group = host.children[0];
@@ -111,6 +120,7 @@ const tick = delay => {
     assert.equal(updates, 2, 'source card links update without navigating');
     assert.equal(navigations, 1, 'only legacy apply needs a document navigation');
     controller.stop();
+    assert.equal(toggle.events.click, undefined);
     assert.equal(timers.size, 0);
     assert.equal(listeners.resize, undefined, 'menu resize listener must be released');
     assert.equal(listeners.scroll, undefined, 'menu scroll listener must be released');
