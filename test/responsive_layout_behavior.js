@@ -48,7 +48,8 @@ assert(!renderer.includes('card.style.width = width'), 'panel width must no long
 assert(dashboardCards.includes("card.dataset.panelSize = panel.width === '100%'"),
     'editing a panel must refresh its semantic grid size');
 
-assert(batchCss.includes('max-width: 80rem'), 'Batch must use the wider responsive workspace');
+assert(batchCss.includes('max-width: none') && batchCss.includes('width: calc(100% - (2 * var(--page-gutter)))'),
+    'Batch must align its responsive workspace with shared page gutters');
 const testRunnerCss = read('pages/test-runner/test-runner.css');
 assert(testRunnerCss.includes('.tr-layout') && testRunnerCss.includes('max-width: none')
     && testRunnerCss.includes('.tr-input-panel') && testRunnerCss.includes('width: 100%')

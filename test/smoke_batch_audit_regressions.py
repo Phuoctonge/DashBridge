@@ -38,8 +38,8 @@ check('Batch capture blocks physical pointer hover and tooltip portals',
       and '[role="tooltip"]' in PANEL_LOADER
       and '.u-cursor-x' in PANEL_LOADER
       and "new MouseEvent('mouseleave'" in PANEL_LOADER)
-check('Batch uses the shared gradient page header',
-      'class="batch-header"' in HTML and 'background: var(--header-grad)' in CSS)
+check('Batch uses the shared theme-aware page header',
+      'class="batch-header"' in HTML and 'background: var(--header-bg)' in CSS)
 check('Batch panel picker buttons match adjacent URL field height',
       '.batch-url-actions .btn { height: 100%;' in CSS
       and '.batch-url-actions .btn { height: 100%; min-height: var(--control-height-lg); margin-top: 0; }' in CSS

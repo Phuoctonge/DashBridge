@@ -7,7 +7,7 @@ body {
     background-color: var(--bg);
     color: var(--text);
     margin: 0;
-    padding: 0 0 40px;
+    padding: 0 0 1.5rem;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -16,16 +16,16 @@ body {
 
 .batch-header {
     width: 100%;
-    margin-bottom: 28px;
-    padding: 1.5rem clamp(1rem, 3vw, 2.5rem);
-    color: #fff;
-    background: var(--header-grad);
-    box-shadow: var(--shadow);
+    margin-bottom: 1rem;
+    padding: .875rem var(--page-gutter);
+    color: var(--text-main);
+    background: var(--header-bg);
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
 }
 
 .batch-header-content {
     width: 100%;
-    max-width: 80rem;
     margin: 0 auto;
     display: flex;
     align-items: center;
@@ -39,14 +39,15 @@ body {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid rgba(255,255,255,.22);
+    border: 1px solid var(--border);
     border-radius: 11px;
-    background: rgba(255,255,255,.12);
+    background: var(--tab-active-bg);
+    color: var(--primary);
 }
 
 .batch-brand-mark svg { width: 23px; height: 23px; }
-.batch-header h1 { margin: 0; color: #fff; }
-.batch-header p { margin: 4px 0 0; color: rgba(255,255,255,.72); font-size: 12px; }
+.batch-header h1 { margin: 0; color: var(--primary); }
+.batch-header p { margin: .25rem 0 0; color: var(--text-muted); font-size: .8125rem; }
 
 .batch-capture-theme-group {
     border: 0;
@@ -83,14 +84,21 @@ body {
 }
 
 .container {
-    max-width: 80rem;
+    max-width: none;
     width: calc(100% - (2 * var(--page-gutter)));
 }
 
+[data-theme="dark"] .container { background: transparent; }
+[data-theme="dark"] .batch-parameters-card:hover {
+    background: var(--card-bg);
+    border-color: var(--border);
+}
+.btn-primary, .btn-primary:hover { color: var(--text-on-primary); }
+
 .card {
     background: var(--card-bg);
-    border-radius: var(--radius-lg);
-    padding: clamp(1rem, 2vw, 1.75rem);
+    border-radius: var(--radius-md);
+    padding: 1.25rem;
     border: 1px solid var(--border);
     box-shadow: var(--shadow);
 }
@@ -108,7 +116,7 @@ h1 {
 .tabs-header {
     display: flex;
     gap: 5px;
-    margin-bottom: 24px;
+    margin-bottom: 1rem;
     border-bottom: 1px solid var(--border);
     padding-bottom: 10px;
 }
@@ -155,7 +163,7 @@ textarea:focus-visible {
 }
 
 .form-group {
-    margin-bottom: 1.25rem;
+    margin-bottom: 1rem;
 }
 
 label {
@@ -169,8 +177,8 @@ input,
 select,
 textarea {
     width: 100%;
-    padding: 0.75rem;
-    border-radius: 8px;
+    padding: 0.625rem 0.875rem;
+    border-radius: var(--radius-md);
     border: 1px solid var(--border);
     background: var(--bg-elevated);
     color: var(--text-main);
