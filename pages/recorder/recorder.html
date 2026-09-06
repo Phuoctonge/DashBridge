@@ -19,17 +19,15 @@
 
     <main>
         <section class="control-card">
+            <h2 class="control-title">Новая запись</h2>
             <div class="url-row">
                 <label class="sr-only" for="startUrl">URL для записи</label>
                 <input id="startUrl" type="url" placeholder="site.ru или https://site.ru" autocomplete="off">
                 <button id="startButton" class="primary">Начать запись</button>
                 <button id="stopButton" disabled>Остановить</button>
             </div>
-            <div class="import-row">
-                <label class="file-button" role="button" tabindex="0">Открыть .dashflow<input id="flowFile" type="file" accept=".dashflow,.zip,application/zip"></label>
-                <button id="replayButton" disabled>Запустить replay</button>
-                <button id="saveButton" disabled>Сохранить .dashflow</button>
-            </div>
+            <section class="settings-section" aria-labelledby="settingsSectionTitle">
+                <h2 id="settingsSectionTitle">Параметры записи</h2>
             <div class="network-switches">
                 <div class="network-switch-card">
                     <label><input id="disableCache" type="checkbox" checked><span>Disable Cache</span><small>Загружать ресурсы с сервера, обходя browser и Service Worker cache</small></label>
@@ -46,10 +44,21 @@
                     </div>
                 </div>
             </div>
+            </section>
+            <section class="file-section" aria-labelledby="fileSectionTitle">
+                <h2 id="fileSectionTitle">Работа с файлом</h2>
+                <p class="section-description">Откройте сохранённый сценарий для воспроизведения или сохраните текущую запись.</p>
+                <div class="import-row">
+                <label class="file-button" role="button" tabindex="0">Открыть .dashflow<input id="flowFile" type="file" accept=".dashflow,.zip,application/zip"></label>
+                <button id="replayButton" disabled>Запустить replay</button>
+                <button id="saveButton" disabled>Сохранить .dashflow</button>
+                </div>
+            </section>
             <div id="secretWarning" class="warning">
                 Запись сохраняет введенные пароли, cookies, токены и тела HTTP-запросов. Файл .dashflow необходимо хранить как файл с учетными данными.
             </div>
-            <div class="session-status">
+            <div class="session-strip">
+              <div class="session-status">
                 <span id="sessionModeBadge" class="session-mode-badge" data-mode="idle">Ожидание</span>
                 <div>
                     <div id="status" class="status" role="status">Готов к записи</div>
@@ -57,6 +66,7 @@
                 </div>
             </div>
             <div id="networkMode" class="network-mode"></div>
+            </div>
         </section>
 
         <section class="metrics">
