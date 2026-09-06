@@ -41,7 +41,9 @@
             const timeLabel = documentRef.getElementById('timePickerLabel');
             if (!timeLabel) return;
             if (state.from.toString().startsWith('now-')) {
-                timeLabel.textContent = 'Last ' + state.from.replace('now-', '');
+                const interval = state.from.replace('now-', '');
+                const units = { s: 'с', m: 'мин', h: 'ч', d: 'дн', w: 'нед', M: 'мес', y: 'г' };
+                timeLabel.textContent = 'За ' + interval.replace(/(\d+)([smhdwMy])/g, (_match, count, unit) => `${count} ${units[unit]}`);
             } else {
                 timeLabel.textContent = timeState.formatForLabel(state.from, state.to);
             }
@@ -50,7 +52,8 @@
                 ? `Выбрать время: ${timeLabel.textContent}`
                 : `Выбрать время: ${timeState.formatForInput(state.from)} — ${timeState.formatForInput(state.to)}`;
             const refreshLabel = documentRef.getElementById('refreshPickerLabel');
-            if (refreshLabel) refreshLabel.textContent = state.refresh || 'Off';
+            if (refreshLabel) refreshLabel.textContent = state.refresh === 'auto' ? 'Авто'
+                : state.refresh ? state.refresh.replace(/(\d+)([smhd])/, (_match, count, unit) => `${count} ${{ s: 'с', m: 'мин', h: 'ч', d: 'дн' }[unit]}`) : 'Выкл.';
         };
 
         const syncControls = () => {

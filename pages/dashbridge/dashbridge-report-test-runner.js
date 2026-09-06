@@ -246,7 +246,7 @@
             const modal = document.createElement('section'); modal.className = 'modal-content report-audit-modal report-runner-modal';
             modal.setAttribute('role', 'dialog'); modal.setAttribute('aria-modal', 'true'); overlay.appendChild(modal);
             const header = appendText(modal, 'div', 'report-audit-header', '');
-            appendText(header, 'h3', '', 'Message Test Runner');
+            appendText(header, 'h3', '', 'Проверка сводного сообщения');
             const closeButton = appendText(header, 'button', 'btn btn-outline report-audit-close', 'Закрыть'); closeButton.type = 'button';
             appendText(modal, 'p', 'report-runner-source-note',
                 'Сначала проверяем движок на тестовых данных, затем один раз собираем сообщение из активного профиля.');

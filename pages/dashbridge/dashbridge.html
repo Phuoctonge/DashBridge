@@ -88,7 +88,7 @@
                         stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="10" />
                         <polyline points="12 6 12 12 16 14" />
-                    </svg> <span id="timePickerLabel">Last 1 hour</span>
+                    </svg> <span id="timePickerLabel">Последний час</span>
                 </button>
 
                 <!-- Time Popover -->
@@ -96,10 +96,9 @@
                     style="display: none; position: absolute; top: calc(100% + 0.5rem); left: 0; z-index: 1000; box-shadow: 0 0.25rem 1rem rgba(0,0,0,0.15);">
                     <div class="gtp-left">
                         <button id="closeTimePopover" type="button" class="btn btn-outline time-picker-close" aria-label="Закрыть выбор времени">Закрыть</button>
-                        <h4 style="margin-top: 0; margin-bottom: 1rem; font-size: 1rem; font-weight: 500;">Absolute time
-                            range</h4>
+                        <h4 style="margin-top: 0; margin-bottom: 1rem; font-size: 1rem; font-weight: 500;">Абсолютный временной диапазон</h4>
                         <div class="form-group">
-                            <label>From</label>
+                            <label>Время начала</label>
                             <div class="gtp-input-wrapper">
                                 <input type="text" id="absTimeFrom" value="now-1h">
                                 <button class="gtp-icon-btn calendar-btn" data-picker="pickerFrom"><svg class="ic"
@@ -115,7 +114,7 @@
                             </div>
                         </div>
                         <div class="form-group">
-                            <label>To</label>
+                            <label>Время окончания</label>
                             <div class="gtp-input-wrapper">
                                 <input type="text" id="absTimeTo" value="now">
                                 <button class="gtp-icon-btn calendar-btn" data-picker="pickerTo"><svg class="ic"
@@ -131,16 +130,16 @@
                             </div>
                         </div>
                         <div class="gtp-actions">
-                            <button id="copyTimeBtn" class="btn btn-outline gtp-clipboard-btn" title="Copy time range"
-                                aria-label="Copy time range">
+                            <button id="copyTimeBtn" class="btn btn-outline gtp-clipboard-btn" title="Скопировать временной диапазон"
+                                aria-label="Скопировать временной диапазон">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                                 </svg>
                             </button>
-                            <button id="pasteTimeBtn" class="btn btn-outline gtp-clipboard-btn" title="Paste time range"
-                                aria-label="Paste time range">
+                            <button id="pasteTimeBtn" class="btn btn-outline gtp-clipboard-btn" title="Вставить временной диапазон"
+                                aria-label="Вставить временной диапазон">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2">
@@ -148,25 +147,25 @@
                                     <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
                                 </svg>
                             </button>
-                            <button id="applyAbsoluteTime" class="btn btn-primary gtp-apply-btn">Apply time range</button>
+                            <button id="applyAbsoluteTime" class="btn btn-primary gtp-apply-btn">Применить диапазон</button>
                         </div>
                     </div>
 
                     <div class="gtp-right">
                         <div class="gtp-search">
-                            <input type="text" placeholder="Search quick ranges" id="quickRangeSearch">
+                            <input type="text" placeholder="Поиск быстрых диапазонов" id="quickRangeSearch">
                         </div>
                         <div class="quick-ranges-list" id="quickRangesList">
-                            <button class="quick-range-btn" data-time="now-5m">Last 5 minutes</button>
-                            <button class="quick-range-btn" data-time="now-15m">Last 15 minutes</button>
-                            <button class="quick-range-btn" data-time="now-30m">Last 30 minutes</button>
-                            <button class="quick-range-btn" data-time="now-1h">Last 1 hour</button>
-                            <button class="quick-range-btn" data-time="now-3h">Last 3 hours</button>
-                            <button class="quick-range-btn" data-time="now-6h">Last 6 hours</button>
-                            <button class="quick-range-btn" data-time="now-12h">Last 12 hours</button>
-                            <button class="quick-range-btn" data-time="now-24h">Last 24 hours</button>
-                            <button class="quick-range-btn" data-time="now-2d">Last 2 days</button>
-                            <button class="quick-range-btn" data-time="now-7d">Last 7 days</button>
+                            <button class="quick-range-btn" data-time="now-5m">Последние 5 минут</button>
+                            <button class="quick-range-btn" data-time="now-15m">Последние 15 минут</button>
+                            <button class="quick-range-btn" data-time="now-30m">Последние 30 минут</button>
+                            <button class="quick-range-btn" data-time="now-1h">Последний час</button>
+                            <button class="quick-range-btn" data-time="now-3h">Последние 3 часа</button>
+                            <button class="quick-range-btn" data-time="now-6h">Последние 6 часов</button>
+                            <button class="quick-range-btn" data-time="now-12h">Последние 12 часов</button>
+                            <button class="quick-range-btn" data-time="now-24h">Последние 24 часа</button>
+                            <button class="quick-range-btn" data-time="now-2d">Последние 2 дня</button>
+                            <button class="quick-range-btn" data-time="now-7d">Последние 7 дней</button>
                         </div>
                     </div>
                 </div>
@@ -184,7 +183,7 @@
 
                 <button id="refreshPickerBtn" class="btn btn-outline" title="Автообновление"
                     style="display: flex; align-items: center; gap: 6px; padding: 0.5rem 0.75rem;">
-                    <span id="refreshPickerLabel" style="color: var(--primary); font-weight: 500;">Off</span>
+                    <span id="refreshPickerLabel" style="color: var(--primary); font-weight: 500;">Выкл.</span>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                         stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-muted);">
                         <path d="m6 9 6 6 6-6" />
@@ -194,19 +193,19 @@
                 <!-- Refresh Popover -->
                 <div id="refreshPopover" class="grafana-dropdown"
                     style="display: none; position: absolute; top: calc(100% + 0.25rem); right: 0; z-index: 1000; background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 0.25rem; box-shadow: 0 0.25rem 0.75rem rgba(0,0,0,0.2); min-width: 7.5rem; padding: 0.5rem 0;">
-                    <button class="dropdown-item" data-refresh="">Off</button>
+                    <button class="dropdown-item" data-refresh="">Выкл.</button>
                     <div style="height: 1px; background: var(--border-color); margin: 0.25rem 0;"></div>
-                    <button class="dropdown-item" data-refresh="auto">Auto</button>
-                    <button class="dropdown-item" data-refresh="5s">5s</button>
-                    <button class="dropdown-item" data-refresh="10s">10s</button>
-                    <button class="dropdown-item" data-refresh="30s">30s</button>
-                    <button class="dropdown-item" data-refresh="1m">1m</button>
-                    <button class="dropdown-item" data-refresh="5m">5m</button>
-                    <button class="dropdown-item" data-refresh="15m">15m</button>
-                    <button class="dropdown-item" data-refresh="30m">30m</button>
-                    <button class="dropdown-item" data-refresh="1h">1h</button>
-                    <button class="dropdown-item" data-refresh="2h">2h</button>
-                    <button class="dropdown-item" data-refresh="1d">1d</button>
+                    <button class="dropdown-item" data-refresh="auto">Авто</button>
+                    <button class="dropdown-item" data-refresh="5s">5 с</button>
+                    <button class="dropdown-item" data-refresh="10s">10 с</button>
+                    <button class="dropdown-item" data-refresh="30s">30 с</button>
+                    <button class="dropdown-item" data-refresh="1m">1 мин</button>
+                    <button class="dropdown-item" data-refresh="5m">5 мин</button>
+                    <button class="dropdown-item" data-refresh="15m">15 мин</button>
+                    <button class="dropdown-item" data-refresh="30m">30 мин</button>
+                    <button class="dropdown-item" data-refresh="1h">1 ч</button>
+                    <button class="dropdown-item" data-refresh="2h">2 ч</button>
+                    <button class="dropdown-item" data-refresh="1d">1 дн</button>
                 </div>
             </div>
         </div>
@@ -217,7 +216,7 @@
                 <div id="reportDropdown" class="header-menu-dropdown" style="display:none;">
                     <button id="generateReportBtn" type="button">Сформировать сообщение</button>
                     <button id="configureReportBtn" type="button">Настроить шаблон</button>
-                    <button id="testReportBtn" type="button">Message Test Runner</button>
+                    <button id="testReportBtn" type="button">Проверка сводного сообщения</button>
                 </div>
             </div>
             <div class="header-menu">
@@ -316,11 +315,11 @@
     <div id="modalOverlay" class="modal-overlay">
         <div class="modal-content">
             <div class="modal-header">
-                <h4>Добавить панель (Iframe)</h4>
+                <h4>Добавить встроенную панель</h4>
             </div>
 
             <div class="form-group">
-                <label>Embed URL (из меню Share -> Embed в Графане)</label>
+                <label>Ссылка для встраивания (меню «Поделиться» → «Встроить» в Grafana)</label>
                 <input type="text" id="newPanelUrl" placeholder="https://grafana.../d-solo/...">
             </div>
             <div class="form-group">
