@@ -8,14 +8,16 @@ const date = value => value ? new Date(value).toLocaleString('ru-RU') : '—';
 const hour = value => value ? new Date(value).toLocaleString('ru-RU', {
     year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
 }) : '—';
-const userLabel = id => id ? `Пользователь ${String(id).slice(0, 8)}…${String(id).slice(-4)}` : '—';
+const userLabel = id => id ? `Установка ${String(id).slice(0, 8)}…${String(id).slice(-4)}` : '—';
 const featureName = id => labels.features[id] || id;
 const signalName = signal => labels.signals[signal] || signal;
 const failureOwners = Object.freeze({ runtime_dependency_missing: 'Расширение',
     visual_verification_failed: 'Расширение / совместимость с Grafana',
-    legend_apply_failed: 'Совместимость с Grafana', timeout: 'Окружение / производительность',
+    legend_apply_failed: 'Совместимость с Grafana', timeout: 'Требуется анализ причины задержки',
     unexpected_exception: 'Расширение' });
 let current = null;
+let loadGeneration = 0;
+let loadController = null;
 let sortState = { table: 'features', key: 'events', direction: -1 };
 
 function parseDimensions(value) {
@@ -70,7 +72,7 @@ function renderTable(id, rows, columns, installationKey = '') {
         const tr = document.createElement('tr'); tr.appendChild(cells(row, columns));
         if (installationKey && row[installationKey]) {
             tr.dataset.installation = row[installationKey];
-            tr.title = 'Показать только действия этого пользователя';
+            tr.title = 'Показать только действия этой установки';
             tr.addEventListener('click', () => selectInstallation(row[installationKey]));
         }
         body.appendChild(tr);
@@ -96,10 +98,10 @@ function render(data) {
     ], 'installationId');
     const active = Number(data.totals.activeInstallations) || 0;
     renderTable('features', data.features.map(item => ({ ...item,
-        featureName: featureName(item.featureId), adoption: active ? Number(item.users) / active * 100 : 0,
+        featureName: featureName(item.featureId), adoption: active ? Number(item.usedUsers) / active * 100 : 0,
     })), [
         { key: 'featureName', title: (_value, row) => row.featureId },
-        { key: 'adoption', format: value => `${number(Math.round(value))}%` },
+        { key: 'adoption', format: (value, row) => `${number(Math.round(value))}% (${number(row.usedUsers)} / ${number(active)})` },
         { key: 'usedUsers', format: number }, { key: 'configuredUsers', format: number },
         { key: 'effectiveUsers', format: number }, { key: 'successUsers', format: number },
         { key: 'issueUsers', format: number }, { key: 'events', format: number },
@@ -107,7 +109,10 @@ function render(data) {
     renderTable('problems', data.problems.map(item => ({ ...item,
         featureName: featureName(item.featureId), outcomeName: labels.values[item.outcome] || item.outcome,
         failureName: item.failure ? (labels.values[item.failure] || item.failure) : 'Не собиралась в этой версии',
-        ownerName: item.failure ? (failureOwners[item.failure] || 'Требуется анализ') : 'Недостаточно данных',
+        ownerName: ['invalid_input', 'auth_required', 'permission_denied', 'busy', 'unsupported_page'].includes(item.outcome)
+            ? 'Требуется действие / проверка условий' : item.outcome === 'no_data' ? 'Нет данных'
+                : item.outcome === 'partial' ? 'Частичный результат'
+                    : item.failure ? (failureOwners[item.failure] || 'Требуется анализ') : 'Ошибка: требуется анализ',
     })), [
         { key: 'featureName', title: (_value, row) => row.featureId }, { key: 'version' },
         { key: 'outcomeName' }, { key: 'failureName' }, { key: 'ownerName' },
@@ -117,7 +122,7 @@ function render(data) {
         issueRate: Number(item.outcomes) ? Number(item.issues) / Number(item.outcomes) * 100 : 0,
     })), [
         { key: 'version' }, { key: 'users', format: number }, { key: 'events', format: number },
-        { key: 'issues', format: number }, { key: 'issueRate', format: value => `${number(Math.round(value))}%` },
+        { key: 'issues', format: number }, { key: 'issueRate', format: (value, row) => `${number(Math.round(value))}% (${number(row.issues)} / ${number(row.outcomes)})` },
         { key: 'lastSeen', format: date },
     ]);
     renderTable('installations', data.installations.map(item => ({ ...item, userLabel: userLabel(item.installationId) })), [
@@ -142,11 +147,11 @@ function render(data) {
         const bar = document.createElement('div'); bar.className = 'bar';
         bar.style.height = `${Math.max(3, Number(item.events) / maximum * 100)}%`;
         const eventCount = number(item.events); const userCount = number(item.users);
-        bar.setAttribute('aria-label', `${item.day}: событий ${eventCount}, пользователей ${userCount}`);
+        bar.setAttribute('aria-label', `${item.day}: сигналов ${eventCount}, установок ${userCount}`);
         const tooltip = document.createElement('span'); tooltip.className = 'bar-tooltip';
         const day = document.createElement('strong'); day.textContent = item.day;
         const totals = document.createElement('span');
-        totals.textContent = `Событий: ${eventCount} · Пользователей: ${userCount}`;
+        totals.textContent = `Сигналов: ${eventCount} · Установок: ${userCount}`;
         tooltip.append(day, totals); bar.appendChild(tooltip);
         bar.addEventListener('pointerenter', () => {
             tooltip.style.left = '50%'; tooltip.style.transform = 'translateX(-50%)';
@@ -171,21 +176,35 @@ function render(data) {
         `Последний приём: ${date(operations.lastSuccessfulIngest)}`,
     ].join(' · ');
     const selected = byId('installation').value;
-    byId('status').textContent = `Обновлено ${date(data.generatedAt)} · хранение ${data.retentionDays} дней`
+    const limits = { actions: 1000, features: 500, problems: 500, installations: 500, dimensions: 500, versions: 100 };
+    const capped = Object.entries(limits).filter(([key, limit]) => data[key]?.length >= limit).map(([key]) => byId(key).closest('section').querySelector('h2').textContent);
+    byId('status').textContent = `Отчёт: ${date(data.generatedAt)} · загружен: ${date(new Date().toISOString())} · последнее событие: ${date(data.totals.lastPeriod)} · хранение ${data.retentionDays} дней`
+        + (capped.length ? ` · Достигнут лимит, таблицы могут быть неполными: ${capped.join(', ')}` : '')
         + (selected ? ` · выбран ${userLabel(selected)}` : '');
     byId('status').className = '';
 }
 
 async function load() {
+    const generation = ++loadGeneration;
+    loadController?.abort();
+    const controller = new AbortController();
+    loadController = controller;
+    const timeout = setTimeout(() => controller.abort(), 15000);
     byId('status').textContent = 'Загрузка…'; byId('status').className = '';
     const query = new URLSearchParams();
     filters.forEach(id => { if (byId(id).value) query.set(id, byId(id).value); });
     try {
-        const response = await fetch(`/admin/api/data?${query}`, { cache: 'no-store' });
+        const response = await fetch(`/admin/api/data?${query}`, { cache: 'no-store', signal: controller.signal });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        render(await response.json());
+        const data = await response.json();
+        if (generation !== loadGeneration || controller.signal.aborted) return;
+        render(data);
     } catch (error) {
+        if (generation !== loadGeneration) return;
         byId('status').textContent = `Ошибка загрузки: ${error.message}`; byId('status').className = 'error';
+    } finally {
+        clearTimeout(timeout);
+        if (generation === loadGeneration) loadController = null;
     }
 }
 

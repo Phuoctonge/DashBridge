@@ -1,5 +1,25 @@
 ﻿document.addEventListener('DOMContentLoaded', () => {
     const memCalcModeEl = document.getElementById('settingGrafanaMemCalcMode');
+    const refreshAnalyticsHealth = async () => {
+        const output = document.getElementById('analyticsDeliveryHealth');
+        if (!output) return;
+        try {
+            const stored = await chrome.storage.local.get('dashbridgeAnalyticsState');
+            const state = stored.dashbridgeAnalyticsState || {};
+            const queued = [...(Array.isArray(state.aggregates) ? state.aggregates.slice(0, 2000) : []),
+                ...(Array.isArray(state.inflight) ? state.inflight.slice(0, 100) : [])];
+            const dates = queued.map(item => Date.parse(item?.periodStart)).filter(Number.isFinite);
+            const date = value => Number.isFinite(value) && value > 0 && value <= 8640000000000000 ? new Date(value).toLocaleString('ru-RU') : '—';
+            const errors = { network: 'сеть', timeout: 'тайм-аут', http_400: 'пачка отклонена, сохранена в карантине',
+                configuration: 'доступ к серверу', rate_limit: 'лимит запросов', server: 'сервер', http: 'HTTP', storage: 'локальное хранилище' };
+            output.textContent = `В очереди: ${queued.length}. Старейшее событие: ${date(dates.length ? Math.min(...dates) : 0)}. `
+                + `Попытка: ${date(state.lastSendAttemptAt)}. Успех: ${date(state.lastSuccessAt)}. Повтор: ${date(state.nextRetryAt)}. `
+                + `Потери к отправке: ${Number(state.droppedAggregates) || 0}. Карантин за всё время: ${Number(state.quarantinedCount) || 0}. `
+                + `Состояние: ${errors[state.lastError] || 'ошибка не зарегистрирована'}.`;
+        } catch { output.textContent = 'Не удалось прочитать локальное состояние доставки.'; }
+    };
+    document.getElementById('refreshAnalyticsHealth')?.addEventListener('click', refreshAnalyticsHealth);
+    void refreshAnalyticsHealth();
     const memSecondKeywordEl = document.getElementById('settingGrafanaMemAvailKeyword');
     const memSecondKeywordLabel = document.getElementById('settingGrafanaMemSecondKeywordLabel');
     const memFormulaEl = document.getElementById('settingGrafanaMemFormula');

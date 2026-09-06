@@ -29,6 +29,8 @@
         };
 
         const validInstallationId = value => typeof value === 'string' && /^[a-zA-Z0-9-]{16,80}$/.test(value);
+        const counter = value => Number.isSafeInteger(value) && value >= 0 ? Math.min(value, 1_000_000) : 0;
+        const queueLimit = Math.max(100, Math.min(2000, Number(config.queueLimit) || 2000));
         const freshState = (installationId = randomUUID()) => ({
             schemaVersion: STATE_VERSION,
             installationId,
@@ -41,14 +43,23 @@
             nextRetryAt: 0,
             retryCount: 0,
             dailyEvidence: {},
+            lastSuccessAt: 0,
+            lastError: '',
+            quarantine: [],
+            quarantinedCount: 0,
         });
         const sanitizeRecord = record => {
             const normalized = contract.normalize(record && {
                 featureId: record.featureId, signal: record.signal, dimensions: record.dimensions
             });
-            if (!normalized || typeof record.eventId !== 'string' || !record.eventId
-                || typeof record.periodStart !== 'string' || !Number.isInteger(record.count)
-                || record.count < 1 || typeof record.extensionVersion !== 'string') return null;
+            if (!normalized || !validInstallationId(record.eventId)
+                || typeof record.periodStart !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:00:00\.000Z$/.test(record.periodStart)
+                || !Number.isFinite(Date.parse(record.periodStart))
+                || new Date(record.periodStart).toISOString() !== record.periodStart
+                || Date.parse(record.periodStart) > now() + 24 * 3_600_000
+                || !Number.isInteger(record.count) || record.count < 1 || record.count > 1_000_000
+                || typeof record.extensionVersion !== 'string'
+                || !/^\d{1,4}\.\d{1,4}\.\d{1,4}(?:\.\d{1,4})?$/.test(record.extensionVersion)) return null;
             return { eventId: record.eventId, periodStart: record.periodStart,
                 featureId: normalized.featureId, signal: normalized.signal,
                 dimensions: normalized.dimensions, count: Math.min(record.count, 1_000_000),
@@ -62,11 +73,35 @@
                 const installationId = validInstallationId(stored?.[INSTALLATION_ID_KEY])
                     ? stored[INSTALLATION_ID_KEY]
                     : (validInstallationId(source?.installationId) ? source.installationId : randomUUID());
-                const state = source && source.schemaVersion === STATE_VERSION
-                    ? { ...freshState(installationId), ...source, installationId }
-                    : freshState(installationId);
-                state.aggregates = Array.isArray(state.aggregates) ? state.aggregates.map(sanitizeRecord).filter(Boolean) : [];
-                state.inflight = Array.isArray(state.inflight) ? state.inflight.map(sanitizeRecord).filter(Boolean) : [];
+                const state = freshState(installationId);
+                if (source?.schemaVersion === STATE_VERSION) {
+                    state.droppedAggregates = counter(source.droppedAggregates);
+                    const restore = (values, cap) => {
+                        if (!Array.isArray(values)) return [];
+                        const records = values.slice(0, cap).map(sanitizeRecord).filter(Boolean);
+                        state.droppedAggregates = counter(Math.min(1_000_000, state.droppedAggregates + values.length - records.length));
+                        return records;
+                    };
+                    state.inflight = restore(source.inflight, 100);
+                    state.aggregates = restore(source.aggregates, queueLimit - state.inflight.length);
+                    state.quarantine = Array.isArray(source.quarantine) ? source.quarantine.slice(0, 100).map(sanitizeRecord).filter(Boolean) : [];
+                    state.quarantinedCount = counter(source.quarantinedCount);
+                    state.retryCount = Math.min(8, counter(source.retryCount));
+                    for (const key of ['lastSendAttemptAt', 'nextRetryAt', 'lastSuccessAt']) {
+                        state[key] = Number.isFinite(source[key]) && source[key] >= 0 ? Math.min(source[key], now() + 6 * 3_600_000) : 0;
+                    }
+                    for (const key of ['lastSnapshotDay', 'lastHeartbeatDay']) {
+                        if (typeof source[key] === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(source[key])) state[key] = source[key];
+                    }
+                    state.lastError = ['network', 'timeout', 'http_400', 'configuration', 'rate_limit', 'server', 'http', 'storage'].includes(source.lastError) ? source.lastError : '';
+                    const evidence = source.dailyEvidence;
+                    if (evidence && typeof evidence === 'object' && !Array.isArray(evidence)) {
+                        for (const key of Object.keys(evidence).slice(0, 2000)) {
+                            if (key.length <= 512 && /^\d{4}-\d{2}-\d{2}\|/.test(key) && evidence[key] === true
+                                && key.slice(0, 10) >= dayKey(now() - 2 * 86_400_000) && key.slice(0, 10) <= dayKey(now())) state.dailyEvidence[key] = true;
+                        }
+                    }
+                }
                 // Retry the immutable batch with the same IDs after restart.
                 // Merging it into aggregates could change already acknowledged counts.
                 cachedState = state;
@@ -80,6 +115,7 @@
         });
         const append = (state, normalized, timestamp = now()) => {
             const periodStart = hourStart(timestamp);
+            const extensionVersion = runtimeApi.getManifest().version;
             const dimensionsKey = stableDimensions(normalized.dimensions);
             if (normalized.signal === 'effective') {
                 const evidenceKey = `${dayKey(timestamp)}|${normalized.featureId}|${dimensionsKey}`;
@@ -91,8 +127,11 @@
                 Object.keys(state.dailyEvidence).forEach(key => {
                     if (key.slice(0, 10) < keepAfter) delete state.dailyEvidence[key];
                 });
+                const evidenceKeys = Object.keys(state.dailyEvidence);
+                evidenceKeys.slice(0, Math.max(0, evidenceKeys.length - 2000)).forEach(key => delete state.dailyEvidence[key]);
             }
             const existing = state.aggregates.find(item => item.periodStart === periodStart
+                && item.extensionVersion === extensionVersion
                 && item.featureId === normalized.featureId && item.signal === normalized.signal
                 && stableDimensions(item.dimensions) === dimensionsKey);
             if (existing) {
@@ -103,14 +142,14 @@
                 eventId: randomUUID(), periodStart,
                 featureId: normalized.featureId, signal: normalized.signal,
                 dimensions: normalized.dimensions, count: 1,
-                extensionVersion: runtimeApi.getManifest().version,
+                extensionVersion,
             };
             state.aggregates.push(record);
-            const limit = Math.max(100, Number(config.queueLimit) || 2000) - state.inflight.length;
+            const limit = queueLimit - state.inflight.length;
             if (state.aggregates.length > limit) {
                 const removed = state.aggregates.length - limit;
                 state.aggregates.splice(0, removed);
-                state.droppedAggregates = (Number(state.droppedAggregates) || 0) + removed;
+                state.droppedAggregates = Math.min(1_000_000, counter(state.droppedAggregates) + removed);
             }
             return record;
         };
@@ -231,10 +270,12 @@
             const controller = new AbortController();
             let timer;
             let succeeded = false;
+            let errorCategory = 'network';
+            let retryAfterMs = 0;
             try {
                 const deadline = new Promise((_, reject) => {
                     timer = setTimeout(() => {
-                        controller.abort(); reject(new Error('analytics-timeout'));
+                        errorCategory = 'timeout'; controller.abort(); reject(new Error('analytics-timeout'));
                     }, Math.min(25_000, Math.max(1000, Number(config.requestTimeoutMs) || 15_000)));
                 });
                 const response = await Promise.race([deadline, fetchFn(config.endpoint, {
@@ -242,7 +283,15 @@
                     body: JSON.stringify(batch), signal: controller.signal,
                     cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer',
                 })]);
-                if (!response?.ok) throw new Error(`analytics-http-${Number(response?.status) || 0}`);
+                if (!response?.ok) {
+                    const code = Number(response?.status) || 0;
+                    errorCategory = code === 400 ? 'http_400' : [401, 403].includes(code) ? 'configuration'
+                        : code === 429 ? 'rate_limit' : code >= 500 ? 'server' : 'http';
+                    const retry = response?.headers?.get('Retry-After');
+                    const delay = retry && /^\d+$/.test(retry) ? Number(retry) * 1000 : Date.parse(retry) - now();
+                    if (Number.isFinite(delay)) retryAfterMs = Math.max(0, Math.min(6 * 3_600_000, delay));
+                    throw new Error('analytics-http');
+                }
                 succeeded = true;
             } catch { /* Retry retains the original event IDs and counts. */ }
             finally { clearTimeout(timer); }
@@ -252,9 +301,18 @@
                     state.inflight = [];
                     state.droppedAggregates = Math.max(0, state.droppedAggregates - batch.droppedAggregates);
                     state.retryCount = 0; state.nextRetryAt = 0;
+                    state.lastSuccessAt = now(); state.lastError = '';
                 } else {
+                    state.lastError = errorCategory;
+                    if (errorCategory === 'http_400') {
+                        // Preserve the latest rejected batch locally, without blocking later batches.
+                        state.quarantine = state.inflight;
+                        state.quarantinedCount = counter(Math.min(1_000_000, state.quarantinedCount + state.inflight.length));
+                        state.droppedAggregates = counter(Math.min(1_000_000, state.droppedAggregates + state.inflight.length));
+                        state.inflight = [];
+                    }
                     state.retryCount = Math.min(8, Number(state.retryCount || 0) + 1);
-                    state.nextRetryAt = now() + Math.min(6 * 3_600_000, 60_000 * (2 ** state.retryCount));
+                    state.nextRetryAt = now() + Math.max(retryAfterMs, Math.min(6 * 3_600_000, 60_000 * (2 ** state.retryCount)));
                 }
                 await persist(state);
                 return succeeded ? { sent: batch.events.length } : { sent: 0, reason: 'network-error' };

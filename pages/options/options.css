@@ -657,6 +657,12 @@
             flex: 0 0 38px;
         }
 
+        .analytics-delivery { margin: 1rem 0 4rem; padding: .875rem; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--card-bg); }
+        .analytics-delivery summary { cursor: pointer; font-size: .875rem; font-weight: 600; color: var(--text-main); }
+        .analytics-delivery p { margin: .75rem 0; font-size: .8125rem; line-height: 1.6; overflow-wrap: anywhere; color: var(--text-muted); }
+        .analytics-delivery button { padding: .5rem .75rem; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-elevated); color: var(--text-main); font: inherit; font-size: .8125rem; cursor: pointer; }
+        .analytics-delivery button:focus-visible, .analytics-delivery summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+
         @media (max-width: 560px) {
             .header {
                 padding: 24px 20px;
