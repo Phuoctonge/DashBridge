@@ -114,3 +114,20 @@
     .dashboard-variable-group > a { flex-basis: 100%; max-width: 100%; border-inline-end: 0; padding-inline-end: 0; }
 }
 
+.dashboard-variables-dialog {
+    margin: auto;
+    width: min(56rem, calc(100vw - 2 * var(--page-gutter)));
+    max-width: none;
+    max-height: calc(100dvh - 2 * var(--page-gutter));
+    padding: 1.25rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--card-bg);
+    color: var(--text-main);
+    box-shadow: var(--shadow-lg);
+    overflow: auto;
+}
+.dashboard-variables-dialog::backdrop { background: rgba(0, 0, 0, .4); }
+.dashboard-variables-dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.dashboard-variables-dialog-heading h2 { margin: 0; font-size: 1.125rem; font-weight: 600; }
+.dashboard-variables-dialog .dashboard-variables { padding: 0; }

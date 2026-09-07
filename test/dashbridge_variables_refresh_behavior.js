@@ -14,10 +14,15 @@ class Element {
     querySelector(name) { return this.children.find(child => child.tag === name); }
     querySelectorAll() { return []; }
     remove() {}
+    focus() { this.focused = true; }
+    showModal() { this.open = true; }
+    close() { this.open = false; }
 }
 const host = new Element('div');
 const dashboard = new Element('main');
 const toggle = new Element('button');
+const dialog = new Element('dialog');
+const closeButton = new Element('button');
 const listeners = {};
 const timers = new Map();
 let timerId = 0;
@@ -52,7 +57,8 @@ const controller = context.DashBridgeVariablesController.create({
         assert.equal(options.reloadFrame, false);
         updates++;
     },
-    documentRef: { getElementById: name => name === 'dashboardVariables' ? host : name === 'dashboardVariablesToggle' ? toggle : dashboard,
+    documentRef: { getElementById: name => ({ dashboardVariables: host, dashboardVariablesToggle: toggle,
+        dashboardVariablesDialog: dialog, closeDashboardVariables: closeButton })[name] || dashboard,
         querySelectorAll: () => [currentFrame], createElement: tag => new Element(tag) },
     windowRef: { addEventListener: (name, fn) => { listeners[name] = fn; }, removeEventListener: name => { delete listeners[name]; } },
 });
@@ -69,9 +75,18 @@ const tick = delay => {
     assert.equal(toggle.hidden, false);
     toggle.events.click();
     assert.equal(host.hidden, false);
+    assert.equal(dialog.open, true, 'button opens modal dialog');
     assert.equal(toggle['aria-expanded'], 'true');
     toggle.events.click();
     assert.equal(host.hidden, true);
+    assert.equal(dialog.open, false);
+    assert.equal(toggle.focused, true, 'closing restores focus');
+    toggle.events.click();
+    dialog.events.keydown({ key: 'Escape', preventDefault() {}, stopPropagation() {} });
+    assert.equal(dialog.open, false, 'Escape closes dialog');
+    toggle.events.click();
+    closeButton.events.click();
+    assert.equal(dialog.open, false, 'close button does not cancel transport');
     respond(currentFrame.contentWindow, { ...snapshot, requestId: messages.at(-1).requestId });
     await Promise.resolve();
     const group = host.children[0];
@@ -121,6 +136,10 @@ const tick = delay => {
     assert.equal(navigations, 1, 'only legacy apply needs a document navigation');
     controller.stop();
     assert.equal(toggle.events.click, undefined);
+    assert.equal(dialog.events.keydown, undefined);
+    assert.equal(dialog.events.cancel, undefined);
+    assert.equal(dialog.events.click, undefined);
+    assert.equal(closeButton.events.click, undefined);
     assert.equal(timers.size, 0);
     assert.equal(listeners.resize, undefined, 'menu resize listener must be released');
     assert.equal(listeners.scroll, undefined, 'menu scroll listener must be released');

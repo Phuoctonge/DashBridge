@@ -216,9 +216,8 @@
             </div>
         </div>
         <div class="controls">
-            <button id="dashboardVariablesToggle" class="btn btn-outline" type="button" aria-controls="dashboardVariables" aria-expanded="false" hidden>
+            <button id="dashboardVariablesToggle" class="btn btn-outline" type="button" aria-controls="dashboardVariablesDialog" aria-haspopup="dialog" aria-expanded="false" hidden>
                 <span class="header-button-label">Переменные<br>дашборда</span>
-                <span class="variables-indicator" aria-hidden="true"></span>
             </button>
             <div class="header-menu report-menu">
                 <button id="reportMenuBtn" class="btn btn-outline header-menu-trigger" type="button"
@@ -318,7 +317,13 @@
         </div>
     </header>
 
-    <div id="dashboardVariables" class="dashboard-variables" aria-label="Переменные дашборда" hidden></div>
+    <dialog id="dashboardVariablesDialog" class="dashboard-variables-dialog" aria-labelledby="dashboardVariablesTitle">
+        <div class="dashboard-variables-dialog-heading">
+            <h2 id="dashboardVariablesTitle">Переменные дашборда</h2>
+            <button id="closeDashboardVariables" class="btn btn-outline" type="button" autofocus>Закрыть</button>
+        </div>
+        <div id="dashboardVariables" class="dashboard-variables" aria-label="Переменные дашборда" hidden></div>
+    </dialog>
     <main class="dashboard-container" id="dashboard"></main>
 
     <!-- Modal for adding new iframe -->

@@ -6,26 +6,41 @@
         const codec = root.DashBridgeVariablesState;
         const host = documentRef.getElementById('dashboardVariables');
         const toggle = documentRef.getElementById('dashboardVariablesToggle');
-        const expandedProfiles = new Set();
+        const dialog = documentRef.getElementById('dashboardVariablesDialog');
+        const closeButton = documentRef.getElementById('closeDashboardVariables');
+        function closeDialog() {
+            host.querySelectorAll('.dashboard-variable[open]').forEach(details => { details.open = false; });
+            host.hidden = true;
+            toggle?.setAttribute('aria-expanded', 'false');
+            if (dialog.open) { dialog.close(); toggle?.focus(); }
+        }
         function updateVisibility() {
             const available = [...groups.values()].some(group => !group.snapshot || !group.element.hidden);
-            const expanded = expandedProfiles.has(profileId);
             if (toggle) {
                 toggle.hidden = !available;
-                toggle.setAttribute('aria-expanded', String(available && expanded));
-                const error = [...groups.values()].some(group => group.failed);
-                const busy = [...groups.values()].some(group => group.pending || group.reloading || !group.snapshot);
-                toggle.dataset.state = error ? 'error' : busy ? 'loading' : 'ready';
-                toggle.title = error ? 'Переменные дашборда: ошибка обновления' : busy ? 'Переменные дашборда: ожидание Grafana' : 'Показать или скрыть переменные дашборда';
+                toggle.setAttribute('aria-expanded', String(available && dialog.open));
+                toggle.title = 'Открыть переменные дашборда';
             }
-            host.hidden = !available || !expanded;
+            if (!available) closeDialog();
+            host.hidden = !available || !dialog.open;
         }
         function toggleVisibility() {
-            if (expandedProfiles.has(profileId)) {
-                expandedProfiles.delete(profileId);
-                host.querySelectorAll('.dashboard-variable[open]').forEach(details => { details.open = false; });
-            } else expandedProfiles.add(profileId);
+            if (dialog.open) closeDialog();
+            else { host.hidden = false; dialog.showModal(); }
             updateVisibility();
+        }
+        function onDialogKeydown(event) {
+            if (event.key !== 'Escape') return;
+            event.preventDefault(); event.stopPropagation();
+            const details = host.querySelector('.dashboard-variable[open]');
+            if (details) { details.open = false; details.querySelector('summary')?.focus(); }
+            else closeDialog();
+        }
+        function onDialogCancel(event) { event.preventDefault(); closeDialog(); }
+        function onDialogClick(event) {
+            if (event.target !== dialog) return;
+            const rect = dialog.getBoundingClientRect();
+            if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) closeDialog();
         }
         let profileId = '';
         let stopped = false;
@@ -285,6 +300,7 @@
             if (stopped) return;
             const current = String(getActiveProfile()?.id || '');
             if (current !== profileId) {
+                closeDialog();
                 groups.forEach(cancel); groups.clear(); host.replaceChildren(); profileId = current;
             }
             const keys = new Set();
@@ -379,6 +395,10 @@
         }
         const observer = new MutationObserver(schedule);
         function start() {
+            closeButton.addEventListener('click', closeDialog);
+            dialog.addEventListener('keydown', onDialogKeydown, true);
+            dialog.addEventListener('cancel', onDialogCancel);
+            dialog.addEventListener('click', onDialogClick);
             toggle?.addEventListener('click', toggleVisibility);
             observer.observe(documentRef.getElementById('dashboard'), { childList: true });
             windowRef.addEventListener('message', onMessage);
@@ -388,6 +408,11 @@
             sync();
         }
         function stop() {
+            closeDialog();
+            closeButton.removeEventListener('click', closeDialog);
+            dialog.removeEventListener('keydown', onDialogKeydown, true);
+            dialog.removeEventListener('cancel', onDialogCancel);
+            dialog.removeEventListener('click', onDialogClick);
             toggle?.removeEventListener('click', toggleVisibility);
             if (toggle) { toggle.hidden = true; toggle.setAttribute('aria-expanded', 'false'); }
             stopped = true; clearTimeout(syncTimer); groups.forEach(cancel); groups.clear();
