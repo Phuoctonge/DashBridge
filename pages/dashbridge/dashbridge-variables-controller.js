@@ -52,7 +52,10 @@
         const members = group => getPanels().filter(panel => codec.scope(panel.src) === group.key);
         const alive = group => !stopped && groups.get(group.key) === group && profileId === String(getActiveProfile()?.id || '');
         const status = (group, text) => { group.status.textContent = text; updateVisibility(); };
-        function positionOptions() {
+        function positionOptions(event) {
+            // Scrolling the menu's own list/actions must not resize that same
+            // scrollport and move the button the user is trying to reach.
+            if (event?.type === 'scroll' && event.target?.closest?.('.dashboard-variable-options')) return;
             const details = host.querySelector('.dashboard-variable[open]');
             if (!details?.getBoundingClientRect) return;
             const body = details.querySelector('.dashboard-variable-options');
