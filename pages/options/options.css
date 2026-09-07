@@ -57,7 +57,7 @@
 /* Form labels */
 .form-label-row {
     margin-bottom: 0;
-    font-size: 14px;
+    font-size: 0.875rem;
     color: var(--text-main);
     cursor: pointer;
     font-weight: 500;
@@ -65,7 +65,7 @@
 
 .form-label-row-sm {
     margin-bottom: 0;
-    font-size: 13px;
+    font-size: 0.8125rem;
     color: var(--text-main);
     cursor: pointer;
 }
@@ -80,7 +80,7 @@
 /* Subsection title */
 .subsection-title {
     margin: 0 0 12px 0;
-    font-size: 14px;
+    font-size: 0.875rem;
     font-weight: 600;
     color: var(--text-main);
     display: flex;
@@ -123,7 +123,7 @@
     align-items: center;
     gap: 8px;
     font-weight: 500;
-    font-size: 14px;
+    font-size: 0.875rem;
     color: var(--text-main);
 }
 
@@ -150,7 +150,7 @@
     justify-content: space-between;
     margin-bottom: 12px;
     font-weight: 500;
-    font-size: 14px;
+    font-size: 0.875rem;
     color: var(--text-main);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
 }
@@ -190,7 +190,7 @@
 /* Section title (h4) */
 .section-title-h4 {
     margin: 0 0 16px 0;
-    font-size: 16px;
+    font-size: 1rem;
     color: var(--primary);
     display: flex;
     align-items: center;
@@ -203,26 +203,26 @@
 
 /* Form hints */
 .form-hint {
-    font-size: 11px;
+    font-size: 0.6875rem;
     color: var(--text-muted);
     margin-top: 4px;
 }
 
 .form-hint-block {
-    font-size: 11px;
+    font-size: 0.6875rem;
     color: var(--text-muted);
     margin-bottom: 12px;
     line-height: 1.4;
 }
 
 .form-hint-block-lg {
-    font-size: 12px;
+    font-size: 0.75rem;
     color: var(--text-muted);
     margin-bottom: 16px;
 }
 
 .form-hint-italic {
-    font-size: 10px;
+    font-size: 0.625rem;
     color: var(--text-muted);
     margin-top: 6px;
     font-style: italic;
@@ -265,7 +265,7 @@
 .btn-secondary-flex {
     background: #64748b;
     flex: 1;
-    font-size: 13px;
+    font-size: 0.8125rem;
 }
 
 .btn-secondary-flex:hover {
@@ -276,7 +276,7 @@
     display: none;
     margin-top: 12px;
     font-weight: 500;
-    font-size: 13px;
+    font-size: 0.8125rem;
     text-align: center;
 }
 
@@ -310,7 +310,7 @@
     width: 100%;
     border-radius: 18px;
     padding: 14px;
-    font-size: 14px;
+    font-size: 0.875rem;
     font-weight: 700;
     margin: 0;
     background: linear-gradient(135deg, var(--primary) 0%, #3b82f6 100%);
@@ -330,7 +330,7 @@
 /* Form input variants */
 .form-input-mono {
     font-family: monospace;
-    font-size: 12px;
+    font-size: 0.75rem;
     background: #fff;
     border-color: #e2e8f0;
     line-height: 1.5;
@@ -502,7 +502,7 @@
             background: #dcfce7;
             color: #166534;
             display: none;
-            font-size: 14px;
+            font-size: 0.875rem;
             font-weight: 500;
         }
 
@@ -584,7 +584,7 @@
         .options-subsection-title {
             margin: 0 0 16px;
             color: var(--text-main);
-            font-size: 14px;
+            font-size: 0.875rem;
             font-weight: 700;
         }
 
@@ -621,7 +621,7 @@
         .metric-settings-title {
             margin: 0 0 14px;
             color: var(--text-main);
-            font-size: 14px;
+            font-size: 0.875rem;
             font-weight: 750;
             letter-spacing: 0.02em;
         }
@@ -633,7 +633,7 @@
             background: var(--surface-raised);
             color: var(--text-main);
             font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-            font-size: 12px;
+            font-size: 0.75rem;
             line-height: 1.45;
             overflow-wrap: anywhere;
         }
@@ -645,7 +645,7 @@
             gap: 16px;
             margin-top: 12px;
             color: var(--text-muted);
-            font-size: 13px;
+            font-size: 0.8125rem;
             line-height: 1.4;
         }
 

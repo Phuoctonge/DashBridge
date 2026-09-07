@@ -319,7 +319,7 @@ button {
     color: #ffffff !important;
     border: 1px solid rgba(255, 255, 255, 0.2) !important;
     font-weight: 600;
-    font-size: 13px;
+    font-size: 0.8125rem;
     line-height: 1;
     cursor: pointer;
     box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3);
@@ -544,7 +544,7 @@ input:checked+.slider::before {
     padding: 12px 20px;
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-lg);
-    font-size: 13px;
+    font-size: 0.8125rem;
     pointer-events: auto;
     animation: toastIn 0.3s ease;
     border-left: 4px solid var(--primary);
@@ -667,7 +667,7 @@ input:checked+.slider::before {
 
 /* Описание секции */
 .section-description {
-    font-size: 11px;
+    font-size: 0.6875rem;
     color: var(--text-muted);
     margin-bottom: 12px;
     line-height: 1.5;

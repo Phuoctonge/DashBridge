@@ -47,7 +47,7 @@
     justify-content: space-between;
     gap: 12px;
     color: var(--text-muted);
-    font-size: 12px;
+    font-size: 0.75rem;
 }
 
 .batch-panel-picker-toolbar-actions {
@@ -193,7 +193,7 @@
 .batch-series-pattern-section h2 {
     margin: 0 0 12px;
     color: var(--text-main);
-    font-size: 14px;
+    font-size: 0.875rem;
 }
 
 .batch-series-patterns {
@@ -206,14 +206,14 @@
     display: grid;
     gap: 6px;
     color: var(--text-main);
-    font-size: 12px;
+    font-size: 0.75rem;
     font-weight: 600;
 }
 
 .batch-series-card p {
     margin: 0;
     color: var(--text-muted);
-    font-size: 12px;
+    font-size: 0.75rem;
     line-height: 1.4;
 }
 
@@ -230,11 +230,11 @@
 .batch-field-hint {
     margin: 7px 0 0;
     color: var(--text-muted);
-    font-size: 12px;
+    font-size: 0.75rem;
     line-height: 1.4;
 }
 
-.batch-field-hint-small { font-size: 11px; }
+.batch-field-hint-small { font-size: 0.6875rem; }
 .batch-url-row { display: flex; align-items: stretch; gap: 10px; flex-wrap: wrap; }
 .batch-url-input { flex: 1 1 18.75rem; min-width: min(18.75rem, 100%); }
 .batch-url-actions { display: flex; align-items: stretch; gap: 5px; }
@@ -253,7 +253,7 @@
 
 .panel-id-badge {
     color: var(--text-muted);
-    font-size: 11px;
+    font-size: 0.6875rem;
     white-space: nowrap;
 }
 
@@ -370,7 +370,7 @@ h3 .ic {
 .batch-panel-rules-status {
     margin: 5px 0 0;
     color: var(--text-muted);
-    font-size: 12px;
+    font-size: 0.75rem;
     line-height: 1.4;
 }
 
@@ -411,7 +411,7 @@ h3 .ic {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-size: 12px;
+    font-size: 0.75rem;
     cursor: pointer;
 }
 
@@ -457,7 +457,7 @@ h3 .ic {
 
 .batch-panel-title {
     color: var(--text-main);
-    font-size: 13px;
+    font-size: 0.8125rem;
 }
 
 .toast-icon-success {

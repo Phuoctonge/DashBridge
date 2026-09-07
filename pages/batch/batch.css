@@ -75,7 +75,7 @@ body {
     gap: 4px;
     cursor: pointer;
     color: var(--text-main);
-    font-size: 13px;
+    font-size: 0.8125rem;
 }
 
 .batch-capture-theme-options input {
@@ -245,7 +245,7 @@ textarea:focus {
     min-height: 100px;
     max-height: 300px;
     overflow-y: auto;
-    font-size: 12px;
+    font-size: 0.75rem;
     border: 1px solid var(--border);
     line-height: 1.5;
 }
@@ -298,7 +298,7 @@ textarea:focus {
     justify-content: space-between;
     gap: 12px;
     color: var(--text-muted);
-    font-size: 12px;
+    font-size: 0.75rem;
 }
 
 .batch-progress progress {
@@ -335,7 +335,7 @@ textarea:focus {
     border-radius: 10px;
     border: 1px solid var(--border);
     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
-    font-size: 14px;
+    font-size: 0.875rem;
     font-weight: 500;
     display: flex;
     align-items: center;

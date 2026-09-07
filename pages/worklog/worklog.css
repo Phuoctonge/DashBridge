@@ -28,7 +28,7 @@
             display: flex;
             align-items: center;
             gap: 10px;
-            font-size: 12px;
+            font-size: 0.75rem;
             margin-bottom: 6px;
             opacity: 0.9;
         }
@@ -159,7 +159,7 @@
             border-radius: var(--radius-md);
             box-sizing: border-box;
             font-family: inherit;
-            font-size: 13px;
+            font-size: 0.8125rem;
             line-height: 1.4;
             min-height: 2.25rem;
             transition: all 0.2s;
@@ -190,7 +190,7 @@
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            font-size: 14px;
+            font-size: 0.875rem;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -222,7 +222,7 @@
             background: var(--status-danger-bg);
             color: var(--danger);
             border: 1px solid #fee2e2;
-            font-size: 18px;
+            font-size: 1.125rem;
             padding: 6px 10px;
         }
 
@@ -236,7 +236,7 @@
             background: #deebff;
             color: #0747a6;
             border: 1px solid #b3d4ff;
-            font-size: 14px;
+            font-size: 0.875rem;
             padding: 4px 10px;
         }
 
@@ -255,7 +255,7 @@
         .status-badge {
             padding: 4px 8px;
             border-radius: 12px;
-            font-size: 11px;
+            font-size: 0.6875rem;
             font-weight: 700;
             text-transform: uppercase;
         }
@@ -279,7 +279,7 @@
             margin-top: 15px;
             padding: 10px;
             border-radius: 4px;
-            font-size: 14px;
+            font-size: 0.875rem;
             display: none;
         }
 
@@ -290,7 +290,7 @@
         }
 
         .summary-display {
-            font-size: 13px;
+            font-size: 0.8125rem;
             color: #172b4d;
             text-align: left;
             white-space: pre-wrap;
@@ -317,7 +317,7 @@
             background: var(--surface-raised);
             font-weight: 700;
             color: #1e293b;
-            font-size: 15px;
+            font-size: 0.9375rem;
             padding: 16px 20px;
             border-top: 1px solid var(--border);
             border-bottom: 2px solid var(--border);
@@ -331,7 +331,7 @@
             margin-left: 15px;
             padding: 4px 10px;
             border-radius: 6px;
-            font-size: 13px;
+            font-size: 0.8125rem;
             font-weight: 700;
             transition: all 0.3s;
         }
@@ -432,7 +432,7 @@
         .picker-title {
             font-weight: 700;
             color: #1e293b;
-            font-size: 13px;
+            font-size: 0.8125rem;
         }
 
         .picker-nav {
@@ -466,7 +466,7 @@
         }
 
         .weekday {
-            font-size: 10px;
+            font-size: 0.625rem;
             font-weight: 700;
             color: #94a3b8;
             padding: 2px 0;
@@ -474,7 +474,7 @@
         }
 
         .day {
-            font-size: 12px;
+            font-size: 0.75rem;
             padding: 5px 0;
             border-radius: 6px;
             cursor: pointer;
@@ -529,13 +529,13 @@
             text-align: center !important;
             border: 1px solid #e2e8f0 !important;
             border-radius: 4px !important;
-            font-size: 12px !important;
+            font-size: 0.75rem !important;
             height: 24px !important;
             background: var(--surface) !important;
         }
 
         .time-label {
-            font-size: 10px;
+            font-size: 0.625rem;
             color: #94a3b8;
             font-weight: 600;
         }
@@ -589,7 +589,7 @@
             transform: translateY(100px);
             opacity: 0;
             transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
-            font-size: 13px;
+            font-size: 0.8125rem;
             border-left: 4px solid var(--primary);
         }
 
@@ -611,7 +611,7 @@
             padding: 4px 10px;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 11px;
+            font-size: 0.6875rem;
             font-weight: 700;
             text-transform: uppercase;
         }
