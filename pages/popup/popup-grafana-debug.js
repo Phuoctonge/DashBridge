@@ -263,6 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fullResetButton.addEventListener('click', async () => {
         const confirmed = await new Promise(resolve => {
             const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
             overlay.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.6);padding:16px;';
             overlay.innerHTML = `
                 <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="dashbridgeResetTitle" style="width:min(420px,100%);border:1px solid var(--text,#111827);">

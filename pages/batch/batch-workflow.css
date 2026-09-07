@@ -14,7 +14,7 @@
 }
 
 .modal-panels {
-    background: var(--card-bg);
+    background: var(--bg-elevated);
     border-radius: var(--radius);
     width: min(45rem, 100%);
     max-height: calc(100dvh - (2 * var(--page-gutter)));
@@ -22,12 +22,13 @@
     padding: 1.5rem;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow: auto;
     color: var(--text-main);
     box-shadow: var(--shadow-lg);
 }
 
 .batch-panel-picker-header {
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -40,6 +41,7 @@
 }
 
 .batch-panel-picker-toolbar {
+    flex-shrink: 0;
     min-height: 34px;
     margin: 16px 0 10px;
     display: flex;
@@ -106,6 +108,7 @@
 }
 
 .batch-panel-picker-footer {
+    flex-shrink: 0;
     display: flex;
     justify-content: flex-end;
     gap: 12px;

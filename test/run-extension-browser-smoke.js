@@ -148,6 +148,32 @@ async function inspectPage(context, extensionId, relativePath) {
         if (!page.isClosed()) {
             result.finalUrl = page.url();
             result.title = await page.title();
+            const isDashboard = relativePath === 'pages/dashbridge/dashbridge.html';
+            const isPopup = relativePath === 'pages/popup/popup.html';
+            if (isDashboard || isPopup) {
+                if (isPopup) await page.locator('[data-sub="grafana-links"]').click();
+                const opener = isDashboard ? '#addPanelBtn' : '#openAddModal';
+                await page.locator(opener).click();
+                const modal = page.locator('#modalOverlay');
+                for (const key of ['Tab', 'Shift+Tab']) {
+                    for (let index = 0; index < 12; index++) {
+                        await page.keyboard.press(key);
+                        if (!await modal.evaluate(element => element.contains(document.activeElement))) {
+                            throw new Error(`${key} escaped the modal`);
+                        }
+                    }
+                }
+                if (isDashboard) {
+                    await page.evaluate(() => { void globalThis.DashBridgeModal.showAlert('Nested smoke check'); });
+                    await page.keyboard.press('Escape');
+                    if (!await modal.isVisible()) throw new Error('Escape closed the parent with the child');
+                }
+                await page.keyboard.press('Escape');
+                await modal.waitFor({ state: 'hidden' });
+                if (!await page.locator(opener).evaluate(element => element === document.activeElement)) {
+                    throw new Error('Modal did not restore opener focus');
+                }
+            }
         }
     } catch (error) {
         result.navigationError = serializeError(error);

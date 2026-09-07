@@ -458,7 +458,7 @@ textarea:focus {
 }
 
 .modal-content {
-    background: var(--card-bg);
+    background: var(--bg-elevated);
     border-radius: var(--radius-lg);
     padding: 1.5rem;
     max-width: 31.25rem;
