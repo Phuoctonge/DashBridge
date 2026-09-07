@@ -116,7 +116,7 @@
 
 .dashboard-variables-dialog {
     margin: auto;
-    width: min(56rem, calc(100vw - 2 * var(--page-gutter)));
+    width: min(76rem, calc(100vw - 2 * var(--page-gutter)));
     max-width: none;
     max-height: calc(100dvh - 2 * var(--page-gutter));
     padding: 1.25rem;
