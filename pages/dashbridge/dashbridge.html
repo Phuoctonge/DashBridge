@@ -230,7 +230,8 @@
             </div>
             <div class="header-menu">
                 <button id="dataMenuBtn" class="btn btn-outline header-menu-trigger" type="button"
-                    aria-expanded="false">Данные ▾</button>
+                    aria-expanded="false" aria-label="Импорт и экспорт">
+                    <span class="header-button-label">Импорт<br>Экспорт</span> ▾</button>
                 <div id="dataDropdown" class="header-menu-dropdown" style="display:none;">
                     <button id="exportPanelsBtn" type="button">Экспорт (JSON)</button>
                     <button id="importPanelsBtn" type="button">Импорт (JSON)</button>
@@ -417,8 +418,8 @@
                 </div>
             </div>
             <div class="modal-actions">
-                <button id="cancelDashboardPanelPickerBtn" class="btn btn-cancel" type="button">Отмена</button>
                 <button id="addSelectedDashboardPanelsBtn" class="btn btn-primary" type="button" disabled>Добавить выбранные</button>
+                <button id="cancelDashboardPanelPickerBtn" class="btn btn-cancel" type="button">Отмена</button>
             </div>
         </div>
     </div>
