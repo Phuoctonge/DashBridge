@@ -446,6 +446,8 @@
         decode_error: 'Ошибка обработки ответа datasource',
         network_error: 'Сетевая ошибка при получении данных'
     });
+    const nativeNoDataVisibility = window.DashBridgeGrafanaDom?.createNativeNoDataVisibility?.();
+    registerRuntimeCleanup(() => { nativeNoDataVisibility?.stop(); document.getElementById('dashbridge-panel-data-status')?.remove(); });
     const syncPanelDataStatusPresentation = () => {
         const status = visualMetadata.responseDataStatus || { kind: 'unknown' };
         const overlayId = 'dashbridge-panel-data-status';
@@ -454,19 +456,15 @@
         const transportFailureWithVisibleData = hasCachedData
             && ['http_error', 'network_error', 'decode_error'].includes(status.kind);
         if (!status.text || ['data', 'unknown'].includes(status.kind) || transportFailureWithVisibleData) {
-            document.querySelectorAll?.('[data-dashbridge-native-no-data]').forEach(element => {
-                element.style.removeProperty('visibility');
-                delete element.dataset.dashbridgeNativeNoData;
-            });
+            nativeNoDataVisibility?.stop();
             existing?.remove();
             return;
         }
-        const panel = window.DashBridgeGrafanaDom?.outerPanel?.(getTargetPanel()) || getTargetPanel() || document.body;
-        Array.from(panel?.querySelectorAll?.('div, span') || []).forEach(element => {
-            if (element.children.length === 0 && /^No data$/i.test(String(element.textContent || '').trim())) {
-                element.dataset.dashbridgeNativeNoData = 'true';
-                element.style.setProperty('visibility', 'hidden', 'important');
-            }
+        nativeNoDataVisibility?.update(() => {
+            if (isDashboardIframe) return document.body;
+            const panel = getTargetPanel();
+            return panel && panel !== document && panel !== document.body
+                ? (window.DashBridgeGrafanaDom?.outerPanel?.(panel) || panel) : null;
         });
         const overlay = existing || document.createElement('div');
         if (!existing) overlay.id = overlayId;

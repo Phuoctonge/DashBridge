@@ -271,6 +271,46 @@ async function inspectTestSelectionWorkflow(context, extensionId) {
     return result;
 }
 
+async function inspectNoDataWorkflow(context) {
+    const result = { name: 'native No data lifecycle', status: 'passed' };
+    const page = await context.newPage();
+    try {
+        await page.setContent('<main id="panel"></main><aside id="other"><p>No data</p></aside>');
+        await page.addScriptTag({ path: path.join(projectRoot, 'js/content/grafana-dom.js') });
+        await page.evaluate(() => {
+            globalThis.noDataProbe = globalThis.DashBridgeGrafanaDom.createNativeNoDataVisibility();
+            globalThis.noDataProbe.update(() => document.getElementById('panel'));
+            document.getElementById('panel').innerHTML = '<p id="native" style="visibility:visible!important">No <span>data</span></p>';
+        });
+        await page.locator('#native').waitFor({ state: 'hidden' });
+        if (!await page.locator('#other p').isVisible()) throw new Error('Unrelated panel was hidden');
+        await page.evaluate(() => { document.getElementById('native').textContent = 'Returned data'; });
+        await page.locator('#native').waitFor({ state: 'visible' });
+        await page.evaluate(() => { document.getElementById('native').firstChild.data = 'No data'; });
+        await page.locator('#native').waitFor({ state: 'hidden' });
+        await page.evaluate(() => {
+            const old = document.getElementById('panel');
+            const next = document.createElement('main'); next.id = 'panel';
+            next.innerHTML = '<div id="replacement">No data</div><button>No data</button>';
+            old.replaceWith(next);
+        });
+        await page.locator('#replacement').waitFor({ state: 'hidden' });
+        if (!await page.locator('#panel button').isVisible()) throw new Error('Interactive control was hidden');
+        await page.evaluate(() => globalThis.noDataProbe.stop());
+        await page.locator('#replacement').waitFor({ state: 'visible' });
+        await page.evaluate(() => {
+            globalThis.noDataProbe.update(() => document.getElementById('panel'));
+            globalThis.noDataProbe.stop();
+            document.getElementById('replacement').textContent = 'No data';
+        });
+        await page.waitForTimeout(100);
+        if (!await page.locator('#replacement').isVisible()) throw new Error('Cleanup left observer/RAF active');
+    } catch (error) {
+        result.status = 'failed'; result.error = serializeError(error);
+    } finally { await page.close(); }
+    return result;
+}
+
 async function inspectPanelUnitWorkflow(context) {
     const result = { name: 'panel threshold unit radios', status: 'passed', checks: [] };
     const page = await context.newPage();
@@ -464,6 +504,7 @@ async function main() {
         const workflows = [
             await inspectTestSelectionWorkflow(context, extensionId),
             await inspectPanelUnitWorkflow(context),
+            await inspectNoDataWorkflow(context),
             await inspectSecurityBoundaries(context, extensionId, analyticsSink.endpoint)
         ];
 

@@ -92,5 +92,63 @@
         return names.filter(name => !unique || (!seen.has(name) && seen.add(name)));
     };
 
-    window.DashBridgeGrafanaDom = { panelSelectors, visiblePanels, panelKey, findPanelById, findPanel, outerPanel, legendItems, legendLabel, legendSeriesNames };
+    // Owned by the calling panel-tools generation, independently of data transforms.
+    const createNativeNoDataVisibility = () => {
+        let resolveRoot = null, observer = null, frame = 0;
+        const hidden = new Map();
+        const restore = element => {
+            const previous = hidden.get(element);
+            if (!previous) return;
+            if (element.style.getPropertyValue('visibility') === 'hidden'
+                && element.style.getPropertyPriority('visibility') === 'important') {
+                if (previous.value) element.style.setProperty('visibility', previous.value, previous.priority);
+                else element.style.removeProperty('visibility');
+            }
+            delete element.dataset.dashbridgeNativeNoData;
+            hidden.delete(element);
+        };
+        const matches = element => /^(?:No\s+data)$/i.test(String(element.textContent || '').trim())
+            && !element.closest('button,a,[role="button"],h1,h2,h3,h4,h5,h6,.graph-legend-series,.u-legend')
+            && !element.querySelector('canvas,svg,button,a,input,select,textarea');
+        const sync = () => {
+            frame = 0;
+            const root = resolveRoot?.();
+            const candidates = root?.querySelectorAll ? [root, ...root.querySelectorAll('div,span,p')]
+                .filter(element => element.nodeType === 1 && matches(element)) : [];
+            // Prefer the smallest text container; never hide the surrounding panel.
+            const targets = new Set(candidates.filter(element => !candidates.some(other =>
+                other !== element && element.contains(other))));
+            for (const element of hidden.keys()) if (!targets.has(element) || !element.isConnected) restore(element);
+            for (const element of targets) {
+                if (!element.isConnected) continue;
+                if (!hidden.has(element)) hidden.set(element, {
+                    value: element.style.getPropertyValue('visibility'),
+                    priority: element.style.getPropertyPriority('visibility')
+                });
+                element.dataset.dashbridgeNativeNoData = 'true';
+                element.style.setProperty('visibility', 'hidden', 'important');
+            }
+        };
+        const stop = () => {
+            observer?.disconnect(); observer = null;
+            if (frame) cancelAnimationFrame(frame);
+            frame = 0; resolveRoot = null;
+            for (const element of hidden.keys()) restore(element);
+        };
+        const update = resolver => {
+            if (!resolver) { stop(); return; }
+            resolveRoot = resolver;
+            if (!observer) {
+                observer = new MutationObserver(() => {
+                    if (!frame) frame = requestAnimationFrame(sync);
+                });
+                // No attributes: writing visibility cannot trigger a feedback loop.
+                observer.observe(document.documentElement, { subtree: true, childList: true, characterData: true });
+            }
+            if (frame) cancelAnimationFrame(frame);
+            sync();
+        };
+        return Object.freeze({ update, stop });
+    };
+    window.DashBridgeGrafanaDom = { panelSelectors, visiblePanels, panelKey, findPanelById, findPanel, outerPanel, legendItems, legendLabel, legendSeriesNames, createNativeNoDataVisibility };
 })();

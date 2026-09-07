@@ -298,7 +298,7 @@ checks = {
         and "const visibilityCandidates = legendLabels.map(label => {" in CORE
         and "key: `${label}\\u0000${occurrence}`" in CORE
         and "const legendLabel = item => item?.querySelector(" in GRAFANA_DOM
-        and "legendItems, legendLabel, legendSeriesNames };" in GRAFANA_DOM
+        and re.search(r"window\.DashBridgeGrafanaDom\s*=\s*\{[^}]*\blegendItems\b[^}]*\blegendLabel\b[^}]*\blegendSeriesNames\b[^}]*\}", GRAFANA_DOM)
         and ".map(item => (dom?.legendLabel?.(item) || item).textContent?.trim())" in CORE
         and "const labelNode = dom?.legendLabel?.(entry) || entry;" in SUITE
         and "const getLegendLabel = item => window.DashBridgeGrafanaDom?.legendLabel?.(item) || item;" in PANEL_TOOLS
