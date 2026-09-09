@@ -300,13 +300,6 @@ Recorder данные и тексты исключений запрещены. �
 health-checked restart и rollback. В release запрещено включать SQLite,
 credentials, Compose или root helper.
 
-Админка collector проверяется локально через
-`scripts/Start-AnalyticsDev.ps1`; она использует только `.dev-data` и
-синтетические fixtures. Публикация выполняется `scripts/Publish-Analytics.ps1`:
-визуальные assets применяются без restart, server/contract — с коротким
-health-checked restart и rollback. В release запрещено включать SQLite,
-credentials, Compose или root helper.
-
 ## Политика комментариев
 
 Комментарий должен объяснять не очевидное действие, а ограничение: почему

@@ -158,6 +158,36 @@ function createHarness({ mode = 'group', matches = [{ name: 'cpu', key: 'cpu\u00
     assert.strictEqual(loadCalls[0][5], null);
     assert.strictEqual(loadCalls[1][5], 'cpu');
 
+    const partial = createHarness({ mode: 'standalone', matches: standaloneMatches });
+    let captures = 0;
+    partial.operation.capturePanelToZip = async () => {
+        if (++captures === 2) throw new Error('archive write failed');
+        return true;
+    };
+    await partial.controller.run();
+    const partialReport = partial.calls.find(call => Array.isArray(call) && call[0] === 'report')[2];
+    assert.strictEqual(partialReport.totalJobs, 2);
+    assert.strictEqual(partialReport.successfulJobs, 1);
+    assert.strictEqual(partialReport.failedJobs, 1);
+    assert.strictEqual(partialReport.errors[0].reason, 'archive write failed');
+    assert(!partial.notifications.some(call => call[1] === 'success'));
+
+    const concurrent = createHarness();
+    concurrent.operation.begin = async () => { concurrent.operation.processing = true; return 17; };
+    let releaseOptions;
+    concurrent.operation.getCaptureOptions = () => new Promise(resolve => { releaseOptions = resolve; });
+    const firstRun = concurrent.controller.run();
+    await Promise.resolve();
+    await concurrent.controller.run();
+    assert(concurrent.notifications.some(call => call[0] === 'Процесс уже запущен!'));
+    releaseOptions({ prepared: false });
+    await firstRun;
+
+    const settingsFailure = createHarness();
+    settingsFailure.operation.getCaptureOptions = async () => { throw new Error('storage unavailable'); };
+    await settingsFailure.controller.run();
+    assert(settingsFailure.calls.some(call => Array.isArray(call) && call[0] === 'finish'));
+
     let failureHarness;
     failureHarness = createHarness({
         discoveryImpl: async options => {

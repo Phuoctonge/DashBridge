@@ -33,7 +33,8 @@ check('Batch rule labels match the Grafana panel settings',
       and 'Инвертировать CPU-график: Idle → Load' in JS
       and 'Конвертировать RAM-график в % Used' in JS
       and 'Толщина ' in JS)
-check('Thickness value is enabled only with its checkbox', 'width.hidden = !enabled' in JS and 'widthInput.disabled = !enabled' in JS)
+check('Thickness slider stays visible and is enabled only with its checkbox',
+      'widthInput.disabled = thick?.checked !== true' in JS and 'width.hidden' not in JS)
 check('Main capture resolves a rule by panel ID', 'panelRules.forPanel(mainPanelRules, panelId)' in JS)
 check('Series capture resolves a rule by panel ID', 'panelRules.forPanel(seriesPanelRules, panelId)' in JS)
 check('Loader applies tools before waiting for the capture rectangle', 'await applySharedGrafanaPanelTools' in LOADER and LOADER.index('await applySharedGrafanaPanelTools') < LOADER.rindex('waitForPanelInMainWorld'))

@@ -1,7 +1,7 @@
 (function initDashBridgePanelTransferController(root) {
     'use strict';
 
-    function create({ transfer, showAlert, showConfirm, getPanels, setPanels, getProfiles,
+    function create({ transfer, showAlert, showImportChoice, getPanels, setPanels, getProfiles,
         getActiveProfile, setTabActiveProfileId, savePanels, saveProfiles,
         loadActiveProfileTimeState, syncTimeControlsFromState, renderProfileSwitcher,
         renderDashboard, documentRef = document, fileReaderFactory = () => new FileReader(),
@@ -9,7 +9,7 @@
         randomUUID = () => crypto.randomUUID(), now = () => new Date() }) {
         if (!transfer?.createPanelExportPayload || !transfer?.buildPanelExportFileName
             || !transfer?.parsePanelImportText || typeof showAlert !== 'function'
-            || typeof showConfirm !== 'function' || typeof getPanels !== 'function'
+            || typeof showImportChoice !== 'function' || typeof getPanels !== 'function'
             || typeof setPanels !== 'function' || typeof getProfiles !== 'function'
             || typeof getActiveProfile !== 'function' || typeof setTabActiveProfileId !== 'function'
             || typeof savePanels !== 'function' || typeof saveProfiles !== 'function'
@@ -70,12 +70,13 @@
                         root.DashBridgeAnalytics?.outcome('dashbridge.profile_imported', 'no_data');
                         return;
                     }
-                    const choice = await showConfirm(
+                    const choice = await showImportChoice(
                         `Файл содержит ${importedPanels.length} панел(и).\n\n`
-                        + '[OK] — Заменить панели текущего профиля\n'
-                        + `[Отмена] — Создать новый профиль «${profileName}»`
+                        + 'Заменить панели текущего профиля или создать новый профиль '
+                        + `«${profileName}»?`
                     );
-                    if (choice) {
+                    if (choice !== 'replace' && choice !== 'create') return;
+                    if (choice === 'replace') {
                         setPanels(importedPanels);
                         const activeProfile = getActiveProfile();
                         if (activeProfile && imported.hasTimeState) {
@@ -84,7 +85,7 @@
                             syncTimeControlsFromState();
                         }
                         if (activeProfile && imported.hasReport) activeProfile.report = importedReport;
-                        savePanels();
+                        await savePanels();
                         renderDashboard();
                     } else {
                         const newProfile = {

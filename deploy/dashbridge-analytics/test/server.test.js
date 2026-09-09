@@ -92,3 +92,59 @@ test('ingestion is public, deduplicated and admin data is authenticated', async 
     assert.equal(report.operations.clientDroppedAggregates, 2);
     assert.equal(JSON.stringify(report).includes('127.0.0.1'), false);
 });
+
+test('reports preserve calendar gaps, filter versions, dimensions and page stable complete results', async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const timestamp = Date.parse(today);
+    const installationId = '00000000-0000-4000-9000-000000000001';
+    const make = (index, age, version, featureId = 'popup.opened', signal = 'used', dimensions = {}) => ({
+        eventId: `00000000-0000-4000-9000-${String(index + 100).padStart(12, '0')}`,
+        periodStart: new Date(timestamp - age * 86400000).toISOString(),
+        featureId, signal, dimensions, count: 1, extensionVersion: version
+    });
+    const events = Array.from({ length: 130 }, (_, index) => make(index, 2, '2.4.2'));
+    events.push(make(131, 0, '2.4.3'), make(132, 0, '2.4.4'),
+        make(133, 0, '2.4.3', 'grafana.panel.fill_removed', 'effective', { surface: 'dashbridge', renderer: 'flot' }),
+        make(134, 0, '2.4.3', 'internal.panel_tools_apply', 'outcome', { surface: 'dashbridge', failure: 'timeout', outcome: 'error' }));
+    for (let start = 0; start < events.length; start += 100) {
+        const response = await fetch(`http://127.0.0.1:${port}/v1/events/batch`, { method: 'POST',
+            headers: { 'content-type': 'application/json' }, body: JSON.stringify({ schemaVersion: 1,
+                installationId, droppedAggregates: 0, events: events.slice(start, start + 100) }) });
+        assert.equal(response.status, 202);
+    }
+    const get = async query => {
+        const response = await fetch(`http://127.0.0.1:${port}/admin/api/data?days=7&installation=${installationId}&${query}`, {
+            headers: { 'x-dashbridge-admin': 'admin' }
+        });
+        assert.equal(response.status, 200);
+        return response.json();
+    };
+    const old = await get('version=2.4.2');
+    assert.equal(old.installations[0].version, '2.4.2');
+    assert.deepEqual(old.installations[0].latestVersion.split(',').sort(), ['2.4.3', '2.4.4']);
+    assert.equal(old.timeline.length, 7);
+    assert.equal(old.timeline.at(-1).events, 0);
+    assert.equal(old.timeline.at(-2).events, 0);
+    assert.equal(old.timeline.at(-3).events, 130);
+    assert.equal(old.pagination.actions.total, 130);
+    assert.equal(old.actions.length, 100);
+    assert.equal(old.pagination.actions.hasMore, true);
+    const second = await get('version=2.4.2&actionsPage=1');
+    assert.equal(second.actions.length, 30);
+    assert.equal(second.pagination.actions.hasMore, false);
+    const empty = await get('surface=direct_grafana');
+    assert.equal(empty.totals.events, 0);
+    assert.equal(empty.timeline.length, 7);
+    const filtered = await get('surface=dashbridge&renderer=flot');
+    assert.equal(filtered.totals.events, 1);
+    assert.equal(filtered.features[0].effectiveUsers, 1);
+    assert(!filtered.features[0].supportedSignals.includes('used'));
+    const failure = await get('outcome=error&failure=timeout');
+    assert.equal(failure.problems.length, 1);
+    assert.equal(failure.problems[0].failure, 'timeout');
+    const sorted = await get('actionsSort=version&actionsDirection=desc');
+    assert.equal(sorted.actions[0].version, '2.4.4');
+    assert.equal((await get('actionsPage=Infinity&actionsSort=event_id%3BDELETE')).pagination.actions.page, 1);
+    assert.equal((await get('signal=used')).versions.every(row => row.outcomes === 0), true);
+    assert.equal((await fetch(`http://127.0.0.1:${port}/health`)).status, 200);
+});

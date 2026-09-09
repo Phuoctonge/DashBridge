@@ -82,8 +82,23 @@ controller.run().then(() => {
 
     elements.dashUrl.value = '';
     return controller.run();
-}).then(() => {
+}).then(async () => {
     assert(notifications.some(call => call[0] === 'Заполните URL и диапазоны дат'));
+    elements.dashUrl.value = 'https://grafana.example/d/uid/name';
+    operation.begin = async () => { operation.processing = true; return 7; };
+    let releaseOptions;
+    operation.getCaptureOptions = () => new Promise(resolve => { releaseOptions = resolve; });
+    const first = controller.run();
+    await Promise.resolve();
+    await controller.run();
+    assert(notifications.some(call => call[0] === 'Процесс уже запущен!'));
+    releaseOptions({ prepared: false });
+    await first;
+    operation.processing = false;
+    const finishes = calls.filter(call => Array.isArray(call) && call[0] === 'finish').length;
+    operation.getCaptureOptions = async () => { throw new Error('storage unavailable'); };
+    await controller.run();
+    assert.strictEqual(calls.filter(call => Array.isArray(call) && call[0] === 'finish').length, finishes + 1);
     assert.throws(
         () => context.BatchMainRunController.create({ documentRef }),
         /dependencies are incomplete/,

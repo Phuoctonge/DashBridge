@@ -137,7 +137,8 @@ const profileContext = runModule(['pages', 'dashbridge', 'dashbridge-profile-con
     },
     window: { addEventListener: (type, listener) => { profileListeners[type] = listener; } },
     console,
-    crypto: { randomUUID: () => 'new-profile' },
+    structuredClone,
+    crypto: { randomUUID: (() => { let id = 0; return () => `clone-${++id}`; })() },
 });
 let profiles = [];
 let activeProfileId = null;
@@ -206,6 +207,26 @@ const profileController = profileContext.DashBridgeProfileController.create({
     assert.strictEqual(tabState.get('dashbridge_tab_activeProfileId'), 'two');
     assert(profileListeners.storage && profileListeners.visibilitychange && profileListeners.pagehide,
         'profile controller must retain storage and lifecycle cleanup listeners');
+    const original = profiles[1];
+    panels[0].tools = { legendVisibleSeries: ['CPU'] };
+    panels[0].paused = true;
+    panels.push({ id: 'p3', src: 'https://grafana.example/?viewPanel=3', report: { normalTemplate: 'OK' } });
+    original.report = { panelOrder: ['p3', 'p2'], template: '{{panels}}' };
+    original.timeState = { from: 'now-2h', to: 'now' };
+    await profileController.cloneProfile('Copy', original.id);
+    const copy = profileController.getActiveProfile();
+    assert.notStrictEqual(copy.id, original.id);
+    assert.strictEqual(copy.name, 'Copy');
+    assert.strictEqual(copy.panels[0].paused, true);
+    assert.notStrictEqual(copy.panels[0].id, original.panels[0].id);
+    assert.deepStrictEqual(Array.from(copy.report.panelOrder), [copy.panels[1].id, copy.panels[0].id]);
+    copy.panels[0].tools.legendVisibleSeries.push('Memory');
+    copy.timeState.from = 'now-1h';
+    assert.strictEqual(original.panels[0].tools.legendVisibleSeries.length, 1);
+    assert.strictEqual(original.timeState.from, 'now-2h');
+    const count = profiles.length;
+    await profileController.cloneProfile(' ', original.id);
+    assert.strictEqual(profiles.length, count);
     console.log('PASS extracted controllers retain script order, trust, replay and profile-state contracts');
 })().catch(error => {
     console.error(error);

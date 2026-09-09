@@ -16,12 +16,51 @@ const context = {
 context.window.window = context.window;
 context.window.document = context.document;
 vm.createContext(context);
+vm.runInContext(fs.readFileSync('js/content/grafana-unit.js', 'utf8'), context);
+context.window.DashBridgeGrafanaUnit = context.DashBridgeGrafanaUnit;
 vm.runInContext(fs.readFileSync(
     path.join(__dirname, '..', 'js', 'content', 'grafana-report-snapshot.js'), 'utf8'
 ), context);
 
 const factory = context.window.DashBridgeGrafanaReportSnapshot;
 assert(factory && Object.isFrozen(factory), 'report snapshot factory must expose one immutable MAIN dependency');
+for (const engine of ['uplot', 'flot', 'table-dom', 'table-response']) {
+    for (const [values, expectedState, latest, average] of [
+        [[80, null], 'critical', 80, 80],
+        [[null, undefined, '', ' ', NaN, Infinity], 'no_data', undefined, undefined],
+        [[80, null, 0], 'ok', 0, 40],
+        [[0], 'ok', 0, 0],
+    ]) {
+        const plot = { getData: () => [{ label: 'metric', data: values.map((v, i) => [i, v]) }] };
+        context.window.$ = engine === 'flot' ? () => ({
+            find: () => ({ toArray: () => [{}] }), data: () => plot,
+        }) : undefined;
+        context.window.__dashbridgePanelToolsVisualMetadata = engine === 'table-response'
+            ? { responseTableRecords: [{ name: 'metric', value: values.at(-1) }] } : {};
+        const collector = factory.create({
+            mergeAxisAndPanelUnit: value => value,
+            inferUnitFromAxisTicks: () => ({ unit: '', factor: 1 }),
+            getCachedPanelDefinition: () => null,
+            unitFromPanelDefinition: () => ({ unit: '', factor: 1 }),
+            collectGrafanaTableData: () => engine.startsWith('table') ? { rows: [['metric']] } : null,
+            collectGrafanaTableRecords: () => [{ name: 'metric', visible: true, values }],
+            findUPlot: () => engine === 'uplot' ? { series: [{}, { label: 'metric' }], data: [[], values] } : null,
+            getUPlotYScaleKey: () => 'y',
+            getUPlotUnitDetails: () => ({ unit: '', factor: 1 }),
+        });
+        const result = collector.collectPanelReportSnapshot({ root: {},
+            sla: { source: 'custom', value: 70, evaluation: 'latest' } });
+        const tableValue = values.at(-1);
+        const missingTable = engine === 'table-response' && (tableValue == null || !Number.isFinite(tableValue));
+        assert.strictEqual(result.state, missingTable ? 'no_data' : expectedState, engine);
+        if (engine !== 'table-response') {
+            assert.strictEqual(result.lastValue, latest, engine);
+            assert.strictEqual(result.averageValue, average, engine);
+        }
+    }
+}
+context.window.$ = undefined;
+context.window.__dashbridgePanelToolsVisualMetadata = {};
 const report = factory.create({
     mergeAxisAndPanelUnit: value => value,
     inferUnitFromAxisTicks: () => ({ unit: '', factor: 1 }),
@@ -151,3 +190,25 @@ assert.strictEqual(informationalFilteredSnapshot.threshold, null,
     'hidden stale SLA values must not leak into informational phrases');
 assert.throws(() => factory.create({}), /dependencies are incomplete/);
 console.log('PASS report snapshot module preserves bounded Table aggregation behind the visual facade');
+for (const engine of ['uplot', 'flot']) for (const requestedUnit of ['', 'ms']) {
+    const legendRows = [['fast', '510 ms'], ['slow', '1.40 mins'], ['middle', '43.8 s']];
+    context.window.__dashbridgePanelToolsVisualMetadata = {};
+    context.window.DashBridgeGrafanaDom = {
+        legendItems: () => legendRows.map(([name, value]) => ({ name, querySelector: () => ({ textContent: value }) })),
+        legendLabel: row => ({ textContent: row.name }), legendSeriesNames: () => [],
+    };
+    const plot = { getData: () => [{ label: 'Value', data: [[0, 84000]] }] };
+    context.window.$ = engine === 'flot' ? () => ({ find: () => ({ toArray: () => [{}] }), data: () => plot }) : null;
+    const mixed = factory.create({
+        mergeAxisAndPanelUnit: value => value, inferUnitFromAxisTicks: () => ({ unit: 'mins', factor: 60000 }),
+        getCachedPanelDefinition: () => null, unitFromPanelDefinition: () => ({ unit: 'ms', factor: 1 }),
+        collectGrafanaTableData: () => null, collectGrafanaTableRecords: () => [],
+        findUPlot: () => engine === 'uplot' ? { series: [{}, { label: 'Value' }], data: [[0], [84000]] } : null,
+        getUPlotYScaleKey: () => 'y', getUPlotUnitDetails: () => ({ unit: 'mins', factor: 60000 }),
+    }).collectPanelReportSnapshot({ root: {}, sla: { source: 'custom', value: requestedUnit ? 4200000 : 70,
+        unit: requestedUnit, evaluation: 'period_max' } });
+    assert.strictEqual(mixed.state, 'ok', engine);
+    assert.strictEqual(mixed.maxValue, requestedUnit ? 84000 : 1.4, engine);
+    assert.deepStrictEqual(Array.from(mixed.series, item => item.value),
+        requestedUnit ? [510, 84000, 43800] : [0.0085, 1.4, 0.73], engine);
+}

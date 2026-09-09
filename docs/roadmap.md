@@ -8,9 +8,18 @@
 ## P0 — ручной browser acceptance перед выпуском
 
 - Проверить расширение после reload в актуальном Chrome/Chromium.
+- Коллаж сообщения: проверить реальные uPlot/Flot панели, включая длинные
+  легенды и разные DPR, копирование PNG в Telegram Desktop/Web и отправку
+  сохранённым файлом. 2026-09-08 проверены захват двух доступных живых панелей
+  современной Grafana и визуальная сборка PNG; legacy-сервер не загрузился.
+  Локальный browser smoke проверяет сборку, lifecycle и реальный background
+  capture/crop на fixture, но не заменяет оставшийся acceptance.
 - Пройти реальные Grafana 9/10/12: direct page и DashBridge iframe, Flot и
   uPlot, capture success/error и восстановление UI.
 - Проверить авторизованные Jira, TDM и Confluence сценарии.
+- Проверить исправления отчёта на живых Flot/uPlot direct/iframe: ряд
+  `[80, null]` при latest/SLA >70 остаётся critical, `[null, null]` даёт
+  no_data, сетевые ошибки при SLA по vCPU не превращаются в норму.
 - Для Traffic Recorder записать, сохранить, импортировать и replay новый
   `.dashflow` v2 с cache/cookies в обоих режимах.
 

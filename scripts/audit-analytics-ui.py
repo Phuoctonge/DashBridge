@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 from pathlib import Path
 
 from playwright.async_api import async_playwright
@@ -7,7 +8,7 @@ from playwright.async_api import async_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "test-results" / "analytics-ui-audit"
-URL = "http://127.0.0.1:18080/admin/"
+URL = os.environ.get("DASHBRIDGE_ANALYTICS_URL", "http://127.0.0.1:18080/admin/")
 CHROME = Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe")
 VIEWPORTS = ((1440, 900), (1024, 768), (768, 1024), (430, 932), (360, 800), (320, 568))
 
@@ -15,16 +16,24 @@ VIEWPORTS = ((1440, 900), (1024, 768), (768, 1024), (430, 932), (360, 800), (320
 AUDIT_SCRIPT = """
 () => {
   const visible = element => {
+    if (!element.checkVisibility({ checkVisibilityCSS: true })) return false;
     const style = getComputedStyle(element);
     const rect = element.getBoundingClientRect();
     return style.visibility !== 'hidden' && style.display !== 'none' && rect.width > 0 && rect.height > 0;
   };
   const candidates = [...document.querySelectorAll('button,select,summary,a,[tabindex]:not([tabindex="-1"])')]
-    .filter(visible).map((element, index) => {
+    .filter(visible).filter(element => !element.classList.contains('table-wrap')).map((element, index) => {
       const rect = element.getBoundingClientRect();
+      let left = rect.left, top = rect.top, right = rect.right, bottom = rect.bottom;
+      for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+        const style = getComputedStyle(parent);
+        const bounds = parent.getBoundingClientRect();
+        if (/(auto|scroll|hidden|clip)/.test(style.overflowX)) { left = Math.max(left, bounds.left); right = Math.min(right, bounds.right); }
+        if (/(auto|scroll|hidden|clip)/.test(style.overflowY)) { top = Math.max(top, bounds.top); bottom = Math.min(bottom, bounds.bottom); }
+      }
       return { index, tag: element.tagName, id: element.id, text: (element.innerText || element.value || '').trim().slice(0, 80),
-        left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height };
-    });
+        left, top, right, bottom, width: rect.width, height: rect.height };
+    }).filter(rect => rect.right > rect.left && rect.bottom > rect.top);
   const overlaps = [];
   for (let left = 0; left < candidates.length; left += 1) {
     for (let right = left + 1; right < candidates.length; right += 1) {
@@ -78,19 +87,13 @@ async def main():
                 tooltip_checks = []
                 for name, index in (("first", 0), ("middle", await bars.count() // 2), ("last", await bars.count() - 1)):
                     bar = bars.nth(index)
-                    await bar.hover()
-                    metrics = await bar.evaluate("""element => {
-                      const timeline = element.parentElement.getBoundingClientRect();
-                      const tooltipElement = element.querySelector('.bar-tooltip');
-                      const tooltip = tooltipElement.getBoundingClientRect();
-                      return {
-                        name: element.getAttribute('aria-label'),
-                        timeline: { left: timeline.left, top: timeline.top, right: timeline.right, bottom: timeline.bottom },
-                        tooltip: { left: tooltip.left, top: tooltip.top, right: tooltip.right, bottom: tooltip.bottom,
-                          width: tooltip.width, height: tooltip.height,
-                          insideTimeline: tooltip.left >= timeline.left && tooltip.right <= timeline.right },
-                      };
-                    }""")
+                    await bar.focus()
+                    await bar.press("Enter")
+                    await page.locator("#rowDetails[open]").wait_for()
+                    metrics = {"name": await bar.get_attribute("aria-label"),
+                               "detail": await page.locator("#rowDetailsBody").inner_text()}
+                    await page.locator("#rowDetails").press("Escape")
+                    assert await bar.evaluate("element => element === document.activeElement")
                     metrics["position"] = name
                     tooltip_checks.append(metrics)
                     await page.locator("#timeline").locator("xpath=ancestor::section").screenshot(
@@ -105,8 +108,9 @@ async def main():
             audit["httpStatus"] = response.status if response else None
             audit["console"] = messages
             if width == 430:
-                await page.locator("summary").click()
+                await page.locator("details.legend > summary").click()
                 audit["legendOpened"] = await page.locator("details.legend").get_attribute("open") is not None
+                await page.locator('#filterPanel > summary').click()
                 await page.locator("#version").select_option("2.4.3")
                 await page.wait_for_load_state("networkidle")
                 audit["versionFilterApplied"] = await page.locator("#version").input_value() == "2.4.3"

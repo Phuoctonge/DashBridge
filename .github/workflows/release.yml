@@ -31,7 +31,9 @@ jobs:
         run: xvfb-run -a npm run test:browser
       - name: Test Windows installer
         shell: pwsh
-        run: ./scripts/Install-DashBridge.ps1 -SelfTest
+        run: |
+          ./scripts/Install-DashBridge.ps1 -SelfTest
+          ./test/installer_regressions.ps1
       - name: Build release archive
         shell: pwsh
         run: ./scripts/build-release.ps1 -ExpectedTag '${{ github.ref_name }}'

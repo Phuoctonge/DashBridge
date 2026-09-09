@@ -1,5 +1,6 @@
 param(
     [ValidateRange(1024, 65535)][int]$Port = 18080,
+    [ValidateSet('normal', 'empty', 'sparse', 'large', 'upgrade', 'catalog', 'outcomes', 'delivery')][string]$Scenario = 'normal',
     [switch]$ResetData,
     [switch]$NoBrowser
 )
@@ -7,14 +8,21 @@ param(
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $appRoot = Join-Path $projectRoot 'deploy\dashbridge-analytics'
-$dataRoot = Join-Path $appRoot '.dev-data'
+$dataRoot = Join-Path $appRoot ".dev-data\$Scenario"
 $node = 'C:\Program Files\nodejs\node.exe'
 
 if (-not (Test-Path -LiteralPath $node)) {
     throw "Node.js was not found at $node"
 }
 
-$seedArguments = @((Join-Path $appRoot 'scripts\seed-dev-data.js'))
+$probe = [System.Net.Sockets.TcpClient]::new()
+try {
+    if ($probe.ConnectAsync('127.0.0.1', $Port).Wait(500) -and $probe.Connected) {
+        throw "Port $Port is already in use. Stop the existing preview before preparing fixtures."
+    }
+} catch [System.AggregateException] { # Connection refused: this port is available.
+} finally { $probe.Dispose() }
+$seedArguments = @((Join-Path $appRoot 'scripts\seed-dev-data.js'), "--scenario=$Scenario")
 if ($ResetData) { $seedArguments += '--reset' }
 $env:DATA_DIR = $dataRoot
 & $node @seedArguments

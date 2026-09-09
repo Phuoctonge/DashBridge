@@ -160,9 +160,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const rect = target.getBoundingClientRect();
         animateProjectile(event.clientX - rect.left, event.clientY - rect.top);
     });
-    fileInput.addEventListener('change', async () => {
-        const file = fileInput.files?.[0];
-        if (!file || !/\.(png|jpe?g|webp|gif|bmp|svg|avif)$/i.test(file.name)) return;
+    let loadingPhoto = false;
+    const loadPhoto = async (file) => {
+        if (loadingPhoto || !file || !(file.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp|svg|avif)$/i.test(file.name))) return;
+        loadingPhoto = true;
         const nextUrl = URL.createObjectURL(file);
         try {
             await showImage(nextUrl);
@@ -172,8 +173,18 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch {
             URL.revokeObjectURL(nextUrl);
         } finally {
+            loadingPhoto = false;
             fileInput.value = '';
         }
+    };
+    fileInput.addEventListener('change', () => { void loadPhoto(fileInput.files?.[0]); });
+    document.addEventListener('paste', (event) => {
+        const item = Array.from(event.clipboardData?.items || [])
+            .find(candidate => candidate.kind === 'file' && candidate.type.startsWith('image/'));
+        const file = item?.getAsFile();
+        if (!file) return;
+        event.preventDefault();
+        void loadPhoto(file);
     });
     window.addEventListener('unload', () => {
         assetUrls.forEach((url) => URL.revokeObjectURL(url));

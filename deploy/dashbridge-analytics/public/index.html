@@ -1,40 +1,391 @@
 <!doctype html>
 <html lang="ru">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>DashBridge Analytics</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="style-extra.css">
-    <script src="labels.js" defer></script>
-    <script src="app.js" defer></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DashBridge Analytics</title>
+<link rel="stylesheet" href="style.css">
+<script src="labels.js" defer>
+</script>
+<script src="app.js" defer>
+</script>
 </head>
 <body>
-    <header><div><h1>DashBridge Analytics</h1><p>Обезличенные почасовые агрегаты</p></div><div class="header-actions"><button id="reset" class="secondary">Сбросить фильтры</button><button id="refresh">Обновить</button></div></header>
-    <main>
-        <section class="filters" aria-label="Фильтры">
-            <label>Период<select id="days"><option value="7">7 дней</option><option value="30" selected>30 дней</option><option value="90">90 дней</option><option value="180">180 дней</option><option value="365">365 дней</option></select></label>
-            <label>Версия<select id="version"><option value="">Все</option></select></label>
-            <label>Функция<select id="feature"><option value="">Все</option></select></label>
-            <label>Тип действия<select id="signal"><option value="">Все</option><option value="used">Использовано</option><option value="changed">Настройка изменена</option><option value="configured">Сохранено в конфигурации</option><option value="effective">Подтверждено в работе</option><option value="outcome">Результат операции</option><option value="lifecycle">Состояние расширения</option></select></label>
-            <label>Установка<select id="installation"><option value="">Все</option></select></label>
-        </section>
-        <p id="status" role="status">Загрузка…</p>
-        <details class="legend"><summary>Что означают показатели?</summary><p><b>Использовали</b> — вызвали функцию. <b>Настроили</b> — функция сохранена и может работать без повторного клика. <b>Сработало</b> — runtime подтвердил фактическое применение. <b>Проблемы</b> — ошибка, тайм-аут, отсутствие данных или частичный результат.</p></details>
-        <section class="cards" aria-label="Сводка">
-            <article><span>Установки</span><strong id="totalUsers">—</strong></article>
-            <article><span>Сигналы</span><strong id="totalEvents">—</strong></article>
-            <article><span>Агрегаты</span><strong id="totalAggregates">—</strong></article>
-            <article><span>Размер SQLite</span><strong id="databaseSize">—</strong></article>
-        </section>
-        <section class="panel"><h2>Активность по дням</h2><div id="timeline" class="timeline"></div></section>
-        <section class="panel"><h2>Лента действий по часам</h2><p class="hint">Время намеренно округлено до часа. Нажмите на установку, чтобы оставить только её действия.</p><div class="table-wrap table-wrap-feed"><table id="actions"><thead><tr><th data-key="periodStart">Час</th><th data-key="userLabel">Установка</th><th data-key="featureName">Что сделал</th><th data-key="signalName">Тип</th><th data-key="details">Результат и параметры</th><th data-key="events">Количество</th></tr></thead><tbody></tbody></table></div></section>
-        <section class="panel"><h2>Использование функций</h2><p class="hint">Доля использовавших функцию от активных установок за период. Числитель и знаменатель показаны рядом; настроенное состояние учитывается отдельно.</p><div class="table-wrap table-wrap-long"><table id="features"><thead><tr><th data-key="featureName">Функция</th><th data-key="adoption">Доля</th><th data-key="usedUsers">Использовали</th><th data-key="configuredUsers">Настроили</th><th data-key="effectiveUsers">Сработало</th><th data-key="successUsers">Успешно</th><th data-key="issueUsers">Проблемы</th><th data-key="events">Сигналы</th></tr></thead><tbody></tbody></table></div></section>
-        <section class="panel"><h2>Ошибки и проблемы</h2><p class="hint">Категория результата и причина помогают расследованию, но сами по себе не доказывают баг расширения. Тексты ошибок, адреса и данные Grafana не собираются.</p><div class="table-wrap"><table id="problems"><thead><tr><th data-key="featureName">Операция</th><th data-key="version">Версия</th><th data-key="outcomeName">Результат</th><th data-key="failureName">Причина</th><th data-key="ownerName">Категория / направление проверки</th><th data-key="users">Установки</th><th data-key="events">Сигналы</th></tr></thead><tbody></tbody></table></div></section>
-        <section class="panel"><h2>Версии расширения</h2><div class="table-wrap"><table id="versions"><thead><tr><th data-key="version">Версия</th><th data-key="users">Установки</th><th data-key="events">Сигналы</th><th data-key="issues">Проблемы</th><th data-key="issueRate">Доля неуспешных результатов</th><th data-key="lastSeen">Последняя активность</th></tr></thead><tbody></tbody></table></div></section>
-        <section class="panel"><h2>Установки расширения</h2><p class="hint">Идентификатор создаётся случайно в браузере и не связан с именем, почтой или IP. Нажмите строку для фильтрации.</p><div class="table-wrap"><table id="installations"><thead><tr><th data-key="userLabel">Установка</th><th data-key="version">Версия</th><th data-key="features">Функции</th><th data-key="events">Действия</th><th data-key="lastSeen">Последняя активность</th></tr></thead><tbody></tbody></table></div></section>
-        <section class="panel"><h2>Параметры операций</h2><p class="hint">Диапазон «Объектов в операции» скрывает точное количество. Например, «6–10» и «1 событие» означает одну операцию с 6–10 объектами.</p><div class="table-wrap table-wrap-long"><table id="dimensions"><thead><tr><th data-key="featureName">Функция</th><th data-key="signalName">Тип действия</th><th data-key="details">Параметры</th><th data-key="users">Установки</th><th data-key="events">Сигналы</th></tr></thead><tbody></tbody></table></div></section>
-        <section class="panel"><h2>Состояние приёма данных за всё время</h2><p class="hint">Общесервисные показатели не зависят от фильтров. Таблицы ограничены: лента — 1000 строк, версии — 100, остальные сводки — 500. Уточните фильтры, если достигнут лимит. Сигналы не равны числу операций; одна операция может создавать несколько сигналов.</p><div id="operations" class="operations"></div></section>
-    </main>
+<a class="skip-link" href="#report">К отчёту</a>
+<header>
+<div>
+<h1>DashBridge Analytics</h1>
+<p>Использование функций и качество работы</p>
+</div>
+<div class="header-actions">
+<button id="reset" class="secondary">Сбросить фильтры</button>
+<button id="refresh">Обновить</button>
+</div>
+</header>
+<main>
+<p id="environment" hidden>
+</p>
+<details id="filterPanel" class="panel filters-panel" open>
+<summary>Фильтры отчёта</summary>
+<div class="filters">
+<label for="days">Период<select id="days">
+<option value="7">7 дней</option>
+<option value="30" selected>30 дней</option>
+<option value="90">90 дней</option>
+<option value="180">180 дней</option>
+<option value="365">365 дней</option>
+</select>
+</label>
+<label for="version">Версия<select id="version">
+<option value="">Все</option>
+</select>
+</label>
+<label for="feature">Функция<select id="feature">
+<option value="">Все</option>
+</select>
+</label>
+<label for="signal">Сигнал<select id="signal">
+<option value="">Все</option>
+<option value="used">Вызов функции</option>
+<option value="changed">Изменение настройки</option>
+<option value="configured">Снимок конфигурации</option>
+<option value="effective">Применение подтверждено</option>
+<option value="outcome">Результат операции</option>
+<option value="lifecycle">Состояние расширения</option>
+</select>
+</label>
+<label for="installation">Установка<select id="installation">
+<option value="">Все</option>
+</select>
+</label>
+<label for="surface">Раздел<select id="surface">
+<option value="">Все</option>
+<option value="direct_grafana">Grafana</option>
+<option value="dashbridge">DashBridge</option>
+<option value="popup">Popup</option>
+<option value="batch">Batch</option>
+<option value="worklog">Worklog</option>
+<option value="recorder">Recorder</option>
+<option value="tdm">TDM</option>
+<option value="options">Настройки</option>
+<option value="confluence">Confluence</option>
+</select>
+</label>
+<label for="outcome">Результат<select id="outcome">
+<option value="">Все</option>
+<option value="success">Успешно</option>
+<option value="error">Ошибка</option>
+<option value="timeout">Тайм-аут</option>
+<option value="partial">Частично</option>
+<option value="no_data">Нет данных</option>
+<option value="cancelled">Отменено</option>
+<option value="invalid_input">Некорректный ввод</option>
+<option value="auth_required">Нужна авторизация</option>
+<option value="permission_denied">Нет разрешения</option>
+<option value="busy">Уже выполняется</option>
+<option value="unsupported_page">Не поддерживается</option>
+</select>
+</label>
+<label for="renderer">Графический движок<select id="renderer">
+<option value="">Все</option>
+<option value="uplot">uPlot</option>
+<option value="flot">Flot</option>
+<option value="unknown">Не определён</option>
+</select>
+</label>
+<label for="failure">Причина сбоя<select id="failure">
+<option value="">Все</option>
+<option value="runtime_dependency_missing">Компонент не загрузился</option>
+<option value="visual_verification_failed">Изменение не подтвердилось</option>
+<option value="legend_apply_failed">Легенда не применилась</option>
+<option value="timeout">Тайм-аут</option>
+<option value="unexpected_exception">Непредвиденная ошибка</option>
+</select>
+</label>
+</div>
+</details>
+<p id="status" role="status">Загрузка…</p>
+<p id="dataWarning" role="status" hidden>
+</p>
+<div id="report" tabindex="-1">
+<section class="cards" aria-label="Сводка">
+<article>
+<span>Установки с сигналами</span>
+<strong id="totalUsers">—</strong>
+</article>
+<article>
+<span>Сигналы в выборке</span>
+<strong id="totalEvents">—</strong>
+</article>
+<article>
+<span>Агрегаты в выборке</span>
+<strong id="totalAggregates">—</strong>
+</article>
+</section>
+<details class="legend panel">
+<summary>Как читать эти данные</summary>
+<p>Вызов — намерение воспользоваться функцией; результат учитывается отдельно. Снимок конфигурации выполняется при первом событии за день: «настроено за период» не означает текущее состояние. Подтверждение применения относится к команде настройки, а не к числу срабатываний или уведомлений. Дневные повторы подтверждения подавляются.</p>
+<p>Данные приходят не чаще раза в час и могут задержаться после офлайна. Нулевой день означает отсутствие полученных сигналов. Старые версии могли завышать подтверждения применения и считать применение времени дважды. Исторические записи сохраняются без предположительной коррекции.</p>
+</details>
+<section class="panel">
+<h2>Активность по дням</h2>
+<p class="hint" id="timelineHint">Календарные дни UTC, включая текущий неполный день. Высота — число сигналов.</p>
+<div id="timeline" class="timeline">
+</div>
+<details>
+<summary>Точные данные по дням</summary>
+<div class="table-wrap">
+<table id="timelineData">
+<caption>Дневная активность, UTC</caption>
+<thead>
+<tr>
+<th scope="col">Дата</th>
+<th scope="col">Сигналы</th>
+<th scope="col">Установки</th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+</div>
+</details>
+</section>
+<section class="panel">
+<h2>Охват функций</h2>
+<p class="hint">Любой сигнал означает наблюдение функции, а не доказанный вызов. Доля — уникальные установки с выбранными сигналами / установки с сигналами за период в том же контексте, без фильтра функции и сигнала. Колонки не суммируются. «—» означает, что сигнал не предусмотрен контрактом.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Охват функций">
+<table id="features">
+<caption>Охват функций. Сортировка всей выборки; стрелка обозначает направление.</caption>
+<thead>
+<tr>
+<th scope="col" data-key="featureId">
+<button type="button" class="sort">Функция</button>
+</th>
+<th scope="col" data-key="users">
+<button type="button" class="sort">Охват</button>
+</th>
+<th scope="col" data-key="usedUsers">
+<button type="button" class="sort">Вызвали</button>
+</th>
+<th scope="col" data-key="configuredUsers">
+<button type="button" class="sort">Настроено за период</button>
+</th>
+<th scope="col" data-key="effectiveUsers">
+<button type="button" class="sort">Применение подтверждено</button>
+</th>
+<th scope="col" data-key="successUsers">
+<button type="button" class="sort">Успешные результаты</button>
+</th>
+<th scope="col" data-key="issueUsers">
+<button type="button" class="sort">Проблемы</button>
+</th>
+<th scope="col" data-key="events">
+<button type="button" class="sort">Сигналы</button>
+</th>
+<th scope="col">Детали</th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+</div>
+<nav class="pagination" id="featuresPages" aria-label="Страницы: Охват функций">
+</nav>
+</section>
+<section class="panel">
+<h2>Ошибки и проблемы</h2>
+<p class="hint">Категория помогает расследованию, но не доказывает баг расширения. Старые подтверждения применения могли включать выключенные дочерние настройки; их нельзя точно исправить задним числом.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Ошибки и проблемы">
+<table id="problems">
+<caption>Ошибки и проблемы. Сортировка всей выборки; стрелка обозначает направление.</caption>
+<thead>
+<tr>
+<th scope="col" data-key="featureId">
+<button type="button" class="sort">Функция</button>
+</th>
+<th scope="col" data-key="version">
+<button type="button" class="sort">Версия</button>
+</th>
+<th scope="col" data-key="outcome">
+<button type="button" class="sort">Результат</button>
+</th>
+<th scope="col" data-key="failure">
+<button type="button" class="sort">Причина</button>
+</th>
+<th scope="col">Направление проверки</th>
+<th scope="col" data-key="users">
+<button type="button" class="sort">Установки</button>
+</th>
+<th scope="col" data-key="events">
+<button type="button" class="sort">Сигналы</button>
+</th>
+<th scope="col">Детали</th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+</div>
+<nav class="pagination" id="problemsPages" aria-label="Страницы: Ошибки и проблемы">
+</nav>
+</section>
+<section class="panel">
+<h2>Версии расширения</h2>
+<p class="hint">Доля проблем: все результаты, кроме success/cancelled, делённые на все outcome, включая отмены. «Нет результатов» не означает отсутствие ошибок. Одна установка может встречаться в нескольких версиях.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Версии расширения">
+<table id="versions">
+<caption>Версии расширения. Сортировка всей выборки; стрелка обозначает направление.</caption>
+<thead>
+<tr>
+<th scope="col" data-key="version">
+<button type="button" class="sort">Версия</button>
+</th>
+<th scope="col" data-key="users">
+<button type="button" class="sort">Установки</button>
+</th>
+<th scope="col" data-key="events">
+<button type="button" class="sort">Сигналы</button>
+</th>
+<th scope="col" data-key="issues">
+<button type="button" class="sort">Проблемы</button>
+</th>
+<th scope="col">Доля проблем</th>
+<th scope="col" data-key="lastSeen">
+<button type="button" class="sort">Последний сигнал, UTC</button>
+</th>
+<th scope="col">Детали</th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+</div>
+<nav class="pagination" id="versionsPages" aria-label="Страницы: Версии расширения">
+</nav>
+</section>
+<section class="panel">
+<h2>Установки расширения</h2>
+<p class="hint">Версии в выборке относятся к текущим фильтрам. Последняя наблюдаемая версия берётся из всей истории; несколько версий в одном последнем часе показаны вместе. Это не число людей.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Установки расширения">
+<table id="installations">
+<caption>Установки расширения. Сортировка всей выборки; стрелка обозначает направление.</caption>
+<thead>
+<tr>
+<th scope="col" data-key="installationId">
+<button type="button" class="sort">Установка</button>
+</th>
+<th scope="col" data-key="version">
+<button type="button" class="sort">Версии в выборке</button>
+</th>
+<th scope="col">Последние наблюдаемые версии</th>
+<th scope="col" data-key="features">
+<button type="button" class="sort">Функции</button>
+</th>
+<th scope="col" data-key="events">
+<button type="button" class="sort">Сигналы</button>
+</th>
+<th scope="col" data-key="lastSeen">
+<button type="button" class="sort">Последний сигнал, UTC</button>
+</th>
+<th scope="col">Детали</th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+</div>
+<nav class="pagination" id="installationsPages" aria-label="Страницы: Установки расширения">
+</nav>
+</section>
+<details class="panel">
+<summary>Лента сигналов по часам</summary>
+<p class="hint">Это почасовые агрегаты, не последовательность отдельных операций. Одна операция может создавать разные сигналы. Все даты приведены к UTC; сортировка действует на всю выборку.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Лента сигналов по часам">
+<table id="actions">
+<caption>Лента сигналов по часам. Сортировка всей выборки; стрелка обозначает направление.</caption>
+<thead>
+<tr>
+<th scope="col" data-key="periodStart">
+<button type="button" class="sort">Час, UTC</button>
+</th>
+<th scope="col" data-key="installationId">
+<button type="button" class="sort">Установка</button>
+</th>
+<th scope="col" data-key="featureId">
+<button type="button" class="sort">Функция</button>
+</th>
+<th scope="col" data-key="signal">
+<button type="button" class="sort">Сигнал</button>
+</th>
+<th scope="col" data-key="dimensions">
+<button type="button" class="sort">Параметры</button>
+</th>
+<th scope="col" data-key="events">
+<button type="button" class="sort">Количество</button>
+</th>
+<th scope="col" data-key="version">
+<button type="button" class="sort">Версия</button>
+</th>
+<th scope="col">Детали</th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+</div>
+<nav class="pagination" id="actionsPages" aria-label="Страницы: Лента сигналов по часам">
+</nav>
+</details>
+<details class="panel">
+<summary>Параметры сигналов</summary>
+<p class="hint">Количество объектов передаётся диапазоном. Для configured это объекты в снимке, для outcome — объекты операции. Нажмите «Подробнее», чтобы прочитать строку без горизонтальной прокрутки.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Параметры сигналов">
+<table id="dimensions">
+<caption>Параметры сигналов. Сортировка всей выборки; стрелка обозначает направление.</caption>
+<thead>
+<tr>
+<th scope="col" data-key="featureId">
+<button type="button" class="sort">Функция</button>
+</th>
+<th scope="col" data-key="signal">
+<button type="button" class="sort">Сигнал</button>
+</th>
+<th scope="col" data-key="dimensions">
+<button type="button" class="sort">Параметры</button>
+</th>
+<th scope="col" data-key="users">
+<button type="button" class="sort">Установки</button>
+</th>
+<th scope="col" data-key="events">
+<button type="button" class="sort">Сигналы</button>
+</th>
+<th scope="col">Детали</th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+</div>
+<nav class="pagination" id="dimensionsPages" aria-label="Страницы: Параметры сигналов">
+</nav>
+</details>
+<section class="panel">
+<h2>Состояние collector</h2>
+<p class="hint">Показатели за всё время, не зависят от фильтров. База и очередь ограничены; принятые повторы не добавляют события повторно.</p>
+<p>Занято SQLite: <strong id="databaseSize">—</strong>
+</p>
+<div id="operations" class="operations">
+</div>
+</section>
+</div>
+<dialog id="rowDetails" aria-labelledby="rowDetailsTitle">
+<h2 id="rowDetailsTitle">Подробности сигнала</h2>
+<dl id="rowDetailsBody">
+</dl>
+<form method="dialog">
+<button>Закрыть</button>
+</form>
+</dialog>
+</main>
 </body>
 </html>

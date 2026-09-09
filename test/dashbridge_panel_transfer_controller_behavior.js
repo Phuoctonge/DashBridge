@@ -31,7 +31,7 @@ const documentRef = {
 let panels = [];
 const profiles = [{ id: 'current', name: 'Current', panels: [] }];
 let activeProfile = profiles[0];
-let confirmChoice = true;
+let confirmChoice = 'replace';
 let nextText = '';
 let readComplete = Promise.resolve();
 let savePanelsCount = 0;
@@ -66,7 +66,7 @@ const transfer = {
 const controller = context.DashBridgePanelTransferController.create({
     transfer,
     showAlert: async message => { alerts.push(message); },
-    showConfirm: async () => confirmChoice,
+    showImportChoice: async () => confirmChoice,
     getPanels: () => panels,
     setPanels: value => { panels = value; },
     getProfiles: () => profiles,
@@ -112,7 +112,7 @@ const controller = context.DashBridgePanelTransferController.create({
     nextText = 'replace';
     await controller.importPanels({ name: 'large.json', size: 16 * 1024 * 1024 + 1 });
     assert.match(alerts.pop(), /16 МиБ/);
-    confirmChoice = true;
+    confirmChoice = 'replace';
     await controller.importPanels({ name: 'replace.json' });
     await readComplete;
     assert.strictEqual(panels[0].id, 'uuid-1');
@@ -123,7 +123,7 @@ const controller = context.DashBridgePanelTransferController.create({
 
     const previousPanels = panels;
     nextText = 'create';
-    confirmChoice = false;
+    confirmChoice = 'create';
     await controller.importPanels({ name: 'create.json' });
     await readComplete;
     assert.strictEqual(profiles.length, 2);
@@ -132,6 +132,17 @@ const controller = context.DashBridgePanelTransferController.create({
     assert.strictEqual(activeProfile.name, 'Imported');
     assert.strictEqual(saveProfilesCount, 1);
     assert.strictEqual(switcherCount, 1);
+
+    const beforeCancel = JSON.stringify({ panels, profiles, selectedProfileId, savePanelsCount,
+        saveProfilesCount, renderCount, switcherCount, loadTimeCount, syncTimeCount });
+    for (const cancelled of [null, undefined, false, 'cancel']) {
+        confirmChoice = cancelled;
+        await controller.importPanels({ name: 'cancel.json' });
+        await readComplete;
+        assert.strictEqual(JSON.stringify({ panels, profiles, selectedProfileId, savePanelsCount,
+            saveProfilesCount, renderCount, switcherCount, loadTimeCount, syncTimeCount }), beforeCancel,
+        'dismissal and unrecognized choices must not mutate profiles or trigger saving/rendering');
+    }
 
     nextText = 'empty';
     await controller.importPanels({ name: 'empty.json' });

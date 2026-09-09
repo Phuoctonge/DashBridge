@@ -478,7 +478,7 @@
         overlay.style.cssText = `position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2147483000;
             max-width:min(80vw,520px);padding:8px 12px;border-radius:7px;text-align:center;pointer-events:none;
             font:500 14px/1.35 system-ui,sans-serif;color:${status.kind === 'filtered_empty' ? '#1f7a3f' : '#b54708'};
-            background:rgba(255,255,255,.92);border:1px solid currentColor;box-shadow:0 3px 12px rgba(0,0,0,.12);`;
+            background:#fff;border:1px solid currentColor;box-shadow:0 3px 12px rgba(0,0,0,.12);`;
         if (!existing) document.body.appendChild(overlay);
     };
     const setPanelDataStatus = (kind, details = {}) => {

@@ -114,6 +114,7 @@
                 }
                 fullscreenPanelId = id;
                 forceLoadPanel(id);
+                root.DashBridgeAnalytics?.opened('dashbridge.panel_fullscreen_opened');
             }
             refreshPanelThresholdLayout(id);
         };

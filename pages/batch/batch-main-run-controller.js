@@ -49,7 +49,6 @@
             }
             const timestamps = normalizedRanges.ranges;
             const captureTheme = getCaptureTheme('captureThemeMain');
-            const captureOptions = await operation.getCaptureOptions('compactCaptureMain');
             if (!timestamps.length) {
                 showToast('Не удалось разобрать диапазоны дат', 'error');
                 return;
@@ -63,6 +62,8 @@
             let analyticsOutcome = 'error';
             logMessage('🚀 Начало работы массового сбора...');
             try {
+                const captureOptions = await operation.getCaptureOptions('compactCaptureMain');
+                if (!operation.isActive(runId)) return;
                 const dashboardResult = await panelPicker.getDashboardPanelsWithRecovery(urlStr);
                 if (!operation.isActive(runId)) return;
                 const panels = { ...dashboardResult.panels };

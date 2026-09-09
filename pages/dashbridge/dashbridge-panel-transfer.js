@@ -44,6 +44,7 @@
         const panels = [];
         const warnings = [];
         const identities = new Set();
+        const importedIds = new Map();
         let invalidEntries = 0;
         let duplicatesDropped = 0;
 
@@ -76,12 +77,16 @@
                 }
                 if (identity) identities.add(identity);
                 panels.push(normalized);
+                const sourceId = typeof source.id === 'string' ? source.id : '';
+                // For ambiguous legacy IDs, retain the first accepted panel deterministically.
+                if (sourceId && !importedIds.has(sourceId)) importedIds.set(sourceId, normalized.id);
             } catch (error) {
                 invalidEntries += 1;
                 warnings.push(error);
             }
         }
 
+        report.panelOrder = [...new Set(report.panelOrder.map(id => importedIds.get(id)).filter(Boolean))];
         return {
             version: data.version,
             profileName,

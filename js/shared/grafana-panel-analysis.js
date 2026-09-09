@@ -45,10 +45,10 @@
         let parsed = Number.parseFloat(text.replace(/,/g, '.').replace(/[^\d.-]/g, ''));
         if (!Number.isFinite(parsed)) return NaN;
         const lower = text.toLowerCase();
-        if (lower.includes('ki') || lower.includes('kb')) parsed *= 1024;
-        else if (lower.includes('mi') || lower.includes('mb')) parsed *= 1024 ** 2;
-        else if (lower.includes('gi') || lower.includes('gb')) parsed *= 1024 ** 3;
-        else if (lower.includes('ti') || lower.includes('tb')) parsed *= 1024 ** 4;
+        if (lower.includes('ki')) parsed *= 1024;
+        else if (lower.includes('mi')) parsed *= 1024 ** 2;
+        else if (lower.includes('gi')) parsed *= 1024 ** 3;
+        else if (lower.includes('ti')) parsed *= 1024 ** 4;
         else if (lower.includes('k')) parsed *= 1000;
         else if (lower.includes('m')) parsed *= 1000 ** 2;
         else if (lower.includes('g')) parsed *= 1000 ** 3;

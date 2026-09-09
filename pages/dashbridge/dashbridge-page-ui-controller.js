@@ -4,7 +4,7 @@
     function create({ getCrosshairMode, setCrosshairMode, getCrosshairThickness,
         setCrosshairThickness, hideCrosshair, postToDashboardFrame, getFrames,
         getCapturePrepared, setCapturePrepared, captureAllPanels,
-        renderProfileSwitcher, showPrompt, createProfile, renameActiveProfile,
+        renderProfileSwitcher, showPrompt, createProfile, cloneProfile, renameActiveProfile,
         deleteProfile, getActiveProfile, getActiveProfileId, openReportSettings,
         openReportPreview, openReportTest, setupPanelAddition,
         closeDashboardPickerIfOpen, setupPanelTransfer, closePanelAnalysis,
@@ -14,7 +14,7 @@
             getCrosshairMode, setCrosshairMode, getCrosshairThickness,
             setCrosshairThickness, hideCrosshair, postToDashboardFrame, getFrames,
             getCapturePrepared, setCapturePrepared, captureAllPanels,
-            renderProfileSwitcher, showPrompt, createProfile, renameActiveProfile,
+            renderProfileSwitcher, showPrompt, createProfile, cloneProfile, renameActiveProfile,
             deleteProfile, getActiveProfile, getActiveProfileId, openReportSettings,
             openReportPreview, openReportTest, setupPanelAddition,
             closeDashboardPickerIfOpen, setupPanelTransfer, closePanelAnalysis,
@@ -102,8 +102,34 @@
                 documentRef.getElementById('timePopover').style.display = 'none';
                 documentRef.getElementById('refreshPopover').style.display = 'none';
                 closeHeaderMenus();
-                if (!isShowing) renderProfileSwitcher();
+                if (!isShowing) {
+                    renderProfileSwitcher();
+                    positionProfileDropdown();
+                }
             });
+            const positionProfileDropdown = () => {
+                if (profileDropdown.style.display !== 'flex' || !profileDropdown.getBoundingClientRect) return;
+                profileDropdown.style.left = '0px';
+                const rect = profileDropdown.getBoundingClientRect();
+                const viewportWidth = documentRef.documentElement.clientWidth;
+                const shift = Math.max(8 - rect.left, Math.min(0, viewportWidth - 8 - rect.right));
+                profileDropdown.style.left = `${shift}px`;
+            };
+            const view = documentRef.defaultView;
+            if (view?.ResizeObserver) {
+                const observer = new view.ResizeObserver(positionProfileDropdown);
+                const start = () => {
+                    observer.observe(documentRef.querySelector('header'));
+                    observer.observe(profileDropdown);
+                    view.addEventListener('resize', positionProfileDropdown);
+                };
+                view.addEventListener('pagehide', () => {
+                    observer.disconnect();
+                    view.removeEventListener('resize', positionProfileDropdown);
+                });
+                view.addEventListener('pageshow', start);
+                start();
+            }
             profileDropdown.addEventListener('click', event => event.stopPropagation());
 
             const toggleHeaderMenu = (button, dropdown) => {
@@ -154,6 +180,17 @@
                 if (!profile) return;
                 const name = await showPrompt('Переименовать профиль:', profile.name);
                 if (name?.trim() && name.trim() !== profile.name) renameActiveProfile(name.trim());
+            });
+            documentRef.getElementById('cloneProfileBtn').addEventListener('click', async event => {
+                const source = getActiveProfile();
+                if (!source) return;
+                const button = event.currentTarget;
+                button.disabled = true;
+                closeHeaderMenus();
+                try {
+                    const name = await showPrompt('Название копии профиля:', `${source.name.slice(0, 112)} — копия`);
+                    if (name?.trim()) await cloneProfile(name.trim(), source.id);
+                } finally { button.disabled = false; }
             });
             documentRef.getElementById('deleteProfileBtn').addEventListener('click', () => {
                 deleteProfile(getActiveProfileId());

@@ -103,6 +103,16 @@ const modal = window.DashBridgeModal;
     assert.strictEqual(body.children.length, 0);
 
     const html = fs.readFileSync('pages/dashbridge/dashbridge.html', 'utf8');
+    for (const [selector, expected] of [
+        ['.modal-ok', 'replace'], ['.modal-create', 'create'], ['.modal-cancel', null], [null, null],
+    ]) {
+        const choice = modal.showImportChoice('Импорт <profile>');
+        overlay = body.children.at(-1);
+        assert.strictEqual(overlay.querySelector('.modal-cancel').focused, true);
+        (selector ? overlay.querySelector(selector) : overlay).dispatch('click');
+        assert.strictEqual(await choice, expected);
+        assert.strictEqual(body.children.length, 0);
+    }
     assert(html.indexOf('dashbridge-modal.js') < html.indexOf('dashbridge.js'),
         'modal owner must load before the DashBridge controller');
     const controller = fs.readFileSync('pages/dashbridge/dashbridge.js', 'utf8');

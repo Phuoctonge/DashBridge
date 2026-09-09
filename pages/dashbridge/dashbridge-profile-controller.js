@@ -172,6 +172,33 @@
             profile.name = newName.trim().slice(0, 120); void saveProfiles(); renderProfileSwitcher();
             root.DashBridgeAnalytics?.outcome('dashbridge.profile_renamed', 'success');
         };
+        const cloneProfile = async (name, sourceId = getActiveProfileId()) => {
+            const source = getProfiles().find(profile => profile.id === sourceId);
+            if (!source || !name?.trim()) return;
+            const sourcePanels = sourceId === getActiveProfileId() ? getPanels() : source.panels;
+            const copy = structuredClone({ ...source, panels: sourcePanels });
+            const ids = new Map();
+            copy.id = crypto.randomUUID();
+            copy.name = name.trim().slice(0, 120);
+            copy.panels.forEach(panel => {
+                const id = crypto.randomUUID();
+                ids.set(panel.id, id);
+                panel.id = id;
+            });
+            if (Array.isArray(copy.report?.panelOrder)) {
+                copy.report.panelOrder = copy.report.panelOrder.map(id => ids.get(id)).filter(Boolean);
+            }
+            const current = getActiveProfile();
+            if (current) current.panels = getPanels();
+            invalidateActiveProfileRuntime();
+            getProfiles().push(copy);
+            setTabActiveProfileId(copy.id);
+            setPanels([...copy.panels]);
+            loadActiveProfileTimeState();
+            const result = await saveProfiles();
+            renderProfileSwitcher(); syncTimeControlsFromState(); await renderDashboard();
+            if (result?.error) await showAlert('Копия создана, но не сохранена: ' + result.error);
+        };
         const deleteProfile = async id => {
             const profiles = getProfiles();
             if (profiles.length <= 1) return showAlert('Нельзя удалить единственный профиль.');
@@ -204,7 +231,7 @@
         window.addEventListener('pagehide', () => { void profileStore.checkpoint().catch(() => undefined); });
 
         return Object.freeze({ getActiveProfile, loadProfiles, saveProfiles, savePanels, syncProfilesFromStorage,
-            switchProfile, createProfile, renameActiveProfile, deleteProfile, renderProfileSwitcher,
+            switchProfile, createProfile, cloneProfile, renameActiveProfile, deleteProfile, renderProfileSwitcher,
             getCurrentProfilePanelIdentities, currentProfileHasPanel, setTabActiveProfileId });
     }
 

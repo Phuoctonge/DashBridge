@@ -63,6 +63,14 @@
                                 <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
                             </svg>
                         </button>
+                        <button id="cloneProfileBtn" type="button" class="profile-dropdown-action"
+                            title="Создать копию профиля" aria-label="Создать копию профиля">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <rect x="9" y="9" width="12" height="12" rx="2" />
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                            </svg>
+                        </button>
                         <button id="deleteProfileBtn" type="button"
                             class="profile-dropdown-action profile-dropdown-delete" title="Удалить профиль"
                             aria-label="Удалить профиль">
@@ -209,9 +217,6 @@
                     <button class="dropdown-item" data-refresh="5m">5 мин</button>
                     <button class="dropdown-item" data-refresh="15m">15 мин</button>
                     <button class="dropdown-item" data-refresh="30m">30 мин</button>
-                    <button class="dropdown-item" data-refresh="1h">1 ч</button>
-                    <button class="dropdown-item" data-refresh="2h">2 ч</button>
-                    <button class="dropdown-item" data-refresh="1d">1 дн</button>
                 </div>
             </div>
         </div>
@@ -463,6 +468,8 @@
 <script src="dashbridge-report-ui.js"></script>
 <script src="dashbridge-report-audit.js"></script>
 <script src="dashbridge-report-test-runner.js"></script>
+<script src="dashbridge-report-collage.js"></script>
+<script src="dashbridge-report-attachments.js"></script>
 <script src="dashbridge-report-controller.js"></script>
 <script src="dashbridge-capture.js"></script>
 <script src="dashbridge-variables-state.js"></script>

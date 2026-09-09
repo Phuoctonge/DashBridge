@@ -26,7 +26,16 @@
         }
         function toggleVisibility() {
             if (dialog.open) closeDialog();
-            else { host.hidden = false; dialog.showModal(); }
+            else {
+                host.hidden = false; dialog.showModal();
+                for (const group of groups.values()) {
+                    if (group.pending || group.reloading || group.transaction) continue;
+                    if (group.snapshot && !group.failed && Date.now() - group.updatedAt < 60000) continue;
+                    group.failed = false;
+                    status(group, group.snapshot ? 'Актуализация списка полей…' : 'Загрузка полей…');
+                    request(group);
+                }
+            }
             updateVisibility();
         }
         function onDialogKeydown(event) {
@@ -107,7 +116,7 @@
             group.pending = { id, frame };
             updateVisibility();
             group.element.setAttribute('aria-busy', 'true');
-            group.timer = setTimeout(() => fail(group, 'Нет ответа Grafana. Нажмите «Обновить поля».'), 27000);
+            group.timer = setTimeout(() => fail(group, 'Нет ответа Grafana. Закройте и снова откройте «Переменные дашборда».'), 27000);
             frame.contentWindow.postMessage({ action: 'dashbridgeVariablesRequest', requestId: id, operation, name, values },
                 new URL(frame.dataset.src || frame.src).origin);
         }
@@ -126,11 +135,8 @@
             group.failed = false;
             group.transaction = { frame, panel };
             invalidate();
-            if (changedName && group.snapshot.adapter === 'scenes') {
-                status(group, 'Grafana обновляет значения и зависимые поля…');
-                request(group, 'set', changedName, nextVariables.find(variable => variable.name === changedName).values);
-                return;
-            }
+            // Navigate once with the chosen value and without stale dependents.
+            // Mutating live Scenes first would start an extra query/render cycle.
             group.reloading = true;
             group.element.setAttribute('aria-busy', 'true');
             group.controls.querySelectorAll('button, input').forEach(control => { control.disabled = true; });
@@ -153,7 +159,7 @@
             else {
                 if (name) {
                     const panel = members(group).find(item => !item.paused && frameFor(item));
-                    if (panel) group.transaction = { panel, frame: frameFor(panel) };
+                    if (panel) group.transaction = { panel, frame: frameFor(panel), reloadSource: true };
                 }
                 request(group, name ? 'refresh' : 'read', name);
             }
@@ -292,11 +298,8 @@
             title.title = 'Открыть исходный дашборд Grafana';
             const controls = documentRef.createElement('div'); controls.className = 'dashboard-variable-controls';
             const message = documentRef.createElement('span'); message.setAttribute('role', 'status');
-            const button = documentRef.createElement('button'); button.type = 'button'; button.textContent = 'Обновить поля';
-            button.className = 'btn btn-outline';
             const group = { key, id: crypto.randomUUID(), element, controls, status: message, updatedAt: 0, ids: new Set() };
-            button.addEventListener('click', () => refresh(group));
-            element.append(title, controls, button, message); host.appendChild(element);
+            element.append(title, controls, message); host.appendChild(element);
             return group;
         }
         function sync() {
@@ -357,9 +360,10 @@
                 for (const [panel, src] of changes) {
                     if (panel.src === src) continue;
                     panel.src = src;
-                    // The correlated source already has Grafana's settled native
-                    // state. Rebuilding it would execute the same queries twice.
-                    if (panel.id === transaction.panel.id && frameFor(panel) === transaction.frame) {
+                    // Selection already navigated the source with new variables;
+                    // keep it when committing Grafana-resolved dependencies.
+                    // An explicit native options refresh may still need reload.
+                    if (!transaction.reloadSource && panel.id === transaction.panel.id && frameFor(panel) === transaction.frame) {
                         updatePanelCard(panel.id, { reloadFrame: false });
                     } else {
                         replacePanelCard(panel.id);

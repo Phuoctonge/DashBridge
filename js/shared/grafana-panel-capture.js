@@ -126,6 +126,25 @@ async function captureGrafanaPanelImage({
             if (!rect) return null;
         }
         await new Promise(resolve => setTimeout(resolve, settleMs));
+        if (prepared) {
+            await chrome.scripting.executeScript({
+                target: { tabId }, world: 'MAIN', args: [panelId],
+                func: async targetPanelId => {
+                    const state = window.__dashbridgeThresholdDiagnostic;
+                    if (!state?.enabled || !state.status?.enabled || state.suppressedReason
+                        || String(state.panelId).replace(/^panel-/, '') !== String(targetPanelId).replace(/^panel-/, '')) return;
+                    const panel = window.DashBridgeGrafanaDom?.findPanel({ panelId: targetPanelId });
+                    if (!panel) return;
+                    // Prepared layout changes chart coordinates after threshold
+                    // observers ran. Repaint against the settled capture geometry.
+                    window.DashBridgeGrafanaVisualEngine?.setThreshold?.({
+                        root: document.querySelector('.dashbridge-panel-capture-frame') || window.DashBridgeGrafanaDom.outerPanel(panel), enabled: true,
+                        value: state.requested.value, rawValue: state.requested.rawValue
+                    });
+                    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                }
+            });
+        }
         const source = await captureGrafanaVisibleTab(tabId, expectedUrl);
         if (!source) return null;
         const dataUrl = await new Promise(resolve => {
@@ -151,7 +170,11 @@ async function captureGrafanaPanelImage({
         if (preparedSessionId) {
             await chrome.scripting.executeScript({
                 target: { tabId }, world: 'MAIN', args: [preparedSessionId],
-                func: sessionId => window.DashBridgeGrafanaBatchCapture?.restore(sessionId)
+                func: sessionId => {
+                    const frame = document.querySelector('.dashbridge-panel-capture-frame');
+                    if (frame) window.DashBridgeGrafanaVisualEngine?.setThreshold?.({ root: frame, enabled: false });
+                    return window.DashBridgeGrafanaBatchCapture?.restore(sessionId);
+                }
             }).catch(() => undefined);
         }
     }

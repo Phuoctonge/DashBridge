@@ -46,9 +46,15 @@
                 })
             };
             if (sla.source !== 'cpu_capacity') return attached;
+            // Enrichment must not turn a failed or missing snapshot into a healthy report.
+            if (!['no_threshold', 'ok', 'warning', 'critical'].includes(snapshot.state)) return attached;
             const coefficient = Number(sla.coefficient);
             if (!Number.isFinite(coefficient) || coefficient <= 0) {
                 return { ...attached, state: 'configuration_error', error: 'Некорректный коэффициент фильтра Load Average по vCPU.' };
+            }
+            if (!attached.series.length) {
+                return snapshot.filteredEmpty === true && snapshot.dataStatus === 'filtered_empty'
+                    ? attached : { ...attached, state: 'no_data' };
             }
             let unknownCapacity = false;
             const series = attached.series.map(item => {

@@ -32,6 +32,72 @@
 
 > DashBridge работает поверх уже открытых корпоративных сервисов и использует действующую браузерную сессию пользователя. Отдельный сервер DashBridge не требуется.
 
+## Установка
+
+### Ручная установка
+
+1. Скачайте `DashBridge-X.Y.Z.zip` из
+   [последнего GitHub Release](https://github.com/Phuoctonge/DashBridge/releases/latest).
+2. Распакуйте ZIP в постоянную отдельную папку.
+3. Откройте `chrome://extensions`, `edge://extensions` либо
+   `browser://extensions` в Яндекс Браузере.
+4. Включите Developer Mode (Режим разработчика) и выберите **Загрузить распакованное расширение**.
+
+После ручной замены файлов нажмите **Обновить** на карточке расширения.
+
+### Автоматическая установка (Windows, бета)
+
+> Установщик находится в бета-версии: возможны ошибки и нестабильная работа.
+> Если установка не получается, используйте ручной способ выше.
+
+Installer определяет Google Chrome, Microsoft Edge или Яндекс Браузер,
+скачивает последний GitHub Release и распаковывает DashBridge
+в постоянную пользовательскую папку. Запустите в PowerShell:
+
+```powershell
+$installerFile = Join-Path $env:TEMP ('Install-DashBridge-' + [guid]::NewGuid().ToString('N') + '.ps1')
+try {
+    Invoke-WebRequest 'https://github.com/Phuoctonge/DashBridge/releases/latest/download/Install-DashBridge.ps1' -UseBasicParsing -TimeoutSec 120 -ErrorAction Stop -OutFile $installerFile
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installerFile
+} catch {
+    Write-Error ('Не удалось скачать установщик: ' + $_.Exception.Message)
+}
+```
+
+Права администратора не нужны. `ExecutionPolicy Bypass` действует только для
+этого процесса; корпоративные ограничения браузера и групповые политики сохраняются.
+
+Первый раз Chromium всё равно требует явного подтверждения: installer запустит
+браузер при необходимости и откроет папку расширения в Проводнике. Откройте
+управление расширениями, включите **Режим разработчика**, затем нажмите
+**Загрузить распакованное расширение** и выберите показанную папку. Следующие
+обновления заменяют проверенные файлы по тому же пути при работающем браузере и
+оставляют timestamped backup. Затем откройте popup DashBridge и нажмите
+**Перезагрузить расширение** — это штатный `chrome.runtime.reload()`, без
+страницы `chrome://extensions` и закрытия браузера.
+
+Для новой установки installer показывает путь
+`%LOCALAPPDATA%\DashBridge\Extension`. Нажмите Enter, чтобы использовать его,
+либо введите другой абсолютный путь распаковки. Для автоматизированного запуска
+тот же выбор доступен через параметр `-InstallPath`.
+
+Read-only диагностика браузеров, профилей и уже загруженных путей:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Install-DashBridge.ps1 -Diagnostics
+```
+
+Installer никогда не перезаписывает Git checkout. Для локальной разработки
+продолжайте загружать корень репозитория напрямую.
+
+При открытии popup проверяет последний стабильный выпуск в
+[GitHub Releases](https://github.com/Phuoctonge/DashBridge/releases) не чаще
+одного раза в час. Для более новой версии он показывает ссылку на проверенный
+installer asset, предварительно сверив тег, версию, имена ZIP/installer и GitHub
+URL. Отсутствие сети не мешает работе расширения, а запуск скачанного PowerShell
+остаётся явным действием пользователя. Подробный контракт находится в
+[docs/installer.md](docs/installer.md).
+
 ## Возможности
 
 ### Единый дашборд Grafana
@@ -178,59 +244,6 @@ Recorder создаёт отдельную контролируемую Chrome-�
 4. Создайте профиль и добавьте нужные панели через Share → Embed или по ID.
 5. Настройте время, фильтры Series, преобразования и пороги.
 6. Используйте дашборд для наблюдения или сохраните готовые снимки в PNG/ZIP.
-
-## Установка
-
-### Рекомендуемый Windows Installer
-
-Installer определяет Google Chrome, Microsoft Edge или Яндекс Браузер,
-скачивает последний GitHub Release, проверяет SHA-256 и распаковывает DashBridge
-в постоянную пользовательскую папку. Запустите в PowerShell:
-
-```powershell
-$p = Join-Path $env:TEMP 'Install-DashBridge.ps1'; Invoke-WebRequest 'https://github.com/Phuoctonge/DashBridge/releases/latest/download/Install-DashBridge.ps1' -UseBasicParsing -OutFile $p; Unblock-File -LiteralPath $p; & $p
-```
-
-Первый раз Chromium всё равно требует явного подтверждения: installer запустит
-браузер при необходимости и покажет путь через его штатное меню. Откройте
-управление расширениями, включите **Режим разработчика**, затем нажмите
-**Загрузить распакованное расширение** и выберите показанную папку. Следующие
-обновления заменяют проверенные файлы по тому же пути при работающем браузере и
-оставляют timestamped backup. Затем откройте popup DashBridge и нажмите
-**Перезагрузить расширение** — это штатный `chrome.runtime.reload()`, без
-страницы `chrome://extensions` и закрытия браузера.
-
-Для новой установки installer показывает путь
-`%LOCALAPPDATA%\DashBridge\Extension`. Нажмите Enter, чтобы использовать его,
-либо введите другой абсолютный путь распаковки. Для автоматизированного запуска
-тот же выбор доступен через параметр `-InstallPath`.
-
-Read-only диагностика браузеров, профилей и уже загруженных путей:
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Install-DashBridge.ps1 -Diagnostics
-```
-
-Installer никогда не перезаписывает Git checkout. Для локальной разработки
-продолжайте загружать корень репозитория напрямую.
-
-### Ручная установка
-
-1. Скачайте `DashBridge-X.Y.Z.zip` и `.sha256` из GitHub Release.
-2. Проверьте SHA-256 и распакуйте ZIP в постоянную отдельную папку.
-3. Откройте `chrome://extensions`, `edge://extensions` либо страницу расширений
-   Яндекс Браузера.
-4. Включите Developer Mode и выберите **Загрузить распакованное расширение**.
-
-После ручной замены файлов нажмите **Обновить** на карточке расширения.
-
-При открытии popup проверяет последний стабильный выпуск в
-[GitHub Releases](https://github.com/Phuoctonge/DashBridge/releases) не чаще
-одного раза в час. Для более новой версии он показывает ссылку на проверенный
-installer asset, предварительно сверив тег, версию, имена ZIP/installer и GitHub
-URL. Отсутствие сети не мешает работе расширения, а запуск скачанного PowerShell
-остаётся явным действием пользователя. Подробный контракт находится в
-[docs/installer.md](docs/installer.md).
 
 ## Первичная настройка
 

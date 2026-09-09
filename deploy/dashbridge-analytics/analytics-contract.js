@@ -117,4 +117,5 @@ function validateBatch(payload) {
     return payload.events.every(validateEvent);
 }
 
-module.exports = Object.freeze({ validateBatch, featureIds: Object.freeze([...definitions.keys()]) });
+const signalsFor = id => [...(definitions.get(id)?.signals || [])];
+module.exports = Object.freeze({ validateBatch, signalsFor, featureIds: Object.freeze([...definitions.keys()]) });

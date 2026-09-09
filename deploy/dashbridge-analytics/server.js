@@ -4,7 +4,7 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
-const { validateBatch } = require('./analytics-contract');
+const { validateBatch, signalsFor } = require('./analytics-contract');
 
 const port = Math.max(1, Math.min(65535, Number(process.env.PORT) || 8080));
 const host = process.env.HOST || '0.0.0.0';
@@ -142,16 +142,23 @@ maintain();
 setInterval(maintain, 24 * 60 * 60 * 1000).unref();
 
 function buildFilter(url, omitted = new Set()) {
-    const days = Math.max(1, Math.min(retentionDays, Number(url.searchParams.get('days')) || 30));
-    const cutoff = new Date(Date.now() - days * 86_400_000).toISOString();
-    const clauses = ['period_start >= ?']; const params = [cutoff];
+    const days = Math.floor(Math.max(1, Math.min(retentionDays, Number(url.searchParams.get('days')) || 30)));
+    const today = new Date().toISOString().slice(0, 10);
+    const cutoff = new Date(Date.parse(today) - (days - 1) * 86_400_000).toISOString();
+    const end = new Date().toISOString();
+    const clauses = ['period_start >= ?', 'period_start <= ?']; const params = [cutoff, end];
     const allowed = { feature: 'feature_id', signal: 'signal', version: 'extension_version', installation: 'installation_id' };
     Object.entries(allowed).forEach(([query, column]) => {
         if (omitted.has(query)) return;
         const value = (url.searchParams.get(query) || '').trim();
         if (value && value.length <= 120) { clauses.push(`${column} = ?`); params.push(value); }
     });
-    return { where: clauses.join(' AND '), params, days };
+    for (const key of ['surface', 'outcome', 'renderer', 'failure']) {
+        if (omitted.has(key)) continue;
+        const value = (url.searchParams.get(key) || '').trim();
+        if (value && value.length <= 120) { clauses.push(`json_extract(dimensions_json, '$.${key}') = ?`); params.push(value); }
+    }
+    return { where: clauses.join(' AND '), params, days, cutoff, end };
 }
 
 function adminData(url) {
@@ -167,13 +174,48 @@ function adminData(url) {
     const totals = query(`COALESCE(SUM(event_count), 0) AS events,
         COUNT(DISTINCT installation_id) AS installations,
         COUNT(*) AS aggregates, MIN(period_start) AS firstPeriod, MAX(period_start) AS lastPeriod`)[0];
+    const pagination = {};
+    const sortKeys = {
+        features: ['featureId', 'users', 'usedUsers', 'configuredUsers', 'effectiveUsers', 'successUsers', 'issueUsers', 'events'],
+        actions: ['periodStart', 'installationId', 'featureId', 'signal', 'dimensions', 'events', 'version'],
+        installations: ['installationId', 'version', 'features', 'events', 'lastSeen'],
+        versions: ['version', 'users', 'events', 'issues', 'outcomes', 'lastSeen'],
+        problems: ['featureId', 'version', 'outcome', 'failure', 'users', 'events'],
+        dimensions: ['featureId', 'signal', 'dimensions', 'users', 'events']
+    };
+    const pageQuery = (id, select, group = '', order = '', extra = '') => {
+        const total = db.prepare(`SELECT COUNT(*) AS count FROM (SELECT ${select} FROM events WHERE ${filter.where} ${extra} ${group})`).get(...filter.params).count;
+        const size = id === 'actions' ? 100 : 50;
+        const requested = Math.floor(Math.max(0, Math.min(1_000_000, Number(url.searchParams.get(`${id}Page`)) || 0)));
+        const page = Math.min(requested, Math.max(0, Math.ceil(total / size) - 1));
+        const key = url.searchParams.get(`${id}Sort`);
+        const direction = url.searchParams.get(`${id}Direction`) === 'asc' ? 'ASC' : 'DESC';
+        if (sortKeys[id].includes(key)) order = `ORDER BY ${key} ${direction}`;
+        // A stable tie-breaker prevents repeated/missing rows across pages with equal values.
+        const tie = id === 'actions' ? 'event_id' : id === 'features' ? 'feature_id'
+            : id === 'versions' ? 'extension_version' : id === 'installations' ? 'installation_id'
+                : id === 'problems' ? 'feature_id, extension_version, outcome, failure' : 'feature_id, signal, dimensions_json';
+        order += `, ${tie}`;
+        pagination[id] = { page, pageSize: size, total, hasMore: (page + 1) * size < total };
+        return query(select, group, order, `LIMIT ${size} OFFSET ${page * size}`, extra);
+    };
+    const timelineRows = query(`substr(period_start, 1, 10) AS day, SUM(event_count) AS events,
+        COUNT(DISTINCT installation_id) AS users`, 'GROUP BY day', 'ORDER BY day');
+    const byDay = new Map(timelineRows.map(row => [row.day, row]));
+    const timeline = Array.from({ length: filter.days }, (_, index) => {
+        const day = new Date(Date.parse(filter.cutoff) + index * 86_400_000).toISOString().slice(0, 10);
+        return byDay.get(day) || { day, events: 0, users: 0 };
+    });
     return {
+        pagination, range: { from: filter.cutoff, to: filter.end, timezone: 'UTC' },
+        environment: devAdminBypass ? { mode: 'development', fixtureVersion: readMetric.get('fixture_version')?.value || null,
+            scenario: readMetric.get('fixture_scenario')?.value || null, createdAt: readMetric.get('fixture_created_at')?.value || null } : { mode: 'production' },
         generatedAt: new Date().toISOString(), days: filter.days, retentionDays,
         databaseMiB: Math.round(databaseSize() / 104857.6) / 10,
         databaseUsedMiB: Math.round(databaseUsedSize() / 104857.6) / 10,
         databaseLimitMiB: Math.round(maxDatabaseBytes / 104857.6) / 10,
         totals: { ...totals, activeInstallations },
-        features: query(`feature_id AS featureId,
+        features: pageQuery('features', `feature_id AS featureId,
             COUNT(DISTINCT installation_id) AS users,
             COUNT(DISTINCT CASE WHEN signal = 'used' THEN installation_id END) AS usedUsers,
             COUNT(DISTINCT CASE WHEN signal = 'configured' THEN installation_id END) AS configuredUsers,
@@ -182,34 +224,35 @@ function adminData(url) {
                 THEN installation_id END) AS successUsers,
             COUNT(DISTINCT CASE WHEN signal = 'outcome' AND json_extract(dimensions_json, '$.outcome')
                 NOT IN ('success', 'cancelled') THEN installation_id END) AS issueUsers,
-            SUM(event_count) AS events`, 'GROUP BY feature_id', 'ORDER BY users DESC, events DESC', 'LIMIT 500'),
-        versions: query(`extension_version AS version, SUM(event_count) AS events,
+            SUM(event_count) AS events`, 'GROUP BY feature_id', 'ORDER BY users DESC, events DESC').map(row => ({ ...row, supportedSignals: signalsFor(row.featureId) })),
+        versions: pageQuery('versions', `extension_version AS version, SUM(event_count) AS events,
             COUNT(DISTINCT installation_id) AS users,
             SUM(CASE WHEN signal = 'outcome' THEN event_count ELSE 0 END) AS outcomes,
             SUM(CASE WHEN signal = 'outcome' AND json_extract(dimensions_json, '$.outcome')
                 NOT IN ('success', 'cancelled') THEN event_count ELSE 0 END) AS issues,
             MAX(period_start) AS lastSeen`,
-        'GROUP BY extension_version', 'ORDER BY lastSeen DESC', 'LIMIT 100'),
-        installations: query(`installation_id AS installationId, SUM(event_count) AS events,
+        'GROUP BY extension_version', 'ORDER BY lastSeen DESC'),
+        installations: pageQuery('installations', `installation_id AS installationId, SUM(event_count) AS events,
             COUNT(DISTINCT feature_id) AS features,
-            (SELECT recent.extension_version FROM events AS recent
+            GROUP_CONCAT(DISTINCT extension_version) AS version,
+            (SELECT GROUP_CONCAT(DISTINCT recent.extension_version) FROM events AS recent
                 WHERE recent.installation_id = events.installation_id
-                ORDER BY recent.period_start DESC LIMIT 1) AS version,
-            MAX(period_start) AS lastSeen`, 'GROUP BY installation_id', 'ORDER BY lastSeen DESC', 'LIMIT 500'),
-        timeline: query(`substr(period_start, 1, 10) AS day, SUM(event_count) AS events,
-            COUNT(DISTINCT installation_id) AS users`, 'GROUP BY day', 'ORDER BY day ASC', 'LIMIT 1500'),
-        dimensions: query(`feature_id AS featureId, signal, dimensions_json AS dimensions,
+                AND recent.period_start = (SELECT MAX(latest.period_start) FROM events AS latest
+                    WHERE latest.installation_id = events.installation_id)) AS latestVersion,
+            MAX(period_start) AS lastSeen`, 'GROUP BY installation_id', 'ORDER BY lastSeen DESC'),
+        timeline,
+        dimensions: pageQuery('dimensions', `feature_id AS featureId, signal, dimensions_json AS dimensions,
             SUM(event_count) AS events, COUNT(DISTINCT installation_id) AS users`,
-        'GROUP BY feature_id, signal, dimensions_json', 'ORDER BY events DESC', 'LIMIT 500',
+        'GROUP BY feature_id, signal, dimensions_json', 'ORDER BY events DESC',
         `AND dimensions_json <> '{}'`),
-        actions: query(`period_start AS periodStart, installation_id AS installationId,
+        actions: pageQuery('actions', `period_start AS periodStart, installation_id AS installationId,
             feature_id AS featureId, signal, dimensions_json AS dimensions,
-            event_count AS events, extension_version AS version`, '', 'ORDER BY period_start DESC', 'LIMIT 1000'),
-        problems: query(`feature_id AS featureId, extension_version AS version,
+            event_count AS events, extension_version AS version`, '', 'ORDER BY period_start DESC'),
+        problems: pageQuery('problems', `feature_id AS featureId, extension_version AS version,
             json_extract(dimensions_json, '$.outcome') AS outcome,
             json_extract(dimensions_json, '$.failure') AS failure,
             COUNT(DISTINCT installation_id) AS users, SUM(event_count) AS events`,
-        'GROUP BY feature_id, extension_version, outcome, failure', 'ORDER BY events DESC', 'LIMIT 500',
+        'GROUP BY feature_id, extension_version, outcome, failure', 'ORDER BY events DESC',
         `AND signal = 'outcome' AND json_extract(dimensions_json, '$.outcome') NOT IN ('success', 'cancelled')`),
         operations: {
             acceptedBatches: metricNumber('accepted_batches'),
@@ -221,7 +264,7 @@ function adminData(url) {
             lastSuccessfulIngest: readMetric.get('last_successful_ingest')?.value || null,
         },
         filterOptions: (() => {
-            const broad = buildFilter(url, new Set(['feature', 'signal', 'version', 'installation']));
+            const broad = buildFilter(url, new Set(['feature', 'signal', 'version', 'installation', 'surface', 'outcome', 'renderer', 'failure']));
             return {
                 versions: queryFor(broad, 'DISTINCT extension_version AS value', '', 'ORDER BY value'),
                 features: queryFor(broad, 'DISTINCT feature_id AS value', '', 'ORDER BY value'),
@@ -307,7 +350,9 @@ const server = http.createServer(async (request, response) => {
             send(response, 308, '', { location: '/admin/' }); return;
         }
         if (request.method === 'GET' && url.pathname === '/admin/api/data') {
-            sendJson(response, 200, adminData(url)); return;
+            try { sendJson(response, 200, adminData(url)); }
+            catch { sendJson(response, 500, { ok: false, error: 'report-unavailable' }); }
+            return;
         }
         const asset = request.method === 'GET' ? readAsset(url.pathname) : null;
         if (asset) { send(response, 200, asset.body, { 'content-type': asset.contentType }); return; }

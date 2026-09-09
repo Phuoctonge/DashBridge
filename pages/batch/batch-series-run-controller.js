@@ -57,7 +57,6 @@
 
             const mode = documentRef.getElementById('seriesCaptureMode').value;
             const captureTheme = getCaptureTheme('captureThemeSeries');
-            const captureOptions = await operation.getCaptureOptions('compactCaptureSeries');
             const includePattern = documentRef.getElementById('seriesIncludeFilter').value;
             const ignorePattern = documentRef.getElementById('seriesIgnoreFilter').value;
             const cards = documentRef.querySelectorAll('#seriesPanelsContainer .batch-series-card');
@@ -75,6 +74,8 @@
             let seriesDiscoveryTabId = null;
             let analyticsOutcome = 'error';
             try {
+                const captureOptions = await operation.getCaptureOptions('compactCaptureSeries');
+                if (!operation.isActive(runId)) return;
                 const batchPageTab = await chromeRef.tabs.getCurrent();
                 const seriesDashboardUrl = documentRef.getElementById('seriesDashUrl').value.trim();
                 const seriesPanelRules = parseUrl(seriesDashboardUrl)
@@ -128,6 +129,8 @@
                             failed: failedJobs, phase: `Series панели ${panelId}`,
                             message: `${range.from} → ${range.to}`,
                         });
+                        const completedBeforeSlice = completedJobs;
+                        let plannedSliceJobs = 0;
                         try {
                             const discoveryResult = await discovery.discoverForSlice({
                                 dashboardUrl: seriesDashboardUrl,
@@ -143,9 +146,10 @@
                             const selection = seriesSelection.resolvePatterns(
                                 discoveryResult.names, includePattern, ignorePattern,
                             );
-                            totalJobs += mode === 'group'
+                            plannedSliceJobs = mode === 'group'
                                 ? (selection.matches.length ? 1 : 0)
                                 : selection.matches.length;
+                            totalJobs += plannedSliceJobs;
                             updateProgress({
                                 done: completedJobs, total: totalJobs,
                                 success: successfulJobs, failed: failedJobs,
@@ -275,6 +279,15 @@
                                 }
                             }
                         } catch (error) {
+                            if (!operation.isActive(runId)) break;
+                            // Discovery failures count as one job; after discovery,
+                            // account for every capture skipped by this slice failure.
+                            if (!plannedSliceJobs) { plannedSliceJobs = 1; totalJobs++; }
+                            const remaining = plannedSliceJobs - (completedJobs - completedBeforeSlice);
+                            for (let index = 0; index < remaining; index++) {
+                                recordSeriesJob(false, `panel-${panelId}/range-${rangeIndex + 1}/pending-${index + 1}`,
+                                    error.message || 'Ошибка сбора Series');
+                            }
                             logMessage(
                                 `Не удалось получить серии панели ${panelId} для ${range.from} → ${range.to}: ${error.message}`,
                                 true,

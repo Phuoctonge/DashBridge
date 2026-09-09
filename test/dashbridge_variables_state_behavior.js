@@ -20,7 +20,7 @@ assert.equal(changed.searchParams.get('var-other'), 'a');
 assert.equal(changed.searchParams.get('from'), 'now-1h');
 assert.equal(changed.searchParams.get('timezone'), 'Europe/Moscow');
 assert.equal(changed.hash, '#keep');
-const dependentUrl = api.resetDependents(first + '&var-child=stale&var-leaf=old', [
+const dependentUrl = api.resetDependents(first.replace('#keep', '&var-child=stale&var-leaf=old#keep'), [
     { name: 'x', dependencies: [] }, { name: 'child', dependencies: ['x'] },
     { name: 'leaf', dependencies: ['child'] }, { name: 'other', dependencies: [] }
 ], 'x');

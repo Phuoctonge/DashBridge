@@ -50,6 +50,23 @@ assert.strictEqual(dynamicSnapshot.series[1].threshold, 12.8);
 assert.strictEqual(dynamicSnapshot.series[0].level, 'critical');
 assert.strictEqual(dynamicSnapshot.series[1].level, 'normal');
 
+const cpuSla = { source: 'cpu_capacity', coefficient: 0.8 };
+for (const state of ['error', 'no_data', 'configuration_error', 'unknown']) {
+    for (const series of [[], [{ name: 'known', value: 1, cpuCapacity: 4 }]]) {
+        const failed = { state, series, dataStatus: 'network_error', error: 'Network failed' };
+        const enriched = context.attachCapacity(failed, cpuSla);
+        assert.strictEqual(enriched.state, state, 'enrichment must preserve failed/unknown states');
+        assert.strictEqual(enriched.error, failed.error);
+        assert.strictEqual(enriched.dataStatus, failed.dataStatus);
+    }
+}
+assert.strictEqual(context.attachCapacity({ state: 'no_threshold', series: [] }, cpuSla).state, 'no_data');
+assert.strictEqual(context.attachCapacity({ state: 'ok', series: [], filteredEmpty: true,
+    dataStatus: 'filtered_empty' }, cpuSla).state, 'ok', 'explicit filtered-empty success must survive');
+assert.strictEqual(context.attachCapacity({ state: 'no_threshold', series: [
+    { name: 'unknown', value: 8 }
+] }, cpuSla).state, 'no_data');
+
 assert(moduleSource.includes("insertCell(headerRow, headerAnchor, 'vCPU', true)"),
     'table legend must receive a vCPU header after the name column');
 assert(moduleSource.includes('if (tableCell?.parentElement === row) tableCell.after(cell);'),

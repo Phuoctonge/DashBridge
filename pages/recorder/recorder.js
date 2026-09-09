@@ -50,6 +50,14 @@
         sessionModeBadge: document.getElementById('sessionModeBadge'),
         sessionProgress: document.getElementById('sessionProgress'),
         comparisonPanel: document.getElementById('comparisonPanel'),
+        recordingPanel: document.getElementById('recordingPanel'),
+        recordingTab: document.getElementById('recordingTab'),
+        comparisonTab: document.getElementById('comparisonTab'),
+        comparisonTabCount: document.getElementById('comparisonTabCount'),
+        comparisonOverview: document.getElementById('comparisonOverview'),
+        comparisonEmpty: document.getElementById('comparisonEmpty'),
+        comparisonStatus: document.getElementById('comparisonStatus'),
+        backToRecording: document.getElementById('backToRecording'),
         comparisonSummary: document.getElementById('comparisonSummary'),
         comparisonFilter: document.getElementById('comparisonFilter'),
         comparisonUrlFilter: document.getElementById('comparisonUrlFilter'),
@@ -65,7 +73,7 @@
     const state = {
         mode: 'idle', tabId: null, windowId: null, attached: false, detaching: false,
         title: '', startUrl: '', createdAt: null, steps: [], requests: new Map(),
-        baselineRequests: new Map(), comparison: [],
+        baselineRequests: new Map(), comparison: [], comparisonReady: false,
         loadedManifest: null, totalBodyBytes: 0, totalRequestBodyBytes: 0, inFlight: new Set(), lastNetworkAt: 0,
         actionSequence: 0, detachedUnexpectedly: false, activeRequests: new Map(), redirectCounts: new Map(), ignoredRequests: new Set(), selectedRequestId: null,
         requestChains: new Map(), requestExtraInfoIndexes: new Map(), responseExtraInfoIndexes: new Map(),
@@ -85,6 +93,8 @@
     function setStatus(message, error = false) {
         ui.status.textContent = message;
         ui.status.classList.toggle('error', error);
+        ui.comparisonStatus.textContent = message;
+        ui.comparisonStatus.classList.toggle('error', error);
     }
 
     function formatBytes(bytes) {
@@ -219,6 +229,8 @@
         if (!keepSteps) state.steps = [];
         if (!keepBaseline) state.baselineRequests = new Map();
         state.comparison = [];
+        state.comparisonReady = false;
+        recorderView.resetWorkspace();
         state.requests = new Map(); state.totalBodyBytes = 0; state.totalRequestBodyBytes = 0; state.inFlight = new Set();
         state.activeRequests = new Map(); state.redirectCounts = new Map();
         state.requestChains = new Map(); state.requestExtraInfoIndexes = new Map(); state.responseExtraInfoIndexes = new Map();
@@ -485,6 +497,6 @@
         onCancel: () => sessionController.stop(true),
     }) || null;
     void restoreRecorderSettings().finally(() => {
-        updateControls(); refreshIncognitoAccess(); renderSteps(); renderTraffic(); renderRequestDetails();
+        updateControls(); refreshIncognitoAccess(); renderSteps(); renderTraffic(); renderRequestDetails(); renderComparison();
     });
 })();

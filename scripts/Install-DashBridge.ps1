@@ -214,8 +214,9 @@ function Write-InstallerState([pscustomobject]$BrowserDefinition, [string]$Targe
 
 function Resolve-RequestedInstallPath([string]$Value) {
     $expanded = [Environment]::ExpandEnvironmentVariables(([string]$Value).Trim().Trim('"'))
-    if (-not $expanded -or -not [IO.Path]::IsPathRooted($expanded)) {
-        throw 'Укажите полный пут, например C:\Tools\DashBridge.'
+    if (-not $expanded -or -not [IO.Path]::IsPathRooted($expanded) -or
+        ($script:IsWindowsHost -and $expanded -notmatch '^[a-zA-Z]:[\\/]')) {
+        throw 'Укажите полный локальный путь, например C:\Tools\DashBridge.'
     }
     return [IO.Path]::GetFullPath($expanded)
 }
@@ -224,7 +225,7 @@ function Read-NewInstallPath {
     if ($NonInteractive) { return $script:CanonicalInstallPath }
     Write-Host "Папка установки по умолчанию: $script:CanonicalInstallPath"
     while ($true) {
-        $answer = Read-Host 'Введите другой полный пут или нажмите Enter'
+        $answer = Read-Host 'Введите другой полный путь или нажмите Enter'
         if (-not $answer.Trim()) { return $script:CanonicalInstallPath }
         try {
             return Assert-SafeTargetPath (Resolve-RequestedInstallPath $answer)
@@ -245,7 +246,8 @@ function Select-TargetPath([pscustomobject]$BrowserDefinition) {
     if ($installed.Count -eq 1) {
         Write-Host "Найден DashBridge $($installed[0].Version): $($installed[0].Path)"
         if (Read-Confirmation 'Обновлять эту папку?') { return $installed[0].Path }
-    } elseif ($installed.Count -gt 1 -and -not $NonInteractive) {
+    } elseif ($installed.Count -gt 1) {
+        if ($NonInteractive) { throw 'Найдено несколько установок. Укажите нужную папку через -InstallPath.' }
         Write-Host 'Найдено несколько папок DashBridge:'
         for ($index = 0; $index -lt $installed.Count; $index += 1) {
             Write-Host "[$($index + 1)] $($installed[$index].Path) ($($installed[$index].Profile))"
@@ -260,7 +262,7 @@ function Select-TargetPath([pscustomobject]$BrowserDefinition) {
 }
 
 function Assert-SafeTargetPath([string]$TargetPath) {
-    $fullPath = [IO.Path]::GetFullPath($TargetPath).TrimEnd('\')
+    $fullPath = (Resolve-RequestedInstallPath $TargetPath).TrimEnd('\')
     $root = [IO.Path]::GetPathRoot($fullPath).TrimEnd('\')
     $userProfile = [Environment]::GetFolderPath('UserProfile').TrimEnd('\')
     $localAppData = $script:LocalAppDataRoot.TrimEnd('\')
@@ -270,8 +272,22 @@ function Assert-SafeTargetPath([string]$TargetPath) {
     if (Test-Path -LiteralPath (Join-Path $fullPath '.git')) {
         throw "Папка $fullPath является Git checkout. Установщик не будет её перезаписывать."
     }
+    # A junction can redirect staging/backup outside the selected installation.
+    $ancestor = $fullPath
+    while ($ancestor) {
+        if (Test-Path -LiteralPath $ancestor) {
+            $item = Get-Item -LiteralPath $ancestor -Force
+            if (-not $item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+                throw "Путь установки содержит файл или ссылку: $ancestor"
+            }
+            if (Test-Path -LiteralPath (Join-Path $ancestor '.git')) {
+                throw "Путь установки находится внутри Git checkout: $ancestor"
+            }
+        }
+        $ancestor = Split-Path -Parent $ancestor
+    }
     if ((Test-Path -LiteralPath $fullPath) -and -not (Test-DashBridgeDirectory $fullPath)) {
-        $items = @(Get-ChildItem -LiteralPath $fullPath -Force -ErrorAction SilentlyContinue)
+        $items = @(Get-ChildItem -LiteralPath $fullPath -Force)
         if ($items.Count) { throw "Папка $fullPath не пуста и не является установкой DashBridge." }
     }
     return $fullPath
@@ -291,6 +307,7 @@ function Get-ReleaseMetadata {
     }
     $version = $Matches[1]
     $tag = "v$version"
+    if ($ReleaseTag -and $tag -cne $ReleaseTag) { throw 'Полученный релиз не совпадает с запрошенным тегом.' }
     $expectedPage = "https://github.com/$script:RepositoryOwner/$script:RepositoryName/releases/tag/$tag"
     if ([string]$release.html_url -ne $expectedPage) { throw 'Недоверенный URL релиза.' }
     $archiveName = "DashBridge-$version.zip"
@@ -323,6 +340,22 @@ function Receive-Release([pscustomobject]$Release, [string]$TemporaryRoot) {
     $expectedHash = $Matches[1].ToLowerInvariant()
     $actualHash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($actualHash -ne $expectedHash) { throw 'Хеш ZIP не совпадает с опубликованным SHA-256.' }
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $zip = [IO.Compression.ZipFile]::OpenRead($archivePath)
+    try {
+        $expandedBytes = 0L
+        $names = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+        if ($zip.Entries.Count -gt 10000) { throw 'Слишком много файлов в ZIP.' }
+        foreach ($entry in $zip.Entries) {
+            $name = $entry.FullName.Replace('\', '/')
+            if ($name.StartsWith('/') -or $name.Contains(':') -or
+                $name -match '(^|/)\.\.?(/|$)' -or -not $names.Add($name)) {
+                throw 'ZIP содержит небезопасный или повторяющийся путь.'
+            }
+            $expandedBytes += $entry.Length
+            if ($expandedBytes -gt 256MB) { throw 'Распакованный ZIP превышает лимит 256 МиБ.' }
+        }
+    } finally { $zip.Dispose() }
     $expandedPath = Join-Path $TemporaryRoot 'expanded'
     Expand-Archive -LiteralPath $archivePath -DestinationPath $expandedPath
     if (-not (Test-DashBridgeDirectory $expandedPath)) { throw 'Архив не содержит корректный DashBridge.' }
@@ -332,15 +365,17 @@ function Receive-Release([pscustomobject]$Release, [string]$TemporaryRoot) {
 }
 
 function Install-ReleaseDirectory([string]$SourcePath, [string]$TargetPath) {
+    $TargetPath = Assert-SafeTargetPath $TargetPath
     $parent = Split-Path -Parent $TargetPath
     New-Item -ItemType Directory -Path $parent -Force | Out-Null
     $staging = Join-Path $parent ('.dashbridge-staging-' + [guid]::NewGuid().ToString('N'))
-    Copy-Item -LiteralPath $SourcePath -Destination $staging -Recurse
-    if (-not (Test-DashBridgeDirectory $staging)) { throw 'Не удалось подготовить staging-папку.' }
     $backup = $null
     try {
+        Copy-Item -LiteralPath $SourcePath -Destination $staging -Recurse
+        if (-not (Test-DashBridgeDirectory $staging)) { throw 'Не удалось подготовить staging-папку.' }
+        [void](Assert-SafeTargetPath $TargetPath)
         if (Test-Path -LiteralPath $TargetPath) {
-            $backup = "$TargetPath.backup-$([DateTime]::Now.ToString('yyyyMMdd-HHmmssfff'))"
+            $backup = "$TargetPath.backup-$([DateTime]::Now.ToString('yyyyMMdd-HHmmssfff'))-$([guid]::NewGuid().ToString('N'))"
             Move-Item -LiteralPath $TargetPath -Destination $backup
         }
         Move-Item -LiteralPath $staging -Destination $TargetPath
@@ -366,7 +401,7 @@ function Open-BrowserInstructions([pscustomobject]$BrowserDefinition, [string]$T
             try { Start-Process -FilePath $BrowserDefinition.Executable | Out-Null }
             catch { Write-Warning "Не удалось запустить $($BrowserDefinition.Name): $($_.Exception.Message)" }
         }
-        try { Start-Process -FilePath 'explorer.exe' -ArgumentList $TargetPath | Out-Null }
+        try { Start-Process -FilePath 'explorer.exe' -ArgumentList ('"' + $TargetPath + '"') | Out-Null }
         catch { Write-Warning "Не удалось открыть Проводник: $($_.Exception.Message)" }
         $menuPath = switch ($BrowserDefinition.Id) {
             'Chrome' { 'Меню ⋮ → Расширения → Управление расширениями' }
@@ -432,7 +467,7 @@ function Invoke-Diagnostics {
     if ($state) {
         $stateBrowser = if ($state.PSObject.Properties['browser']) { [string]$state.browser } else { 'не указан' }
         $statePath = if ($state.PSObject.Properties['extensionPath']) { [string]$state.extensionPath } else { 'не указан' }
-        $stateVersion = if ($state.PSObject.Properties['installedVersion']) { [string]$state.installedVersion } else { 'не указа' }
+        $stateVersion = if ($state.PSObject.Properties['installedVersion']) { [string]$state.installedVersion } else { 'не указана' }
         Write-Host "  Browser: $stateBrowser"
         Write-Host "  Version: $stateVersion"
         Write-Host "  Path: $statePath"
@@ -476,12 +511,18 @@ if ($SelfTest) { Invoke-SelfTest; exit 0 }
 if ($Diagnostics) { Invoke-Diagnostics; exit 0 }
 
 $temporaryRoot = Join-Path ([IO.Path]::GetTempPath()) ('dashbridge-install-' + [guid]::NewGuid().ToString('N'))
+$installMutex = [Threading.Mutex]::new($false, 'Local\DashBridge-Installer')
+$ownsInstallMutex = $false
 try {
+    try { $ownsInstallMutex = $installMutex.WaitOne(0) }
+    catch [Threading.AbandonedMutexException] { $ownsInstallMutex = $true }
+    if (-not $ownsInstallMutex) { throw 'Другой установщик DashBridge уже работает. Дождитесь его завершения.' }
     Write-Host 'DashBridge Installer' -ForegroundColor White
     $selectedBrowser = Select-BrowserDefinition
     Write-Step "Браузер: $($selectedBrowser.Name)"
     $targetPath = Assert-SafeTargetPath (Select-TargetPath $selectedBrowser)
     $wasUpdate = Test-DashBridgeDirectory $targetPath
+    $registered = @((Find-InstalledDashBridge $selectedBrowser) | Where-Object { $_.Path -eq $targetPath }).Count -gt 0
     Write-Host "Папка: $targetPath"
 
     Write-Step 'Получение метаданных GitHub Release'
@@ -498,12 +539,16 @@ try {
     $sourcePath = Receive-Release $release $temporaryRoot
     Write-Step $(if ($wasUpdate) { 'Безопасное обновление' } else { 'Установка' })
     $backup = Install-ReleaseDirectory $sourcePath $targetPath
-    Write-InstallerState $selectedBrowser $targetPath $release.Version
+    try { Write-InstallerState $selectedBrowser $targetPath $release.Version }
+    catch { Write-Warning "Файлы установлены, но путь не сохранён: $($_.Exception.Message). При следующем запуске укажите -InstallPath." }
     if ($backup) { Write-Host "Резервная копия: $backup" }
-    Open-BrowserInstructions $selectedBrowser $targetPath $wasUpdate
+    if ($NonInteractive) { Write-Host "Файлы готовы: $targetPath. Подключите папку в браузере или перезагрузите уже подключённое расширение." }
+    else { Open-BrowserInstructions $selectedBrowser $targetPath $registered }
 } catch {
     Write-Host "`nОшибка: $($_.Exception.Message)" -ForegroundColor Red
     exit 1
 } finally {
+    if ($ownsInstallMutex) { $installMutex.ReleaseMutex() }
+    $installMutex.Dispose()
     if (Test-Path -LiteralPath $temporaryRoot) { Remove-Item -LiteralPath $temporaryRoot -Recurse -Force }
 }

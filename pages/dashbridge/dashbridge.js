@@ -109,7 +109,7 @@ const dashBridgeProfileController = DashBridgeProfileController.create({
     invalidateActiveProfileRuntime,
 });
 const {
-    getActiveProfile, loadProfiles, saveProfiles, savePanels, switchProfile, createProfile,
+    getActiveProfile, loadProfiles, saveProfiles, savePanels, switchProfile, createProfile, cloneProfile,
     renameActiveProfile, deleteProfile, renderProfileSwitcher, getCurrentProfilePanelIdentities,
     currentProfileHasPanel, setTabActiveProfileId,
 } = dashBridgeProfileController;
@@ -196,7 +196,7 @@ dashBridgePanelToolsController = DashBridgePanelToolsController.create({
 const dashBridgePanelTransferController = DashBridgePanelTransferController.create({
     transfer: window.DashBridgePanelTransfer,
     showAlert,
-    showConfirm,
+    showImportChoice: window.DashBridgeModal.showImportChoice,
     getPanels: () => panels,
     setPanels: value => { panels = value; },
     getProfiles: () => profiles,
@@ -285,6 +285,10 @@ dashBridgeReportController = DashBridgeReportController.create({
     transportFactory: DashBridgeReportTransport,
     testRunnerFactory: DashBridgeReportTestRunner,
     auditEngine: DashBridgeReportAudit,
+    attachmentsFactory: globalThis.DashBridgeReportAttachments,
+    collage: globalThis.DashBridgeReportCollage,
+    captureSelection: (selected, options) => dashBridgeCapture.captureSelection(selected, options),
+    copyImage: blob => globalThis.DashBridgeGrafanaCaptureOutput.copy(blob),
     forceLoadPanel,
     postToDashboardFrame,
     getPanels: () => panels,
@@ -477,6 +481,7 @@ dashBridgePageUiController = DashBridgePageUiController.create({
     renderProfileSwitcher,
     showPrompt,
     createProfile,
+    cloneProfile,
     renameActiveProfile,
     deleteProfile,
     getActiveProfile,

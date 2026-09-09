@@ -40,9 +40,11 @@ sudo ./ops/bootstrap-vps.sh dashbridge-deploy
 Изменения отправляются из корня Windows-репозитория:
 
 ```powershell
-.\scripts\Publish-Analytics.ps1 -RemoteHost analytics.example.com `
-  -IdentityFile .\.deploy-keys\dashbridge-vps-temp
+.\scripts\Publish-Analytics.ps1 -RemoteHost 82.202.142.88 -IdentityFile "$env:USERPROFILE/.ssh/dashbridge-analytics-deploy"
 ```
+
+Команда выше использует ключ текущей рабочей станции. На другом ПК укажите
+свой путь через `-IdentityFile`; содержимое приватного ключа в проект не копируется.
 
 Скрипт прогоняет тесты, загружает только `server.js`,
 `analytics-contract.js` и `public/`, проверяет SHA-256 и вызывает узкий root
@@ -101,7 +103,37 @@ docker exec caddy caddy reload --config /etc/caddy/Caddyfile
 curl -fsS https://analytics.tongehub.com/health
 ```
 
-## Резервное копирование
+## Проверка админки и синтетические сценарии
+
+Из корня проекта: `scripts/Start-AnalyticsDev.ps1 -Scenario catalog -NoBrowser`.
+Доступны `normal`, `empty`, `sparse`, `large`, `upgrade`, `catalog`, `outcomes`,
+`delivery`. Каждый сценарий хранится в `.dev-data/<scenario>`; шапка DEV
+показывает версию fixtures и дату создания. `catalog` покрывает весь каталог,
+`large` содержит 64 800 агрегатов, `upgrade` — последовательные обновления.
+Все события проходят production-валидатор. Счётчик effective равен единице
+для уникального сочетания установки, дня, функции и dimensions.
+
+Существующая база автоматически не обновляется. Остановите preview перед
+`-ResetData`: помеченная синтетическая база сохраняется как `.backup-*`,
+непомеченная база не перезаписывается. Прямой seed принимает
+`--scenario=... --date=YYYY-MM-DD` и `DATA_DIR`; это позволяет воспроизводить
+сценарии, не затрагивая старую `.dev-data/analytics.sqlite`.
+
+Admin API дополнительно принимает `surface`, `outcome`, `renderer`, `failure`.
+Для таблиц `features`, `problems`, `versions`, `installations`, `actions`,
+`dimensions` доступны `<table>Page` (с нуля), `<table>Sort` (ключ колонки) и
+`<table>Direction` (`asc`/`desc`). Сортировка охватывает всю выборку и имеет
+стабильный порядок равных значений. Ответ `pagination` содержит `page`,
+`pageSize`, `total`, `hasMore`: actions по 100 строк, остальные по 50.
+Отчёт использует календарные дни UTC; версии в выборке отделены от последних
+наблюдаемых версий по сохранённой истории. Пустые результаты не равны 0% ошибок.
+
+Проверки: `node --test deploy/dashbridge-analytics/test/*.test.js` и
+`scripts/audit-analytics-ui.py` (переменная `DASHBRIDGE_ANALYTICS_URL` позволяет
+выбрать локальный порт). UI проверяет клавиатурные диалоги, фильтры, reset и
+прокрутку на шести размерах экрана. Production не участвует в этих проверках.
+
+## Резервное копирование SQLite
 
 SQLite работает в WAL. Для согласованной копии используйте `.backup`, а не
 простое копирование живого файла:

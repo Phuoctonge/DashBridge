@@ -166,13 +166,17 @@ module.exports = [
         rules: correctnessRules
     },
     {
-        files: ['test/**/*.js', 'scripts/**/*.js', 'eslint.config.js'],
+        files: ['test/**/*.js', 'scripts/**/*.js', 'eslint.config.js', 'deploy/dashbridge-analytics/**/*.js'],
         languageOptions: {
             ecmaVersion: 'latest',
             sourceType: 'script',
             globals: nodeGlobals
         },
         rules: correctnessRules
+    },
+    {
+        files: ['deploy/dashbridge-analytics/public/*.js'],
+        languageOptions: { globals: { ...webGlobals, Option: 'readonly' } }
     },
     {
         // These files are pasted/injected into a real browser page by the

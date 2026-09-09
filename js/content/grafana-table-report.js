@@ -82,7 +82,7 @@
         return best;
     };
 
-    const collectGrafanaTableRecords = (root = document) => {
+    const collectGrafanaTableRecords = (root = document, { unit } = {}) => {
         const table = collectGrafanaTableData(root);
         if (!table) return [];
         let nameIndex = table.columns.findIndex(header => /^(?:metric|name|series|метрика|имя|серия|запрос)$/iu.test(header));
@@ -91,7 +91,8 @@
         if (nameIndex < 0 || valueIndex < 0 || nameIndex === valueIndex) return [];
         return table.rows.map(row => ({
             name: String(row[nameIndex] || '').trim(), visible: true,
-            values: [parseGrafanaTableDisplayValue(row[valueIndex])].filter(Number.isFinite)
+            values: [unit === undefined ? parseGrafanaTableDisplayValue(row[valueIndex])
+                : globalThis.DashBridgeGrafanaUnit.parseDisplayValue(row[valueIndex], unit)].filter(Number.isFinite)
         })).filter(record => record.name && record.values.length);
     };
 

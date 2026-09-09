@@ -23,7 +23,7 @@
         newProfileBtn: 'dashbridge.profile_created', renameProfileBtn: 'dashbridge.profile_renamed',
         deleteProfileBtn: 'dashbridge.profile_deleted', forceRefreshBtn: 'dashbridge.force_refresh',
         copyTimeBtn: 'dashbridge.time_range_copied', pasteTimeBtn: 'dashbridge.time_range_pasted',
-        applyAbsoluteTime: 'dashbridge.time_absolute_range_applied', captureAllPanelsBtn: 'dashbridge.capture_all_zip',
+        captureAllPanelsBtn: 'dashbridge.capture_all_zip',
         generateReportBtn: 'dashbridge.report_generated',
         testReportBtn: 'internal.message_test_runner', exportPanelsBtn: 'dashbridge.profile_exported',
         importPanelsBtn: 'dashbridge.profile_imported', savePanelBtn: 'dashbridge.panel_added',
@@ -49,10 +49,9 @@
         ['.quick-range-btn', 'dashbridge.time_quick_range_applied'], ['.btn-refresh', 'dashbridge.panel_refreshed'],
         ['.dropdown-item[data-refresh]', 'dashbridge.refresh_interval_changed'],
         ['.btn-pause', 'dashbridge.panel_paused'], ['.btn-resume', 'dashbridge.panel_resumed'],
-        ['.btn-fullscreen', 'dashbridge.panel_fullscreen_opened'], ['.btn-open', 'dashbridge.panel_original_opened'],
+        ['.btn-open', 'dashbridge.panel_original_opened'],
         ['.btn-capture-save', 'dashbridge.capture_panel_download'], ['.btn-capture-copy', 'dashbridge.capture_panel_copy'],
         ['.btn-iframe-settings', 'dashbridge.panel_iframe_settings_changed'],
-        ['.btn-report-settings', 'dashbridge.report_panel_settings_saved'],
         ['.report-regenerate', 'dashbridge.report_regenerated'], ['.report-copy', 'dashbridge.report_copied'],
     ];
 

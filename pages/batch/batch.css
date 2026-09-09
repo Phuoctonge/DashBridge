@@ -29,25 +29,26 @@ body {
     margin: 0 auto;
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: .875rem;
 }
 
 .batch-brand-mark {
-    width: 42px;
-    height: 42px;
-    flex: 0 0 42px;
+    width: 2.625rem;
+    height: 2.625rem;
+    flex: 0 0 2.625rem;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     border: 1px solid var(--border);
-    border-radius: 11px;
+    border-radius: .6875rem;
     background: var(--tab-active-bg);
     color: var(--primary);
 }
 
-.batch-brand-mark svg { width: 23px; height: 23px; }
+.batch-brand-mark svg { width: 1.4375rem; height: 1.4375rem; }
 .batch-header h1 { margin: 0; color: var(--primary); }
 .batch-header p { margin: .25rem 0 0; color: var(--text-muted); font-size: .8125rem; }
+.batch-header h1, .batch-header p { line-height: 1.4; }
 
 .batch-capture-theme-group {
     border: 0;

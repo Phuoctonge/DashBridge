@@ -90,6 +90,21 @@ assert.deepStrictEqual(analyticsEvents, [{
     dimensions: { surface: 'dashbridge', failure: 'visual_verification_failed', outcome: 'error' }
 }], 'one shared command failure must not be multiplied across every enabled panel tool');
 
+analyticsEvents.length = 0;
+controller.apply({ id: 'disabled-tools', title: 'CPU', tools: {} }, iframe);
+controller.acceptApplied({ requestId: messages.at(-1).requestId, commandStatus: 'applied' });
+assert.deepStrictEqual(analyticsEvents, [],
+    'disabled parent tools and prepared capture preference must not produce effective evidence');
+controller.apply({ id: 'enabled-tools', title: 'CPU', tools: {
+    thresholdEnabled: true, cpuCapacityFilterEnabled: true, cpuCapacityFilterLoad5: true
+} }, iframe);
+controller.acceptApplied({ requestId: messages.at(-1).requestId, commandStatus: 'applied' });
+assert.deepStrictEqual(analyticsEvents.map(event => event.featureId).sort(), [
+    'grafana.panel.load_cpu_capacity_filter', 'grafana.panel.load_cpu_capacity_highlight',
+    'grafana.panel.load_series_1m', 'grafana.panel.load_series_5m',
+    'grafana.panel.threshold', 'grafana.panel.threshold_notification'
+].sort(), 'only enabled tools and their enabled children may be acknowledged');
+
 (async () => {
     await controller.open(panel, iframe);
     assert.strictEqual(modalOptions.content, 'transform:ram|threshold|legend');

@@ -1,11 +1,12 @@
 'use strict';
-/* global chrome, document */
+/* global chrome, document, DataTransfer, File, ClipboardEvent */
 
 const fs = require('node:fs');
 const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
 const { chromium } = require('@playwright/test');
+const inspectReportCollage = require('./support/browser-report-collage');
 
 const projectRoot = path.resolve(__dirname, '..');
 const resultsRoot = path.join(projectRoot, 'test-results');
@@ -150,6 +151,57 @@ async function inspectPage(context, extensionId, relativePath) {
             result.title = await page.title();
             const isDashboard = relativePath === 'pages/dashbridge/dashbridge.html';
             const isPopup = relativePath === 'pages/popup/popup.html';
+            if (isDashboard) {
+                await page.locator('#profilePickerBtn').click();
+                await page.locator('#cloneProfileBtn').click();
+                await page.locator('.modal-input').fill('Playwright profile copy');
+                await page.locator('.modal-input').press('Enter');
+                await page.waitForFunction(() => document.getElementById('profilePickerLabel').textContent === 'Playwright profile copy');
+                await page.reload();
+                await page.waitForFunction(() => document.getElementById('profilePickerLabel').textContent === 'Playwright profile copy');
+            }
+            if (isDashboard) {
+                for (const action of ['Escape', 'backdrop', 'cancel', 'replace', 'create']) {
+                    await page.locator('#addPanelBtn').focus();
+                    await page.evaluate(() => {
+                        globalThis.importChoiceResult = 'pending';
+                        void globalThis.DashBridgeModal.showImportChoice('Проверка импорта').then(value => {
+                            globalThis.importChoiceResult = value;
+                        });
+                    });
+                    const choiceModal = page.locator('.modal-overlay').filter({ has: page.locator('.modal-create') });
+                    if (action === 'Escape') await page.keyboard.press('Escape');
+                    else if (action === 'backdrop') await choiceModal.click({ position: { x: 2, y: 2 } });
+                    else await choiceModal.locator(action === 'replace' ? '.modal-ok'
+                        : action === 'create' ? '.modal-create' : '.modal-cancel').click();
+                    await choiceModal.waitFor({ state: 'detached' });
+                    const selected = await page.evaluate(() => globalThis.importChoiceResult);
+                    const expected = ['replace', 'create'].includes(action) ? action : null;
+                    if (selected !== expected) throw new Error(`Import choice ${action} returned ${selected}`);
+                    if (!await page.locator('#addPanelBtn').evaluate(element => element === document.activeElement)) {
+                        throw new Error('Import choice did not restore focus');
+                    }
+                }
+            }
+            if (relativePath === 'pages/debug-easter-egg/debug-easter-egg.html') {
+                const pasted = await page.evaluate(async () => {
+                    const canvas = document.createElement('canvas'); canvas.width = 64; canvas.height = 48;
+                    canvas.getContext('2d').fillRect(0, 0, 64, 48);
+                    const blob = await new Promise(resolve => canvas.toBlob(resolve));
+                    const data = new DataTransfer(); data.items.add(new File([blob], 'clipboard', { type: 'image/png' }));
+                    const event = new ClipboardEvent('paste', { clipboardData: data, cancelable: true, bubbles: true });
+                    document.dispatchEvent(event);
+                    return event.defaultPrevented;
+                });
+                if (!pasted) throw new Error('Image paste was not handled');
+                await page.waitForFunction(() => document.getElementById('debugEasterEggPortrait').naturalWidth === 64);
+                const textHandled = await page.evaluate(() => {
+                    const data = new DataTransfer(); data.setData('text/plain', 'ordinary text');
+                    const event = new ClipboardEvent('paste', { clipboardData: data, cancelable: true });
+                    document.dispatchEvent(event); return event.defaultPrevented;
+                });
+                if (textHandled) throw new Error('Ordinary text paste must remain native');
+            }
             if (isDashboard || isPopup) {
                 if (isPopup) await page.locator('[data-sub="grafana-links"]').click();
                 const opener = isDashboard ? '#addPanelBtn' : '#openAddModal';
@@ -502,6 +554,7 @@ async function main() {
             pages.push(await inspectPage(context, extensionId, htmlPath));
         }
         const workflows = [
+            await inspectReportCollage(context, extensionId),
             await inspectTestSelectionWorkflow(context, extensionId),
             await inspectPanelUnitWorkflow(context),
             await inspectNoDataWorkflow(context),

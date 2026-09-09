@@ -1,6 +1,16 @@
 // Batch navigation and renderer readiness in the temporary Grafana tab.
 function createBatchPanelLoader({ log }) {
-    const waitForPanelInMainWorld = panelId => new Promise(resolve => {
+    const waitForPanelInMainWorld = (panelId, panelTools) => new Promise(resolve => {
+        const findPanel = () => {
+            const exact = window.DashBridgeGrafanaDom?.findPanelById(panelId);
+            if (exact) return exact;
+            const route = new URL(location.href);
+            const requested = route.searchParams.get('viewPanel') || route.searchParams.get('panelId');
+            // Legacy fullscreen panels can omit their DOM id. Only the exact
+            // single-panel route may use the runtime's active-panel fallback.
+            return String(requested) === String(panelId)
+                ? window.DashBridgeGrafanaDom?.findPanel({ panelId }) : null;
+        };
         let previousRect = null;
         let stableFrames = 0;
         let frame = 0;
@@ -29,8 +39,13 @@ function createBatchPanelLoader({ log }) {
         const inspect = () => {
             frame = 0;
             if (preparingCapture) return;
-            const panel = window.DashBridgeGrafanaDom?.findPanelById(panelId) || null;
-            const loading = document.querySelectorAll('.panel-loading, [data-testid="spinner"]').length > 0;
+            const panel = findPanel() || null;
+            const loading = Array.from((panel || document).querySelectorAll('.panel-loading, [data-testid="spinner"]'))
+                .some(element => {
+                    const style = getComputedStyle(element);
+                    return style.display !== 'none' && style.visibility !== 'hidden'
+                        && Number(style.opacity) !== 0 && element.getClientRects().length > 0;
+                });
             if (loading || !panel) {
                 stableFrames = 0;
                 previousRect = null;
@@ -42,8 +57,18 @@ function createBatchPanelLoader({ log }) {
                 resizeObserver?.observe(panel);
             }
             const rect = panel.getBoundingClientRect();
+            if (panelTools?.thresholdEnabled) {
+                const threshold = window.__dashbridgeThresholdDiagnostic;
+                if (!threshold?.status?.enabled || threshold.suppressedReason
+                    || String(threshold.panelId).replace(/^panel-/, '') !== String(panelId).replace(/^panel-/, '')
+                    || Number(threshold.requested?.rawValue) !== Number(panelTools.thresholdRawValue)) {
+                    stableFrames = 0; schedule(); return;
+                }
+            }
             if (rect.width <= 5 || rect.height <= 10) return;
-            const renderer = panel.querySelector('canvas,svg,.flot-base') || panel;
+            // Header/menu SVG icons may precede the chart and can be hidden.
+            const renderer = panel.querySelector('.flot-base, .uplot canvas, .graph-panel__chart canvas, canvas')
+                || Array.from(panel.querySelectorAll('svg')).find(svg => svg.getBoundingClientRect().height > 1) || panel;
             if (renderer.getBoundingClientRect().height <= 1) return;
             const currentRect = [rect.x, rect.y, rect.width, rect.height].map(value => Math.round(value * 10) / 10);
             if (previousRect && currentRect.every((value, index) => value === previousRect[index])) stableFrames++;
@@ -102,7 +127,7 @@ function createBatchPanelLoader({ log }) {
             });
             document.activeElement?.blur?.();
             requestAnimationFrame(() => requestAnimationFrame(() => {
-                const finalPanel = window.DashBridgeGrafanaDom?.findPanelById(panelId) || null;
+                const finalPanel = findPanel() || null;
                 if (!finalPanel) return finish(null);
                 const finalRect = finalPanel.getBoundingClientRect();
                 finish({ x: finalRect.x, y: finalRect.y, w: finalRect.width, h: finalRect.height, dpr: window.devicePixelRatio });
@@ -160,7 +185,7 @@ function createBatchPanelLoader({ log }) {
                 preparing = true;
                 try {
                     if (panelTools) {
-                        const refresh = panelTools.invertIdle === true || panelTools.convertMemToUsed === true;
+                        const refresh = panelTools.invertIdle === true || panelTools.convertMemToUsed === true || panelTools.seriesQueryFilterEnabled === true;
                         const applied = await applySharedGrafanaPanelTools(panelTools, { tabId, refresh });
                         if (!applied?.ok) {
                             log(`Не удалось применить настройки панели ${panelId}: ${applied?.reason || 'неизвестная ошибка'}`, true);
@@ -174,7 +199,7 @@ function createBatchPanelLoader({ log }) {
                         target: { tabId },
                         world: 'MAIN',
                         func: waitForPanelInMainWorld,
-                        args: [panelId]
+                        args: [panelId, panelTools]
                     });
                     finish(results?.[0]?.result || null);
                 } catch (error) {

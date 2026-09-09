@@ -109,6 +109,34 @@
         return null;
     };
 
+    // Convert a formatted cell to the report's unit, never discard a different suffix.
+    const parseDisplayValue = (text, targetUnit = '') => {
+        const normalized = String(text ?? '').trim().replace(/[−–]/g, '-').replace(/[\u00a0\u202f]/g, ' ')
+            .replace(/(\d)\s+(?=\d)/g, '$1');
+        const match = normalized.match(/^([-+]?(?:\d+(?:[.,]\d+)?|[.,]\d+)(?:e[-+]?\d+)?)\s*(.*?)$/i);
+        if (!match) return null;
+        const value = Number(match[1].replace(',', '.'));
+        const from = match[2].trim();
+        const to = String(targetUnit || '').trim();
+        if (!Number.isFinite(value)) return null;
+        if (!from || from === to) return value;
+        const fromDuration = durationScaleMs(from), toDuration = durationScaleMs(to);
+        if (fromDuration !== null && toDuration !== null) return value * fromDuration / toDuration;
+        const byteScale = unit => {
+            const parts = unit.match(/^([kKMGTPE]?)(i?)B(\/s)?$/);
+            if (!parts) return null;
+            const power = parts[1] ? 'KMGTPE'.indexOf(parts[1].toUpperCase()) + 1 : 0;
+            return { scale: (parts[2] ? 1024 : 1000) ** power, rate: !!parts[3] };
+        };
+        const a = byteScale(from), b = byteScale(to);
+        if (a && b && a.rate === b.rate) return value * a.scale / b.scale;
+        const compact = from.match(/^([kKMGT])(?:\s+(.*))?$/);
+        if (compact && (compact[2] || '') === to) {
+            return value * ({ k: 1e3, K: 1e3, M: 1e6, G: 1e9, T: 1e12 })[compact[1]];
+        }
+        return null;
+    };
+
     const mergeAxisAndPanelUnit = (axisUnit, panel) => {
         // Prefer visible axis scale whenever it exists: it converts a user
         // threshold in GiB/TiB or MB/s/GB/s to Grafana's raw value exactly.
@@ -140,6 +168,7 @@
 
     globalThis.DashBridgeGrafanaUnit = Object.freeze({
         parseAxisUnitLabel,
+        parseDisplayValue,
         inferUnitFromAxisLabels,
         inferUnitFromAxisTicks,
         unitFromPanelDefinition,

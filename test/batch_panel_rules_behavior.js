@@ -34,7 +34,7 @@ async function main() {
 
     const rules = await context.BatchPanelRules.load(url);
     assert.deepStrictEqual(JSON.parse(JSON.stringify(rules)), {
-        '12': { removeFill: true, thickenLines: true, thickenLinesValue: 10, invertIdle: true },
+        '12': { removeFill: true, thickenLines: true, thickenLinesValue: 5, invertIdle: true },
         '18': { convertMemToUsed: true }
     });
     assert.deepStrictEqual(JSON.parse(JSON.stringify(await context.BatchPanelRules.load(otherUrl))), {});
@@ -44,11 +44,26 @@ async function main() {
         'rules from different Grafana organizations must not share a key'
     );
     assert.deepStrictEqual(JSON.parse(JSON.stringify(context.BatchPanelRules.forPanel(rules, '12'))), {
-        removeFill: true, thickenLines: true, thickenLinesValue: 10, invertIdle: true, targetPanelId: '12'
+        removeFill: true, thickenLines: true, thickenLinesValue: 5, invertIdle: true, targetPanelId: '12'
     });
     assert.strictEqual(context.BatchPanelRules.forPanel(rules, '999'), null);
     await context.BatchPanelRules.save(url, {});
     assert.deepStrictEqual(JSON.parse(JSON.stringify(await context.BatchPanelRules.load(url))), {});
+    await context.BatchPanelRules.save(url, {
+        6: { convertMemToUsed: true, seriesQueryFilterEnabled: true, seriesQueryFilterValue: 40,
+            seriesQueryFilterMode: 'last', seriesQueryFilterHighlightEnabled: false,
+            thresholdEnabled: true, thresholdValue: 75 },
+        8: { seriesQueryFilterValue: 100, thresholdValue: 50 }
+    });
+    const advanced = await context.BatchPanelRules.load(url);
+    assert.strictEqual(advanced[8], undefined);
+    assert.strictEqual(advanced[6].seriesQueryFilterRawValue, 40);
+    assert.strictEqual(advanced[6].seriesFilterSettingsVersion, 2);
+    assert.strictEqual(advanced[6].seriesQueryFilterMode, 'last');
+    assert.strictEqual(advanced[6].seriesQueryFilterHighlightEnabled, false);
+    assert.strictEqual(advanced[6].thresholdRawValue, 75);
+    assert.strictEqual(advanced[6].thresholdNotifyEnabled, false);
+    assert.strictEqual(context.BatchPanelRules.forPanel(advanced, 6).thresholdEnabled, true);
     console.log('[OK] Batch panel rules behavior');
 }
 

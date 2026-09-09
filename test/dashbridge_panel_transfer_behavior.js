@@ -68,6 +68,23 @@ assert.strictEqual(imported.panels[0].futurePanelField.keep, true, 'round-trip m
 assert.strictEqual(imported.hasTimeState, true);
 assert.strictEqual(imported.hasReport, true);
 
+const secondPanel = { ...sourcePanel, id: 'second', src: sourcePanel.src.replace('panelId=7', 'panelId=8') };
+const orderedPayload = transfer.createPanelExportPayload({
+    profile: { ...profile, report: { ...profile.report, panelOrder: ['second', 'source-panel', 'missing'] } },
+    panels: [sourcePanel, secondPanel],
+});
+const ordered = transfer.parsePanelImportText(JSON.stringify(orderedPayload), { randomUUID });
+assert.deepStrictEqual(Array.from(ordered.report.panelOrder), [ordered.panels[1].id, ordered.panels[0].id],
+    'independent phrase order must follow regenerated IDs and discard dangling references');
+const ambiguous = transfer.parsePanelImportText(JSON.stringify({
+    panels: [sourcePanel, { ...secondPanel, id: sourcePanel.id },
+        { ...sourcePanel, id: 'duplicate-url' }, { id: 'invalid', src: 'javascript:bad' }],
+    report: { panelOrder: ['duplicate-url', 'invalid', sourcePanel.id] },
+}), { randomUUID });
+assert.deepStrictEqual(Array.from(ambiguous.report.panelOrder), [ambiguous.panels[0].id],
+    'duplicate IDs bind to the first accepted panel; rejected panels cannot leave stale references');
+assert.strictEqual(ambiguous.panels.length, 2);
+
 assert.throws(() => transfer.parsePanelImportText('{broken'), error => error?.name === 'SyntaxError');
 assert.throws(
     () => transfer.parsePanelImportText('{"version":3}'),

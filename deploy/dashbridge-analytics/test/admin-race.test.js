@@ -9,7 +9,7 @@ test('admin ignores stale responses and stale failures even when fetch ignores a
     const context = vm.createContext({ URLSearchParams, AbortController, Intl, Date,
         setTimeout: () => 1, clearTimeout() {},
         DashBridgeAnalyticsLabels: {},
-        document: { getElementById(id) { if (!elements.has(id)) elements.set(id, { value: '', addEventListener() {} }); return elements.get(id); }, querySelectorAll: () => [] },
+        document: { getElementById(id) { if (!elements.has(id)) elements.set(id, { value: '', addEventListener() {}, setAttribute() {} }); return elements.get(id); }, querySelectorAll: () => [] },
         fetch: (_url, options) => new Promise((resolve, reject) => pending.push({ resolve, reject, options })) });
     vm.runInContext(fs.readFileSync(require.resolve('../public/app.js'), 'utf8'), context);
     vm.runInContext('globalThis.painted=[]; render=data=>painted.push(data);', context);

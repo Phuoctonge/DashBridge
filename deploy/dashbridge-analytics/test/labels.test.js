@@ -8,7 +8,7 @@ const labels = require('../public/labels');
 test('every analytics feature has a Russian admin label', () => {
     const missing = contract.featureIds.filter(featureId => !labels.features[featureId]);
     assert.deepEqual(missing, []);
-    assert.equal(labels.features['grafana.panel.fill_removed'], 'Убрана заливка графика');
+    assert.equal(labels.features['grafana.panel.fill_removed'], 'Удаление заливки графика');
 });
 
 test('every categorical dimension is rendered with a human-readable label', () => {

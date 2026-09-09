@@ -27,10 +27,7 @@
             const responseDataStatus = window.__dashbridgePanelToolsVisualMetadata?.responseDataStatus
                 || { kind: 'unknown', text: '' };
             const parseLegendCalculation = value => {
-                const normalized = String(value || '').replace(/[\u00a0\u202f\s]/g, '').replace(',', '.');
-                const match = normalized.match(/[-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?/i);
-                const parsed = match ? Number(match[0]) : null;
-                return Number.isFinite(parsed) ? parsed : null;
+                return window.DashBridgeGrafanaUnit.parseDisplayValue(value, unit);
             };
             const legendMaxByName = () => {
                 const result = new Map();
@@ -49,8 +46,8 @@
                         const cells = Array.from(row.cells || row.querySelectorAll?.(':scope > td, :scope > th') || []);
                         if (maxIndex >= 0) valueCell = cells[maxIndex];
                     }
-                    const value = parseLegendCalculation(valueCell?.textContent);
-                    if (value !== null && !result.has(name)) result.set(name, value);
+                    const value = valueCell?.textContent;
+                    if (value != null && !result.has(name)) result.set(name, value);
                 }
                 return result;
             };
@@ -86,7 +83,7 @@
                 records = plotSeries.map((item, index) => ({
                     name: reportSeriesName(item.label, legendNames[index], index),
                     visible: item.lines?.show !== false || item.points?.show !== false,
-                    values: (item.data || []).map(point => Number(point?.[1])).filter(Number.isFinite),
+                    values: (item.data || []).map(point => point?.[1]),
                     legendMaximum: legendMaximumFor(reportSeriesName(item.label, legendNames[index], index))
                 }));
             } else {
@@ -102,7 +99,7 @@
                     records = plotSeries.map((item, offset) => ({
                         name: reportSeriesName(item.label, legendNames[offset], offset),
                         visible: item.show !== false,
-                        values: Array.from(uplot.data?.[offset + 1] || []).map(Number).filter(Number.isFinite),
+                        values: Array.from(uplot.data?.[offset + 1] || []),
                         legendMaximum: legendMaximumFor(reportSeriesName(item.label, legendNames[offset], offset))
                     }));
                 } else {
@@ -110,17 +107,18 @@
                         ? window.__dashbridgePanelToolsVisualMetadata.responseTableRecords : [];
                     const table = collectGrafanaTableData(root);
                     visualTable = table;
+                    const tableUnit = unitFromPanelDefinition(getCachedPanelDefinition());
                     const tableRecords = table && responseTableRecords.length
                         ? responseTableRecords.map(item => ({
                             name: String(item?.name || ''), visible: true,
-                            values: [Number(item?.value)].filter(Number.isFinite)
+                            values: [item?.value]
                         })).filter(item => item.name && item.values.length)
-                        : collectGrafanaTableRecords(root);
+                        : collectGrafanaTableRecords(root, { unit: tableUnit.unit || '' });
                     if (!records.length && tableRecords.length) {
                         engine = table && responseTableRecords.length ? 'table-response' : 'table-dom';
-                        const details = unitFromPanelDefinition(getCachedPanelDefinition());
+                        const details = tableUnit;
                         unit = details.unit || '';
-                        factor = 1;
+                        factor = engine === 'table-response' ? (Number(details.factor) || 1) : 1;
                         records = tableRecords;
                     }
                 }
@@ -132,6 +130,7 @@
                 let sum = 0;
                 let latest = null;
                 for (const rawValue of values || []) {
+                    if (rawValue == null || (typeof rawValue === 'string' && !rawValue.trim())) continue;
                     const value = Number(rawValue);
                     if (!Number.isFinite(value)) continue;
                     count += 1;
@@ -194,6 +193,26 @@
                 ? Number(sla.value) : null;
             const configuredRawValue = sla.rawValue !== null && sla.rawValue !== '' && Number.isFinite(Number(sla.rawValue))
                 ? Number(sla.rawValue) : null;
+            const requestedUnit = String(sla.unit || unit || '').trim();
+            if (requestedUnit !== unit) {
+                const conversion = window.DashBridgeGrafanaUnit.parseDisplayValue(`1 ${unit}`, requestedUnit);
+                if (conversion === null || conversion <= 0) {
+                    return { state: 'configuration_error', source, evaluation, operator, engine, unit,
+                        series: [], dataStatus: 'unit_mismatch', error: 'Единица SLA несовместима с единицей панели' };
+                }
+                factor /= conversion;
+                unit = requestedUnit;
+            }
+            for (const [name, text] of legendMaximums) {
+                const value = parseLegendCalculation(text);
+                if (value === null) {
+                    return { state: 'configuration_error', source, evaluation, operator, engine, unit,
+                        series: [], dataStatus: 'unit_mismatch',
+                        error: 'Не удалось согласовать единицы Max в легенде и отчёте',
+                        dataStatusText: 'Не удалось согласовать единицы Max в легенде и отчёте' };
+                }
+                legendMaximums.set(name, value);
+            }
             const configuredWarningValue = sla.warningValue !== null && sla.warningValue !== '' && Number.isFinite(Number(sla.warningValue))
                 ? Number(sla.warningValue) : null;
             const configuredWarningRawValue = sla.warningRawValue !== null && sla.warningRawValue !== '' && Number.isFinite(Number(sla.warningRawValue))

@@ -13,8 +13,10 @@ async function runGrafanaCommand({ tabId = null, command, payload = {}, refresh 
         target: { tabId: targetTabId }, world: 'MAIN', args: [command, payload, requestId],
         func: (action, data, id) => new Promise(resolve => {
             const onApplied = event => {
-                if (event.origin !== location.origin || event.data?.action !== 'panelToolsApplied' || event.data.requestId !== id) return;
-                clearTimeout(timeout); window.removeEventListener('message', onApplied); resolve({ ok: true });
+                if (event.source !== window || event.origin !== location.origin || event.data?.action !== 'panelToolsApplied' || event.data.requestId !== id) return;
+                clearTimeout(timeout); window.removeEventListener('message', onApplied);
+                resolve(event.data.commandStatus === 'applied'
+                    ? { ok: true } : { ok: false, reason: event.data.failureCode || 'apply-error' });
             };
             const timeout = setTimeout(() => { window.removeEventListener('message', onApplied); resolve({ ok: false, reason: 'apply-timeout' }); }, 20000);
             window.addEventListener('message', onApplied);
@@ -23,7 +25,51 @@ async function runGrafanaCommand({ tabId = null, command, payload = {}, refresh 
     });
     const applied = result?.[0]?.result;
     if (!applied?.ok) return applied || { ok: false, reason: 'empty-apply-result' };
-    if (refresh) await chrome.scripting.executeScript({ target: { tabId: targetTabId }, world: 'MAIN', func: () => document.querySelector('button[aria-label="Refresh dashboard"], .refresh-picker button, [data-testid="data-toolbar-refresh"], button[title="Refresh dashboard"]')?.click() });
+    if (refresh) {
+        const refreshed = await chrome.scripting.executeScript({
+            target: { tabId: targetTabId }, world: 'MAIN', args: [payload.tools || {}],
+            func: requestedTools => new Promise(resolve => {
+                const button = document.querySelector('button[aria-label="Refresh dashboard"], .refresh-picker button, [data-testid="data-toolbar-refresh"], button[title="Refresh dashboard"]');
+                if (!button) return resolve({ ok: false, reason: 'refresh-unavailable' });
+                const requiresTransform = requestedTools.invertIdle === true || requestedTools.convertMemToUsed === true || requestedTools.seriesQueryFilterEnabled === true;
+                const diagnostic = window.__dashbridgeDataInterceptorDiagnostic;
+                if (requiresTransform && !diagnostic) return resolve({ ok: false, reason: 'transform-runtime-unavailable' });
+                // Only a request started after this refresh can confirm the new
+                // settings. A completed older request or unrelated panel cannot.
+                const baseline = diagnostic?.nextEventId || 0;
+                const startedAt = Date.now();
+                const inspect = () => {
+                    if (window.__dashbridgeDataInterceptorDiagnostic !== diagnostic) {
+                        return resolve({ ok: false, reason: 'transform-runtime-replaced' });
+                    }
+                    const events = (diagnostic.events || []).filter(event => event.id > baseline);
+                    const started = new Set(events.filter(event => event.stage === 'request-start').map(event => event.requestId));
+                    const transformed = events.filter(event => event.stage === 'transform' && started.has(event.requestId)
+                        && (!requestedTools.invertIdle || event.invertIdle === true)
+                        && (!requestedTools.convertMemToUsed || event.convertMemToUsed === true)
+                        && (!requestedTools.seriesQueryFilterEnabled || event.sourceFilterEnabled === true));
+                    const completed = events.filter(event => event.stage === 'request-complete' && started.has(event.requestId));
+                    if (transformed.some(event => event.memoryTransform?.applied === false)) {
+                        return resolve({ ok: false, reason: 'memory-transform-not-applied' });
+                    }
+                    if (completed.some(event => ['http-error', 'network-error', 'decode-error'].includes(event.outcome))) {
+                        return resolve({ ok: false, reason: 'refresh-query-error' });
+                    }
+                    if (!diagnostic.activeRequests && transformed.length && transformed.every(event =>
+                        completed.some(done => done.requestId === event.requestId && done.outcome === 'transformed'))) {
+                        return resolve({ ok: true });
+                    }
+                    if (Date.now() - startedAt >= 20000) return resolve({ ok: false, reason: 'transform-timeout' });
+                    setTimeout(inspect, 100);
+                };
+                button.click();
+                if (!requiresTransform) return resolve({ ok: true });
+                inspect();
+            })
+        });
+        const ready = refreshed?.[0]?.result;
+        if (!ready?.ok) return ready || { ok: false, reason: 'empty-refresh-result' };
+    }
     return { ok: true, confirmed: true };
 }
 

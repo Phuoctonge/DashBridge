@@ -10,6 +10,36 @@
             }
 
             const sensitiveNamePattern = /authorization|proxy-authorization|cookie|set-cookie|pass(?:word|wd)?|token|secret|api[-_]?key|session|username|login|e-?mail|phone|credential/i;
+            const comparisonLabels = { unchanged: 'Без изменений', changed: 'Изменено', added: 'Добавлено', removed: 'Удалено', incomplete: 'Недостаточно данных' };
+
+            function selectWorkspace(comparison, focus = false) {
+                ui.recordingPanel.hidden = comparison;
+                ui.comparisonPanel.hidden = !comparison;
+                for (const [tab, selected] of [[ui.recordingTab, !comparison], [ui.comparisonTab, comparison]]) {
+                    tab.setAttribute('aria-selected', String(selected));
+                    tab.tabIndex = selected ? 0 : -1;
+                    if (selected && focus) tab.focus();
+                }
+            }
+
+            function resetWorkspace() {
+                const restoreFocus = ui.comparisonPanel.contains(document.activeElement);
+                ui.comparisonFilter.value = 'all';
+                ui.comparisonUrlFilter.value = '';
+                selectWorkspace(false, restoreFocus);
+                renderComparison();
+            }
+
+            // Tab listeners belong to this extension-page document, as does the view.
+            [ui.recordingTab, ui.comparisonTab].forEach((tab, index) => {
+                tab.addEventListener('click', () => selectWorkspace(index === 1));
+                tab.addEventListener('keydown', event => {
+                    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+                    event.preventDefault();
+                    selectWorkspace(event.key === 'Home' ? false : event.key === 'End' ? true : index === 0, true);
+                });
+            });
+            ui.backToRecording.addEventListener('click', () => selectWorkspace(false, true));
 
             function stepLabel(step) {
                 if (step.type === 'navigate') return step.url;
@@ -224,15 +254,30 @@
             }
 
             function renderComparison() {
-                if (!state.comparison.length) { ui.comparisonPanel.hidden = true; return; }
-                ui.comparisonPanel.hidden = false;
+                const ready = state.comparisonReady || state.comparison.length > 0;
+                ui.comparisonEmpty.hidden = ready;
+                ui.comparisonOverview.hidden = !ready;
+                ui.comparisonTabCount.hidden = !ready;
+                ui.comparisonTabCount.textContent = String(state.comparison.length);
+                ui.comparisonPanel.querySelector('.comparison-controls').hidden = !ready;
+                ui.comparisonPanel.querySelector('.comparison-table-wrap').hidden = !ready;
+                if (!ready) { ui.comparisonSummary.textContent = ''; return; }
                 const counts = Object.fromEntries(['unchanged', 'changed', 'added', 'removed', 'incomplete'].map(status => [status, state.comparison.filter(item => item.status === status).length]));
                 const visible = filteredComparisonItems();
-                ui.comparisonSummary.textContent = `Без изменений: ${counts.unchanged} · Изменено: ${counts.changed} · Добавлено: ${counts.added} · Удалено: ${counts.removed} · Недостаточно данных: ${counts.incomplete} · Показано: ${visible.length}`;
+                ui.comparisonSummary.textContent = `Показано ${visible.length} из ${state.comparison.length} запросов`;
+                ui.comparisonOverview.textContent = '';
+                for (const [status, label] of Object.entries(comparisonLabels)) {
+                    const card = document.createElement('div');
+                    card.className = `comparison-stat comparison-row-${status}`;
+                    const count = document.createElement('strong'); count.textContent = String(counts[status]);
+                    const caption = document.createElement('span'); caption.textContent = label;
+                    card.append(count, caption); ui.comparisonOverview.appendChild(card);
+                }
                 ui.comparisonBody.textContent = '';
                 if (!visible.length) {
                     const row = document.createElement('tr'); const cell = document.createElement('td');
-                    cell.colSpan = 6; cell.className = 'empty'; cell.textContent = 'По выбранному URL-фильтру запросов нет';
+                    cell.colSpan = 6; cell.className = 'empty'; cell.textContent = state.comparison.length
+                        ? 'По выбранным фильтрам запросов нет' : 'В исходной записи и повторном запуске нет запросов для сравнения';
                     row.appendChild(cell); ui.comparisonBody.appendChild(row); return;
                 }
                 const groups = new Map();
@@ -254,7 +299,7 @@
                     heading.appendChild(headingCell); ui.comparisonBody.appendChild(heading);
                     for (const item of items) {
                         const row = document.createElement('tr'); row.className = `comparison-row-${item.status}`;
-                        const values = [item.status, item.method, item.url, comparisonValue(item.baseline), comparisonValue(item.current), item.differences.join(', ') || '—'];
+                        const values = [comparisonLabels[item.status] || item.status, item.method, item.url, comparisonValue(item.baseline), comparisonValue(item.current), item.differences.join(', ') || '—'];
                         values.forEach((value, index) => {
                             const cell = document.createElement('td'); cell.textContent = String(value);
                             if (index === 0) cell.className = 'comparison-result';
@@ -268,7 +313,9 @@
 
             function buildComparison() {
                 state.comparison = flowCompare.build(state.baselineRequests.values(), state.requests.values());
+                state.comparisonReady = true;
                 renderComparison();
+                selectWorkspace(true, true);
             }
 
             async function exportComparisonReport() {
@@ -337,6 +384,7 @@
                 buildComparison,
                 exportComparisonReport,
                 scheduleRender,
+                resetWorkspace,
             });
         },
     });

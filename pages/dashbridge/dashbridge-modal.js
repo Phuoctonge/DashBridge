@@ -48,7 +48,7 @@
         okButton.textContent = 'OK';
 
         overlay.style.display = 'flex';
-        return { overlay, input, okButton, cancelButton };
+        return { overlay, input, okButton, cancelButton, actions };
     }
 
     function showAlert(message) {
@@ -93,5 +93,22 @@
         });
     }
 
-    window.DashBridgeModal = Object.freeze({ showAlert, showConfirm, showPrompt });
+    function showImportChoice(message) {
+        return new Promise(resolve => {
+            const { overlay, okButton, cancelButton, actions } = createModal(message, { confirm: true });
+            actions.style.flexWrap = 'wrap';
+            okButton.textContent = 'Заменить';
+            const createButton = appendElement(actions, 'button', 'btn btn-outline modal-create');
+            createButton.type = 'button';
+            createButton.textContent = 'Создать новый';
+            const close = choice => { overlay.remove(); resolve(choice); };
+            okButton.addEventListener('click', () => close('replace'));
+            createButton.addEventListener('click', () => close('create'));
+            cancelButton.addEventListener('click', () => close(null));
+            overlay.addEventListener('click', event => { if (event.target === overlay) close(null); });
+            cancelButton.focus();
+        });
+    }
+
+    window.DashBridgeModal = Object.freeze({ showAlert, showConfirm, showPrompt, showImportChoice });
 })();

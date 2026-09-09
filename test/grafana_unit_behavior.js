@@ -88,4 +88,12 @@ assert.deepStrictEqual(plain(unit.collectDataFrameUnitCodes({ results: {
 
 vm.runInContext(source, context);
 assert.strictEqual(context.DashBridgeGrafanaUnit, unit, 'repeated runtime installation must preserve the original API object');
+for (const [text, target, expected] of [
+    ['510 ms', 'mins', 0.0085], ['1.40 mins', 'ms', 84000], ['43.8 s', 'mins', 0.73],
+    ['500 µs', 'ms', 0.5], ['2 h', 's', 7200], ['1,5 GiB', 'MiB', 1536],
+    ['2 MB/s', 'B/s', 2000000], ['12.4%', '%', 12.4], ['1.25 K', '', 1250],
+    ['3 M requests', 'requests', 3000000], ['1.2e3 ms', 's', 1.2], ['0 ms', 's', 0],
+    ['12 dogs', 'mins', null], ['NaN', 'ms', null], ['1 GB', 'B/s', null],
+]) assert.strictEqual(unit.parseDisplayValue(text, target), expected, `${text} -> ${target}`);
+
 console.log('PASS Grafana axis unit parsing is isolated behind a stable runtime API');

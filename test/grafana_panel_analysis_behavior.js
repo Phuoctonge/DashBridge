@@ -85,6 +85,16 @@ const ramCalculated = analysis.analyzeRecords({
     records: [{ name: 'server-02.example:9182 Used % (calc)', current: '91,25%' }]
 });
 assert.strictEqual(ramCalculated.items[0].value, 91.25);
+const mixedMemoryUnits = analysis.analyzeRecords({
+    type: 'ram', mode: 'latest',
+    settings: { ...defaults, availKeyword: 'consumed[bytes]', memCalcMode: 'used' },
+    records: [
+        { name: 'server-01.example:9182 total[bytes]', current: '1 GiB' },
+        { name: 'server-01.example:9182 consumed[bytes]', current: '500 MB' }
+    ]
+});
+assert(Math.abs(mixedMemoryUnits.items[0].value - 500000000 / 1024 ** 3 * 100) < 1e-8,
+    'Memory analysis must distinguish decimal MB from binary GiB');
 
 const missing = analysis.analyzeRecords({
     type: 'ram', mode: 'period', settings: defaults,

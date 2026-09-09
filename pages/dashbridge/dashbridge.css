@@ -93,9 +93,9 @@ header {
     position: absolute;
     top: calc(100% + 0.375rem);
     left: 0;
-    width: 100%;
+    width: 17.5rem;
     min-width: 0;
-    max-width: min(17.5rem, calc(100vw - (2 * var(--page-gutter))));
+    max-width: calc(100vw - (2 * var(--page-gutter)));
     background: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: 0.5rem;
@@ -114,7 +114,7 @@ header {
 
 .profile-dropdown-actions {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     flex: 0 0 auto;
     margin-top: 0.25rem;
     padding: 0.375rem;
@@ -137,6 +137,7 @@ header {
 }
 
 .profile-dropdown-action {
+    position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -149,8 +150,15 @@ header {
     cursor: pointer;
 }
 
-.profile-dropdown-action+.profile-dropdown-action {
-    border-left: 1px solid var(--border-color);
+.profile-dropdown-action + .profile-dropdown-action::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 25%;
+    bottom: 25%;
+    width: 1px;
+    background: var(--border-color);
+    pointer-events: none;
 }
 
 .header-menu-dropdown button:hover {
@@ -486,7 +494,7 @@ header .grafana-dropdown {
     border: 1px solid currentColor;
     border-radius: 7px;
     color: #b42318;
-    background: rgba(255, 255, 255, 0.94);
+    background: var(--bg-elevated);
     box-shadow: 0 3px 12px rgba(0, 0, 0, 0.16);
     font-size: 0.875rem;
     font-weight: 600;

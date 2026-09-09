@@ -12,10 +12,29 @@
             const date = value => Number.isFinite(value) && value > 0 && value <= 8640000000000000 ? new Date(value).toLocaleString('ru-RU') : '—';
             const errors = { network: 'сеть', timeout: 'тайм-аут', http_400: 'пачка отклонена, сохранена в карантине',
                 configuration: 'доступ к серверу', rate_limit: 'лимит запросов', server: 'сервер', http: 'HTTP', storage: 'локальное хранилище' };
-            output.textContent = `В очереди: ${queued.length}. Старейшее событие: ${date(dates.length ? Math.min(...dates) : 0)}. `
-                + `Попытка: ${date(state.lastSendAttemptAt)}. Успех: ${date(state.lastSuccessAt)}. Повтор: ${date(state.nextRetryAt)}. `
-                + `Потери к отправке: ${Number(state.droppedAggregates) || 0}. Карантин за всё время: ${Number(state.quarantinedCount) || 0}. `
-                + `Состояние: ${errors[state.lastError] || 'ошибка не зарегистрирована'}.`;
+            const earliest = queued.length ? Math.max(Number(state.nextRetryAt) || 0,
+                state.lastSendAttemptAt ? Number(state.lastSendAttemptAt) + 3_600_000 : 0) : 0;
+            const status = state.lastError ? errors[state.lastError] || 'неизвестная ошибка'
+                : !state.lastSendAttemptAt ? 'Ещё не отправлялось'
+                    : queued.length ? 'В очереди, ожидание отправки' : 'Очередь пуста';
+            output.replaceChildren();
+            const details = document.createElement('dl');
+            [
+                ['Состояние', status], ['Агрегатов в очереди', String(queued.length)],
+                ['Старейшее событие', date(dates.length ? Math.min(...dates) : 0)],
+                ['Последняя попытка', date(state.lastSendAttemptAt)], ['Успешная доставка', date(state.lastSuccessAt)],
+                ['Следующая попытка не раньше', earliest ? date(earliest) : queued.length ? 'Ближайшее фоновое пробуждение' : 'Очередь пуста'],
+                ['Потери к отправке', String(Number(state.droppedAggregates) || 0)],
+                ['Карантин за всё время', String(Number(state.quarantinedCount) || 0)]
+            ].forEach(([label, value]) => {
+                const term = document.createElement('dt'); term.textContent = label;
+                const description = document.createElement('dd'); description.textContent = value;
+                details.append(term, description);
+            });
+            output.appendChild(details);
+            const hint = document.createElement('p');
+            hint.textContent = 'Время локальное. Отправка зависит от фонового пробуждения браузера; это не точное расписание. Обновление состояния не отправляет данные.';
+            output.appendChild(hint);
         } catch { output.textContent = 'Не удалось прочитать локальное состояние доставки.'; }
     };
     document.getElementById('refreshAnalyticsHealth')?.addEventListener('click', refreshAnalyticsHealth);

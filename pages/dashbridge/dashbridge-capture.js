@@ -24,6 +24,7 @@ globalThis.DashBridgeCapture = (() => {
         }
         let panelCaptureInProgress = false;
         let archiveCaptureInProgress = false;
+        let selectionOwner = null;
         let lastPanelCaptureAt = 0;
         const waitForLayout = () => new Promise(resolve =>
             requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -87,8 +88,8 @@ globalThis.DashBridgeCapture = (() => {
             });
         };
 
-        const capturePanel = async (sourceIframe, panel, request) => {
-            if (panelCaptureInProgress) {
+        const capturePanel = async (sourceIframe, panel, request, owner = null) => {
+            if (panelCaptureInProgress || (selectionOwner && owner !== selectionOwner)) {
                 const busyResult = {
                     action: 'dashbridgePanelCaptureResult', requestId: request.requestId,
                     ok: false, error: 'capture-in-progress'
@@ -113,6 +114,7 @@ globalThis.DashBridgeCapture = (() => {
                 ok: false, error: 'capture-failed'
             };
             try {
+                request.assertCurrent?.();
                 if (!card) throw new Error('capture-card-not-found');
                 if (prepared) {
                     const fitted = window.DashBridgeGrafanaCaptureOutput.fitPreparedSize({
@@ -149,7 +151,9 @@ globalThis.DashBridgeCapture = (() => {
                 const throttleWait = Math.max(0, 600 - (Date.now() - lastPanelCaptureAt));
                 if (throttleWait) await new Promise(resolve => setTimeout(resolve, throttleWait));
                 lastPanelCaptureAt = Date.now();
+                request.assertCurrent?.();
                 const captured = await chrome.runtime.sendMessage({ type: 'dashbridge-capture-visible-tab' });
+                request.assertCurrent?.();
                 if (!captured?.ok) throw new Error(captured?.error || 'capture-visible-tab-failed');
                 const source = captured.dataUrl;
                 if (!source) throw new Error('capture-visible-tab-failed');
@@ -161,6 +165,7 @@ globalThis.DashBridgeCapture = (() => {
                     x: rect.left, y: rect.top, width: rect.width, height: rect.height,
                     dpr: window.devicePixelRatio || 1
                 }, outputSize);
+                request.assertCurrent?.();
                 if (request.outputAction === 'copy') {
                     try {
                         await window.DashBridgeGrafanaCaptureOutput.copy(image.blob);
@@ -176,7 +181,7 @@ globalThis.DashBridgeCapture = (() => {
                             insecureContext: window.isSecureContext !== true
                         };
                     }
-                } else if (request.outputAction === 'archive') {
+                } else if (request.outputAction === 'archive' || request.outputAction === 'image') {
                     result = { action: 'dashbridgePanelCaptureResult', requestId: request.requestId, ok: true, image };
                 } else {
                     await chrome.downloads.download({
@@ -194,26 +199,108 @@ globalThis.DashBridgeCapture = (() => {
                     ok: false, error: error?.message || String(error)
                 };
             } finally {
-                if (card) {
-                    card.classList.remove('dashbridge-panel-capture-active');
-                    captureSnapshot?.forEach((state, prop) => state.value
-                        ? card.style.setProperty(prop, state.value, state.priority || '')
-                        : card.style.removeProperty(prop));
-                }
-                window.scrollTo(scroll.x, scroll.y);
-                postToDashboardFrame(sourceIframe, { action: 'dashbridgeCaptureLayoutChanged' });
-                await waitForLayout();
-                postToDashboardFrame(sourceIframe, {
-                    action: result.action, requestId: result.requestId,
-                    ok: result.ok, error: result.error
-                });
-                panelCaptureInProgress = false;
+                try {
+                    if (card) {
+                        card.classList.remove('dashbridge-panel-capture-active');
+                        captureSnapshot?.forEach((state, prop) => state.value
+                            ? card.style.setProperty(prop, state.value, state.priority || '')
+                            : card.style.removeProperty(prop));
+                    }
+                    window.scrollTo(scroll.x, scroll.y);
+                    postToDashboardFrame(sourceIframe, { action: 'dashbridgeCaptureLayoutChanged' });
+                    await waitForLayout();
+                    postToDashboardFrame(sourceIframe, {
+                        action: result.action, requestId: result.requestId,
+                        ok: result.ok, error: result.error
+                    });
+                } finally { panelCaptureInProgress = false; }
             }
             return result;
         };
 
+        // The lease stays in this controller; iframe messages cannot acquire it.
+        const captureSelection = async (selected, { signal, assertCurrent = () => {}, onProgress = () => {},
+            onCaptureVisibility = () => {} } = {}) => {
+            if (panelCaptureInProgress || archiveCaptureInProgress || selectionOwner) throw new Error('Уже выполняется захват снимков.');
+            if (!Array.isArray(selected) || selected.length < 1 || selected.length > 8
+                || new Set(selected.map(panel => panel.id)).size !== selected.length) throw new Error('Выберите от 1 до 8 разных панелей.');
+            const owner = {};
+            selectionOwner = owner;
+            const images = [];
+            const errors = [];
+            let bytes = 0;
+            const check = () => {
+                if (signal?.aborted) throw new DOMException('Подготовка отменена', 'AbortError');
+                assertCurrent();
+            };
+            const waitRendered = async iframe => {
+                check();
+                if (iframe.dataset.dashbridgeRendered === 'true') return;
+                await new Promise((resolve, reject) => {
+                    let observer;
+                    let timer;
+                    const finish = error => {
+                        observer?.disconnect(); clearTimeout(timer);
+                        signal?.removeEventListener('abort', abort);
+                        error ? reject(error) : resolve();
+                    };
+                    const abort = () => finish(new DOMException('Подготовка отменена', 'AbortError'));
+                    const inspect = () => {
+                        try {
+                            check();
+                            if (!iframe.isConnected) throw new Error('Панель удалена.');
+                            if (iframe.dataset.dashbridgeRendered === 'true') finish();
+                        } catch (error) { finish(error); }
+                    };
+                    observer = new MutationObserver(inspect);
+                    observer.observe(documentRef.body, { subtree: true, childList: true, attributes: true,
+                        attributeFilter: ['data-dashbridge-rendered', 'src'] });
+                    timer = setTimeout(() => finish(new Error('Панель не загрузилась за 20 секунд.')), 20_000);
+                    signal?.addEventListener('abort', abort, { once: true });
+                    inspect();
+                });
+            };
+            try {
+                for (let index = 0; index < selected.length; index += 1) {
+                    check();
+                    const panel = selected[index];
+                    onProgress(index, selected.length, panel.title);
+                    try {
+                        if (!getPanels().some(current => current.id === panel.id && !current.paused)) throw new Error('Панель недоступна или на паузе.');
+                        const iframe = forceLoadPanel(panel.id);
+                        if (!iframe) throw new Error('Iframe панели отсутствует.');
+                        const src = iframe.src;
+                        const assertFrame = () => {
+                            check();
+                            if (!iframe.isConnected || iframe.src !== src || iframe.dataset.dashbridgeRendered !== 'true') throw new Error('Панель перезагружена.');
+                        };
+                        await waitRendered(iframe);
+                        let result;
+                        try {
+                            onCaptureVisibility(true);
+                            result = await capturePanel(iframe, panel, {
+                                requestId: `report_image_${Date.now()}_${index}`, outputAction: 'image',
+                                prepared: true, outputWidth: 1000, outputHeight: 520, assertCurrent: assertFrame
+                            }, owner);
+                        } finally { onCaptureVisibility(false); }
+                        check();
+                        if (!result.ok || !result.image?.blob) throw new Error(result.error || 'Не удалось снять панель.');
+                        bytes += result.image.blob.size;
+                        if (bytes > 64 * 1024 * 1024) throw new Error('Превышен лимит снимков 64 МиБ.');
+                        const { blob, width, height } = result.image;
+                        images.push({ panelId: panel.id, title: panel.title, blob, width, height, capturedAt: Date.now() });
+                    } catch (error) {
+                        check();
+                        errors.push({ panelId: panel.id, title: panel.title, error: error.message || String(error) });
+                    }
+                }
+                check();
+                return { images, errors };
+            } finally { selectionOwner = null; }
+        };
+
         const captureAll = async button => {
-            if (!button || archiveCaptureInProgress || panelCaptureInProgress) return;
+            if (!button || archiveCaptureInProgress || panelCaptureInProgress || selectionOwner) return;
             const panels = getPanels();
             const activePanels = panels.filter(panel => !panel.paused);
             const pausedCount = panels.length - activePanels.length;
@@ -340,6 +427,7 @@ globalThis.DashBridgeCapture = (() => {
             captureAll,
             captureFromToolbar,
             capturePanel,
+            captureSelection,
             syncToggles,
             broadcastPrepared,
             setPrepared,

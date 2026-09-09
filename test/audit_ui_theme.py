@@ -497,7 +497,7 @@ if content:
         ('.module-toggle', 'background: var(--card-bg)'),
         ('.section-card', 'background: var(--card-bg)'),
         ('.maintenance-section', 'background: var(--bg-elevated)'),
-        ('.save-island', 'background: rgba(15, 23, 42'),
+        ('.save-island', 'background: var(--bg-elevated)'),
         ('.form-input-mono', 'background: var(--bg-elevated)'),
         ('.form-row-divider', 'border-bottom-color: var(--border)'),
     ]

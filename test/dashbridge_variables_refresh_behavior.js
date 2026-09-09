@@ -31,13 +31,14 @@ let replacements = 0;
 let saves = 0;
 let navigations = 0;
 let updates = 0;
+let now = 100000;
 const messages = [];
 const panel = { id: 'p', src: 'https://grafana.test/d-solo/uid/name?orgId=1&var-x=a#policy=off' };
 const frame = () => ({ isConnected: true, dataset: { dashbridgeLoaded: 'true' }, src: panel.src,
     contentWindow: { postMessage: message => messages.push(message) } });
 let currentFrame = frame();
 const context = vm.createContext({
-    URL, URLSearchParams, console, crypto: { randomUUID: () => String(++id) },
+    URL, URLSearchParams, console, Date: { now: () => now }, crypto: { randomUUID: () => String(++id) },
     setTimeout: (fn, delay) => { timers.set(++timerId, { fn, delay }); return timerId; },
     clearTimeout: key => timers.delete(key),
     MutationObserver: class { observe() {} disconnect() {} },
@@ -64,7 +65,7 @@ const controller = context.DashBridgeVariablesController.create({
 });
 const respond = (source, data) => listeners.message({ source, origin: 'https://grafana.test', data });
 const snapshot = { action: 'dashbridgeVariablesResponse', adapter: 'template', variables: [
-    { name: 'x', label: 'X', type: 'constant', values: ['a'], texts: ['a'], options: [], supported: true }
+    { name: 'x', label: 'X', type: 'textbox', values: ['a'], texts: ['a'], options: [], supported: true }
 ] };
 const tick = delay => {
     for (const [key, timer] of [...timers]) if (timer.delay === delay) { timers.delete(key); timer.fn(); }
@@ -90,14 +91,27 @@ const tick = delay => {
     respond(currentFrame.contentWindow, { ...snapshot, requestId: messages.at(-1).requestId });
     await Promise.resolve();
     const group = host.children[0];
-    const button = group.children.find(child => child.tag === 'button');
+    assert.equal(group.children.some(child => child.textContent === 'Обновить поля'), false);
+    const readsBeforeOpen = messages.length;
+    toggle.events.click();
+    assert.equal(messages.length, readsBeforeOpen, 'fresh cached fields open immediately without another request');
+    closeButton.events.click();
+    now += 61000;
+    toggle.events.click();
+    assert.equal(messages.length, readsBeforeOpen + 1, 'opening rereads all fields');
+    assert.equal(messages.at(-1).operation, 'read');
+    assert.equal(replacements, 0, 'opening must not reload Grafana');
+    respond(currentFrame.contentWindow, { ...snapshot, requestId: messages.at(-1).requestId });
+    await Promise.resolve();
+    assert.equal(saves, 0, 'reading must not save or apply selection');
     for (let repeat = 0; repeat < 2; repeat++) {
         const staleWindow = currentFrame.contentWindow;
+        const button = group.children[1].children[0].children[1].children.find(child => child.textContent === 'Обновить варианты');
         button.events.click();
         assert.equal(replacements, repeat + 1);
         assert.equal(group['aria-busy'], 'true');
         respond(staleWindow, { action: 'dashbridgeIframeReady' });
-        assert.equal(messages.length, repeat + 1, 'old frame cannot finish a refresh');
+        assert.equal(messages.length, repeat + readsBeforeOpen + 1, 'old frame cannot finish a refresh');
         respond(currentFrame.contentWindow, { action: 'dashbridgeIframeReady' });
         tick(300);
         respond(currentFrame.contentWindow, { ...snapshot, requestId: messages.at(-1).requestId });
@@ -108,7 +122,9 @@ const tick = delay => {
     assert.equal(saves, 2);
     assert.equal(navigations, 0, 'refresh must recreate the frame even with an unchanged URL');
     for (const adapter of ['template', 'scenes']) {
-        const editable = { ...snapshot, adapter, variables: [{ ...snapshot.variables[0], type: 'textbox' }] };
+        const dependent = { ...snapshot.variables[0], name: 'child', type: 'query', hide: 2,
+            dependencies: ['x'], values: ['stale'] };
+        const editable = { ...snapshot, adapter, variables: [{ ...snapshot.variables[0], type: 'textbox' }, dependent] };
         respond(currentFrame.contentWindow, { action: 'dashbridgeIframeReady' });
         tick(300);
         respond(currentFrame.contentWindow, { ...editable, requestId: messages.at(-1).requestId });
@@ -119,21 +135,33 @@ const tick = delay => {
         input.events.input();
         const sourceFrame = currentFrame;
         body.children.find(child => child.textContent === 'Применить').events.click();
-        if (adapter === 'template') {
-            respond(currentFrame.contentWindow, { action: 'dashbridgeIframeReady' });
-            tick(300);
-        } else {
-            assert.equal(messages.at(-1).operation, 'set');
-        }
+        assert.equal(new URL(currentFrame.src).searchParams.get('var-x'), adapter, 'first navigation already uses the selected project');
+        assert.equal(new URL(currentFrame.src).searchParams.has('var-child'), false, 'stale dependent selection must not reach the new document');
+        assert.equal(messages.some(message => message.operation === 'set'), false, 'native mutation must not precede navigation');
+        respond(currentFrame.contentWindow, { action: 'dashbridgeIframeReady' });
+        tick(300);
         respond(currentFrame.contentWindow, { ...editable,
-            variables: [{ ...editable.variables[0], values: [adapter] }], requestId: messages.at(-1).requestId });
+            variables: [{ ...editable.variables[0], values: [adapter] }, { ...dependent, values: ['resolved'] }], requestId: messages.at(-1).requestId });
         await Promise.resolve();
-        assert.equal(currentFrame, sourceFrame, 'settled source must not be recreated on commit');
+        assert.equal(currentFrame, sourceFrame, 'source has already navigated and must not reload on commit');
         assert.equal(new URL(panel.src).searchParams.get('var-x'), adapter);
+        assert.equal(new URL(panel.src).searchParams.get('var-child'), 'resolved', 'commit saves Grafana-resolved dependencies');
         assert.equal(replacements, 2);
     }
-    assert.equal(updates, 2, 'source card links update without navigating');
-    assert.equal(navigations, 1, 'only legacy apply needs a document navigation');
+    assert.equal(updates, 2, 'both adapters preserve the already navigated source');
+    assert.equal(navigations, 2, 'each selection navigates once');
+    closeButton.events.click();
+    now += 61000;
+    toggle.events.click();
+    const failedRequest = messages.at(-1);
+    respond(currentFrame.contentWindow, { action: 'dashbridgeVariablesResponse', requestId: failedRequest.requestId, error: 'unavailable' });
+    closeButton.events.click();
+    toggle.events.click();
+    assert.notEqual(messages.at(-1).requestId, failedRequest.requestId, 'reopening retries a failed read without waiting for cache expiry');
+    const pendingRequestCount = messages.length;
+    closeButton.events.click();
+    toggle.events.click();
+    assert.equal(messages.length, pendingRequestCount, 'reopening during a pending read must not duplicate it');
     controller.stop();
     assert.equal(toggle.events.click, undefined);
     assert.equal(dialog.events.keydown, undefined);

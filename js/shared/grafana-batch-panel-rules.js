@@ -3,7 +3,7 @@
 // while sync has strict per-item and total quotas.
 window.BatchPanelRules = (() => {
     const STORAGE_KEY = 'batchPanelToolRules';
-    const BOOLEAN_FIELDS = ['removeFill', 'thickenLines', 'invertLegend', 'invertIdle', 'convertMemToUsed', 'forceMemByteUnit'];
+    const BOOLEAN_FIELDS = ['removeFill', 'thickenLines', 'invertLegend', 'invertIdle', 'convertMemToUsed', 'forceMemByteUnit', 'seriesQueryFilterEnabled', 'thresholdEnabled'];
 
     const dashboardKey = url => {
         const dashboard = parseGrafanaDashboardUrl(url);
@@ -22,9 +22,21 @@ window.BatchPanelRules = (() => {
         if (normalized.thickenLines) {
             const width = Number(rule.thickenLinesValue);
             normalized.thickenLinesValue = Number.isFinite(width)
-                ? Math.min(10, Math.max(1, width))
+                ? Math.min(5, Math.max(0.5, width))
                 : 1.5;
         }
+        for (const prefix of ['seriesQueryFilter', 'threshold']) {
+            if (!normalized[`${prefix}Enabled`]) continue;
+            const value = Number(rule[`${prefix}Value`]);
+            normalized[`${prefix}Value`] = Number.isFinite(value) ? value : 0;
+            normalized[`${prefix}RawValue`] = normalized[`${prefix}Value`];
+        }
+        if (normalized.seriesQueryFilterEnabled) {
+            normalized.seriesFilterSettingsVersion = 2;
+            normalized.seriesQueryFilterMode = rule.seriesQueryFilterMode === 'last' ? 'last' : 'max';
+            normalized.seriesQueryFilterHighlightEnabled = rule.seriesQueryFilterHighlightEnabled !== false;
+        }
+        if (normalized.thresholdEnabled) normalized.thresholdNotifyEnabled = false;
         return normalized;
     };
 

@@ -6,6 +6,7 @@
 
     function create({ reportEngine, transportFactory, testRunnerFactory, auditEngine,
         forceLoadPanel, postToDashboardFrame, getPanels, getActiveProfile, getTimeContext,
+        attachmentsFactory = null, captureSelection = null, collage = null, copyImage = null,
         documentRef = document, navigatorRef = navigator, setTimer = setTimeout }) {
         if (!reportEngine?.normalizePanel || !reportEngine?.orderPanels
             || !transportFactory?.create || !testRunnerFactory?.create
@@ -127,12 +128,21 @@
             }
             const overlay = documentRef.createElement('div');
             overlay.className = 'modal-overlay report-preview-overlay';
-            overlay.innerHTML = `<section class="modal-content report-preview-modal" role="dialog" aria-modal="true">
-                <div class="report-preview-header"><h3>Сводное сообщение</h3><button type="button" class="btn btn-outline report-close">Закрыть</button></div>
+            overlay.innerHTML = `<section class="modal-content report-preview-modal" role="dialog" aria-modal="true" aria-labelledby="reportPreviewTitle">
+                <div class="report-preview-header"><div><h3 id="reportPreviewTitle">Сводное сообщение</h3><p>Текст и изображение отправляются отдельно.</p></div><button type="button" class="btn btn-outline report-close">Закрыть</button></div>
+                <div class="report-preview-tabs" role="tablist" aria-label="Содержимое сообщения">
+                    <button type="button" role="tab" id="reportTextTab" aria-controls="reportTextPanel" aria-selected="true">Текст</button>
+                    <button type="button" role="tab" id="reportImagesTab" aria-controls="reportImagesPanel" aria-selected="false" tabindex="-1">Скриншоты</button>
+                </div>
+                <div id="reportTextPanel" class="report-text-panel" role="tabpanel" aria-labelledby="reportTextTab">
+                <div class="report-text-body">
                 <div class="report-preview-status" role="status">Подготовка…</div>
                 <div class="report-preview-warnings" hidden></div>
                 <textarea class="report-preview-output" aria-label="Сформированное сообщение"></textarea>
-                <div class="modal-actions"><button type="button" class="btn btn-outline report-regenerate">Обновить данные</button><button type="button" class="btn btn-primary report-copy">Скопировать</button></div>
+                </div>
+                <div class="report-preview-footer"><button type="button" class="btn btn-outline report-regenerate">Обновить данные</button><button type="button" class="btn btn-primary report-copy">Копировать текст</button></div>
+                </div>
+                <div id="reportImagesPanel" class="report-attachments-host" role="tabpanel" aria-labelledby="reportImagesTab" hidden></div>
             </section>`;
             documentRef.body.appendChild(overlay); overlay.style.display = 'flex';
             activePreview = overlay;
@@ -140,6 +150,37 @@
             const status = overlay.querySelector('.report-preview-status');
             const warnings = overlay.querySelector('.report-preview-warnings');
             const regenerate = overlay.querySelector('.report-regenerate');
+            const tabs = [...overlay.querySelectorAll('[role="tab"]')];
+            const selectTab = index => {
+                tabs.forEach((tab, current) => {
+                    tab.setAttribute('aria-selected', String(current === index));
+                    tab.tabIndex = current === index ? 0 : -1;
+                    overlay.querySelector('#' + tab.getAttribute('aria-controls')).hidden = current !== index;
+                });
+            };
+            tabs.forEach((tab, index) => {
+                tab.addEventListener('click', () => selectTab(index));
+                tab.addEventListener('keydown', event => {
+                    const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1
+                        : event.key === 'ArrowRight' ? (index + 1) % tabs.length
+                            : event.key === 'ArrowLeft' ? (index + tabs.length - 1) % tabs.length : null;
+                    if (next === null) return;
+                    event.preventDefault(); selectTab(next); tabs[next].focus();
+                });
+            });
+            const attachments = attachmentsFactory?.create({
+                host: overlay.querySelector('.report-attachments-host'), overlay,
+                getPanels: () => reportEngine.orderPanels(getPanels(), reportEngine.normalizeProfile(getActiveProfile()?.report).panelOrder),
+                getContext: () => ({
+                    profileId: getActiveProfile()?.id, name: getActiveProfile()?.name,
+                    time: getTimeContext(),
+                    period: documentRef.getElementById('timePickerLabel')?.textContent?.trim(),
+                    panels: getPanels().map(panel => ({ id: panel.id, src: panel.src, title: panel.title,
+                        paused: panel.paused, tools: panel.tools, grafanaTheme: panel.grafanaTheme, report: panel.report,
+                        frameSrc: documentRef.getElementById('iframe-' + panel.id)?.src }))
+                }),
+                captureSelection, collage, copyImage, documentRef
+            });
             let running = false;
             let runController = null;
             const run = async () => {
@@ -148,9 +189,13 @@
                 runController = new AbortController();
                 const controller = runController;
                 regenerate.disabled = true;
+                attachments?.setCollecting(true);
                 warnings.hidden = true;
                 warnings.textContent = '';
-                try { await generate(output, status, warnings, controller.signal); }
+                try {
+                    const collected = await generate(output, status, warnings, controller.signal);
+                    attachments?.setReport(collected);
+                }
                 catch (error) {
                     globalThis.DashBridgeAnalytics?.outcome('dashbridge.report_generated',
                         error?.name === 'AbortError' ? 'cancelled' : 'error');
@@ -161,11 +206,13 @@
                         runController = null;
                         running = false;
                         if (regenerate.isConnected) regenerate.disabled = false;
+                        attachments?.setCollecting(false);
                     }
                 }
             };
             const close = () => {
                 runController?.abort();
+                attachments?.stop();
                 if (activePreview === overlay) {
                     activePreview = null;
                     closeActivePreview = null;
@@ -177,15 +224,16 @@
             overlay.addEventListener('click', event => { if (event.target === overlay) close(); });
             regenerate.addEventListener('click', run);
             overlay.querySelector('.report-copy').addEventListener('click', async event => {
+                const button = event.currentTarget;
                 try {
-                    await navigatorRef.clipboard.writeText(output.value); event.currentTarget.textContent = 'Скопировано';
+                    await navigatorRef.clipboard.writeText(output.value); button.textContent = 'Скопировано';
                     globalThis.DashBridgeAnalytics?.outcome('dashbridge.report_copied', 'success');
                 }
                 catch {
-                    event.currentTarget.textContent = 'Ошибка копирования';
+                    button.textContent = 'Ошибка копирования';
                     globalThis.DashBridgeAnalytics?.outcome('dashbridge.report_copied', 'error');
                 }
-                setTimer(() => { if (event.currentTarget.isConnected) event.currentTarget.textContent = 'Скопировать'; }, 1800);
+                setTimer(() => { if (button.isConnected) button.textContent = 'Копировать текст'; }, 1800);
             });
             void run();
         };

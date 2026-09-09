@@ -84,8 +84,19 @@
         const apply = (panel, iframe) => {
             const tools = normalizeTools(panel);
             const requestId = `panel-tools-${now()}-${random().toString(36).slice(2)}`;
+            const parents = {
+                seriesQueryFilterHighlightEnabled: 'seriesQueryFilterEnabled',
+                cpuCapacityFilterHighlightEnabled: 'cpuCapacityFilterEnabled',
+                cpuCapacityFilterLoad1: 'cpuCapacityFilterEnabled',
+                cpuCapacityFilterLoad5: 'cpuCapacityFilterEnabled',
+                cpuCapacityFilterLoad15: 'cpuCapacityFilterEnabled',
+                thresholdNotifyEnabled: 'thresholdEnabled'
+            };
+            // A saved child preference is not evidence while its parent is off.
+            // Prepared capture is acknowledged by a completed capture, not this command.
             appliedWaiters.set(requestId, Object.entries(analyticsFeatures)
-                .filter(([key]) => tools[key] === true).map(([, featureId]) => featureId));
+                .filter(([key]) => key !== 'capturePrepared' && tools[key] === true
+                    && (!parents[key] || tools[parents[key]] === true)).map(([, featureId]) => featureId));
             setTimer(() => appliedWaiters.delete(requestId), 25_000);
             return postToDashboardFrame(iframe, {
                 action: 'applyPanelTools', requestId, tools, transformSettings: getTransformSettings()

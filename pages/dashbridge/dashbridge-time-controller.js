@@ -372,9 +372,7 @@
                 } else {
                     broadcast();
                 }
-                root.DashBridgeAnalytics?.track('dashbridge.time_absolute_range_applied', 'used', {
-                    mode: requiresNavigation ? 'standalone' : 'period'
-                });
+                root.DashBridgeAnalytics?.track('dashbridge.time_absolute_range_applied', 'used', {});
             });
             documentRef.querySelectorAll('#refreshPopover .dropdown-item').forEach(button => {
                 if (!button.hasAttribute('data-refresh')) return;

@@ -110,7 +110,11 @@
                 const next = JSON.stringify(snapshot);
                 stable = next === signature ? stable + 1 : 0;
                 signature = next;
-                if (snapshot?.variables.length && !snapshot.variables.some(variable => variable.loading) && stable >= 3) break;
+                // A read does not start dependency updates: return native ready
+                // values immediately. Mutations and an initially empty registry
+                // still need a short settle window during Grafana startup.
+                const readyRead = request.operation === 'read' && snapshot?.variables.length > 0;
+                if (snapshot && !snapshot.variables.some(variable => variable.loading) && (readyRead || stable >= 3)) break;
                 await pause();
             } while (!stopped && Date.now() < deadline);
             if (stopped) return;

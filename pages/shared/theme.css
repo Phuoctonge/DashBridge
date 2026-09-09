@@ -43,7 +43,7 @@
     /* Поверхности */
     --bg: #f1f5f9;
     --bg-elevated: #ffffff;
-    --card-bg: rgba(255, 255, 255, 0.9);
+    --card-bg: #ffffff;
     --header-bg: #ffffff;
     --header-grad: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
     --surface: #ffffff;

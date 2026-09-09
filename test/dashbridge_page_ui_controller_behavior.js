@@ -41,7 +41,7 @@ const ids = [
     'addPanelDropdown', 'reportDropdown', 'dataMenuBtn', 'addPanelMenuBtn',
     'reportMenuBtn', 'profilePickerBtn', 'timePopover', 'refreshPopover',
     'configureReportBtn', 'generateReportBtn', 'testReportBtn', 'newProfileBtn',
-    'renameProfileBtn', 'deleteProfileBtn',
+    'renameProfileBtn', 'cloneProfileBtn', 'deleteProfileBtn',
 ];
 const elements = Object.fromEntries(ids.map(id => [id, new FakeElement(id)]));
 const documentListeners = new Map();
@@ -75,6 +75,7 @@ const controller = context.DashBridgePageUiController.create({
     renderProfileSwitcher: () => calls.push('renderProfiles'),
     showPrompt: async (label, value) => label.startsWith('Название') ? ' New ' : `${value} 2`,
     createProfile: name => calls.push(['create', name]),
+    cloneProfile: (name, id) => calls.push(['clone', name, id]),
     renameActiveProfile: name => calls.push(['rename', name]),
     deleteProfile: id => calls.push(['delete', id]),
     getActiveProfile: () => ({ id: 'profile-1', name: 'Current' }),

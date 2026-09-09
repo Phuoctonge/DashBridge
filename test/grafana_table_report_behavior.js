@@ -67,3 +67,6 @@ assert(collectorSource.indexOf('records = tableRecords;') < collectorSource.inde
     && collectorSource.includes("new Set(['http_error', 'network_error', 'decode_error', 'aborted'])"),
     'a visible Metric/Value table must be evaluated before a stale request failure is reported');
 console.log('PASS Grafana table Metric/Value rows feed report snapshots');
+rows.splice(0, rows.length, row(['fast', '510 ms']), row(['slow', '1.40 mins']));
+const durations = tableReport.collectGrafanaTableRecords(root, { unit: 'ms' });
+assert.deepStrictEqual(Array.from(durations, item => item.values[0]), [510, 84000]);

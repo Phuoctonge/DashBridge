@@ -4,7 +4,8 @@ const assert = require('assert');
 const fs = require('fs');
 const vm = require('vm');
 
-const context = { URL, console };
+const analyticsOpened = [];
+const context = { URL, console, DashBridgeAnalytics: { opened: feature => analyticsOpened.push(feature), outcome() {} } };
 context.globalThis = context;
 vm.createContext(context);
 vm.runInContext(
@@ -111,6 +112,8 @@ const controller = context.DashBridgePanelCardController.create({
     assert(!cardClasses.has('fullscreen'));
     assert.strictEqual(fullscreenButton.innerHTML, '<expand>');
     assert.strictEqual(controller.exitFullscreen(), false);
+    assert.deepStrictEqual(analyticsOpened, ['dashbridge.panel_fullscreen_opened'],
+        'only entry emits opened; exiting fullscreen must not inflate analytics');
 
     controller.bindPanelActions(actionCard, panel, iframe);
     actionElements.get('.btn-open').dataset.url = panel.src;
