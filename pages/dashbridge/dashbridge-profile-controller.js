@@ -180,7 +180,7 @@
         };
         const renameActiveProfile = newName => {
             const profile = getActiveProfile();
-            if (!profile || !newName.trim()) return;
+            if (!profile || profile.systemKey === 'dashbridge' || !newName.trim()) return;
             profile.name = newName.trim().slice(0, 120);
             void saveProfiles().then(saved => {
                 if (!saved?.error) root.DashBridgeAnalytics?.outcome('dashbridge.profile_renamed', 'success');

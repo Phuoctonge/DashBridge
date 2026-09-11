@@ -4,6 +4,7 @@
 const dashBridgeProfileFingerprint = value => DashBridgeLocalStateSchema.profileFingerprint(
     DashBridgeLocalStateSchema.normalizeProfiles([value], { mode: 'load' }).items[0]);
 let dashBridgeProfileBaseline = new Map();
+let dashBridgeSystemProfileBaseline = null;
 
 const dashBridgeProfilePatchWrite = (payload, revision) => new Promise((resolve, reject) => {
     const currentById = new Map(payload.profiles.map(profile => [profile.id, profile]));
@@ -42,13 +43,16 @@ const DashBridgeProfileStore = {
         const result = await chrome.storage.local.get(['dashbridge_profiles', 'dashbridge_activeProfileId', 'dashbridge_rejected_profiles_backup']);
         let rawProfiles = Array.isArray(result.dashbridge_profiles) ? result.dashbridge_profiles : [];
         let seededDefault = false;
-        if (!rawProfiles.some(profile => profile?.isSystemDefault === true)) {
+        if (!rawProfiles.some(profile => profile?.systemKey === 'dashbridge')) {
             try {
                 const response = await fetch('dashbridge-default-profile.json', { cache: 'no-store' });
                 if (response.ok) {
                     const seed = await response.json();
                     if (seed && typeof seed === 'object' && Array.isArray(seed.panels)) {
-                        rawProfiles = [...rawProfiles, { ...seed, name: seed.name || 'dashbridge', isSystemDefault: true }];
+                        const existing = rawProfiles.find(profile => profile?.isSystemDefault === true);
+                        rawProfiles = rawProfiles.filter(profile => profile !== existing);
+                        rawProfiles.push({ ...seed, name: 'dashbridge', systemKey: 'dashbridge', isSystemDefault: true,
+                            id: existing?.id || crypto.randomUUID() });
                         seededDefault = true;
                     }
                 }
@@ -59,7 +63,7 @@ const DashBridgeProfileStore = {
             { mode: 'load' }
         );
         const profiles = normalized.items.length
-            ? normalized.items : [{ id: crypto.randomUUID(), name: 'Default', panels: [], isSystemDefault: true }];
+            ? normalized.items : [{ id: crypto.randomUUID(), name: 'dashbridge', panels: [], systemKey: 'dashbridge', isSystemDefault: true }];
         if (seededDefault || !result.dashbridge_profiles?.length) {
             await chrome.storage.local.set({
                 dashbridge_profiles: profiles,
@@ -73,6 +77,7 @@ const DashBridgeProfileStore = {
         const baseline = new Map(normalized.items.map(profile => [
             profile.id, dashBridgeProfileFingerprint(profile)
         ]));
+        dashBridgeSystemProfileBaseline = normalized.items.find(profile => profile.systemKey === 'dashbridge') || null;
         if ((normalized.skippedProfiles || normalized.skippedPanels) && !result.dashbridge_rejected_profiles_backup) {
             await chrome.storage.local.set({
                 dashbridge_rejected_profiles_backup: {
@@ -92,9 +97,9 @@ const DashBridgeProfileStore = {
         if (!Array.isArray(profiles) || !profiles.some(profile => profile?.id === activeProfileId)) {
             throw new TypeError('Активный профиль отсутствует в сохраняемом списке.');
         }
-        return dashBridgeProfileWriter.write({
-            profiles, activeProfileId
-        });
+        const nextProfiles = profiles.map(profile => profile?.systemKey === 'dashbridge' && dashBridgeSystemProfileBaseline
+            ? structuredClone(dashBridgeSystemProfileBaseline) : profile);
+        return dashBridgeProfileWriter.write({ profiles: nextProfiles, activeProfileId });
     },
     flush() { return dashBridgeProfileWriter.flush(); },
     checkpoint() { return dashBridgeProfileWriter.checkpoint(); }
