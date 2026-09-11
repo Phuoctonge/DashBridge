@@ -1,0 +1,447 @@
+{
+  "version": 3,
+  "profileName": "Default",
+  "timeState": {
+    "from": "now-15m",
+    "to": "now",
+    "refresh": "30s"
+  },
+  "report": {
+    "enabled": true,
+    "template": "Состояние инфраструктуры за {{period}}:\n\n{{panels}}\n\nОтчёт сформирован: {{generatedAt}}",
+    "panelOrder": [
+      "486b20b3-521a-490f-8586-8beb72ebc16d",
+      "7b4f5041-0230-4247-923f-e188a9645323",
+      "9537077f-b039-47f0-8e53-eed793427fb3",
+      "20974595-59a2-4b58-b29d-8380855b0bd9",
+      "03c23a22-2c54-4b68-b7ab-f495bf198092",
+      "4cd904a3-80b3-4327-a828-9a16e58ec4ca",
+      "55e4682e-fd9d-4329-a6cb-3f4617397db7",
+      "19411c23-22c9-4032-b95b-757f1e40a07d"
+    ],
+    "attachments": {
+      "slaOnly": true,
+      "heading": false,
+      "layout": "auto",
+      "panelOrder": [
+        "486b20b3-521a-490f-8586-8beb72ebc16d",
+        "7b4f5041-0230-4247-923f-e188a9645323",
+        "9537077f-b039-47f0-8e53-eed793427fb3",
+        "20974595-59a2-4b58-b29d-8380855b0bd9",
+        "03c23a22-2c54-4b68-b7ab-f495bf198092",
+        "4cd904a3-80b3-4327-a828-9a16e58ec4ca",
+        "55e4682e-fd9d-4329-a6cb-3f4617397db7",
+        "19411c23-22c9-4032-b95b-757f1e40a07d"
+      ],
+      "selectedIds": null,
+      "forcedIds": [
+        "486b20b3-521a-490f-8586-8beb72ebc16d",
+        "7b4f5041-0230-4247-923f-e188a9645323"
+      ]
+    },
+    "context": {
+      "testName": "",
+      "environment": "",
+      "testStartedAt": "",
+      "stableLoadStartedAt": ""
+    }
+  },
+  "exportedAt": "2026-09-11T15:05:13.911Z",
+  "panels": [
+    {
+      "height": "350px",
+      "id": "486b20b3-521a-490f-8586-8beb72ebc16d",
+      "report": {
+        "detailsEnabled": false,
+        "enabled": true,
+        "includeMode": "always",
+        "key": "95_перцентиль_успешные",
+        "listLimit": 5,
+        "sla": {
+          "evaluation": "period_max",
+          "operator": "gt",
+          "source": "graph",
+          "unit": "",
+          "value": null,
+          "warningValue": null
+        },
+        "templates": {
+          "breached": "🔴⏱️ Зафиксировано превышение установленного требования SLA по времени ответа (не более {{threshold}} {{unit}}) по следующим запросам:\n{{criticalList}}.",
+          "details": "{{stateQuote}}",
+          "listItem": "- {{name}} — {{value}}{{unit}};",
+          "neutral": "🖥 По панели «{{panelTitle}}»: {{aggregateValue}} {{unit}}.",
+          "normal": "🟢 По времени ответа по запросам превышения SLA (не более {{threshold}} {{unit}}) не фиксируются.",
+          "unavailable": "⚠ Не удалось получить данные панели «{{panelTitle}}». Причина: {{dataStatus}}.",
+          "warning": "⚠️ По панели «{{panelTitle}}» зафиксированы значения предупредительного уровня {{warningThreshold}} {{unit}}."
+        }
+      },
+      "src": "https://grafanakns.mos.ru/d-solo/cegmc4dj40m4gf/monitoring-jmeter?orgId=1&from=2026-09-08T14%3A49%3A17.146Z&to=2026-09-08T15%3A37%3A56.429Z&timezone=Europe%2FMoscow&var-dataSource=000000039&var-station=%24__all&var-project=puds_mig_kasp&refresh=5s&panelId=138&kiosk=tv&dashbridge=1",
+      "title": "95 перцентиль (успешные)",
+      "tools": {
+        "convertMemToUsed": false,
+        "cpuCapacityFilterCoefficient": 0.8,
+        "cpuCapacityFilterEnabled": false,
+        "cpuCapacityFilterHighlightEnabled": true,
+        "cpuCapacityFilterLoad1": false,
+        "cpuCapacityFilterLoad15": false,
+        "cpuCapacityFilterLoad5": false,
+        "cpuCapacityFilterMode": "max",
+        "forceMemByteUnit": false,
+        "invertIdle": false,
+        "invertLegend": false,
+        "legendFilter": [],
+        "legendIgnoreFilter": "",
+        "legendMode": "fast_complete_hide",
+        "legendSearch": "",
+        "legendSelectFilter": "",
+        "legendSelectionVersion": null,
+        "legendVisibleSeries": [],
+        "removeFill": true,
+        "seriesFilterSettingsVersion": 2,
+        "seriesQueryFilterEnabled": false,
+        "seriesQueryFilterHighlightEnabled": true,
+        "seriesQueryFilterInputUnit": "s",
+        "seriesQueryFilterMode": "max",
+        "seriesQueryFilterRawValue": 0,
+        "seriesQueryFilterValue": 0,
+        "thickenLines": false,
+        "thickenLinesValue": 1.5,
+        "thresholdEnabled": true,
+        "thresholdInputUnit": "s",
+        "thresholdNotifyEnabled": true,
+        "thresholdRawValue": 5000,
+        "thresholdUnit": "s",
+        "thresholdValue": 5
+      },
+      "width": "50%"
+    },
+    {
+      "height": "350px",
+      "id": "7b4f5041-0230-4247-923f-e188a9645323",
+      "report": {
+        "detailsEnabled": false,
+        "enabled": false,
+        "includeMode": "always",
+        "key": "интенсивность_по_запросам_rps",
+        "listLimit": null,
+        "sla": {
+          "evaluation": "period_max",
+          "operator": "gt",
+          "source": "none",
+          "unit": "",
+          "value": null,
+          "warningValue": null
+        },
+        "templates": {
+          "breached": "🔴 По серверам {{servers}} фиксируется значение более {{threshold}} {{unit}}, что превышает установленные требования.",
+          "details": "{{stateQuote}}",
+          "listItem": "- {{name}} — {{value}}{{unit}};",
+          "neutral": "🖥 По панели «{{panelTitle}}»: {{aggregateValue}} {{unit}}.",
+          "normal": "🟢 По панели «{{panelTitle}}» превышения SLA {{threshold}} {{unit}} не фиксируются.",
+          "unavailable": "⚠ Не удалось получить данные панели «{{panelTitle}}». Причина: {{dataStatus}}.",
+          "warning": "⚠️ По панели «{{panelTitle}}» зафиксированы значения предупредительного уровня {{warningThreshold}} {{unit}}."
+        }
+      },
+      "src": "https://grafanakns.mos.ru/d-solo/cegmc4dj40m4gf/monitoring-jmeter?orgId=1&from=2026-09-08T14%3A49%3A17.146Z&to=2026-09-08T15%3A37%3A56.429Z&timezone=Europe%2FMoscow&refresh=5s&panelId=115&kiosk=tv&dashbridge=1&var-dataSource=000000039&var-station=%24__all&var-project=puds_mig_kasp",
+      "title": "Интенсивность по запросам RPS",
+      "width": "50%"
+    },
+    {
+      "height": "350px",
+      "id": "9537077f-b039-47f0-8e53-eed793427fb3",
+      "report": {
+        "detailsEnabled": false,
+        "enabled": true,
+        "includeMode": "always",
+        "key": "процент_неуспешных",
+        "listLimit": null,
+        "sla": {
+          "evaluation": "period_max",
+          "operator": "gt",
+          "source": "custom",
+          "unit": "",
+          "value": 5,
+          "warningValue": null
+        },
+        "templates": {
+          "breached": "🔴 Процент неуспешных запросов составил {{maxValue}} {{unit}}, что превышает установленные требования (не более {{criticalThreshold}} {{unit}}).",
+          "details": "{{stateQuote}}",
+          "listItem": "- {{name}} — {{value}}{{unit}};",
+          "neutral": "🖥 По панели «{{panelTitle}}»: {{aggregateValue}} {{unit}}.",
+          "normal": "🟢 Процент неуспешных запросов не превышает установленные требования в  {не более {criticalThreshold}} {{unit}} не фиксируются.",
+          "unavailable": "⚠ Не удалось получить данные панели «{{panelTitle}}». Причина: {{dataStatus}}.",
+          "warning": "⚠️ По панели «{{panelTitle}}» зафиксированы значения предупредительного уровня {{warningThreshold}} {{unit}}."
+        }
+      },
+      "src": "https://grafanakns.mos.ru/d-solo/cegmc4dj40m4gf/monitoring-jmeter?orgId=1&from=2026-09-08T14%3A49%3A17.146Z&to=2026-09-08T15%3A37%3A56.429Z&timezone=Europe%2FMoscow&refresh=5s&panelId=140&kiosk=tv&dashbridge=1&var-dataSource=000000039&var-station=%24__all&var-project=puds_mig_kasp",
+      "title": "Процент неуспешных",
+      "tools": {
+        "thresholdUnit": "%"
+      },
+      "width": "50%"
+    },
+    {
+      "height": "350px",
+      "id": "20974595-59a2-4b58-b29d-8380855b0bd9",
+      "report": {
+        "detailsEnabled": false,
+        "enabled": true,
+        "includeMode": "critical_only",
+        "key": "количество_неуспешных_all",
+        "listLimit": 5,
+        "sla": {
+          "evaluation": "period_max",
+          "operator": "gt",
+          "source": "custom",
+          "unit": "",
+          "value": 1,
+          "warningValue": null
+        },
+        "templates": {
+          "breached": "⚠️Зафиксированы ошибки по следующим запросам (с указанием количества):\n{{allSeriesList}}",
+          "details": "{{stateQuote}}",
+          "listItem": "- {{name}} — {{value}}{{unit}};",
+          "neutral": "🖥 По панели «{{panelTitle}}»: {{aggregateValue}} {{unit}}.",
+          "normal": "",
+          "unavailable": "⚠ Не удалось получить данные панели «{{panelTitle}}». Причина: {{dataStatus}}.",
+          "warning": "⚠️ По панели «{{panelTitle}}» зафиксированы значения предупредительного уровня {{warningThreshold}} {{unit}}."
+        }
+      },
+      "src": "https://grafanakns.mos.ru/d-solo/cegmc4dj40m4gf/monitoring-jmeter?orgId=1&from=2026-09-08T14%3A49%3A17.146Z&to=2026-09-08T15%3A37%3A56.429Z&timezone=Europe%2FMoscow&refresh=5s&panelId=58&kiosk=tv&dashbridge=1&var-dataSource=000000039&var-station=%24__all&var-project=puds_mig_kasp",
+      "title": "Количество неуспешных All",
+      "width": "50%"
+    },
+    {
+      "height": "350px",
+      "id": "03c23a22-2c54-4b68-b7ab-f495bf198092",
+      "report": {
+        "detailsEnabled": false,
+        "enabled": false,
+        "includeMode": "always",
+        "key": "интенсивность_по_сценариям_opm",
+        "listLimit": null,
+        "sla": {
+          "evaluation": "period_max",
+          "operator": "gt",
+          "source": "none",
+          "unit": "",
+          "value": null,
+          "warningValue": null
+        },
+        "templates": {
+          "breached": "🔴 По серверам {{servers}} фиксируется значение более {{threshold}} {{unit}}, что превышает установленные требования.",
+          "details": "{{stateQuote}}",
+          "listItem": "- {{name}} — {{value}}{{unit}};",
+          "neutral": "🖥 По панели «{{panelTitle}}»: {{aggregateValue}} {{unit}}.",
+          "normal": "🟢 По панели «{{panelTitle}}» превышения SLA {{threshold}} {{unit}} не фиксируются.",
+          "unavailable": "⚠ Не удалось получить данные панели «{{panelTitle}}». Причина: {{dataStatus}}.",
+          "warning": "⚠️ По панели «{{panelTitle}}» зафиксированы значения предупредительного уровня {{warningThreshold}} {{unit}}."
+        }
+      },
+      "src": "https://grafanakns.mos.ru/d-solo/cegmc4dj40m4gf/monitoring-jmeter?orgId=1&from=2026-09-08T14%3A49%3A17.146Z&to=2026-09-08T15%3A37%3A56.429Z&timezone=Europe%2FMoscow&refresh=5s&panelId=137&kiosk=tv&dashbridge=1&var-dataSource=000000039&var-station=%24__all&var-project=puds_mig_kasp",
+      "title": "Интенсивность по сценариям OPM",
+      "tools": {
+        "convertMemToUsed": false,
+        "cpuCapacityFilterCoefficient": 0.8,
+        "cpuCapacityFilterEnabled": false,
+        "cpuCapacityFilterHighlightEnabled": true,
+        "cpuCapacityFilterLoad1": false,
+        "cpuCapacityFilterLoad15": false,
+        "cpuCapacityFilterLoad5": false,
+        "cpuCapacityFilterMode": "max",
+        "forceMemByteUnit": false,
+        "invertIdle": false,
+        "invertLegend": false,
+        "legendFilter": [],
+        "legendIgnoreFilter": "",
+        "legendMode": "fast_complete_hide",
+        "legendSearch": "",
+        "legendSelectFilter": "",
+        "legendSelectionVersion": null,
+        "legendVisibleSeries": [],
+        "removeFill": true,
+        "seriesFilterSettingsVersion": 2,
+        "seriesQueryFilterEnabled": true,
+        "seriesQueryFilterHighlightEnabled": false,
+        "seriesQueryFilterInputUnit": "ops/m",
+        "seriesQueryFilterMode": "max",
+        "seriesQueryFilterRawValue": 1,
+        "seriesQueryFilterValue": 1,
+        "thickenLines": false,
+        "thickenLinesValue": 1.5,
+        "thresholdEnabled": false,
+        "thresholdInputUnit": "ops/m",
+        "thresholdNotifyEnabled": true,
+        "thresholdRawValue": 0,
+        "thresholdUnit": "ops/m",
+        "thresholdValue": 0
+      },
+      "width": "50%"
+    },
+    {
+      "height": "350px",
+      "id": "4cd904a3-80b3-4327-a828-9a16e58ec4ca",
+      "report": {
+        "detailsEnabled": false,
+        "enabled": false,
+        "includeMode": "always",
+        "key": "количество_виртуальных_пользователей",
+        "listLimit": null,
+        "sla": {
+          "evaluation": "period_max",
+          "operator": "gt",
+          "source": "none",
+          "unit": "",
+          "value": null,
+          "warningValue": null
+        },
+        "templates": {
+          "breached": "🔴 По серверам {{servers}} фиксируется значение более {{threshold}} {{unit}}, что превышает установленные требования.",
+          "details": "{{stateQuote}}",
+          "listItem": "- {{name}} — {{value}}{{unit}};",
+          "neutral": "🖥 По панели «{{panelTitle}}»: {{aggregateValue}} {{unit}}.",
+          "normal": "🟢 По панели «{{panelTitle}}» превышения SLA {{threshold}} {{unit}} не фиксируются.",
+          "unavailable": "⚠ Не удалось получить данные панели «{{panelTitle}}». Причина: {{dataStatus}}.",
+          "warning": "⚠️ По панели «{{panelTitle}}» зафиксированы значения предупредительного уровня {{warningThreshold}} {{unit}}."
+        }
+      },
+      "src": "https://grafanakns.mos.ru/d-solo/cegmc4dj40m4gf/monitoring-jmeter?orgId=1&from=2026-09-08T14%3A49%3A17.146Z&to=2026-09-08T15%3A37%3A56.429Z&timezone=Europe%2FMoscow&refresh=5s&panelId=139&kiosk=tv&dashbridge=1&var-dataSource=000000039&var-station=%24__all&var-project=puds_mig_kasp",
+      "title": "Количество виртуальных пользователей",
+      "width": "50%"
+    },
+    {
+      "height": "350px",
+      "id": "55e4682e-fd9d-4329-a6cb-3f4617397db7",
+      "report": {
+        "detailsEnabled": false,
+        "enabled": true,
+        "includeMode": "always",
+        "key": "cpu_usage",
+        "listLimit": null,
+        "sla": {
+          "evaluation": "period_max",
+          "operator": "gt",
+          "source": "graph",
+          "unit": "",
+          "value": null,
+          "warningValue": null
+        },
+        "templates": {
+          "breached": "🔴 Фиксируется превышение, установленных требований по утилизации CPU (не более {{threshold}} {{unit}}) на серверах:\n{{criticalList}}.",
+          "details": "{{stateQuote}}",
+          "listItem": "- {{name}} — {{value}}{{unit}};",
+          "neutral": "🖥 По панели «{{panelTitle}}»: {{aggregateValue}} {{unit}}.",
+          "normal": "🟢 Утилизация CPU не превышает требование в {{threshold}} {{unit}}.",
+          "unavailable": "⚠ Не удалось получить данные панели «{{panelTitle}}». Причина: {{dataStatus}}.",
+          "warning": "⚠️ По панели «{{panelTitle}}» зафиксированы значения предупредительного уровня {{warningThreshold}} {{unit}}."
+        }
+      },
+      "src": "https://mon-dc.mos.ru/d-solo/QkZzx-fWz/linux-nodes-group?orgId=1&orgId=1&var-system=%D0%98%D0%A1+%D0%A1%D0%A6+2.0&var-instance=issc2-app001p1-lux.passport.local%3A9182&var-instance=issc2-app001p2-lux.passport.local%3A9182&var-instance=issc2-app002p1-lux.passport.local%3A9182&var-instance=issc2-db001p1-lux.passport.local%3A9182&var-instance=issc2-db001p2-insight.passport.local%3A9182&var-instance=issc2-db002p1-lux.passport.local%3A9182&var-instance=issc2-db002p2-insight.passport.local%3A9182&var-instance=issc2-dbr001p1.passport.local%3A9182&var-instance=issc2-dbr001p2-insight.passport.local%3A9182&var-instance=issc2-dbr002p1.passport.local%3A9182&var-instance=issc2-dbr002p2-insight.passport.local%3A9182&var-instance=issc2-dbr003p1.passport.local%3A9182&var-instance=issc2-dbr003p2-insight.passport.local%3A9182&var-instance=issc2-dbr004p1-lux.passport.local%3A9182&var-instance=issc2-dbr004p2-insight.passport.local%3A9182&var-instance=issc2-dbr005p1-lux.passport.local%3A9182&var-instance=issc2-mng001p1-lux.passport.local%3A9182&var-instance=issc2-mng002p1-lux.passport.local%3A9182&var-instance=issc2-mng003p1-lux.passport.local%3A9182&var-instance=issc2-web001p1-lux.passport.local%3A9182&var-instance=issc2-web002p1-lux.passport.local%3A9182&var-instance=sc2-lux-app01t.passport.local%3A9182&var-instance=sc2-sc-etl01p.passport.local%3A9182&var-instance=sc2-suo-app01p.passport.local%3A9182&var-instance=sc2-suo-auth01p.passport.local%3A9182&var-instance=sc2-suo-connector01p.passport.local%3A9182&var-instance=sc2-suo-coordinator01d.passport.local%3A9182&var-instance=sc2-suo-coordinator01p.passport.local%3A9182&var-instance=sc2-suo-coordinator02p.passport.local%3A9182&var-instance=sc2-suo-db01p.passport.local%3A9182&var-instance=sc2-suo-executor01d.passport.local%3A9182&var-instance=sc2-suo-executor01p.passport.local%3A9182&var-instance=sc2-suo-executor02p.passport.local%3A9182&var-instance=sc2-suo-fs01p.passport.local%3A9182&var-instance=sc2-suo-web01p.passport.local%3A9182&from=1788778800000&to=1788793199000&panelId=2&kiosk=tv&dashbridge=1",
+      "title": "CPU Usage",
+      "tools": {
+        "convertMemToUsed": false,
+        "cpuCapacityFilterCoefficient": 0.8,
+        "cpuCapacityFilterEnabled": false,
+        "cpuCapacityFilterHighlightEnabled": true,
+        "cpuCapacityFilterLoad1": false,
+        "cpuCapacityFilterLoad15": false,
+        "cpuCapacityFilterLoad5": false,
+        "cpuCapacityFilterMode": "max",
+        "forceMemByteUnit": false,
+        "invertIdle": true,
+        "invertLegend": true,
+        "legendFilter": [],
+        "legendIgnoreFilter": "",
+        "legendMode": "fast_complete_hide",
+        "legendSearch": "",
+        "legendSelectFilter": "",
+        "legendSelectionVersion": null,
+        "legendVisibleSeries": [],
+        "removeFill": true,
+        "seriesFilterSettingsVersion": 2,
+        "seriesQueryFilterEnabled": false,
+        "seriesQueryFilterHighlightEnabled": true,
+        "seriesQueryFilterInputUnit": "%",
+        "seriesQueryFilterMode": "max",
+        "seriesQueryFilterRawValue": 0,
+        "seriesQueryFilterValue": 0,
+        "thickenLines": false,
+        "thickenLinesValue": 1.5,
+        "thresholdEnabled": true,
+        "thresholdInputUnit": "%",
+        "thresholdNotifyEnabled": true,
+        "thresholdRawValue": 90,
+        "thresholdUnit": "%",
+        "thresholdValue": 90
+      },
+      "width": "50%"
+    },
+    {
+      "height": "350px",
+      "id": "19411c23-22c9-4032-b95b-757f1e40a07d",
+      "report": {
+        "detailsEnabled": false,
+        "enabled": true,
+        "includeMode": "always",
+        "key": "memory",
+        "listLimit": null,
+        "sla": {
+          "evaluation": "period_max",
+          "operator": "gt",
+          "source": "graph",
+          "unit": "",
+          "value": null,
+          "warningValue": null
+        },
+        "templates": {
+          "breached": "🔴 Зафиксировано превышение требований по утилизации памяти (не более {{threshold}} {{unit}}) следующим серверам:\n{{criticalList}}",
+          "details": "{{stateQuote}}",
+          "listItem": "- {{name}} — {{value}}{{unit}};",
+          "neutral": "🖥 По панели «{{panelTitle}}»: {{aggregateValue}} {{unit}}.",
+          "normal": "🟢 По утилизации памяти превышения SLA {{threshold}} {{unit}} не фиксируется.",
+          "unavailable": "⚠ Не удалось получить данные панели «{{panelTitle}}». Причина: {{dataStatus}}.",
+          "warning": "⚠️ По панели «{{panelTitle}}» зафиксированы значения предупредительного уровня {{warningThreshold}} {{unit}}."
+        }
+      },
+      "src": "https://mon-dc.mos.ru/d-solo/QkZzx-fWz/linux-nodes-group?orgId=1&orgId=1&from=1788778800000&to=1788793199000&panelId=6&kiosk=tv&dashbridge=1&var-system=%D0%98%D0%A1+%D0%A1%D0%A6+2.0&var-instance=issc2-app001p1-lux.passport.local%3A9182&var-instance=issc2-app001p2-lux.passport.local%3A9182&var-instance=issc2-app002p1-lux.passport.local%3A9182&var-instance=issc2-db001p1-lux.passport.local%3A9182&var-instance=issc2-db001p2-insight.passport.local%3A9182&var-instance=issc2-db002p1-lux.passport.local%3A9182&var-instance=issc2-db002p2-insight.passport.local%3A9182&var-instance=issc2-dbr001p1.passport.local%3A9182&var-instance=issc2-dbr001p2-insight.passport.local%3A9182&var-instance=issc2-dbr002p1.passport.local%3A9182&var-instance=issc2-dbr002p2-insight.passport.local%3A9182&var-instance=issc2-dbr003p1.passport.local%3A9182&var-instance=issc2-dbr003p2-insight.passport.local%3A9182&var-instance=issc2-dbr004p1-lux.passport.local%3A9182&var-instance=issc2-dbr004p2-insight.passport.local%3A9182&var-instance=issc2-dbr005p1-lux.passport.local%3A9182&var-instance=issc2-mng001p1-lux.passport.local%3A9182&var-instance=issc2-mng002p1-lux.passport.local%3A9182&var-instance=issc2-mng003p1-lux.passport.local%3A9182&var-instance=issc2-web001p1-lux.passport.local%3A9182&var-instance=issc2-web002p1-lux.passport.local%3A9182&var-instance=sc2-lux-app01t.passport.local%3A9182&var-instance=sc2-sc-etl01p.passport.local%3A9182&var-instance=sc2-suo-app01p.passport.local%3A9182&var-instance=sc2-suo-auth01p.passport.local%3A9182&var-instance=sc2-suo-connector01p.passport.local%3A9182&var-instance=sc2-suo-coordinator01d.passport.local%3A9182&var-instance=sc2-suo-coordinator01p.passport.local%3A9182&var-instance=sc2-suo-coordinator02p.passport.local%3A9182&var-instance=sc2-suo-db01p.passport.local%3A9182&var-instance=sc2-suo-executor01d.passport.local%3A9182&var-instance=sc2-suo-executor01p.passport.local%3A9182&var-instance=sc2-suo-executor02p.passport.local%3A9182&var-instance=sc2-suo-fs01p.passport.local%3A9182&var-instance=sc2-suo-web01p.passport.local%3A9182",
+      "title": "Memory",
+      "tools": {
+        "convertMemToUsed": true,
+        "cpuCapacityFilterCoefficient": 0.8,
+        "cpuCapacityFilterEnabled": false,
+        "cpuCapacityFilterHighlightEnabled": true,
+        "cpuCapacityFilterLoad1": false,
+        "cpuCapacityFilterLoad15": false,
+        "cpuCapacityFilterLoad5": false,
+        "cpuCapacityFilterMode": "max",
+        "forceMemByteUnit": false,
+        "invertIdle": false,
+        "invertLegend": false,
+        "legendFilter": [],
+        "legendIgnoreFilter": "",
+        "legendMode": "fast_complete_hide",
+        "legendSearch": "",
+        "legendSelectFilter": "",
+        "legendSelectionVersion": null,
+        "legendVisibleSeries": [],
+        "removeFill": true,
+        "seriesFilterSettingsVersion": 2,
+        "seriesQueryFilterEnabled": false,
+        "seriesQueryFilterHighlightEnabled": true,
+        "seriesQueryFilterInputUnit": "%",
+        "seriesQueryFilterMode": "max",
+        "seriesQueryFilterRawValue": 0,
+        "seriesQueryFilterValue": 0,
+        "thickenLines": false,
+        "thickenLinesValue": 1.5,
+        "thresholdEnabled": true,
+        "thresholdInputUnit": "%",
+        "thresholdNotifyEnabled": true,
+        "thresholdRawValue": 90,
+        "thresholdUnit": "%",
+        "thresholdValue": 90
+      },
+      "width": "50%"
+    }
+  ]
+}

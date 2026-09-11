@@ -40,12 +40,32 @@ const dashBridgeProfileWriter = DashBridgeStorageWriter.create(null, {
 const DashBridgeProfileStore = {
     async load({ deferBaseline = false } = {}) {
         const result = await chrome.storage.local.get(['dashbridge_profiles', 'dashbridge_activeProfileId', 'dashbridge_rejected_profiles_backup']);
+        let rawProfiles = Array.isArray(result.dashbridge_profiles) ? result.dashbridge_profiles : [];
+        let seededDefault = false;
+        if (!rawProfiles.length) {
+            try {
+                const response = await fetch('dashbridge-default-profile.json', { cache: 'no-store' });
+                if (response.ok) {
+                    const seed = await response.json();
+                    if (seed && typeof seed === 'object' && Array.isArray(seed.panels)) {
+                        rawProfiles = [{ ...seed, name: seed.name || 'dashbridge', isSystemDefault: true }];
+                        seededDefault = true;
+                    }
+                }
+            } catch (_) { /* packaged seed is optional in restricted/offline contexts */ }
+        }
         const normalized = DashBridgeLocalStateSchema.normalizeProfiles(
-            Array.isArray(result.dashbridge_profiles) ? result.dashbridge_profiles : [],
+            rawProfiles,
             { mode: 'load' }
         );
         const profiles = normalized.items.length
-            ? normalized.items : [{ id: crypto.randomUUID(), name: 'Default', panels: [] }];
+            ? normalized.items : [{ id: crypto.randomUUID(), name: 'Default', panels: [], isSystemDefault: true }];
+        if (seededDefault || !result.dashbridge_profiles?.length) {
+            await chrome.storage.local.set({
+                dashbridge_profiles: profiles,
+                dashbridge_activeProfileId: profiles[0].id
+            });
+        }
         const activeProfileId = profiles.some(item => item.id === result.dashbridge_activeProfileId)
             ? result.dashbridge_activeProfileId : profiles[0].id;
         const baseline = new Map(normalized.items.map(profile => [

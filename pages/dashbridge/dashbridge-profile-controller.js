@@ -220,8 +220,9 @@
             if (result?.error) await showAlert('Копия создана, но не сохранена: ' + result.error);
         };
         const deleteProfile = async id => {
-            if (getProfiles().length <= 1) return showAlert('Нельзя удалить единственный профиль.');
             const profile = getProfiles().find(item => item.id === id);
+            if (profile?.isSystemDefault) return showAlert('Профиль «' + profile.name + '» является профилем по умолчанию и не может быть удалён.');
+            if (getProfiles().length <= 1) return showAlert('Нельзя удалить единственный профиль.');
             if (!profile || !await showConfirm(`Удалить профиль «${profile.name}»?\nВсе панели этого профиля будут потеряны.`)) return;
             const profiles = getProfiles();
             const index = profiles.findIndex(item => item.id === id);
