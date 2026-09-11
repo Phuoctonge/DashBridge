@@ -70,15 +70,17 @@
                         root.DashBridgeAnalytics?.outcome('dashbridge.profile_imported', 'no_data');
                         return;
                     }
-                    const choice = await showImportChoice(
-                        `Файл содержит ${importedPanels.length} панел(и).\n\n`
-                        + 'Заменить панели текущего профиля или создать новый профиль '
-                        + `«${profileName}»?`
-                    );
+                    const activeProfile = getActiveProfile();
+                    const choice = activeProfile?.systemKey === 'dashbridge'
+                        ? 'create'
+                        : await showImportChoice(
+                            `Файл содержит ${importedPanels.length} панел(и).\n\n`
+                            + 'Заменить панели текущего профиля или создать новый профиль '
+                            + `«${profileName}»?`
+                        );
                     if (choice !== 'replace' && choice !== 'create') return;
                     if (choice === 'replace') {
                         setPanels(importedPanels);
-                        const activeProfile = getActiveProfile();
                         if (activeProfile && imported.hasTimeState) {
                             activeProfile.timeState = importedTimeState;
                             loadActiveProfileTimeState();

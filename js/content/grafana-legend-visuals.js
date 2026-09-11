@@ -95,6 +95,9 @@
                         text-overflow:ellipsis !important;
                         white-space:nowrap !important;
                     }
+                    .dashbridge-legend-bottom table,
+                    .dashbridge-legend-bottom .u-legend,
+                    .dashbridge-legend-bottom tbody { width:100% !important; max-width:100% !important; min-width:0 !important; table-layout:fixed !important; overflow-x:hidden !important; }
                 `;
                 document.head.appendChild(style);
             };

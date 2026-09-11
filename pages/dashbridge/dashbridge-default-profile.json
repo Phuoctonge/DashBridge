@@ -1,11 +1,6 @@
 {
   "version": 3,
   "profileName": "Default",
-  "timeState": {
-    "from": "now-15m",
-    "to": "now",
-    "refresh": "30s"
-  },
   "report": {
     "enabled": true,
     "template": "Состояние инфраструктуры за {{period}}:\n\n{{panels}}\n\nОтчёт сформирован: {{generatedAt}}",
