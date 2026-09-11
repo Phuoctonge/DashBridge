@@ -13,6 +13,7 @@ const DashBridgeRenderer = {
         if (label) label.textContent = active?.name || 'Default';
         if (!list) return;
         list.replaceChildren();
+        document.documentElement.dataset.dashbridgeSystemProfile = profiles.find(profile => profile.id === activeProfileId)?.systemKey === 'dashbridge' ? 'true' : 'false';
         profiles.forEach(profile => {
             const item = document.createElement('button');
             item.className = 'profile-list-item' + (profile.id === activeProfileId ? ' active' : '');

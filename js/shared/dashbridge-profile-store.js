@@ -51,7 +51,7 @@ const DashBridgeProfileStore = {
                     if (seed && typeof seed === 'object' && Array.isArray(seed.panels)) {
                         const existing = rawProfiles.find(profile => profile?.isSystemDefault === true);
                         rawProfiles = rawProfiles.filter(profile => profile !== existing);
-                        rawProfiles.push({ ...seed, name: 'dashbridge', systemKey: 'dashbridge', isSystemDefault: true,
+                        rawProfiles.push({ ...seed, name: 'DashBridge', systemKey: 'dashbridge', isSystemDefault: true,
                             id: existing?.id || crypto.randomUUID() });
                         seededDefault = true;
                     }
@@ -63,8 +63,12 @@ const DashBridgeProfileStore = {
             { mode: 'load' }
         );
         const profiles = normalized.items.length
-            ? normalized.items : [{ id: crypto.randomUUID(), name: 'dashbridge', panels: [], systemKey: 'dashbridge', isSystemDefault: true }];
-        if (seededDefault || !result.dashbridge_profiles?.length) {
+            ? normalized.items : [{ id: crypto.randomUUID(), name: 'DashBridge', panels: [], systemKey: 'dashbridge', isSystemDefault: true }];
+        profiles.sort((left, right) => Number(right.systemKey === 'dashbridge') - Number(left.systemKey === 'dashbridge'));
+        const systemProfile = profiles.find(profile => profile.systemKey === 'dashbridge');
+        const systemProfileRenamed = !!systemProfile && systemProfile.name !== 'DashBridge';
+        if (systemProfile) systemProfile.name = 'DashBridge';
+        if (seededDefault || systemProfileRenamed || !result.dashbridge_profiles?.length) {
             await chrome.storage.local.set({
                 dashbridge_profiles: profiles,
                 dashbridge_activeProfileId: result.dashbridge_activeProfileId

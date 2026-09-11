@@ -211,6 +211,11 @@ header {
     font-weight: 600;
 }
 
+html[data-dashbridge-system-profile="true"] #renameProfileBtn,
+html[data-dashbridge-system-profile="true"] #deleteProfileBtn {
+    display: none;
+}
+
 .controls {
     display: flex;
     gap: 0.75rem;
