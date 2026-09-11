@@ -3,6 +3,7 @@
     function create({ getPanels, getActiveProfile, getPanelForIframe, applyPanelParamsToUrl,
         navigateDashboardFrame, savePanels, invalidate, replacePanelCard, updatePanelCard,
         documentRef = document, windowRef = window }) {
+        const VISIBILITY_KEY = 'dashbridge_dashboardVariablesVisible';
         const codec = root.DashBridgeVariablesState;
         const inlineHost = documentRef.getElementById('dashboardVariablesInline');
         const host = inlineHost?.id === 'dashboardVariablesInline'
@@ -10,7 +11,15 @@
         const toggle = documentRef.getElementById('dashboardVariablesToggle');
         const dialog = documentRef.getElementById('dashboardVariablesDialog');
         const closeButton = documentRef.getElementById('closeDashboardVariables');
-        let variablesVisible = false;
+        let variablesVisible = true;
+        try {
+            const stored = windowRef.localStorage?.getItem(VISIBILITY_KEY);
+            if (stored === 'false') variablesVisible = false;
+        } catch (_) { /* unavailable storage keeps the first-use default */ }
+        function persistVisibility() {
+            try { windowRef.localStorage?.setItem(VISIBILITY_KEY, String(variablesVisible)); }
+            catch (_) { /* optional storage must not block variable loading */ }
+        }
         function closeDialog() {
             host.querySelectorAll('.dashboard-variable[open]').forEach(details => { details.open = false; });
             host.hidden = true;
@@ -26,12 +35,17 @@
                 toggle.setAttribute('aria-expanded', String(available && variablesVisible));
                 toggle.title = variablesVisible ? 'Скрыть переменные дашборда' : 'Показать переменные дашборда';
             }
-            if (!available) closeDialog();
+            if (!available) {
+                host.hidden = true;
+                host.setAttribute('aria-hidden', 'true');
+                return;
+            }
             host.hidden = !available || !variablesVisible;
             host.setAttribute('aria-hidden', String(host.hidden));
         }
         function toggleVisibility() {
             variablesVisible = !variablesVisible;
+            persistVisibility();
             if (!variablesVisible) closeDialog();
             else {
                 if (dialog) dialog.open = true;
