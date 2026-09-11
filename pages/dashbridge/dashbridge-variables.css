@@ -6,6 +6,11 @@
     gap: .75rem;
 }
 .dashboard-variables[hidden], .dashboard-variable-group[hidden] { display: none; }
+.dashboard-variables-inline {
+    width: min(100%, 120rem);
+    margin-inline: auto;
+    padding-block: .75rem;
+}
 .dashboard-variable-group {
     display: flex;
     flex-wrap: wrap;

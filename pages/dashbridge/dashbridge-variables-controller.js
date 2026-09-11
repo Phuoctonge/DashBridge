@@ -4,30 +4,38 @@
         navigateDashboardFrame, savePanels, invalidate, replacePanelCard, updatePanelCard,
         documentRef = document, windowRef = window }) {
         const codec = root.DashBridgeVariablesState;
-        const host = documentRef.getElementById('dashboardVariables');
+        const inlineHost = documentRef.getElementById('dashboardVariablesInline');
+        const host = inlineHost?.id === 'dashboardVariablesInline'
+            ? inlineHost : documentRef.getElementById('dashboardVariables');
         const toggle = documentRef.getElementById('dashboardVariablesToggle');
         const dialog = documentRef.getElementById('dashboardVariablesDialog');
         const closeButton = documentRef.getElementById('closeDashboardVariables');
+        let variablesVisible = false;
         function closeDialog() {
             host.querySelectorAll('.dashboard-variable[open]').forEach(details => { details.open = false; });
             host.hidden = true;
             toggle?.setAttribute('aria-expanded', 'false');
-            if (dialog.open) { dialog.close(); toggle?.focus(); }
+            if (dialog?.open) { dialog.close(); toggle?.focus(); }
+            variablesVisible = false;
+            if (dialog) dialog.open = false;
         }
         function updateVisibility() {
             const available = [...groups.values()].some(group => !group.snapshot || !group.element.hidden);
             if (toggle) {
                 toggle.hidden = !available;
-                toggle.setAttribute('aria-expanded', String(available && dialog.open));
-                toggle.title = 'Открыть переменные дашборда';
+                toggle.setAttribute('aria-expanded', String(available && variablesVisible));
+                toggle.title = variablesVisible ? 'Скрыть переменные дашборда' : 'Показать переменные дашборда';
             }
             if (!available) closeDialog();
-            host.hidden = !available || !dialog.open;
+            host.hidden = !available || !variablesVisible;
+            host.setAttribute('aria-hidden', String(host.hidden));
         }
         function toggleVisibility() {
-            if (dialog.open) closeDialog();
+            variablesVisible = !variablesVisible;
+            if (!variablesVisible) closeDialog();
             else {
-                host.hidden = false; dialog.showModal();
+                if (dialog) dialog.open = true;
+                host.hidden = false;
                 for (const group of groups.values()) {
                     if (group.pending || group.reloading || group.transaction) continue;
                     if (group.snapshot && !group.failed && Date.now() - group.updatedAt < 60000) continue;
@@ -404,10 +412,10 @@
         }
         const observer = new MutationObserver(schedule);
         function start() {
-            closeButton.addEventListener('click', closeDialog);
-            dialog.addEventListener('keydown', onDialogKeydown, true);
-            dialog.addEventListener('cancel', onDialogCancel);
-            dialog.addEventListener('click', onDialogClick);
+            closeButton?.addEventListener('click', closeDialog);
+            dialog?.addEventListener('keydown', onDialogKeydown, true);
+            dialog?.addEventListener('cancel', onDialogCancel);
+            dialog?.addEventListener('click', onDialogClick);
             toggle?.addEventListener('click', toggleVisibility);
             observer.observe(documentRef.getElementById('dashboard'), { childList: true });
             windowRef.addEventListener('message', onMessage);
@@ -418,10 +426,10 @@
         }
         function stop() {
             closeDialog();
-            closeButton.removeEventListener('click', closeDialog);
-            dialog.removeEventListener('keydown', onDialogKeydown, true);
-            dialog.removeEventListener('cancel', onDialogCancel);
-            dialog.removeEventListener('click', onDialogClick);
+            closeButton?.removeEventListener('click', closeDialog);
+            dialog?.removeEventListener('keydown', onDialogKeydown, true);
+            dialog?.removeEventListener('cancel', onDialogCancel);
+            dialog?.removeEventListener('click', onDialogClick);
             toggle?.removeEventListener('click', toggleVisibility);
             if (toggle) { toggle.hidden = true; toggle.setAttribute('aria-expanded', 'false'); }
             stopped = true; clearTimeout(syncTimer); groups.forEach(cancel); groups.clear();
