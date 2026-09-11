@@ -95,6 +95,9 @@
     
             const bindCurrentPlot = () => {
                 controller.bindQueued = false;
+                // Disconnect does not cancel a microtask queued by the observer.
+                // A reset (or replacement controller) owns the root from then on.
+                if (flotVisibilityControllers.get(controller.root) !== controller) return;
                 const plot = getFlotPlot(controller.root);
                 if (!plot?.getData || !plot?.setData) return;
     
@@ -375,7 +378,7 @@
                 });
             };
     
-            // BUG-I fix: ищем тултипы от document.body, а не от root панели —
+            // BUG-I fix: ищем тултипы от document.body, а не от root панели -
             // Grafana рендерит оверлеи в Portal за пределами панели. Но используем
             // body вместо document чтобы исключить <head> и снизить число узлов.
             const getTooltipOverlays = () => Array.from((document.body || document).querySelectorAll('div')).filter(element => {

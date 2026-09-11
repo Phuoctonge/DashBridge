@@ -151,7 +151,7 @@
         };
 
         const load = async file => {
-            if (state.importing || ['recording', 'replaying'].includes(state.mode)) return;
+            if (state.importing || state.starting || state.stopping || ['recording', 'replaying'].includes(state.mode)) return;
             state.importing = true;
             updateControls();
             try {

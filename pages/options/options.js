@@ -1,4 +1,5 @@
-﻿document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', () => {
+    let connectionBaseline = null;
     const memCalcModeEl = document.getElementById('settingGrafanaMemCalcMode');
     const refreshAnalyticsHealth = async () => {
         const output = document.getElementById('analyticsDeliveryHealth');
@@ -9,7 +10,7 @@
             const queued = [...(Array.isArray(state.aggregates) ? state.aggregates.slice(0, 2000) : []),
                 ...(Array.isArray(state.inflight) ? state.inflight.slice(0, 100) : [])];
             const dates = queued.map(item => Date.parse(item?.periodStart)).filter(Number.isFinite);
-            const date = value => Number.isFinite(value) && value > 0 && value <= 8640000000000000 ? new Date(value).toLocaleString('ru-RU') : '—';
+            const date = value => Number.isFinite(value) && value > 0 && value <= 8640000000000000 ? new Date(value).toLocaleString('ru-RU') : '-';
             const errors = { network: 'сеть', timeout: 'тайм-аут', http_400: 'пачка отклонена, сохранена в карантине',
                 configuration: 'доступ к серверу', rate_limit: 'лимит запросов', server: 'сервер', http: 'HTTP', storage: 'локальное хранилище' };
             const earliest = queued.length ? Math.max(Number(state.nextRetryAt) || 0,
@@ -144,6 +145,7 @@
             ? config.grafanaIframeDomains.join('\n')
             : '';
         autoResize(grafanaIframeDomainsEl);
+        connectionBaseline = parseGrafanaIframeDomains(grafanaIframeDomainsEl.value);
         document.getElementById("settingCpuWarn").value = config.cpuWarnThreshold;
         document.getElementById("settingCpuCrit").value = config.cpuCritThreshold;
         document.getElementById("settingMemWarn").value = config.memWarnThreshold;
@@ -271,7 +273,7 @@
     }
 
     // Сохранение основных настроек
-    document.getElementById('saveBtn').addEventListener('click', () => {
+    document.getElementById('saveBtn').addEventListener('click', async () => {
         const grafanaDefaults = getGrafanaSettingsDefaults();
         const kw = document.getElementById("settingGrafanaKeyword").value.trim() || grafanaDefaults.grafanaIdleKeyword;
         const memTotalKw = document.getElementById("settingGrafanaMemTotalKeyword").value.trim() || grafanaDefaults.grafanaMemTotalKeyword;
@@ -333,6 +335,16 @@
             return;
         }
 
+        if (!connectionBaseline) { showMaintStatus('Дождитесь загрузки настроек.', 'red'); return; }
+        if (JSON.stringify(grafanaIframeDomains) !== JSON.stringify(connectionBaseline)) {
+            try {
+                const response = await chrome.runtime.sendMessage({
+                    type: 'dashbridge-grafana-connections-replace', expected: connectionBaseline, hosts: grafanaIframeDomains,
+                });
+                if (!response?.ok) throw new Error(response?.error || 'Не удалось сохранить подключения.');
+                connectionBaseline = [...grafanaIframeDomains];
+            } catch (error) { showMaintStatus(error.message, 'red'); return; }
+        }
         chrome.storage.sync.set({
             grafanaIdleKeyword: kw,
             grafanaMemTotalKeyword: memTotalKw,
@@ -366,7 +378,6 @@
             wikiDomains: wikiDom,
             wikiIframeIds: wikiIframeIds,
             grafanaKeepParams: keepParams,
-            grafanaIframeDomains: grafanaIframeDomains,
             rememberLastTab: document.getElementById("settingRememberTab").checked,
             rememberLastSubTab: document.getElementById("settingRememberSubTab").checked,
             uiScale: document.getElementById("settingUiScale").value,

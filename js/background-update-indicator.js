@@ -37,7 +37,7 @@
             }
             await Promise.all([
                 ...badgeTasks,
-                actionApi.setTitle({ title: `DashBridge — доступно обновление ${version}` })
+                actionApi.setTitle({ title: `DashBridge - доступно обновление ${version}` })
             ]);
         };
         const clear = async () => {

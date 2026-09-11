@@ -449,12 +449,12 @@ test(
 test(
     "Настройки iframe не пишут в panel.src сырое значение поля",
     "panel.src = rawUrl" not in iframe_save_src
-    and "panel.src = url;" in iframe_save_src
+    and "target.src = url;" in iframe_save_src
 )
 # Нормализация должна идти после валидации и до присваивания
 if iframe_save_src:
     normalize_at = iframe_save_src.find("normalizePanelUrl(rawUrl)")
-    assign_at = iframe_save_src.find("panel.src = url;")
+    assign_at = iframe_save_src.find("target.src = url;")
     test(
         "Нормализация выполняется до присваивания panel.src",
         0 <= normalize_at < assign_at,

@@ -1,8 +1,8 @@
 (function initDashBridgePanelCardController(root) {
     'use strict';
 
-    function createPanelActions({ getPanels, setPanels, savePanels, showAlert, showConfirm,
-        setPanelDataStatus, forceLoadPanel, applyPanelParamsToUrl, navigateDashboardFrame,
+    function createPanelActions({ getPanels, getActiveProfile, setPanels, savePanels, showAlert, showConfirm,
+        setPanelDataStatus, forceLoadPanel, applyPanelParamsToUrl, navigateDashboardFrame, cancelFrameLoad,
         findPanelCard, postToDashboardFrame, removePanelCard, replacePanelCard, updatePanelCard,
         panelAnalysis, closePanelAnalysis, panelTools, isSupportedPanelUrl, normalizePanelUrl,
         escapeHtml, runToolbarCapture, openPanelReportEditor, openPanelTools,
@@ -126,6 +126,18 @@
         };
 
         const openIframeSettings = panel => {
+            const profileId = getActiveProfile()?.id;
+            const signature = value => JSON.stringify([value.src, value.grafanaTheme || 'follow', value.width, value.height]);
+            let baseline = signature(panel);
+            const original = { ...panel };
+            const currentPanel = () => {
+                const current = getPanels().find(item => item.id === panel.id);
+                if (getActiveProfile()?.id !== profileId || !current || signature(current) !== baseline) {
+                    throw new Error('Панель или её настройки изменились. Закройте окно и откройте актуальные настройки.');
+                }
+                return current;
+            };
+            let saving = false;
             const selectedGrafanaTheme = ['light', 'dark'].includes(panel.grafanaTheme)
                 ? panel.grafanaTheme : 'follow';
             const overlay = documentRef.createElement('div');
@@ -162,10 +174,11 @@
                 </div>`;
             documentRef.body.appendChild(overlay);
             overlay.style.display = 'flex';
-            const close = () => overlay.remove();
+            const close = () => { if (!saving) overlay.remove(); };
             overlay.addEventListener('click', event => { if (event.target === overlay) close(); });
             overlay.querySelector('.iframe-settings-cancel').addEventListener('click', close);
             overlay.querySelector('.iframe-settings-save').addEventListener('click', async () => {
+                if (saving) return;
                 const rawUrl = overlay.querySelector('#iframeSettingsUrl').value.trim();
                 const height = Number(overlay.querySelector('#iframeSettingsHeight').value);
                 if (!isSupportedPanelUrl(rawUrl)) {
@@ -186,23 +199,37 @@
                     root.DashBridgeAnalytics?.outcome('dashbridge.panel_iframe_settings_changed', 'invalid_input');
                     return;
                 }
-                const previousSrc = panel.src;
-                const previousGrafanaTheme = panel.grafanaTheme || 'follow';
-                const previousWidth = panel.width;
-                const previousHeight = panel.height;
-                panel.src = url;
-                panel.grafanaTheme = overlay.querySelector('#iframeSettingsTheme').value;
-                panel.width = overlay.querySelector('#iframeSettingsWidth').value;
-                panel.height = `${Math.round(height)}px`;
-                savePanels();
-                close();
-                updatePanelCard(panel.id, {
-                    reloadFrame: previousSrc !== panel.src
-                        || previousGrafanaTheme !== panel.grafanaTheme,
-                });
-                root.DashBridgeAnalytics?.outcome('dashbridge.panel_iframe_settings_changed', 'success');
-                if (previousWidth !== panel.width || previousHeight !== panel.height) {
-                    root.DashBridgeAnalytics?.track('dashbridge.panel_layout_changed', 'changed', {});
+                saving = true;
+                const controls = overlay.querySelectorAll('button, input, select');
+                controls.forEach(control => { control.disabled = true; });
+                overlay.querySelector('.iframe-settings-save-error')?.remove();
+                try {
+                    const target = currentPanel();
+                    target.src = url;
+                    target.grafanaTheme = overlay.querySelector('#iframeSettingsTheme').value;
+                    target.width = overlay.querySelector('#iframeSettingsWidth').value;
+                    target.height = `${Math.round(height)}px`;
+                    baseline = signature(target);
+                    const saved = await savePanels();
+                    if (saved?.error) throw new Error(saved.error);
+                    const livePanel = currentPanel();
+                    if (saved?.current === false) throw new Error('Сохранение не подтверждено. Повторите попытку.');
+                    updatePanelCard(livePanel.id, { reloadFrame: original.src !== livePanel.src
+                        || (original.grafanaTheme || 'follow') !== (livePanel.grafanaTheme || 'follow') });
+                    overlay.remove();
+                    root.DashBridgeAnalytics?.outcome('dashbridge.panel_iframe_settings_changed', 'success');
+                    if (original.width !== livePanel.width || original.height !== livePanel.height) {
+                        root.DashBridgeAnalytics?.track('dashbridge.panel_layout_changed', 'changed', {});
+                    }
+                } catch (error) {
+                    const message = documentRef.createElement('p');
+                    message.className = 'iframe-settings-save-error';
+                    message.setAttribute('role', 'alert');
+                    message.textContent = error.message || String(error);
+                    overlay.querySelector('.iframe-settings-modal').prepend(message);
+                } finally {
+                    saving = false;
+                    controls.forEach(control => { control.disabled = false; });
                 }
             });
         };
@@ -257,6 +284,7 @@
         };
 
         const handlePanelRemoved = panelId => {
+            cancelFrameLoad(documentRef.getElementById('iframe-' + panelId));
             if (panelAnalysis.isPanel(panelId)) closePanelAnalysis();
             panelTools.removePanel(panelId);
             if (fullscreenPanelId === panelId) fullscreenPanelId = null;
@@ -278,6 +306,7 @@
 
     function create({ renderer, getPanels, setPanels, savePanels, getActiveProfile, applyPanelParamsToUrl,
         navigateDashboardFrame, findPanelCard, getPanelAnalysisType,
+        scheduleFrameLoad = navigateDashboardFrame, cancelFrameLoad = () => undefined,
         syncPanelAnalysisAction, closePanelAnalysis, isPanelAnalysisOpen,
         escapeHtml, icons, actionDependencies, runtimeScopeId, documentRef = document }) {
         if (!renderer?.createPanelCard || typeof getPanels !== 'function'
@@ -363,6 +392,7 @@
             const iframe = documentRef.getElementById('iframe-' + id);
             if (!iframe) return null;
             const pendingSrc = iframe.dataset.src;
+            if (iframe.dataset.dashbridgeQueued === 'true') return iframe;
             if (pendingSrc && !iframe.src) {
                 navigateDashboardFrame(iframe, pendingSrc);
                 iframe.removeAttribute('data-src');
@@ -391,6 +421,7 @@
                             navigateDashboardFrame(iframe, nextSrc);
                         } else {
                             iframe.dataset.src = nextSrc;
+                            if (iframe.dataset.dashbridgeQueued === 'true') scheduleFrameLoad(iframe, nextSrc);
                         }
                     }
                 }
@@ -413,8 +444,8 @@
                 iframe.dataset.dashbridgeScopeId = runtimeScopeId;
             }
             if (!panel.paused) {
-                navigateDashboardFrame(iframe, iframe.dataset.src);
-                iframe.removeAttribute('data-src');
+                scheduleFrameLoad(iframe, iframe.dataset.src);
+                if (iframe.dataset.dashbridgeQueued !== 'true') iframe.removeAttribute('data-src');
             }
             bindCardDrag(card, panel, container);
             panelActions.bindPanelActions(card, panel, iframe);
@@ -531,7 +562,9 @@
         };
 
         panelActions = createPanelActions({
+            cancelFrameLoad,
             getPanels,
+            getActiveProfile,
             setPanels,
             savePanels,
             showAlert: actionDependencies.showAlert,

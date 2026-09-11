@@ -22,6 +22,7 @@
         const runtimeFiles = runtimeManifest.files;
         let registrationQueue = Promise.resolve();
         let rulesQueue = Promise.resolve();
+        let connectionQueue = Promise.resolve();
 
         const getHosts = async () => {
             const fallback = settingsDefaults().grafanaIframeDomains;
@@ -43,8 +44,7 @@
 
         const syncRegistration = async () => {
             const hosts = await getHosts();
-            const hostnames = [...new Set(hosts.map(host => parseUrl(host)?.hostname.toLowerCase()).filter(Boolean))];
-            const matches = hostnames.flatMap(runtimeManifest.matchesForHostname);
+            const matches = hosts.flatMap(runtimeManifest.matchesForHostname);
             const existing = await chromeRef.scripting.getRegisteredContentScripts({ ids: [MAIN_SCRIPT_ID] });
             const current = existing[0];
             const sameList = (left, right) => JSON.stringify([...(left || [])].sort())
@@ -72,13 +72,13 @@
             let url;
             try { url = new URL(value); } catch { return false; }
             return ['http:', 'https:'].includes(url.protocol)
-                && allowedHostnames.has(url.hostname.toLowerCase())
+                && (allowedHostnames.has(url.host.toLowerCase()) || allowedHostnames.has(url.hostname.toLowerCase()))
                 && /(?:^|\/)d(?:-solo)?(?:\/|$)/.test(url.pathname);
         };
 
         const backfillOpenFrames = async () => {
             const hosts = await getHosts();
-            const allowedHostnames = new Set(hosts.map(host => parseUrl(host)?.hostname.toLowerCase()).filter(Boolean));
+            const allowedHostnames = new Set(hosts);
             if (!allowedHostnames.size) return { scannedTabs: 0, injectedFrames: 0, failedTabs: 0 };
             const tabs = await chromeRef.tabs.query({});
             let scannedTabs = 0;
@@ -182,7 +182,51 @@
             return { registration, backfill, rules };
         };
 
-        return Object.freeze({ getHosts, isTrustedContentSender, isDashBridgeUrl, handleTabNavigation, queueRulesSync, sync });
+        const configureConnection = (value, add = false) => {
+            const previous = connectionQueue;
+            const operation = (async () => {
+                await previous;
+                let url;
+                try { url = new URL(value); } catch { throw new Error('Некорректный URL Grafana.'); }
+                if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password
+                    || !/(?:^|\/)d(?:-solo)?(?:\/|$)/.test(url.pathname)) {
+                    throw new Error('Укажите HTTP(S) URL дашборда Grafana без логина и пароля.');
+                }
+                const host = normalizeHost(value);
+                const hosts = await getHosts();
+                const configured = hosts.includes(host) || hosts.includes(parseUrl(value).hostname.toLowerCase());
+                if (!configured && add) {
+                    if (hosts.length >= 100) throw new Error('Достигнут лимит 100 подключений Grafana.');
+                    await chromeRef.storage.sync.set({ grafanaIframeDomains: [...hosts, host] });
+                }
+                if (configured || add) await sync();
+                return { host, configured: configured || add };
+            })();
+            connectionQueue = operation.catch(() => undefined);
+            return operation;
+        };
+
+        const replaceConnections = (expected, next) => {
+            const previous = connectionQueue;
+            const operation = (async () => {
+                await previous;
+                if (![expected, next].every(value => Array.isArray(value) && value.length <= 100
+                    && value.every(host => typeof host === 'string' && normalizeHost(host) === host))) {
+                    throw new Error('Некорректный список подключений Grafana.');
+                }
+                const hosts = await getHosts();
+                const signature = values => JSON.stringify([...new Set(values)].sort());
+                if (signature(hosts) !== signature(expected) && signature(hosts) !== signature(next)) {
+                    throw new Error('Подключения изменены в другой вкладке. Скопируйте свой список и обновите страницу настроек.');
+                }
+                await chromeRef.storage.sync.set({ grafanaIframeDomains: [...new Set(next)] });
+                await sync();
+                return { hosts: next };
+            })();
+            connectionQueue = operation.catch(() => undefined);
+            return operation;
+        };
+        return Object.freeze({ getHosts, isTrustedContentSender, isDashBridgeUrl, handleTabNavigation, queueRulesSync, sync, configureConnection, replaceConnections });
     }
 
     root.DashBridgeBackgroundGrafanaInfrastructure = Object.freeze({ create });

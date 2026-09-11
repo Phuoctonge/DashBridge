@@ -142,6 +142,8 @@ globalThis.DashBridgeCapture = (() => {
                 } else card.scrollIntoView({ block: 'center', inline: 'center' });
                 card.classList.add('dashbridge-panel-capture-active');
                 postToDashboardFrame(sourceIframe, { action: 'dashbridgeCaptureLayoutChanged' });
+                await request.waitForData?.();
+                request.assertCurrent?.();
                 await new Promise(resolve => setTimeout(resolve, prepared ? 260 : 80));
                 await waitForLayout();
                 const rect = sourceIframe.getBoundingClientRect();
@@ -220,7 +222,7 @@ globalThis.DashBridgeCapture = (() => {
 
         // The lease stays in this controller; iframe messages cannot acquire it.
         const captureSelection = async (selected, { signal, assertCurrent = () => {}, onProgress = () => {},
-            onCaptureVisibility = () => {} } = {}) => {
+            onCaptureVisibility = () => {}, allowUnrendered = false, waitForData = null } = {}) => {
             if (panelCaptureInProgress || archiveCaptureInProgress || selectionOwner) throw new Error('Уже выполняется захват снимков.');
             if (!Array.isArray(selected) || selected.length < 1 || selected.length > 8
                 || new Set(selected.map(panel => panel.id)).size !== selected.length) throw new Error('Выберите от 1 до 8 разных панелей.');
@@ -235,7 +237,7 @@ globalThis.DashBridgeCapture = (() => {
             };
             const waitRendered = async iframe => {
                 check();
-                if (iframe.dataset.dashbridgeRendered === 'true') return;
+                if (allowUnrendered || iframe.dataset.dashbridgeRendered === 'true') return;
                 await new Promise((resolve, reject) => {
                     let observer;
                     let timer;
@@ -272,7 +274,8 @@ globalThis.DashBridgeCapture = (() => {
                         const src = iframe.src;
                         const assertFrame = () => {
                             check();
-                            if (!iframe.isConnected || iframe.src !== src || iframe.dataset.dashbridgeRendered !== 'true') throw new Error('Панель перезагружена.');
+                            if (!iframe.isConnected || iframe.src !== src
+                                || (!allowUnrendered && iframe.dataset.dashbridgeRendered !== 'true')) throw new Error('Панель перезагружена.');
                         };
                         await waitRendered(iframe);
                         let result;
@@ -280,7 +283,9 @@ globalThis.DashBridgeCapture = (() => {
                             onCaptureVisibility(true);
                             result = await capturePanel(iframe, panel, {
                                 requestId: `report_image_${Date.now()}_${index}`, outputAction: 'image',
-                                prepared: true, outputWidth: 1000, outputHeight: 520, assertCurrent: assertFrame
+                                prepared: true, outputWidth: 1000, allowUnrendered,
+                                waitForData: waitForData ? async () => { check(); await waitForData(panel, signal); check(); } : null,
+                                assertCurrent: assertFrame
                             }, owner);
                         } finally { onCaptureVisibility(false); }
                         check();
@@ -353,7 +358,7 @@ globalThis.DashBridgeCapture = (() => {
                 }
 
                 if (pausedCount) errors.push(`Пропущено панелей на паузе: ${pausedCount}.`);
-                if (errors.length) zip.file('errors.txt', `DashBridge — отчёт создания снимков\n\n${errors.join('\n')}\n`);
+                if (errors.length) zip.file('errors.txt', `DashBridge - отчёт создания снимков\n\n${errors.join('\n')}\n`);
                 if (Object.keys(zip.files).every(name => name === 'errors.txt')) {
                     throw new Error('Не удалось создать ни одного снимка. Проверьте загрузку панелей Grafana.');
                 }

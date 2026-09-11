@@ -4,7 +4,7 @@
     function create({ postToDashboardFrame, getCapturePrepared, getTransformSettings,
         getDefaultCpuCapacityCoefficient, normalizePanelMetadataText, savePanels,
         forceLoadPanel, refreshPanel, settingsStorage, getSettingsKeys, normalizeSettings,
-        panelAnalysis, settingsModal, escapeHtml, documentRef = document, cssEscape = CSS.escape,
+        panelAnalysis, settingsModal, escapeHtml, getPanels, getActiveProfile, documentRef = document, cssEscape = CSS.escape,
         setTimer = setTimeout, clearTimer = clearTimeout, now = () => Date.now(), random = () => Math.random() }) {
         if (typeof postToDashboardFrame !== 'function' || typeof getCapturePrepared !== 'function'
             || typeof getTransformSettings !== 'function' || typeof getDefaultCpuCapacityCoefficient !== 'function'
@@ -182,6 +182,7 @@
             const exceeded = !!status?.enabled && !!status?.exceeded;
             card?.classList.toggle('threshold-exceeded', exceeded);
             if (!exceeded) {
+                documentRef.querySelector(`.threshold-notification[data-panel-id="${panelId}"]`)?.remove();
                 thresholdStates.set(panel.id, { exceeded: false, dismissed: false });
                 return;
             }
@@ -234,6 +235,19 @@
         };
 
         const open = async (panel, iframe) => {
+            const profileId = getActiveProfile?.()?.id;
+            const signature = value => JSON.stringify({ src: value?.src, paused: !!value?.paused,
+                grafanaTheme: value?.grafanaTheme || 'follow',
+                // thresholdUnit is learned by this dialog's own status request.
+                tools: { ...normalizeTools(value), thresholdUnit: undefined, capturePrepared: undefined } });
+            let baseline = signature(panel);
+            const currentPanel = () => {
+                const current = getPanels ? getPanels().find(item => item.id === panel.id) : panel;
+                if (getActiveProfile?.()?.id !== profileId || !current || signature(current) !== baseline) {
+                    throw new Error('Панель или её настройки изменились. Закройте окно и откройте актуальные настройки.');
+                }
+                return current;
+            };
             const tools = normalizeTools(panel);
             const storedSettings = await settingsStorage.get(getSettingsKeys());
             const panelSettings = normalizeSettings(storedSettings);
@@ -244,11 +258,15 @@
                 resolvedTitle = normalizePanelMetadataText(liveTitle, 240) || resolvedTitle;
                 panelKind = panelAnalysis?.classifyPanelTitle(resolvedTitle, panelSettings) || null;
             }
+            try { panel = currentPanel(); }
+            catch { return null; } // The profile changed while the dialog was loading.
             if (resolvedTitle && panel.title !== resolvedTitle) {
                 panel.title = resolvedTitle;
                 savePanels();
             }
-            return settingsModal.open({
+            baseline = signature(panel);
+            let saving = false;
+            const overlay = settingsModal.open({
                 state: tools,
                 content: `${settingsModal.transformFields(tools, { panelKind })}${settingsModal.thresholdFields(tools)}${settingsModal.legendFields(tools.legendMode, tools)}`,
                 advanced: {
@@ -257,33 +275,55 @@
                     getThresholdStatus: () => requestThresholdStatus(panel, iframe),
                     formatThresholdUnit
                 },
-                onSave: nextTools => {
-                    const previousTools = normalizeTools(panel);
-                    nextTools.forceMemByteUnit = nextTools.convertMemToUsed
-                        ? false : (previousTools.convertMemToUsed || previousTools.forceMemByteUnit);
-                    panel.tools = nextTools;
-                    Object.entries(analyticsFeatures).forEach(([key, featureId]) => {
-                        if (!!previousTools[key] !== !!nextTools[key]) {
-                            root.DashBridgeAnalytics?.changed(featureId, !!nextTools[key], { surface: 'dashbridge' });
+                onSave: async nextTools => {
+                    if (saving) return false;
+                    saving = true;
+                    const button = overlay?.querySelector?.('.panel-tools-save');
+                    if (button) button.disabled = true;
+                    overlay?.querySelector?.('.panel-tools-save-error')?.remove();
+                    try {
+                        const targetPanel = currentPanel();
+                        const previousTools = normalizeTools(targetPanel);
+                        nextTools.forceMemByteUnit = nextTools.convertMemToUsed
+                            ? false : (previousTools.convertMemToUsed || previousTools.forceMemByteUnit);
+                        targetPanel.tools = nextTools;
+                        baseline = signature(targetPanel);
+                        const saved = await savePanels();
+                        if (saved?.error) throw new Error(saved.error);
+                        const livePanel = currentPanel();
+                        Object.entries(analyticsFeatures).forEach(([key, featureId]) => {
+                            if (!!previousTools[key] !== !!nextTools[key]) {
+                                root.DashBridgeAnalytics?.changed(featureId, !!nextTools[key], { surface: 'dashbridge' });
+                            }
+                        });
+                        const previousLegend = JSON.stringify(previousTools.legendVisibleSeries || []);
+                        const nextLegend = JSON.stringify(nextTools.legendVisibleSeries || []);
+                        if (previousLegend !== nextLegend) root.DashBridgeAnalytics?.changed(
+                            'grafana.panel.legend_selection', !!nextTools.legendVisibleSeries?.length, { surface: 'dashbridge' });
+                        const liveApplyKeys = ['thresholdEnabled', 'thresholdNotifyEnabled', 'thresholdValue', 'thresholdRawValue', 'thresholdInputUnit', 'thresholdUnit'];
+                        const liveApplyOnlyChange = liveApplyKeys.some(key => previousTools[key] !== nextTools[key])
+                            && Object.keys(nextTools).filter(key => !liveApplyKeys.includes(key))
+                                .every(key => JSON.stringify(previousTools[key]) === JSON.stringify(nextTools[key]));
+                        if (liveApplyOnlyChange) {
+                            const targetIframe = forceLoadPanel(livePanel.id);
+                            if (targetIframe) void apply(livePanel, targetIframe);
+                        } else {
+                            refreshPanel(livePanel.id);
                         }
-                    });
-                    const previousLegend = JSON.stringify(previousTools.legendVisibleSeries || []);
-                    const nextLegend = JSON.stringify(nextTools.legendVisibleSeries || []);
-                    if (previousLegend !== nextLegend) root.DashBridgeAnalytics?.changed(
-                        'grafana.panel.legend_selection', !!nextTools.legendVisibleSeries?.length, { surface: 'dashbridge' });
-                    savePanels();
-                    const liveApplyKeys = ['thresholdEnabled', 'thresholdNotifyEnabled', 'thresholdValue', 'thresholdRawValue', 'thresholdInputUnit', 'thresholdUnit'];
-                    const liveApplyOnlyChange = liveApplyKeys.some(key => previousTools[key] !== nextTools[key])
-                        && Object.keys(nextTools).filter(key => !liveApplyKeys.includes(key))
-                            .every(key => JSON.stringify(previousTools[key]) === JSON.stringify(nextTools[key]));
-                    if (liveApplyOnlyChange) {
-                        const targetIframe = forceLoadPanel(panel.id);
-                        if (targetIframe) void apply(panel, targetIframe);
-                    } else {
-                        refreshPanel(panel.id);
+                    } catch (error) {
+                        const message = documentRef.createElement('p');
+                        message.className = 'panel-tools-save-error';
+                        message.setAttribute('role', 'alert');
+                        message.textContent = error.message || String(error);
+                        (overlay?.querySelector?.('.panel-tools-scroll') || overlay)?.prepend(message);
+                        return false;
+                    } finally {
+                        saving = false;
+                        if (button) button.disabled = false;
                     }
                 }
             });
+            return overlay;
         };
 
         const acceptTitleResponse = message => {

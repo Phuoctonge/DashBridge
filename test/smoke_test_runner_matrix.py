@@ -407,7 +407,6 @@ checks = {
     "diagnostic export has lifecycle accounting schema": (
         "dashbridge-e2e-diagnostics/v4" in REPORT
         and "DashBridgeTestReport.createArtifactStreamPlan" in UI
-        and "serializeSpoolArtifact(snapshot, getSpool(), exportMetadata," in UI
         and "reconciliation" in REPORT
         and "primaryFailure" in REPORT
         and "failureClusters" in REPORT

@@ -71,51 +71,58 @@
     }
 
     async function run() {
-        const localData = await chrome.storage.local.get([
-            VERSION_KEY, BACKUP_KEY, 'dashbridge_profiles', 'dashbridge_activeProfileId'
-        ]);
-        if (Number(localData[VERSION_KEY]) >= CURRENT_SCHEMA_VERSION) {
+        if (typeof root.navigator?.locks?.request !== 'function') {
+            throw new Error('Web Locks недоступны: миграция профилей не выполнена.');
+        }
+        // Same origin-scoped lock as the background profile broker. Keep the
+        // entire read/backup/sync/marker sequence inside it, including retries.
+        return root.navigator.locks.request('dashbridge-profile-storage', async () => {
+            const localData = await chrome.storage.local.get([
+                VERSION_KEY, BACKUP_KEY, 'dashbridge_profiles', 'dashbridge_activeProfileId'
+            ]);
+            if (Number(localData[VERSION_KEY]) >= CURRENT_SCHEMA_VERSION) {
+                clearLegacyTimeState();
+                return { migrated: false, version: CURRENT_SCHEMA_VERSION };
+            }
+
+            const legacyTime = readLegacyTimeState();
+            const syncKeys = getGrafanaSettingsStorageKeys();
+            const syncData = await chrome.storage.sync.get(syncKeys);
+            const profiles = migrateProfiles(localData.dashbridge_profiles, legacyTime.normalized);
+            const syncPatch = buildGrafanaSettingsPatch(syncData);
+
+            if (!localData[BACKUP_KEY]) {
+                const backup = {
+                    createdAt: new Date().toISOString(),
+                    sourceSchemaVersion: Number(localData[VERSION_KEY]) || 0,
+                    legacyTimeState: legacyTime.values,
+                    grafanaSettings: syncData
+                };
+                if (localData.dashbridge_profiles !== undefined) {
+                    backup.dashbridge_profiles = localData.dashbridge_profiles;
+                }
+                if (localData.dashbridge_activeProfileId !== undefined) {
+                    backup.dashbridge_activeProfileId = localData.dashbridge_activeProfileId;
+                }
+                await chrome.storage.local.set({
+                    [BACKUP_KEY]: backup
+                });
+            }
+
+            // Sync settings are committed first. The local schema marker is written
+            // last, so a partial failure is retried safely on the next page load.
+            if (Object.keys(syncPatch).length) await chrome.storage.sync.set(syncPatch);
+            const localPatch = { [VERSION_KEY]: CURRENT_SCHEMA_VERSION };
+            if (!sameValue(localData.dashbridge_profiles, profiles)) localPatch.dashbridge_profiles = profiles;
+            await chrome.storage.local.set(localPatch);
             clearLegacyTimeState();
-            return { migrated: false, version: CURRENT_SCHEMA_VERSION };
-        }
-
-        const legacyTime = readLegacyTimeState();
-        const syncKeys = getGrafanaSettingsStorageKeys();
-        const syncData = await chrome.storage.sync.get(syncKeys);
-        const profiles = migrateProfiles(localData.dashbridge_profiles, legacyTime.normalized);
-        const syncPatch = buildGrafanaSettingsPatch(syncData);
-
-        if (!localData[BACKUP_KEY]) {
-            const backup = {
-                createdAt: new Date().toISOString(),
-                sourceSchemaVersion: Number(localData[VERSION_KEY]) || 0,
-                legacyTimeState: legacyTime.values,
-                grafanaSettings: syncData
+            return {
+                migrated: true,
+                version: CURRENT_SCHEMA_VERSION,
+                profilesChanged: Object.prototype.hasOwnProperty.call(localPatch, 'dashbridge_profiles'),
+                settingsChanged: Object.keys(syncPatch).length
             };
-            if (localData.dashbridge_profiles !== undefined) {
-                backup.dashbridge_profiles = localData.dashbridge_profiles;
-            }
-            if (localData.dashbridge_activeProfileId !== undefined) {
-                backup.dashbridge_activeProfileId = localData.dashbridge_activeProfileId;
-            }
-            await chrome.storage.local.set({
-                [BACKUP_KEY]: backup
-            });
-        }
-
-        // Sync settings are committed first. The local schema marker is written
-        // last, so a partial failure is retried safely on the next page load.
-        if (Object.keys(syncPatch).length) await chrome.storage.sync.set(syncPatch);
-        const localPatch = { [VERSION_KEY]: CURRENT_SCHEMA_VERSION };
-        if (!sameValue(localData.dashbridge_profiles, profiles)) localPatch.dashbridge_profiles = profiles;
-        await chrome.storage.local.set(localPatch);
-        clearLegacyTimeState();
-        return {
-            migrated: true,
-            version: CURRENT_SCHEMA_VERSION,
-            profilesChanged: Object.prototype.hasOwnProperty.call(localPatch, 'dashbridge_profiles'),
-            settingsChanged: Object.keys(syncPatch).length
-        };
+        });
     }
 
     root.DashBridgeDataMigration = Object.freeze({

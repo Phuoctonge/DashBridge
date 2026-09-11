@@ -60,7 +60,7 @@
     };
 
     // BUG-G fix: кеш переключён с единственного объекта на Map.
-    // Каждая панель хранит своё состояние независимо — параллельные вызовы
+    // Каждая панель хранит своё состояние независимо - параллельные вызовы
     // для разных панелей больше не перезаписывают кеш друг друга.
     const getPanelDefinition = async ({ root = document, panelId: requestedPanelId = '' } = {}) => {
         const { uid, panelId: locationPanelId } = getPanelLocation();

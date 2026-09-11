@@ -61,7 +61,8 @@
             const line = document.createElement('div');
             line.setAttribute('data-dashbridge-threshold-line', 'true');
             line.setAttribute('data-dashbridge-threshold-scale', aboveScale ? 'above' : belowScale ? 'below' : 'inside');
-            const thresholdText = `Порог: ${displayValue}${unit ? ` ${unit}` : ''}`;
+            // Match settings display precision; keep raw values untouched for comparisons and geometry.
+            const thresholdText = `Порог: ${Number(displayValue.toPrecision(12))}${unit ? ` ${unit}` : ''}`;
             line.title = aboveScale
                 ? `${thresholdText} (выше текущей шкалы)`
                 : belowScale
@@ -77,7 +78,7 @@
             const label = document.createElement('span');
             label.textContent = `${aboveScale ? '↑ ' : belowScale ? '↓ ' : ''}${thresholdText}`;
             const labelVerticalPosition = aboveScale ? 'top:3px;' : 'bottom:3px;';
-            label.style.cssText = `position:absolute;right:4px;${labelVerticalPosition}padding:1px 4px;border-radius:3px;background:#e24d42;color:#fff;font:600 11px/1.3 sans-serif;`;
+            label.style.cssText = `position:absolute;left:4px;${labelVerticalPosition}padding:1px 4px;border-radius:3px;background:#e24d42;color:#fff;font:600 11px/1.3 sans-serif;`;
             line.appendChild(label);
             parent.appendChild(line);
         };
@@ -488,6 +489,25 @@
             const result = renderFlotThresholdHighlights(root, rules)
                 || renderUPlotThresholdHighlights(root, rules)
                 || { engine: 'unknown', host: null, overlay: null, drawn: 0 };
+            const line = result.host?.querySelector?.('[data-dashbridge-threshold-line]');
+            if (result.overlay && line) {
+                // The body-level highlights sit above the chart's stacking context.
+                // Paint a visual copy last in that same SVG; its existing lifecycle
+                // owns repaint/scroll/capture cleanup, while the original stays put.
+                const rect = line.getBoundingClientRect();
+                const bounds = result.overlay.getBoundingClientRect();
+                const foreground = document.createElementNS(SVG_NAMESPACE, 'foreignObject');
+                foreground.setAttribute('width', '100%');
+                foreground.setAttribute('height', '100%');
+                foreground.setAttribute('aria-hidden', 'true');
+                foreground.setAttribute('data-dashbridge-threshold-foreground', 'true');
+                const copy = line.cloneNode(true);
+                copy.removeAttribute('data-dashbridge-threshold-line');
+                Object.assign(copy.style, { left: `${rect.left - bounds.left}px`,
+                    top: `${rect.top - bounds.top}px`, width: `${rect.width}px`, right: 'auto' });
+                foreground.appendChild(copy);
+                result.overlay.appendChild(foreground);
+            }
             if (controller) controller.overlay = result.overlay || null;
             return result;
         };

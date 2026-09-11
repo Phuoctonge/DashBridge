@@ -171,7 +171,7 @@
             // closes the previous field synchronously before toggle events.
             details.setAttribute('name', 'dashbridge-variable-picker');
             const summary = documentRef.createElement('summary');
-            const fullText = variable.texts.join(' + ') || variable.values.join(' + ') || '—';
+            const fullText = variable.texts.join(' + ') || variable.values.join(' + ') || '-';
             if (variable.hide !== 1) {
                 const label = documentRef.createElement('span');
                 label.className = 'dashboard-variable-label';
@@ -340,6 +340,12 @@
             if (!snapshot || snapshot.variables.some(variable => variable.error)) {
                 fail(group, 'Grafana вернула ошибку или некорректный список переменных.'); return;
             }
+            const changes = [];
+            if (group.transaction) {
+                try {
+                    for (const panel of members(group)) changes.push([panel, codec.apply(panel.src, snapshot.variables)]);
+                } catch (error) { fail(group, error.message); return; }
+            }
             const initial = !group.snapshot;
             const sourcePanel = group.pending && getPanelForIframe(group.pending.frame);
             cancel(group);
@@ -352,10 +358,6 @@
             }
             group.element.removeAttribute('aria-busy');
             if (transaction) {
-                const changes = [];
-                try {
-                    for (const panel of members(group)) changes.push([panel, codec.apply(panel.src, snapshot.variables)]);
-                } catch (error) { group.transaction = transaction; fail(group, error.message); return; }
                 invalidate();
                 for (const [panel, src] of changes) {
                     if (panel.src === src) continue;

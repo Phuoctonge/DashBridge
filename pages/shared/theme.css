@@ -1,5 +1,5 @@
 /* ============================================================
- * DashBridge — Единая тема (источник правды для всех страниц)
+ * DashBridge - Единая тема (источник правды для всех страниц)
  * Подключается во все HTML файлы расширения.
  * ============================================================ */
 
@@ -76,7 +76,7 @@
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 
     /* Единый фон подложки модальных окон.
-       Без backdrop-filter: blur() — фильтр заставляет браузер перерисовывать
+       Без backdrop-filter: blur() - фильтр заставляет браузер перерисовывать
        живой контент под подложкой (iframe Grafana) и даёт пик загрузки CPU. */
     --modal-overlay-bg: rgba(0, 0, 0, 0.6);
 
@@ -129,11 +129,11 @@ html[data-ui-scale="auto"] { font-size: 16px; }
 [data-theme="dark"] {
     /* Поверхности: чёткая иерархия (bg < card-bg < bg-elevated) */
     --bg: #0f172a;
-    /* slate-900 — самый тёмный (фон страницы) */
+    /* slate-900 - самый тёмный (фон страницы) */
     --card-bg: #1e293b;
-    /* slate-800 — карточки, модалки, таблицы */
+    /* slate-800 - карточки, модалки, таблицы */
     --bg-elevated: #334155;
-    /* slate-700 — input, textarea, hover (светлее карточки) */
+    /* slate-700 - input, textarea, hover (светлее карточки) */
     --header-bg: #0f172a;
     --header-grad: linear-gradient(135deg, #020617 0%, #0f172a 100%);
     --surface: #1e293b;
@@ -141,9 +141,9 @@ html[data-ui-scale="auto"] { font-size: 16px; }
 
     /* Текст: светлый, но с хорошим контрастом */
     --text-main: #f1f5f9;
-    /* slate-100 — основной текст */
+    /* slate-100 - основной текст */
     --text-muted: #cbd5e1;
-    /* slate-300 — второстепенный (светлее для видимости) */
+    /* slate-300 - второстепенный (светлее для видимости) */
     --text-inverse: #0f172a;
     --text-on-primary: #ffffff;
 
@@ -154,9 +154,9 @@ html[data-ui-scale="auto"] { font-size: 16px; }
 
     /* Границы: светлее для лучшей видимости на тёмном фоне */
     --border: #475569;
-    /* slate-600 — основные границы */
+    /* slate-600 - основные границы */
     --border-light: #64748b;
-    /* slate-500 — светлые границы */
+    /* slate-500 - светлые границы */
 
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
     --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
@@ -370,7 +370,7 @@ button {
     height: 18px;
 }
 
-/* В тёмной теме — чуть ярче для контраста */
+/* В тёмной теме - чуть ярче для контраста */
 [data-theme="dark"] .btn-theme {
     background: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%) !important;
     box-shadow: 0 2px 4px rgba(129, 140, 248, 0.4);
@@ -487,9 +487,14 @@ textarea:focus {
 }
 
 .switch input {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    margin: 0;
     opacity: 0;
-    width: 0;
-    height: 0;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
 }
 
 .slider {
@@ -523,6 +528,16 @@ input:checked+.slider {
 
 input:checked+.slider::before {
     transform: translateX(1.125rem);
+}
+
+.switch input:focus-visible + .slider {
+    outline: 2px solid var(--primary);
+    outline-offset: 3px;
+}
+.switch input:disabled + .slider { opacity: .5; cursor: not-allowed; }
+.switch input:disabled { cursor: not-allowed; }
+@media (prefers-reduced-motion: reduce) {
+    .switch .slider, .switch .slider::before { transition: none; }
 }
 
 /* === Toast === */

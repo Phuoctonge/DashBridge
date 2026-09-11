@@ -53,8 +53,9 @@
 
 ## Тестирование
 
-- Локальная точка входа — `node test/run-all-tests.js`; отдельный npm/pytest
-  контур не является текущим контрактом проекта.
+- `node test/run-all-tests.js` объединяет Node/Python и guards; полный
+  автономный `npm run test:all` добавляет ESLint и Chromium smoke. Второй
+  параллельный тестовый framework не требуется.
 - Статические и Node behavior-проверки не заменяют живую матрицу Chrome,
   Grafana, Jira, TDM и Confluence.
 - E2E Runner различает PASS, FAIL, SKIP и NOT RUN, сохраняет evidence и обязан

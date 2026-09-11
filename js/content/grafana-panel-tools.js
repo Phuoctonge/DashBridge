@@ -300,10 +300,11 @@
         `;
         document.documentElement.appendChild(style);
     };
-    const showNativeThresholdToast = (title, status) => {
+    const showNativeThresholdToast = (title, status, key) => {
         document.getElementById('dashbridge-threshold-toast')?.remove();
         const toast = document.createElement('div');
         toast.id = 'dashbridge-threshold-toast';
+        toast.dataset.panelKey = String(key);
         toast.setAttribute('role', 'alert');
         const heading = document.createElement('strong');
         heading.textContent = title;
@@ -315,7 +316,7 @@
         close.addEventListener('click', () => toast.remove());
         const message = document.createElement('span');
         message.className = 'dashbridge-threshold-toast-status';
-        message.textContent = `Порог ${status.threshold}${status.unit ? ` ${status.unit}` : ''} превышен`;
+        message.textContent = `Порог ${Number(Number(status.threshold).toPrecision(12))}${status.unit ? ` ${status.unit}` : ''} превышен`;
         toast.append(heading, close, message);
         document.body.appendChild(toast);
     };
@@ -323,9 +324,11 @@
         if (isDashboardIframe) return;
         const key = getPanelStateKey(targetPanel) || tools.targetPanelId || title;
         const previous = nativeThresholdAlerts.get(key);
+        const toast = document.getElementById('dashbridge-threshold-toast');
+        if ((!status?.enabled || !status.exceeded || status.thresholdNotifyEnabled === false)
+            && toast?.dataset.panelKey === String(key)) toast.remove();
         if (status?.thresholdNotifyEnabled === false) {
             nativeThresholdAlerts.delete(key);
-            document.getElementById('dashbridge-threshold-toast')?.remove();
             return;
         }
         if (!status?.enabled) {
@@ -337,14 +340,12 @@
             return;
         }
         ensureNativeThresholdFeedbackStyles();
-        if (!previous?.wasExceeded) showNativeThresholdToast(title, status);
+        if (!previous?.wasExceeded) showNativeThresholdToast(title, status, key);
     };
     const getLegendItems = () => window.DashBridgeGrafanaDom?.legendItems(getTargetPanel()) || [...getTargetPanel().querySelectorAll(
         '.graph-legend-series, [class*="legend-item" i], .u-legend tr, .u-legend-row, [class*="LegendRow"], [class*="Legend"] [role="button"], [class*="legend"] [role="button"]'
     )];
-
     const getLegendLabel = item => window.DashBridgeGrafanaDom?.legendLabel?.(item) || item;
-
     const getLegendSeries = () => {
         const sharedNames = window.DashBridgeGrafanaDom?.legendSeriesNames?.(getTargetPanel());
         if (Array.isArray(sharedNames)) return sharedNames;
@@ -1154,7 +1155,7 @@
         void startThresholdReporting().catch(() => { /* A panel can unmount during refresh. */ });
     };
 
-    // BUG-A fix: добавлен таймаут 10 сек — если график не появился, observer отключается
+    // BUG-A fix: добавлен таймаут 10 сек - если график не появился, observer отключается
     // и промис резолвится, чтобы не зависать навечно.
     const applyThresholdWhenChartReady = () => new Promise(resolve => {
         window.__dashbridgeThresholdReadyObserver?.disconnect();
@@ -1174,7 +1175,7 @@
             if (!window.DashBridgeGrafanaVisualEngine?.isChartReady?.(root)) return;
             finish();
         };
-        // Таймаут 10 секунд: если график не появился — всё равно резолвим промис,
+        // Таймаут 10 секунд: если график не появился - всё равно резолвим промис,
         // чтобы не блокировать вызывающий код.
         const timeout = setTimeout(finish, 10_000);
         window.__dashbridgeThresholdReadyObserver = new MutationObserver(tryApply);
@@ -1661,12 +1662,12 @@
                     let settled = false;
                     let timeout = null;
                     let dataObserver = null;
-                    let inspectFrame = 0;
+                    let inspectTimer = null;
                     const finish = (current, force = false) => {
                         if (settled || (!current && !force)) return;
                         settled = true;
                         clearTimeout(timeout);
-                        if (inspectFrame) cancelAnimationFrame(inspectFrame);
+                        clearTimeout(inspectTimer);
                         dataObserver?.disconnect();
                         window.removeEventListener('dashbridgePanelDataSettled', scheduleInspect);
                         if (panelReportSnapshotCancellers.get(requestId) === cancel) {
@@ -1677,11 +1678,12 @@
                     const cancel = () => finish(null, true);
                     const inspect = () => finish(readySnapshot());
                     const scheduleInspect = () => {
-                        if (inspectFrame || settled) return;
-                        inspectFrame = requestAnimationFrame(() => {
-                            inspectFrame = 0;
+                        if (inspectTimer !== null || settled) return;
+                        // Offscreen iframe animation frames can stop while data still arrives.
+                        inspectTimer = setTimeout(() => {
+                            inspectTimer = null;
                             inspect();
-                        });
+                        }, 0);
                     };
                     const requestedTimeout = Number(event.data.timeoutMs);
                     const reportTimeoutMs = Number.isFinite(requestedTimeout)
@@ -2175,7 +2177,7 @@
                 // Без targetQuerySignatures/targetLegendSeries функция transform() не может
                 // определить refId нужной панели и пропускает трансформацию
                 // (guard: !isDashboardIframe && !targetRefIds.size → return data).
-                // Берём оба источника: подписи запросов надёжнее, серии легенды — fallback.
+                // Берём оба источника: подписи запросов надёжнее, серии легенды - fallback.
                 if (!isDashboardIframe && (nextState.invertIdle || nextState.convertMemToUsed || nextState.forceMemByteUnit)
                     && !nextState.seriesQueryFilterEnabled && !nextState.cpuCapacityFilterEnabled) {
                     const legendSeries = getPanelLegendSeries(panel);
@@ -2187,7 +2189,7 @@
                         }) || [];
                     }
                 }
-                // Если все data-трансформации выключены — очищаем сохранённые сигнатуры.
+                // Если все data-трансформации выключены - очищаем сохранённые сигнатуры.
                 // Иначе transform() продолжит находить совпадения по старым refId и будет
                 // применять filterLegendData / filterSeriesByThreshold к чужим панелям.
                 if (!isDashboardIframe && !nextState.seriesQueryFilterEnabled && !nextState.cpuCapacityFilterEnabled

@@ -1,0 +1,57 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const context={URL,console,crypto:{randomUUID:()=>String(++seq)}};let seq=0;
+vm.createContext(context);
+vm.runInContext(fs.readFileSync('js/shared/grafana-panel-identity.js','utf8'),context);
+vm.runInContext(fs.readFileSync('pages/dashbridge/dashbridge-frame-load-controller.js','utf8'),context);
+const timers=new Map(),calls=[],states=[];let timerId=0;
+const frame=()=>({isConnected:true,dataset:{},listeners:{},src:'',addEventListener(n,f){this.listeners[n]=f;},removeEventListener(n){delete this.listeners[n];},removeAttribute(n){if(n==='data-src')delete this.dataset.src;},contentWindow:{postMessage(message,origin){calls.push({message,origin});}}});
+const owner=context.DashBridgeFrameLoadController.create({
+ navigate:(f,url)=>{f.src=url;calls.push({f,url});},getPanelForIframe:f=>f.valid===false?null:{id:'p'},
+ setTimer:(fn,ms)=>{const id=++timerId;timers.set(id,{fn,ms});return id;},clearTimer:id=>timers.delete(id),
+ showState:(f,state,retry)=>states.push({f,state,retry})
+});
+const url='https://g.test/grafana/d-solo/uid/name?panelId=1';
+const a=frame(),b=frame(),c=frame();
+owner.schedule(a,url);owner.schedule(b,url.replace('panelId=1','panelId=2'));owner.schedule(c,url.replace('g.test','other.test'));
+assert.equal(a.src,url);assert.equal(b.src,'');assert(c.src);assert.equal(b.dataset.src,url.replace('panelId=1','panelId=2'));
+const reply=(f,extra={})=>{f.listeners.load?.();const request=calls.at(-1).message;assert(request);owner.accept({requestId:request.requestId,url:f.src,ready:true,...extra},f);};
+reply(a);assert(b.src,'first ready releases same-origin queued panels');
+const d=frame();owner.schedule(d,url);assert(d.src,'already primed origin needs no gate');
+const home=(f)=>reply(f,{url:'https://g.test/grafana/',ready:false,home:true});
+owner.navigate(a,url);
+const before=calls.filter(x=>x.f===a).length;home(a);
+assert.equal(calls.filter(x=>x.f===a).length,before+1,'one home redirect must retry the original URL');
+home(a);assert.equal(calls.filter(x=>x.f===a).length,before+1,'repeated home must not loop');
+assert.equal(states.at(-1).state,'error');assert.equal(typeof states.at(-1).retry,'function');
+states.at(-1).retry();assert.equal(calls.filter(x=>x.f===a).length,before+2,'manual retry starts a fresh attempt');
+const navCount=calls.filter(x=>x.url).length;reply(a,{url:'https://g.test/grafana/login',ready:false,home:false});
+assert.equal(calls.filter(x=>x.url).length,navCount,'login must stay available to the user');
+owner.reset();assert.equal(timers.size,0,'reset removes all timers');
+const e=frame(),f=frame();owner.schedule(e,url);owner.schedule(f,url);
+owner.cancel(e);assert(f.src,'removing first frame must release the queue');owner.reset();
+const g=frame(),h=frame();owner.schedule(g,url);owner.schedule(h,url);
+const deadline=[...timers.values()].find(t=>t.ms===30000);assert(deadline);deadline.fn();assert(h.src,'deadline must not strand other panels');owner.reset();
+const i=frame(),j=frame();owner.schedule(i,url);owner.schedule(j,url);
+owner.navigate(j,url+'&from=123');assert.equal(j.src,url+'&from=123','explicit navigation supersedes pending startup synchronously');
+i.listeners.load();const stale=calls.at(-1).message.requestId;owner.navigate(i,url+'&from=456');
+const n=calls.filter(x=>x.url).length;owner.accept({requestId:stale,url:'https://g.test/grafana/',home:true},i);assert.equal(calls.filter(x=>x.url).length,n,'old generation reply cannot retry new navigation');
+reply(i,{url:'https://evil.test/grafana/',home:true,ready:false});assert.equal(calls.filter(x=>x.url).length,n,'wrong origin cannot cause reload');
+reply(i,{url:'https://g.test/other/',home:true,ready:false});assert.equal(calls.filter(x=>x.url).length,n,'wrong base path cannot cause reload');
+owner.reset();const k=frame(),l=frame();owner.schedule(k,url);owner.schedule(l,url);l.valid=false;reply(k);assert.equal(l.src,'','queued panel no longer owned must not navigate');owner.reset();
+const m=frame(),p=frame();owner.schedule(m,url);owner.schedule(p,url);
+p.dataset.src=url+'&from=changed&theme=dark';reply(m);
+assert.equal(p.src,url+'&from=changed&theme=dark','time/theme changed while queued must be used at actual startup');owner.reset();
+const slow=frame(),follower=frame();owner.schedule(slow,url);owner.schedule(follower,url);
+reply(slow,{ready:false,documentReady:false});assert.equal(follower.src,'','unfinished navigation does not release followers');
+reply(slow,{url:url.replace('panelId=1','panelId=9'),ready:false,documentReady:true});assert.equal(follower.src,'','another panel cannot confirm navigation');
+reply(slow,{ready:false,documentReady:true});
+assert.equal(follower.src,url,'completed panel document releases followers before any chart exists');
+const beforeLateHome=calls.filter(x=>x.f===slow).length;home(slow);
+assert.equal(calls.filter(x=>x.f===slow).length,beforeLateHome+1,'early release must retain recovery for a later Home redirect');
+reply(slow,{ready:false,documentReady:true});
+assert.equal(states.at(-1).state,null,'return to the correct document clears the recovery notice even while data is slow');
+const slowDeadline=[...timers.values()].find(t=>t.ms===30000);slowDeadline.fn();
+assert.notEqual(states.at(-1).state,'error','slow renderer after successful recovery is not a failed navigation');
+owner.reset();assert.equal(timers.size,0);
+console.log('PASS frame startup gate, bounded recovery, login, stale replies and cancellation');

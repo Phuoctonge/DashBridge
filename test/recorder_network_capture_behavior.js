@@ -162,7 +162,7 @@ const controller = context.DashBridgeRecorderNetworkCapture.create({
     assert.strictEqual(completeness.streamEventsDropped, 1);
 
     controller.handleEvent({ tabId: 7 }, 'Page.frameNavigated', {
-        frame: { url: 'https://site.example/next' },
+        frame: { id: 'main', url: 'https://site.example/next' },
     });
     controller.handleEvent({ tabId: 7 }, 'Page.navigatedWithinDocument', {
         frameId: 'main', url: 'https://site.example/next#hash',

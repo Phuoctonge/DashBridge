@@ -21,7 +21,7 @@ pause_body = ACTIONS[pause_start:pause_end]
 check('pause changes state without waiting for or capturing a frame', 'panel.paused = !panel.paused;' in pause_body and 'waitForDashboardFrameLoad' not in pause_body and 'captureCard' not in pause_body)
 check('pause implementation contains no retired snapshot runtime', 'DashBridgePausedSnapshots' not in PAGE and 'pausedSnapshots' not in PAGE and 'pausedPanelRenderWaiters' not in PAGE)
 check('global refresh does not process paused panels', 'refreshPausedPanels' not in PAGE)
-check('ordinary rendering eagerly loads only active panels', 'if (!panel.paused)' in CARD and 'navigateDashboardFrame(iframe, iframe.dataset.src)' in CARD)
+check('ordinary rendering schedules only active panels', 'if (!panel.paused)' in CARD and 'scheduleFrameLoad(iframe, iframe.dataset.src)' in CARD)
 
 IFRAME = (ROOT / 'js/content/grafana-iframe.js').read_text(encoding='utf-8')
 CSS = ''.join((ROOT / 'pages/dashbridge' / path).read_text(encoding='utf-8') for path in [

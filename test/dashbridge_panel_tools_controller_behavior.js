@@ -11,6 +11,8 @@ const documentRef = {
     getElementById: id => id === 'dashbridgeThresholdNotifications' ? notificationContainer : null,
     querySelector(selector) {
         if (selector.startsWith('.panel-card')) return panelCard;
+        if (selector.startsWith('.threshold-notification')) return notificationContainer.children.find(node =>
+            !node.removed && selector.includes(`"${node.dataset.panelId}"`)) || null;
         return null;
     },
     createElement() {
@@ -111,13 +113,13 @@ assert.deepStrictEqual(analyticsEvents.map(event => event.featureId).sort(), [
     assert.strictEqual(modalOptions.advanced.cpuCapacityFilterCoefficientDefault, 0.75);
 
     const thresholdOnly = { ...modalOptions.state, thresholdValue: 91 };
-    modalOptions.onSave(thresholdOnly);
+    await modalOptions.onSave(thresholdOnly);
     assert.strictEqual(forceCount, 1, 'threshold-only save applies to the live iframe');
     assert.strictEqual(refreshCount, 0);
     assert.strictEqual(messages.at(-1).action, 'applyPanelTools');
 
     await controller.open(panel, iframe);
-    modalOptions.onSave({ ...modalOptions.state, invertLegend: true });
+    await modalOptions.onSave({ ...modalOptions.state, invertLegend: true });
     assert.strictEqual(refreshCount, 1, 'non-live tool change refreshes only the selected panel');
 
     const legendPromise = modalOptions.advanced.getLegendSeries();
@@ -141,6 +143,35 @@ assert.deepStrictEqual(analyticsEvents.map(event => event.featureId).sort(), [
     const notice = notificationContainer.children.at(-1);
     assert(notice.innerHTML.includes('&lt;unsafe>') && !notice.innerHTML.includes('<unsafe>'),
         'threshold notification escapes the Grafana title');
+
+    const notify = (exceeded, extra = {}, target = panel) => controller.acceptThresholdStatus({ status: {
+        enabled: true, exceeded, thresholdNotifyEnabled: true, ...extra
+    } }, target);
+    notify(false);
+    assert.strictEqual(notice.removed, true, 'recovery must remove the stale threshold notification');
+    notify(true);
+    const repeated = notificationContainer.children.at(-1);
+    notify(true);
+    assert.strictEqual(notificationContainer.children.at(-1), repeated, 'repeated breach must not duplicate notices');
+    repeated.button.click();
+    notify(true);
+    assert.strictEqual(notificationContainer.children.at(-1), repeated, 'dismissed breach stays dismissed');
+    notify(false);
+    notify(true);
+    assert.notStrictEqual(notificationContainer.children.at(-1), repeated, 'a new breach after recovery must notify');
+    const other = { id: 'other-panel', tools: {} };
+    notify(true, {}, other);
+    const otherNotice = notificationContainer.children.at(-1);
+    notify(false);
+    assert(!otherNotice.removed, 'recovery must not remove another panel notification');
+    notify(true);
+    const disabledNotice = notificationContainer.children.at(-1);
+    notify(false, { enabled: false });
+    assert(disabledNotice.removed, 'disabling threshold clears its notice');
+    notify(true);
+    const mutedNotice = notificationContainer.children.at(-1);
+    notify(true, { thresholdNotifyEnabled: false });
+    assert(mutedNotice.removed, 'disabling notifications clears its notice');
 
     controller.removePanel(panel.id);
     assert(saveCount >= 3, 'tool and threshold state changes remain persisted');

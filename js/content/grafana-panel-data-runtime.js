@@ -1,6 +1,19 @@
 (() => {
     'use strict';
-    const create = context => {
+    const create = owner => {
+        // Wrappers belong to the document; their UI callbacks belong to the latest
+        // panel-tools generation, including completion of requests already in flight.
+        const context = { ...owner };
+        let disposed = false;
+        for (const name of ['getTargetPanel', 'setPanelDataStatus', 'syncPanelDataStatusPresentation',
+            'responseSeriesFilterIsEnabled', 'syncResponseFilterPresentation', 'hasPersistentVisualWork',
+            'reapplyVisualStylesAfterDataTransform', 'consumeVisualStylesAfterQuery', 'isThresholdRestorePending']) {
+            context[name] = (...args) => window.__dashbridgePanelDataOwner?.[name]?.(...args);
+        }
+        owner.registerRuntimeCleanup(() => {
+            disposed = true;
+            if (window.__dashbridgePanelDataOwner === owner) window.__dashbridgePanelDataOwner = null;
+        });
         const {
             tools, isDashboardIframe, visualMetadata, legendSelection, getTargetPanel,
             pushBoundedDiagnosticEvent, capDiagnosticJournal, setRecentDiagnosticRecord,
@@ -224,6 +237,8 @@
             calculatedTitleFrame = 0;
         });
         const installDataInterceptor = () => {
+            if (disposed) return;
+            window.__dashbridgePanelDataOwner = owner;
             if (window.__dashbridgeCardDataInterceptor) return;
             window.__dashbridgeCardDataInterceptor = true;
             const diagnostics = window.__dashbridgeDataInterceptorDiagnostic = window.__dashbridgeDataInterceptorDiagnostic || {
@@ -373,6 +388,8 @@
                 const resultRefIds = Object.keys(data.results || {});
                 // Never transform a known query belonging to a different panel.
                 if (targetRefIds !== null && !targetRefIds.size) {
+                    // A target switch cannot transfer private helper results to Grafana.
+                    window.DashBridgeGrafanaCpuCapacityFilter?.filterResponse?.(data, requestBody);
                     diagnostics.unmatched += 1;
                     diagnostics.last = { at: Date.now(), scope, resultRefIds, targetRefIds: [] };
                     pushEvent('scope-mismatch', { ...request, scope, resultRefIds, targetRefIds: [] });
@@ -402,13 +419,10 @@
                 visualMetadata.memoryConversionApplied = tools.convertMemToUsed ? memoryTransform.applied : null;
                 const memoryConversionFailed = !!tools.convertMemToUsed && !memoryTransform.applied;
                 if (!tools.convertMemToUsed && tools.forceMemByteUnit) restoreMemByteUnit(scopedData);
-                // Dynamic vCPU filtering owns only Load Average frames and runs
-                // before the generic fixed-threshold series filter. The latter can
-                // then safely evaluate the already-scoped result without changing
-                // how vCPU capacity is calculated.
-                const cpuCapacityFilter = tools.cpuCapacityFilterEnabled
+                // Request-owned helper cleanup survives disabling the filter in flight.
+                const cpuCapacityFilter = tools.cpuCapacityFilterEnabled || cpuContext.helperRefIds.size
                     ? capacityFilter?.filterResponse?.(scopedData, requestBody, {
-                        enabled: true,
+                        enabled: !!tools.cpuCapacityFilterEnabled,
                         coefficient: tools.cpuCapacityFilterCoefficient,
                         mode: tools.cpuCapacityFilterMode,
                         trimDomainEnabled: tools.trimDomainEnabled === true,
@@ -511,7 +525,7 @@
                 if (!observeActive) return originalFetch(...args);
                 let effectiveArgs = args;
                 let requestBody = null;
-                if (transformActive || diagnosticObservationActive || analysisCaptureActive) {
+                if (isDashboardIframe || transformActive || diagnosticObservationActive || analysisCaptureActive) {
                     requestBody = await window.DashBridgeGrafanaNetwork.readFetchBody(args[0], args[1]).catch(() => null);
                 }
                 if (isDashboardVariableQuery(requestBody)) {

@@ -123,7 +123,7 @@
                 // На Grafana 6-7 (Flot) installFlotVisibilityController возвращает null,
                 // если Flot-плот ещё не инициализирован в момент вызова.
                 // В этом случае result === null (falsy), но invertLegend, thickenLines и
-                // removeFill всё равно должны применяться через applyPopupLegendAndVisuals —
+                // removeFill всё равно должны применяться через applyPopupLegendAndVisuals -
                 // эта функция сама повторно вызовет applySeriesVisibility внутри себя.
                 // На uPlot (Grafana 9-11) result всегда truthy ('uplot-fast-complete-hide').
                 // В обоих случаях вызов applyPopupLegendAndVisuals безопасен: он идемпотентен

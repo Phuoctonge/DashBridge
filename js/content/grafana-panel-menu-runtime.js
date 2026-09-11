@@ -163,7 +163,7 @@
             const dialog = create('section', 'dashbridge-panel-analysis-dialog');
             dialog.setAttribute('role', 'dialog'); dialog.setAttribute('aria-modal', 'true');
             const header = create('header', 'dashbridge-panel-analysis-header');
-            const heading = create('h3', '', `Анализ ${type.toUpperCase()} — ${analysis.baseTitle(title)}`);
+            const heading = create('h3', '', `Анализ ${type.toUpperCase()} - ${analysis.baseTitle(title)}`);
             const close = create('button', 'dashbridge-panel-analysis-close');
             close.type = 'button'; close.title = 'Закрыть'; close.setAttribute('aria-label', close.title);
             const closeIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');

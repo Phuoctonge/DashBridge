@@ -234,7 +234,7 @@ function showDiagnostic(test, urlResult) {
     header.appendChild(heading);
     const meta = popup.document.createElement('div');
     meta.className = 'meta';
-    meta.textContent = `${urlResult.engine || '—'} · Grafana ${urlResult.grafanaVersion || '—'}`;
+    meta.textContent = `${urlResult.engine || '-'} · Grafana ${urlResult.grafanaVersion || '-'}`;
     header.appendChild(meta);
     const facts = popup.document.createElement('div');
     facts.className = 'facts';
@@ -247,17 +247,17 @@ function showDiagnostic(test, urlResult) {
         const persistenceFact = persistence?.required
             ? ` | persistence=${persistence.passed ? 'PROVEN' : 'FAILED'} (${persistence.reason || 'без причины'})`
             : '';
-        return `${step.index || '—'}: ${outcome.toUpperCase()} — ${step.verdict?.reason || step.invariant?.reason || step.label}${persistenceFact}`;
+        return `${step.index || '-'}: ${outcome.toUpperCase()} - ${step.verdict?.reason || step.invariant?.reason || step.label}${persistenceFact}`;
     });
     const factValues = [
         ['Результат', status, status.toLowerCase()],
-        ['Функциональная проверка', verdict.functionalPass === false ? 'FAIL' : (verdict.functionalPass === true ? 'PASS' : '—'), verdict.functionalPass === false ? 'fail' : (verdict.functionalPass === true ? 'pass' : '')],
+        ['Функциональная проверка', verdict.functionalPass === false ? 'FAIL' : (verdict.functionalPass === true ? 'PASS' : '-'), verdict.functionalPass === false ? 'fail' : (verdict.functionalPass === true ? 'pass' : '')],
         ['Ошибки DashBridge', String(runtime.dashBridgeErrorCount ?? 0), runtime.dashBridgeErrorCount ? 'fail' : 'pass'],
         ['Предупреждения Grafana', String(runtime.grafanaWarningCount ?? 0), runtime.grafanaWarningCount ? 'skip' : ''],
         ['console.warn', String(runtime.warningCount ?? 0), runtime.warningCount ? 'skip' : ''],
         ['Длительность', formatDuration(test.durationMs || 0), ''],
-        ['Панель', test.diagnostic?.before?.panelId || test.diagnostic?.baseline?.panelId || '—', ''],
-        ['Рендерер', test.diagnostic?.before?.renderer || test.diagnostic?.baseline?.renderer || urlResult.engine || '—', ''],
+        ['Панель', test.diagnostic?.before?.panelId || test.diagnostic?.baseline?.panelId || '-', ''],
+        ['Рендерер', test.diagnostic?.before?.renderer || test.diagnostic?.baseline?.renderer || urlResult.engine || '-', ''],
         ...(test.feature?.sourceFile ? [['Исходный код', `${test.feature.sourceFile}${test.feature.sourceSymbol ? ` · ${test.feature.sourceSymbol}` : ''}`, '']] : []),
     ];
     factValues.forEach(([label, value, className]) => {
@@ -318,7 +318,7 @@ function showDiagnostic(test, urlResult) {
             const checkpoints = action.checkpoints?.filter(item => item.at).length || 0;
             const changes = (action.diffs || []).reduce((sum, diff) => sum + (diff.changeCount || 0), 0);
             const status = action.output?.status || (action.output?.pass === true ? 'pass' : 'observed');
-            return `${action.sequence}. ${action.description || action.action} — ${status}; ${action.durationMs ?? '—'} мс; checkpoints=${checkpoints}; changedPaths=${changes}`;
+            return `${action.sequence}. ${action.description || action.action} - ${status}; ${action.durationMs ?? '-'} мс; checkpoints=${checkpoints}; changedPaths=${changes}`;
         }).join('\n')}`;
         body.appendChild(actionResult);
     }
@@ -342,14 +342,14 @@ function showDiagnostic(test, urlResult) {
     }
     (test.diagnostic?.transitions || []).forEach(step => {
         const number = step.index ? `Шаг ${step.index}` : 'Шаг';
-        addUniqueSnapshot(`${number}: ${step.label} — непосредственно до команды`, step.before);
-        addUniqueSnapshot(`${number}: ${step.label} — после команды, до Refresh`, step.command?.afterCommandBeforeRefresh);
+        addUniqueSnapshot(`${number}: ${step.label} - непосредственно до команды`, step.before);
+        addUniqueSnapshot(`${number}: ${step.label} - после команды, до Refresh`, step.command?.afterCommandBeforeRefresh);
         const persistence = step.persistence || step.command?.persistence;
         if (persistence?.required) {
-            addUniqueSnapshot(`${number}: ${step.label} — после первого refresh`, persistence.beforeRefresh);
-            addUniqueSnapshot(`${number}: ${step.label} — после второго refresh без повторной команды`, step.after);
+            addUniqueSnapshot(`${number}: ${step.label} - после первого refresh`, persistence.beforeRefresh);
+            addUniqueSnapshot(`${number}: ${step.label} - после второго refresh без повторной команды`, step.after);
         } else {
-            addUniqueSnapshot(`${number}: ${step.label} — состояние после команды и refresh`, step.after);
+            addUniqueSnapshot(`${number}: ${step.label} - состояние после команды и refresh`, step.after);
         }
     });
     addUniqueSnapshot('Внешний снимок: после завершения сценария', test.diagnostic?.after);

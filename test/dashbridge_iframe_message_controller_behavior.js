@@ -27,6 +27,7 @@ const controller = context.DashBridgeIframeMessageController.create({
     getPanelForIframe: () => currentPanel,
     getPanels: () => [panel],
     acceptReportSnapshot: (...args) => calls.push(['report', ...args]),
+    acceptFrameLocation: (...args) => calls.push(['location', ...args]),
     acceptPanelAnalysis: (...args) => calls.push(['analysis', ...args]),
     capturePanel: (...args) => calls.push(['capture', ...args]),
     setCapturePrepared: value => calls.push(['prepared', value]),
@@ -61,14 +62,19 @@ const emit = (data, overrides = {}) => messageListener({
 emit({ action: 'panelReportSnapshot', requestId: 'report-1', snapshot: { ok: true } });
 assert(calls.some(call => call[0] === 'report' && call[1] === 'report-1' && call[2] === frame));
 const guardedCount = calls.length;
+emit({ action: 'dashbridgeFrameLocation' }, { origin: 'https://evil.example' });
+emit({ action: 'dashbridgeFrameLocation' }, { source: {} });
 emit({ action: 'panelReportSnapshot', requestId: 'bad' }, { origin: 'https://evil.example' });
 emit({ action: 'panelReportSnapshot', requestId: 'bad' }, { source: {} });
 assert.strictEqual(calls.length, guardedCount, 'wrong source or origin must be ignored');
 currentPanel = null;
+emit({ action: 'dashbridgeFrameLocation' });
 emit({ action: 'panelThresholdStatus', status: { enabled: true, exceeded: true } });
 assert.strictEqual(calls.length, guardedCount,
     'messages from an iframe outside the active profile must be ignored');
 currentPanel = panel;
+emit({ action: 'dashbridgeFrameLocation', requestId: 'nav-1' });
+assert(calls.some(call => call[0] === 'location' && call[2] === frame));
 
 emit({ action: 'dashbridgePanelAnalysisUpdate', requestId: 'analysis-1' });
 emit({ action: 'dashbridgePanelCaptureRequest', requestId: 'capture-1', outputAction: 'copy' });

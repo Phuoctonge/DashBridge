@@ -7,6 +7,7 @@ let dashBridgePanelToolsController = null;
 let dashBridgePanelCardController = null;
 let dashBridgePageUiController = null;
 let dashBridgeReportController = null;
+let dashBridgeFrameLoadController = null;
 
 function invalidateActiveProfileRuntime() {
     dashBridgeReportController?.invalidateProfileContext();
@@ -49,6 +50,7 @@ function reconcileDashboardPanelCards(previousPanels) {
 }
 
 function renderDashboard() {
+    dashBridgeFrameLoadController?.reset();
     return dashBridgePanelCardController.renderDashboard();
 }
 
@@ -117,6 +119,7 @@ const {
     openPanelEditor: openPanelReportEditor,
     openReportSettings,
 } = window.DashBridgeReportUi.create({
+    getTransformSettings: () => grafanaTransformSettings,
     getPanels: () => panels,
     getActiveProfile,
     savePanels,
@@ -131,8 +134,14 @@ function normalizePanelMetadataText(value, maxLength = 96) {
 const {
     getFrameOrigin,
     post: postToDashboardFrame,
-    navigate: navigateDashboardFrame,
 } = DashBridgeIframeMessageController;
+const navigateDashboardFrame = (frame, url) => dashBridgeFrameLoadController.navigate(frame, url);
+dashBridgeFrameLoadController = DashBridgeFrameLoadController.create({
+    navigate: DashBridgeIframeMessageController.navigate,
+    getPanelForIframe: frame => getPanelForIframe(frame),
+});
+window.addEventListener('pagehide', () => dashBridgeFrameLoadController.reset());
+window.addEventListener('pageshow', event => { if (event.persisted) renderDashboard(); });
 const dashBridgePanelAnalysisController = DashBridgePanelAnalysisController.create({
     postToDashboardFrame,
     normalizePanelMetadataText,
@@ -178,6 +187,8 @@ const setupTimeControls = dashBridgeTimeController.setupControls;
 let defaultCapturePrepared = false;
 
 dashBridgePanelToolsController = DashBridgePanelToolsController.create({
+    getPanels: () => panels,
+    getActiveProfile,
     postToDashboardFrame,
     getCapturePrepared: () => defaultCapturePrepared,
     getTransformSettings: () => grafanaTransformSettings,
@@ -216,6 +227,12 @@ const dashBridgePanelAdditionController = DashBridgePanelAdditionController.crea
     parsePanelIds: parseQuickPanelIds,
     parseDashboardUrl: parseGrafanaDashboardUrl,
     fetchDashboardPanels: fetchGrafanaDashboardPanels,
+    showConfirm,
+    configureConnection: async (url, add) => {
+        const result = await chrome.runtime.sendMessage({ type: 'dashbridge-grafana-connection', url, add });
+        if (!result?.ok) throw new Error(result?.error || 'Фоновый процесс не ответил.');
+        return result;
+    },
     normalizePanelMetadataText,
     showAlert,
     currentProfileHasPanel,
@@ -294,6 +311,9 @@ dashBridgeReportController = DashBridgeReportController.create({
     getPanels: () => panels,
     getActiveProfile,
     getTimeContext: dashBridgeTimeController.getState,
+    beginReport: dashBridgeTimeController.beginReport,
+    getReportFrameSource: dashBridgeTimeController.getReportFrameSource,
+    saveProfiles,
 });
 const dashBridgeReportTransport = dashBridgeReportController.transport;
 const dashBridgeReportTestRunner = dashBridgeReportController.testRunner;
@@ -420,6 +440,8 @@ const runDashboardToolbarCapture = dashBridgeCapture.captureFromToolbar;
 const captureDashbridgePanel = dashBridgeCapture.capturePanel;
 
 dashBridgePanelCardController = DashBridgePanelCardController.create({
+    scheduleFrameLoad: dashBridgeFrameLoadController.schedule,
+    cancelFrameLoad: dashBridgeFrameLoadController.cancel,
     renderer: DashBridgeRenderer,
     getPanels: () => panels,
     setPanels: value => { panels = value; },
@@ -501,6 +523,7 @@ window.deletePanel = dashBridgePanelCardController.deletePanel;
 window.refreshPanel = dashBridgePanelCardController.refreshPanel;
 
 DashBridgeIframeMessageController.create({
+    acceptFrameLocation: dashBridgeFrameLoadController.accept,
     getPanelForIframe,
     getPanels: () => panels,
     acceptReportSnapshot: dashBridgeReportTransport.acceptSnapshot,

@@ -29,9 +29,14 @@
         let stopping = null;
         let cancelStart = false;
         const stop = (showStatus = true) => {
-            if (starting && showStatus) { cancelStart = true; return Promise.resolve(); }
+            if (state.starting && showStatus) {
+                cancelStart = starting;
+                state.stopRequested = true;
+                return Promise.resolve();
+            }
             if (stopping) return stopping;
-            stopping = stopSession(showStatus).finally(() => { stopping = null; });
+            state.stopping = true;
+            stopping = stopSession(showStatus).finally(() => { stopping = null; state.stopping = false; });
             return stopping;
         };
         const stopSession = async (showStatus = true) => {
@@ -120,7 +125,7 @@
         };
 
         const start = async () => {
-            if (starting || stopping || state.importing || ['recording', 'replaying'].includes(state.mode)) return;
+            if (starting || stopping || state.starting || state.stopping || state.importing || ['recording', 'replaying'].includes(state.mode)) return;
             const startUrl = schema.normalizeHttpUrl(ui.startUrl.value);
             if (!startUrl) {
                 setStatus('Введите корректный адрес сайта, например site.ru', true);

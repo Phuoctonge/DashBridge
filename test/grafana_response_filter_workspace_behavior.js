@@ -42,7 +42,13 @@ const cpuIndex = source.indexOf('capacityFilter?.filterResponse?.(scopedData');
 const seriesIndex = source.indexOf('sourceFilter = filterSeriesByThreshold(scopedData).metrics;');
 assert(cpuIndex >= 0 && seriesIndex > cpuIndex,
     'vCPU calculation must finish before the generic threshold evaluates the scoped series');
-assert(!source.includes('filterResponse?.(data, requestBody'),
-    'the vCPU filter must never mutate the unscoped dashboard response');
+const scopeMismatchStart = source.indexOf('if (targetRefIds !== null && !targetRefIds.size)');
+const scopeMismatchEnd = source.indexOf("if (scope === 'query-signature')", scopeMismatchStart);
+const cleanupOnlyCall = 'window.DashBridgeGrafanaCpuCapacityFilter?.filterResponse?.(data, requestBody);';
+assert(scopeMismatchStart >= 0 && scopeMismatchEnd > scopeMismatchStart
+    && source.slice(scopeMismatchStart, scopeMismatchEnd).includes(cleanupOnlyCall),
+    'unscoped cleanup must omit filter options so filtering and domain trimming stay disabled');
+assert(!source.replace(cleanupOnlyCall, '').includes('filterResponse?.(data, requestBody'),
+    'only disabled helper cleanup may receive the unscoped dashboard response');
 
 console.log('PASS response filters are isolated to the selected Grafana panel');

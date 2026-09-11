@@ -1,6 +1,6 @@
 # DashBridge: ориентир для дальнейшей разработки
 
-> Сверено с версией 2.4.3, исходным кодом и тестами 2026-09-03. Архитектурный источник
+> Для версии 2.4.3. Команды и описание проверок сверены 2026-09-09. Архитектурный источник
 > истины — [`architecture.md`](architecture.md), карта
 > разрешений — [`permission-map.md`](permission-map.md), незавершённые
 > направления — [`roadmap.md`](roadmap.md). История не описывает
@@ -28,12 +28,13 @@ Browser smoke не требует пользователя и ловит оши�
    isolated world или extension page через узкий мост.
 3. Любой `postMessage` использует точный origin; получатель проверяет `origin`
    и, где есть родитель/iframe, `source`.
-4. Grafana runtime регистрируется только для настроенных hosts и маршрутов
-   `/d/`/`/d-solo/`. `<all_urls>` в manifest не является разрешением включать
-   функциональность на каждом сайте.
-   DOM dataset может сообщать scope MAIN world, но не может авторизовать Chrome
-   API: isolated bridge хранит authority в собственном closure, а service worker
-   повторно проверяет host/route привилегированного capture-запроса.
+4. Постоянная MAIN-регистрация/backfill ограничены настроенными hosts и
+   маршрутами `/d/`/`/d-solo/`. Явные loader-вызовы Batch/Test Runner используют
+   выбранный HTTP(S) dashboard URL; полная область описана в permission-map.
+   Новые привилегированные мосты не должны доверять DOM dataset. Capture bridge
+   хранит authority в closure, service worker повторно проверяет host/route.
+   Существующий time-picker clipboard использует dataset для UI scope;
+   это отмеченное ограничение, которое нельзя копировать как безопасный шаблон.
 5. DNR-правила остаются session- и tab-scoped. Нельзя возвращать глобальное
    снятие X-Frame-Options/CSP.
 6. Любое временное изменение DOM, размеров или renderer при capture
@@ -166,8 +167,9 @@ npm run test:all
 Он последовательно запускает ESLint, канонические Node/Python-тесты и browser
 smoke. Эти же три проверки обязательны в release workflow; Chromium там
 работает под Xvfb. Browser smoke использует отдельный временный профиль, собирает console,
-page и network diagnostics в `test-results/extension-smoke.json`, а снимки
-создаёт только для упавших страниц. Путь к другому тестовому Chromium можно
+page и network diagnostics в `test-results/extension-smoke.json`. При ошибках
+создаются диагностические снимки; отдельные визуальные сценарии сохраняют
+изображения и при успехе как evidence. Путь к другому тестовому Chromium можно
 явно задать через `DASHBRIDGE_CHROME_PATH`.
 
 Для живых Grafana используется один постоянный профиль, отдельный от обычного
@@ -243,7 +245,7 @@ node test/run-python-smoke-tests.js
 Быстрая синтаксическая проверка production JS:
 
 ```powershell
-$files = @(rg --files js -g '*.js')
+$files = @(rg --files js pages -g '*.js')
 foreach ($file in $files) { node --check $file }
 ```
 
@@ -278,8 +280,15 @@ Push тега `vX.Y.Z` запускает `.github/workflows/release.yml`: по�
 принимает download URL лишь при полном совпадении стабильного тега, версии,
 GitHub-путей и имён ZIP/installer assets. Popup скачивает installer только по
 явному действию. Installer сверяет checksum ZIP, делает staging/backup и не
-обходит ручное первичное подтверждение Chromium. После его изменения обязателен
-`pwsh ./scripts/Install-DashBridge.ps1 -SelfTest`; полный контракт находится в
+обходит ручное первичное подтверждение Chromium. После его изменения обязательны
+обе проверки, которые также запускаются release workflow:
+
+```powershell
+pwsh ./scripts/Install-DashBridge.ps1 -SelfTest
+pwsh ./test/installer_regressions.ps1
+```
+
+Они не входят в `npm run test:all`. Полный контракт находится в
 `docs/installer.md`.
 
 ## Изменение аналитики

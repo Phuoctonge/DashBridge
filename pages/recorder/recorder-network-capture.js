@@ -417,17 +417,21 @@
                 state.inFlight.delete(params.requestId);
             } else if (/^Network\.(?:webSocket|eventSourceMessageReceived|webTransport)/.test(method)) {
                 appendStreamEvent(method.slice('Network.'.length), params);
-            } else if (method === 'Page.frameNavigated'
-                && !params.frame?.parentId && state.mode === 'recording') {
-                addNavigateStep(params.frame.url, Date.now());
-                setTimeoutRef(injectActionRecorder, 150);
+            } else if (method === 'Page.frameNavigated' && !params.frame?.parentId) {
+                state.mainFrameId = params.frame?.id || null;
+                if (state.mode === 'recording') {
+                    addNavigateStep(params.frame.url, Date.now());
+                    setTimeoutRef(injectActionRecorder, 150);
+                }
             } else if (method === 'Page.navigatedWithinDocument'
                 && state.mode === 'recording') {
                 appendPageEvent({
                     type: 'sameDocumentNavigation', frameId: params.frameId,
                     url: params.url, timestamp: Date.now(),
                 });
-                addNavigateStep(params.url, Date.now());
+                if (state.mainFrameId && params.frameId === state.mainFrameId) {
+                    addNavigateStep(params.url, Date.now());
+                }
             } else if (method === 'Page.lifecycleEvent') {
                 appendPageEvent({
                     type: params.name, frameId: params.frameId,

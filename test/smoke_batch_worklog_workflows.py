@@ -71,7 +71,7 @@ checks = {
         "selectedKeys: [series.key]" in BATCH
         and "previousSeriesName" in BATCH,
     "batch Series cards show the selected panel title": "appendPanelCard(panelId, panel.title, panelUrl, signatures)" in BATCH
-        and "Панель ID: ${escapeHtml(panelId)} — ${escapeHtml(panelTitle)}" in BATCH,
+        and "Панель ID: ${escapeHtml(panelId)} - ${escapeHtml(panelTitle)}" in BATCH,
     "batch reads Series legends from Grafana's native response": "waitForCapturedSeries(nextTabId, capture.token, 15000, signal)" in BATCH
         and "getPanelQuerySignatures(panel)" in BATCH
         and "triggerGrafanaSeriesRefresh" not in BATCH,

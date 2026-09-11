@@ -53,7 +53,7 @@
             }
         };
         cancelButton.addEventListener('click', cancel);
-        window.addEventListener('pagehide', () => { void progress.release(); });
+        window.addEventListener('pagehide', () => { lifecycle.cancel(); void progress.release(); });
         setProcessing(false);
         return Object.freeze({ progress, loadPanel, updateActionVisibility, acquireWindow, releaseWindow,
             capturePanelToZip, getCaptureOptions, addArchiveReport, begin, isActive, finish,

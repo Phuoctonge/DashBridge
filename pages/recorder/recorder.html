@@ -54,10 +54,10 @@
                 <h2 id="settingsSectionTitle">Параметры записи</h2>
             <div class="network-switches">
                 <div class="network-switch-card">
-                    <label><input id="disableCache" type="checkbox" checked><span>Disable Cache</span><small>Загружать ресурсы с сервера, обходя browser и Service Worker cache</small></label>
+                    <label for="disableCache"><span class="switch"><input id="disableCache" type="checkbox" role="switch" aria-describedby="disableCacheHint" checked><span class="slider" aria-hidden="true"></span></span><span>Disable Cache</span></label><small id="disableCacheHint">Загружать ресурсы с сервера, обходя browser и Service Worker cache</small>
                 </div>
                 <div class="network-switch-card">
-                    <label><input id="disableCookies" type="checkbox" checked><span>Disable Cookies</span><small>Чистая временная incognito-сессия; cookies удаляются после закрытия окна</small></label>
+                    <label for="disableCookies"><span class="switch"><input id="disableCookies" type="checkbox" role="switch" aria-describedby="disableCookiesHint" checked><span class="slider" aria-hidden="true"></span></span><span>Disable Cookies</span></label><small id="disableCookiesHint">Чистая временная incognito-сессия; cookies удаляются после закрытия окна</small>
                     <div id="incognitoSetup" class="incognito-setup" hidden>
                         <ol class="incognito-instructions">
                             <li>Откройте настройки расширения.</li>

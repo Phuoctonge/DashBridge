@@ -12,6 +12,9 @@ function createControl(initial = {}) {
         addEventListener(type, listener) { this.listeners[type] = listener; },
         querySelector() { return createControl(); },
         focus() {},
+        setAttribute() {},
+        checkValidity() { return this.value === '' || (Number.isInteger(Number(this.value)) && Number(this.value) >= 1 && Number(this.value) <= 50); },
+        reportValidity() {},
         setRangeText(value) { this.value += value; },
         ...initial,
     };
@@ -149,6 +152,7 @@ function createDocument() {
     context.globalThis = context;
     context.window = context;
     vm.createContext(context);
+    vm.runInContext(fs.readFileSync('js/shared/grafana-panel-analysis.js', 'utf8'), context);
     vm.runInContext(fs.readFileSync('js/shared/dashbridge-report.js', 'utf8'), context,
         { filename: 'dashbridge-report.js' });
     vm.runInContext(fs.readFileSync('pages/dashbridge/dashbridge-report-ui.js', 'utf8'), context,
@@ -158,7 +162,7 @@ function createDocument() {
     const panel = {
         id: 'panel-1', title: 'CPU <production>',
         tools: { thresholdEnabled: true, thresholdValue: 80, thresholdUnit: '%' },
-        report: { enabled: true, sla: { source: 'custom', operator: 'gt', value: 80 } },
+        report: { enabled: true, sla: { source: 'custom', operator: 'gt', value: 80, unit: '%' } },
     };
     const secondPanel = {
         id: 'panel-2', title: 'RAM', tools: {},
@@ -168,10 +172,14 @@ function createDocument() {
         template: '{{panels}}', panelOrder: ['panel-2', 'panel-1']
     } };
     let saveCalls = 0;
+    let saveError = null;
+    let activeProfile = profile;
+    let transformSettings = {};
     const controller = context.DashBridgeReportUi.create({
+        getTransformSettings: () => transformSettings,
         getPanels: () => [panel, secondPanel],
-        getActiveProfile: () => profile,
-        savePanels: async () => { saveCalls += 1; },
+        getActiveProfile: () => activeProfile,
+        savePanels: async () => { saveCalls += 1; return saveError ? { error: saveError } : undefined; },
         normalizePanelMetadataText: (value, maxLength) => String(value || '').slice(0, maxLength),
         escapeHtml: value => String(value ?? '').replaceAll('<', '&lt;').replaceAll('>', '&gt;'),
     });
@@ -179,11 +187,13 @@ function createDocument() {
 
     controller.openPanelEditor(panel);
     const validOverlay = document.overlays.at(-1);
+    assert(!validOverlay.innerHTML.includes('<option value="cpu_capacity"'), 'CPU panel must not offer Load Average SLA');
     assert(validOverlay.innerHTML.includes('CPU &lt;production&gt;'), 'panel title must be escaped');
     await validOverlay.controls.get('.report-panel-editor-save').listeners.click();
     assert.strictEqual(saveCalls, 1);
     assert.strictEqual(panel.report.sla.source, 'custom');
     assert.strictEqual(panel.report.sla.value, 80);
+    assert.strictEqual(panel.report.sla.unit, '%', 'editing text must preserve the SLA unit');
     assert.strictEqual(panel.report.sla.warningValue, 70);
     assert.strictEqual(validOverlay.removed, true, 'successful save must close the editor');
 
@@ -224,8 +234,57 @@ function createDocument() {
     assert.deepStrictEqual(Array.from(profile.report.panelOrder), ['panel-1', 'panel-2'],
         'dragging cards must persist only the message order');
     assert.strictEqual(saveCalls, 2);
+    for (const title of ['Load Average', 'Load Average calculated']) {
+        controller.openPanelEditor({ ...panel, title });
+        assert(document.overlays.at(-1).innerHTML.includes('<option value="cpu_capacity"'), 'Load panels retain the filter option');
+    }
+    transformSettings = { grafanaLoadPanelTitle: 'System load' };
+    controller.openPanelEditor({ ...panel, title: 'System load', tools: { cpuCapacityFilterEnabled: true } });
+    assert(document.overlays.at(-1).innerHTML.includes('<option value="cpu_capacity"'), 'custom configured Load title is recognized');
+    controller.openPanelEditor({ ...panel, title: 'Memory', tools: { cpuCapacityFilterEnabled: true } });
+    assert(!document.overlays.at(-1).innerHTML.includes('<option value="cpu_capacity"'), 'stale filter settings must not expose Load SLA on Memory');
 
-    console.log('PASS DashBridge report UI validates SLA settings and owns modal cleanup');
+    saveError = 'quota exceeded';
+    controller.openReportSettings();
+    const failedSave = document.overlays.at(-1);
+    await failedSave.controls.get('.report-save').listeners.click();
+    assert.strictEqual(failedSave.removed, false, 'failed durable save keeps the editor and draft');
+    assert.match(failedSave.controls.get('.report-save-error').textContent, /quota/);
+    saveError = null;
+    await failedSave.controls.get('.report-save').listeners.click();
+    assert.strictEqual(failedSave.removed, true, 'retry succeeds after transient storage error');
+    controller.openReportSettings();
+    const staleEditor = document.overlays.at(-1);
+    activeProfile = structuredClone(profile);
+    activeProfile.report.template = 'updated elsewhere';
+    staleEditor.controls.get('.report-profile-template').value = 'unsaved draft';
+    await staleEditor.controls.get('.report-save').listeners.click();
+    assert.strictEqual(staleEditor.removed, false);
+    assert.strictEqual(activeProfile.report.template, 'updated elsewhere');
+    assert.strictEqual(staleEditor.controls.get('.report-profile-template').value, 'unsaved draft');
+    activeProfile = profile;
+    controller.openReportSettings();
+    const replacedEditor = document.overlays.at(-1);
+    activeProfile = structuredClone(profile); // Replacement with no report changes is safe.
+    replacedEditor.controls.get('.report-profile-template').value = 'new template';
+    await replacedEditor.controls.get('.report-save').listeners.click();
+    assert.strictEqual(activeProfile.report.template, 'new template');
+    assert.notStrictEqual(profile.report.template, 'new template');
+    saveError = 'quota exceeded';
+    controller.openPanelEditor(panel);
+    const failedPanel = document.overlays.at(-1);
+    await failedPanel.controls.get('.report-panel-editor-save').listeners.click();
+    assert.strictEqual(failedPanel.removed, false);
+    assert.match(failedPanel.controls.get('.report-panel-editor-error').textContent, /quota/);
+    saveError = null;
+    controller.openReportSettings();
+    const enabledConflict = document.overlays.at(-1);
+    panel.report.enabled = !panel.report.enabled;
+    const remoteEnabled = panel.report.enabled;
+    await enabledConflict.controls.get('.report-save').listeners.click();
+    assert.strictEqual(enabledConflict.removed, false, 'remote enabled state must not be silently overwritten');
+    assert.strictEqual(panel.report.enabled, remoteEnabled);
+    console.log('PASS DashBridge report UI validates SLA, preserves failed drafts and guards stale editors');
 })().catch(error => {
     console.error(error);
     process.exitCode = 1;

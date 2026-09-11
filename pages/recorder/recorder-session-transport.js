@@ -71,6 +71,7 @@
 
         const attachNetwork = async tabId => {
             state.tabId = tabId;
+            state.mainFrameId = null;
             await chromeRef.debugger.attach({ tabId }, cdpVersion);
             state.attached = true;
             postLifecycle({ type: 'bind', tabId });
@@ -82,6 +83,10 @@
                 }),
                 sendCdp('Page.enable'),
             ]);
+            // The initial about:blank document may predate Page.enable events.
+            // A newer root frameNavigated event wins over this initial snapshot.
+            const frameTree = await sendCdp('Page.getFrameTree');
+            if (!state.mainFrameId) state.mainFrameId = frameTree?.frameTree?.frame?.id || null;
             await sendCdp('Page.setLifecycleEventsEnabled', { enabled: true })
                 .catch(() => undefined);
             await Promise.all([
@@ -97,6 +102,7 @@
         const detachNetwork = async () => {
             if (!state.attached || !Number.isInteger(state.tabId)) return;
             const target = { tabId: state.tabId };
+            state.mainFrameId = null;
             state.attached = false;
             state.detaching = true;
             postLifecycle({ type: 'unbind' });

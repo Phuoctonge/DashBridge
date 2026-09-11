@@ -128,7 +128,7 @@
             if (cell.textContent !== text) cell.textContent = text;
             cell.title = header
                 ? 'Количество виртуальных CPU'
-                : (text === '—' ? 'Количество vCPU не определено' : `${text} vCPU`);
+                : (text === '-' ? 'Количество vCPU не определено' : `${text} vCPU`);
             return cell;
         };
 
@@ -201,7 +201,7 @@
                 const value = Number(entry?.value);
                 const text = Number.isFinite(value)
                     ? (Number.isInteger(value) ? String(value) : String(Math.round(value * 100) / 100))
-                    : '—';
+                    : '-';
                 const existingCell = row.querySelector?.(':scope > .dashbridge-vcpu-legend-cell');
                 const previousText = existingCell?.textContent;
                 const cell = insertCell(row, labelElement, text);

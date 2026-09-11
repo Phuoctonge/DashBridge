@@ -4,6 +4,25 @@ const DashBridgeTimeState = {
     defaults() {
         return { from: 'now-1h', to: 'now', refresh: '' };
     },
+    // Use one clock reading for both endpoints; ambiguous calendar math needs
+    // an explicit absolute range rather than a browser-timezone approximation.
+    forReport(value, now = Date.now()) {
+        const resolve = input => {
+            if (input === 'now') return String(now);
+            const relative = /^now([+-])(\d+)([smhdw])$/.exec(String(input));
+            if (relative) {
+                const units = { s: 1000, m: 60000, h: 3600000, d: 86400000, w: 604800000 };
+                const result = now + (relative[1] === '-' ? -1 : 1) * Number(relative[2]) * units[relative[3]];
+                if (Number.isFinite(new Date(result).getTime())) return String(result);
+            }
+            const absolute = parseGrafanaAbsoluteTime(input);
+            if (absolute !== null) return String(absolute);
+            throw new Error('Для общего отчёта выберите абсолютный период или диапазон вида now-1h - now без округления.');
+        };
+        const from = resolve(value.from), to = resolve(value.to);
+        if (Number(from) > Number(to)) throw new Error('Начало периода позже окончания.');
+        return { from, to, refresh: '' };
+    },
     normalize(value, fallback = this.defaults()) {
         const source = value && typeof value === 'object' ? value : {};
         const fallbackRefresh = typeof fallback.refresh === 'string' && DashBridgeRefreshIntervals.has(fallback.refresh)

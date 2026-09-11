@@ -7,7 +7,7 @@
     const DEFAULT_BREACH_TEMPLATE = '🔴 По серверам {{servers}} фиксируется значение более {{threshold}} {{unit}}, что превышает установленные требования.';
     const DEFAULT_NEUTRAL_TEMPLATE = '🖥 По панели «{{panelTitle}}»: {{aggregateValue}} {{unit}}.';
     const DEFAULT_UNAVAILABLE_TEMPLATE = '⚠ Не удалось получить данные панели «{{panelTitle}}». Причина: {{dataStatus}}.';
-    const DEFAULT_LIST_ITEM_TEMPLATE = '- {{name}} — {{value}}{{unit}};';
+    const DEFAULT_LIST_ITEM_TEMPLATE = '- {{name}} - {{value}}{{unit}};';
     const DEFAULT_DETAILS_TEMPLATE = '{{stateQuote}}';
     const SOURCES = new Set(['graph', 'custom', 'cpu_capacity', 'none']);
     const INCLUDE_MODES = new Set(['always', 'issue_only', 'critical_only']);
@@ -17,7 +17,9 @@
         'profileName', 'testName', 'environment', 'testStartedAt', 'stableLoadStartedAt',
         'testDuration', 'stableLoadDuration', 'period', 'generatedAt', 'panels'
     ]);
+    const COMMON_VARIABLES = Object.freeze(PROFILE_VARIABLES.filter(name => name !== 'panels'));
     const PANEL_VARIABLES = Object.freeze([
+        ...COMMON_VARIABLES.filter(name => !['period', 'generatedAt'].includes(name)),
         'panelTitle', 'threshold', 'criticalThreshold', 'warningThreshold', 'unit',
         'servers', 'serverCount', 'criticalServers', 'criticalCount', 'warningServers',
         'warningCount', 'criticalList', 'warningList', 'breachesList', 'allSeriesList',
@@ -27,6 +29,7 @@
         'dataStatus', 'period', 'generatedAt'
     ]);
     const LIST_VARIABLES = Object.freeze([
+        ...COMMON_VARIABLES,
         'name', 'rawName', 'vCpu', 'cpuCapacity', 'seriesThreshold', 'value', 'unit',
         'level', 'panelTitle'
     ]);
@@ -49,6 +52,17 @@
             enabled: value.enabled !== false,
             template: text(value.template, 20_000, DEFAULT_PROFILE_TEMPLATE) || DEFAULT_PROFILE_TEMPLATE,
             panelOrder,
+            attachments: {
+                slaOnly: value.attachments?.slaOnly !== false,
+                heading: value.attachments?.heading !== false,
+                layout: ['auto', 'column', 'grid'].includes(value.attachments?.layout) ? value.attachments.layout : 'auto',
+                panelOrder: Array.isArray(value.attachments?.panelOrder)
+                    ? [...new Set(value.attachments.panelOrder.filter(id => typeof id === 'string' && id.length <= 128))].slice(0, 1000) : [],
+                selectedIds: Array.isArray(value.attachments?.selectedIds)
+                    ? [...new Set(value.attachments.selectedIds.filter(id => typeof id === 'string' && id.length <= 128))].slice(0, 8) : null,
+                forcedIds: Array.isArray(value.attachments?.forcedIds)
+                    ? [...new Set(value.attachments.forcedIds.filter(id => typeof id === 'string' && id.length > 0 && id.length <= 128))].slice(0, 8) : []
+            },
             context: {
                 testName: text(value?.context?.testName, 500, ''),
                 environment: text(value?.context?.environment, 500, ''),
@@ -97,7 +111,8 @@
                 listItem: text(value?.templates?.listItem, 2_000, DEFAULT_LIST_ITEM_TEMPLATE),
                 details: text(value?.templates?.details, 10_000, DEFAULT_DETAILS_TEMPLATE)
             },
-            detailsEnabled: value.detailsEnabled === true
+            detailsEnabled: value.detailsEnabled !== false,
+            listLimit: Number.isInteger(value.listLimit) && value.listLimit > 0 && value.listLimit <= 50 ? value.listLimit : null
         };
     }
 
@@ -112,16 +127,27 @@
     });
     function localizeMessageText(value) {
         return String(value ?? '')
-            .replace(/(^|_)<_/gu, '$1GET_')
-            .replace(/(^|_)>_/gu, '$1POST_')
+            .replace(/([<>])\\?_/gu, (_match, marker) => marker === '<' ? 'GET_' : 'POST_')
             .replace(/(^|_)(?:\\)?\*_/gu, '$1DELETE_')
             .replace(/(^|_)\^_/gu, '$1PUT_')
             .replace(/(\d(?:[.,]\d+)?\s*)(µs|μs|us|ms|mins?|s|h|d)\b/giu,
-                (_match, amount, unit) => `${amount}${MESSAGE_DURATION_UNITS[unit.toLowerCase()] || unit}`);
+                (_match, amount, unit) => `${amount}${MESSAGE_DURATION_UNITS[unit.toLowerCase()] || unit}`)
+            .replace(/\u2014/gu, '-');
     }
     const localizeMessageUnit = value => {
         const unit = String(value ?? '');
         return MESSAGE_DURATION_UNITS[unit.toLowerCase()] || unit;
+    };
+    const durationScales = { 'мкс': 0.000001, 'мс': 0.001, 'с': 1, 'мин': 60, 'ч': 3600, 'д': 86400 };
+    const readableValue = (value, sourceUnit) => {
+        const number = finiteOrNull(value);
+        const unit = localizeMessageUnit(sourceUnit);
+        const scale = Object.hasOwn(durationScales, unit) ? durationScales[unit] : null;
+        if (number === null || !scale || number === 0) return { value: formatNumber(number), unit, factor: 1 };
+        const seconds = number * scale;
+        const target = Object.entries(durationScales).reverse().find(([, size]) => Math.abs(seconds) >= size)
+            || ['мкс', 0.000001];
+        return { value: formatNumber(seconds / target[1]), unit: target[0], factor: scale / target[1] };
     };
 
     const markdownCell = value => localizeMessageText(String(value ?? '').slice(0, 500))
@@ -176,14 +202,36 @@
             const cpuCapacity = cpuCapacityOf(item);
             return cpuCapacity === null ? rawName : `${rawName} (${formatNumber(cpuCapacity)} vCPU)`;
         };
-        const itemText = item => renderTemplate(config.templates.listItem, {
+        const adaptiveList = extractTemplateVariables(config.templates.listItem).includes('unit');
+        const itemText = item => {
+            const display = adaptiveList ? readableValue(item?.value, snapshot?.unit)
+                : { value: formatNumber(item?.value), unit: localizeMessageUnit(snapshot?.unit), factor: 1 };
+            return renderTemplate(config.templates.listItem, {
+            ...Object.fromEntries(COMMON_VARIABLES.map(name => [name, context[name] ?? ''])),
             name: displayNameOf(item), rawName: rawNameOf(item),
             vCpu: formatNumber(cpuCapacityOf(item)), cpuCapacity: formatNumber(cpuCapacityOf(item)),
-            seriesThreshold: formatNumber(item?.threshold ?? item?.cpuCapacityThreshold),
-            value: formatNumber(item?.value), unit: localizeMessageUnit(snapshot?.unit),
+            seriesThreshold: formatNumber(finiteOrNull(item?.threshold ?? item?.cpuCapacityThreshold) === null
+                ? null : Number(item?.threshold ?? item?.cpuCapacityThreshold) * display.factor),
+            value: display.value, unit: display.unit,
             level: levelOf(item), panelTitle: panel?.title || 'Панель Grafana'
         }).trim();
-        const list = items => items.map(itemText).filter(Boolean).join('\n');
+        };
+        const list = items => {
+            const entries = items.map(item => ({ text: itemText(item), value: finiteOrNull(item?.value) })).filter(item => item.text);
+            const lines = entries.map(item => item.text);
+            const limit = config.listLimit;
+            if (!limit || lines.length <= limit) return lines.join('\n');
+            const hidden = lines.length - limit;
+            const values = entries.slice(limit).map(item => item.value);
+            const unit = localizeMessageUnit(snapshot?.unit);
+            const suffix = unit ? ` ${unit}` : '';
+            const min = Math.min(...values); const max = Math.max(...values);
+            const low = readableValue(min, snapshot?.unit); const high = readableValue(max, snapshot?.unit);
+            const range = values.every(value => value !== null)
+                ? (min === max ? ` - ${low.value}${low.unit ? ` ${low.unit}` : ''}`
+                    : ` - от ${low.value}${low.unit !== high.unit ? ` ${low.unit}` : ''} до ${high.value}${high.unit ? ` ${high.unit}` : suffix}`) : '';
+            return `${lines.slice(0, limit).join('\n')}\n- ещё ${hidden} ${russianPlural(hidden, ['запись', 'записи', 'записей'])}${range}`;
+        };
         const quote = value => String(value || '').split('\n').filter(Boolean).map(line => `> ${line}`).join('\n');
         const criticalList = list(critical);
         const warningList = list(warning);
@@ -194,6 +242,7 @@
             ? `vCPU × ${formatNumber(snapshot?.cpuCapacityCoefficient)}` : '';
         const tableMarkdown = formatMarkdownTable(snapshot?.table);
         return {
+            ...Object.fromEntries(COMMON_VARIABLES.map(name => [name, context[name] ?? ''])),
             panelTitle: panel?.title || 'Панель Grafana',
             threshold: dynamicThreshold || formatNumber(snapshot?.threshold),
             criticalThreshold: dynamicThreshold || formatNumber(snapshot?.criticalThreshold ?? snapshot?.threshold),
@@ -205,7 +254,7 @@
             criticalCount: critical.length,
             warningServers: warning.map(displayNameOf).filter(Boolean).join(', '),
             warningCount: warning.length,
-            criticalList, warningList, breachesList: [criticalList, warningList].filter(Boolean).join('\n'),
+            criticalList, warningList, breachesList: list([...critical, ...warning]),
             allSeriesList, top3List: list(ranked.slice(0, 3)),
             stateList, stateQuote: quote(stateList),
             tableMarkdown,
@@ -244,7 +293,11 @@
             && variables.dataStatus && !main.includes(variables.dataStatus)) {
             main = `${main} Причина: ${variables.dataStatus}.`;
         }
-        const details = config.detailsEnabled && ['warning', 'critical'].includes(state)
+        const mainVariables = new Set(extractTemplateVariables(template));
+        const containsStateList = ['stateList', 'stateQuote', 'allSeriesList', 'breachesList',
+            state === 'critical' ? 'criticalList' : 'warningList'].some(name => mainVariables.has(name));
+        const redundantDefaultDetails = config.templates.details.trim() === DEFAULT_DETAILS_TEMPLATE && containsStateList;
+        const details = config.detailsEnabled && !redundantDefaultDetails && ['warning', 'critical'].includes(state)
             ? renderTemplate(config.templates.details, variables).trim() : '';
         return { included: true, state, text: localizeMessageText([main, details].filter(Boolean).join('\n')), variables };
     }
@@ -276,6 +329,9 @@
         const included = panelResults.filter(item => item?.included && item.text);
         const byKey = Object.fromEntries(included.map(item => [item.key, item.text]));
         const variables = {
+            ...config.context,
+            testDuration: formatDuration(config.context.testStartedAt),
+            stableLoadDuration: formatDuration(config.context.stableLoadStartedAt),
             ...context,
             profileName: profile?.name || '',
             period: context.period || '',
@@ -291,7 +347,7 @@
     root.DashBridgeReport = Object.freeze({
         DEFAULT_PROFILE_TEMPLATE, DEFAULT_NORMAL_TEMPLATE, DEFAULT_WARNING_TEMPLATE, DEFAULT_BREACH_TEMPLATE,
         DEFAULT_NEUTRAL_TEMPLATE, DEFAULT_UNAVAILABLE_TEMPLATE, DEFAULT_LIST_ITEM_TEMPLATE, DEFAULT_DETAILS_TEMPLATE,
-        PROFILE_VARIABLES, PANEL_VARIABLES, LIST_VARIABLES,
+        COMMON_VARIABLES, PROFILE_VARIABLES, PANEL_VARIABLES, LIST_VARIABLES,
         normalizeProfile, normalizePanel, orderPanels, renderTemplate, extractTemplateVariables, panelVariables,
         renderPanel, compose, formatNumber, formatMarkdownTable, formatDuration, localizeMessageText, slug
     });

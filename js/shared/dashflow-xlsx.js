@@ -42,7 +42,7 @@
     }
 
     function statusLabel(status) {
-        return ({ unchanged: 'Без изменений', changed: 'Изменено', added: 'Добавлено', removed: 'Удалено', incomplete: 'Недостаточно данных' })[status] || status || '—';
+        return ({ unchanged: 'Без изменений', changed: 'Изменено', added: 'Добавлено', removed: 'Удалено', incomplete: 'Недостаточно данных' })[status] || status || '-';
     }
 
     function worksheet({ columns, rows, merge, autoFilter, freezeRows = 0 }) {
@@ -67,7 +67,7 @@ ${merges.length ? `<mergeCells count="${merges.length}">${merges.map(reference =
 
     function summarySheet(report, items) {
         const rows = [];
-        rows.push(rowXml(1, [textCell(1, 0, 'DashBridge — сравнение baseline и replay', 1)], 28));
+        rows.push(rowXml(1, [textCell(1, 0, 'DashBridge - сравнение baseline и replay', 1)], 28));
         rows.push(rowXml(3, [textCell(3, 0, 'Сценарий', 3), textCell(3, 1, report.title || 'DashBridge recording')]));
         rows.push(rowXml(4, [textCell(4, 0, 'Сформирован', 3), textCell(4, 1, report.generatedDisplay || report.generatedAt)]));
         rows.push(rowXml(5, [textCell(5, 0, 'Фильтр URL', 3), textCell(5, 1, report.urlFilter || report.domainFilter || 'Все URL')]));

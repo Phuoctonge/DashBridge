@@ -7,6 +7,12 @@ const os = require('node:os');
 const path = require('node:path');
 const { chromium } = require('@playwright/test');
 const inspectReportCollage = require('./support/browser-report-collage');
+const inspectGrafanaConnection = require('./support/browser-grafana-connection');
+const inspectFrameStartup = require('./support/browser-frame-startup');
+const inspectAuditFixes = require('./support/browser-audit-fixes');
+const inspectDashboardVisual = require('./support/browser-dashboard-visual');
+const inspectRuntimePortScope = require('./support/browser-runtime-port-scope');
+const inspectIframeSettings = require('./dashbridge_iframe_settings_browser.cjs');
 
 const projectRoot = path.resolve(__dirname, '..');
 const resultsRoot = path.join(projectRoot, 'test-results');
@@ -554,11 +560,17 @@ async function main() {
             pages.push(await inspectPage(context, extensionId, htmlPath));
         }
         const workflows = [
+            await inspectGrafanaConnection(context, extensionId, analyticsSink.endpoint),
+            await inspectFrameStartup(context, extensionId, analyticsSink.endpoint),
             await inspectReportCollage(context, extensionId),
+            await inspectAuditFixes(context, extensionId),
+            await inspectDashboardVisual(context, extensionId),
             await inspectTestSelectionWorkflow(context, extensionId),
             await inspectPanelUnitWorkflow(context),
             await inspectNoDataWorkflow(context),
-            await inspectSecurityBoundaries(context, extensionId, analyticsSink.endpoint)
+            await inspectSecurityBoundaries(context, extensionId, analyticsSink.endpoint),
+            await inspectRuntimePortScope(context, extensionId),
+            await inspectIframeSettings(chromeExecutable)
         ];
 
         report = {

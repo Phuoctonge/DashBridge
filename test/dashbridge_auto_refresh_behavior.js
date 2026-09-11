@@ -75,7 +75,7 @@ const storageSyncSource = profileSource.slice(storageSyncStart, storageSyncEnd);
 assert(storageSyncStart >= 0 && storageSyncEnd > storageSyncStart
     && storageSyncSource.includes('await profileStore.flush();')
     && storageSyncSource.indexOf('await profileStore.flush();')
-        < storageSyncSource.indexOf('await profileStore.load();'),
+        < storageSyncSource.indexOf('await profileStore.load('),
     'profile storage events must wait for the newest local snapshot before deciding to rebuild iframes');
 
 const pauseStart = panelCardSource.indexOf('const togglePanelPause = async id =>');
@@ -98,8 +98,8 @@ const iframeSettingsStart = panelCardSource.indexOf('const openIframeSettings = 
 const iframeSettingsEnd = panelCardSource.indexOf('const togglePanelPause =', iframeSettingsStart);
 const iframeSettingsSource = panelCardSource.slice(iframeSettingsStart, iframeSettingsEnd);
 assert(iframeSettingsStart >= 0 && iframeSettingsEnd > iframeSettingsStart
-    && iframeSettingsSource.includes('reloadFrame: previousSrc !== panel.src')
-    && iframeSettingsSource.includes('|| previousGrafanaTheme !== panel.grafanaTheme'),
+    && iframeSettingsSource.includes('reloadFrame: original.src !== livePanel.src')
+    && iframeSettingsSource.includes("(original.grafanaTheme || 'follow') !== (livePanel.grafanaTheme || 'follow')"),
     'layout-only iframe settings must not navigate the selected Grafana frame');
 
 assert(profileSource.includes('else reconcileDashboardPanelCards(previousPanelStates);')

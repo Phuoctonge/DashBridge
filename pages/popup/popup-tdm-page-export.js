@@ -9,9 +9,29 @@ async function _tdmExportScriptInternal(options) {
     const chatContainer = document.querySelector('[class*="ChatContainerScrollableBlock"]');
     if (!chatContainer) return { error: "Чат не найден" };
 
-    const delay = ms => new Promise(r => setTimeout(r, ms));
     const originalDistanceFromBottom = Math.max(0, chatContainer.scrollHeight - chatContainer.scrollTop);
     const exportDeadline = Date.now() + TDM_EXPORT_MAX_DURATION_MS;
+    const timeoutError = new Error('Экспорт TDM остановлен: превышено максимальное время 10 минут');
+    const exportController = new AbortController();
+    let watchdog;
+    const deadline = new Promise((_, reject) => {
+        watchdog = setTimeout(() => {
+            exportController.abort();
+            reject(timeoutError);
+        }, TDM_EXPORT_MAX_DURATION_MS);
+    });
+    const checkDeadline = () => {
+        if (exportController.signal.aborted || Date.now() >= exportDeadline) throw timeoutError;
+    };
+    const bounded = async operation => {
+        checkDeadline();
+        return Promise.race([operation, deadline]);
+    };
+    const delay = async ms => {
+        let timer;
+        try { await bounded(new Promise(resolve => { timer = setTimeout(resolve, ms); })); }
+        finally { clearTimeout(timer); }
+    };
 
     try {
 
@@ -21,15 +41,23 @@ async function _tdmExportScriptInternal(options) {
 
         if (imgEl.src.startsWith('blob:') || imgEl.src.startsWith('http')) {
             try {
-                const response = await fetch(imgEl.src);
-                const blob = await response.blob();
-                return await new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => resolve(reader.result);
-                    reader.onerror = () => reject();
-                    reader.readAsDataURL(blob);
-                });
+                const response = await bounded(fetch(imgEl.src, { signal: exportController.signal }));
+                const blob = await bounded(response.blob());
+                const reader = new FileReader();
+                const abortReader = () => reader.abort();
+                try {
+                    return await bounded(new Promise((resolve, reject) => {
+                        reader.onloadend = () => resolve(reader.result);
+                        reader.onerror = () => reject(new Error('Не удалось прочитать изображение'));
+                        reader.onabort = () => reject(timeoutError);
+                        exportController.signal.addEventListener('abort', abortReader, { once: true });
+                        reader.readAsDataURL(blob);
+                    }));
+                } finally {
+                    exportController.signal.removeEventListener('abort', abortReader);
+                }
             } catch (e) {
+                checkDeadline();
                 // Если fetch не сработал из-за CORS, попробуем через canvas ниже
             }
         }
@@ -84,6 +112,7 @@ async function _tdmExportScriptInternal(options) {
         const elements = Array.from(document.querySelectorAll('[id^="system-message-date-"], [id^="message-"]'));
 
         for (const child of elements) {
+            checkDeadline();
             if (child.id.startsWith('system-message-date-')) {
                 currentDateStr = child.id.replace('system-message-date-', '');
                 if (!currentDateStr || currentDateStr.length < 5) {
@@ -187,6 +216,7 @@ async function _tdmExportScriptInternal(options) {
                                     const b64 = await fetchImgAsBase64(img);
                                     if (b64) msgObj.images.push(b64);
                                 } catch (e) {
+                                    checkDeadline();
                                     if (img.src) msgObj.images.push(img.src);
                                 }
                             }
@@ -210,7 +240,7 @@ async function _tdmExportScriptInternal(options) {
 
     // Плавно скроллим вверх
     while (!reachedStart) {
-        if (Date.now() > exportDeadline) throw new Error('Экспорт TDM остановлен: превышено максимальное время 10 минут');
+        checkDeadline();
         if (chatContainer.scrollTop > 0) {
             // Поднимаемся на 300px
             chatContainer.scrollTop -= 300;
@@ -275,10 +305,10 @@ async function _tdmExportScriptInternal(options) {
                     if (src.includes(',') && src.includes('base64')) {
                         const b64 = src.split(',')[1];
                         const estimatedBytes = Math.floor(b64.length * 3 / 4);
-                        const response = await chrome.runtime.sendMessage({
+                        const response = await bounded(chrome.runtime.sendMessage({
                             action: 'tdmExportPhoto', exportId: photoExportId,
                             filename, b64, bytes: estimatedBytes
-                        });
+                        }));
                         if (!response?.ok) throw new Error(response?.error || 'Не удалось передать фото в архив');
                         photoCount += 1;
                         m.images[i] = filename; // Replace the base64 string with the filename in JSON
@@ -353,6 +383,7 @@ async function _tdmExportScriptInternal(options) {
 
     return { success: true, messages, html: generateHTML(messages), datePrefix, photoCount };
     } finally {
+        clearTimeout(watchdog);
         chatContainer.scrollTop = Math.max(0, chatContainer.scrollHeight - originalDistanceFromBottom);
     }
 }

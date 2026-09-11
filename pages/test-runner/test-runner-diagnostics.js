@@ -20,7 +20,7 @@ function sleep(ms) {
 }
 
 // Возвращает panelId с приоритетом: viewPanelId (из ?viewPanel=N) > firstGraphPanelId > firstPanelId
-// При viewPanel режиме в DOM только одна панель — используем её ID напрямую.
+// При viewPanel режиме в DOM только одна панель - используем её ID напрямую.
 function resolvePanelId(env) {
     return env.probe?.viewPanelId || env.probe?.firstGraphPanelId || env.probe?.firstPanelId || null;
 }
@@ -129,7 +129,7 @@ async function restoreAutoRefresh(tabId, previousState) {
 }
 
 // Отправляет applyPanelTools в MAIN world (имитирует popup-команду).
-// transformSettings — минимальный набор необходимых ключей.
+// transformSettings - минимальный набор необходимых ключей.
 async function applyPanelTools(tabId, tools) {
     await execMain(tabId, () => {
         window.__dashbridgeDebugLogs = [];

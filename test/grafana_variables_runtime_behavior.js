@@ -16,7 +16,9 @@ const context = vm.createContext({
         removeEventListener: name => events.delete(name), dispatchEvent: event => output.push(event.detail) },
     addEventListener: (name, fn) => listeners.set(name, fn), removeEventListener: name => listeners.delete(name),
     CustomEvent: class { constructor(name, args) { this.detail = args.detail; } },
-    setTimeout: fn => setTimeout(() => { clock += 200; onTick(); fn(); }, 0), clearTimeout,
+    // Accelerate polling, but preserve the deadline as a separate long timer.
+    setTimeout: (fn, delay) => delay >= 1000 ? setTimeout(fn, delay)
+        : setTimeout(() => { clock += 200; onTick(); fn(); }, 0), clearTimeout,
 });
 vm.runInContext(fs.readFileSync('js/content/grafana-variables-runtime.js', 'utf8'), context);
 const request = args => events.get('dashbridgeVariablesRequest')({ detail: { operation: 'read', requestId: 'request', ...args } });

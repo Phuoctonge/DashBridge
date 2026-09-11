@@ -10,7 +10,7 @@ const source = title => ({ title, width: 1000, height: 520, blob: new Blob(['png
 (async () => {
     for (const count of [1, 2, 3, 4, 8]) {
         const grid = collage.geometry(count);
-        assert.equal(grid.columns, count <= 2 ? 1 : 2);
+        assert.equal(grid.columns, count <= 3 ? 1 : 2);
         assert(grid.width * grid.height <= collage.limits.pixels);
         assert.equal(collage.geometry(count, 'column').columns, 1);
     }

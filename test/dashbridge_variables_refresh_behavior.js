@@ -89,8 +89,17 @@ const tick = delay => {
     closeButton.events.click();
     assert.equal(dialog.open, false, 'close button does not cancel transport');
     respond(currentFrame.contentWindow, { ...snapshot, requestId: messages.at(-1).requestId });
-    await Promise.resolve();
+    await new Promise(resolve => setImmediate(resolve));
     const group = host.children[0];
+    const budgetBody = group.children[1].children[0].children[1];
+    const budgetInput = budgetBody.children[0];
+    const originalUrl = panel.src;
+    budgetInput.value = 'x'.repeat(5000); budgetInput.events.input();
+    budgetBody.children.find(child => child.textContent === 'Применить').events.click();
+    assert.equal(navigations, 0, 'oversized selection must be rejected before navigation');
+    assert.equal(saves, 0); assert.equal(panel.src, originalUrl);
+    assert.match(group.children[2].textContent, /4096/, 'show a useful URL limit message');
+    budgetInput.value = 'a'; budgetInput.events.input();
     assert.equal(group.children.some(child => child.textContent === 'Обновить поля'), false);
     const readsBeforeOpen = messages.length;
     toggle.events.click();
@@ -102,7 +111,7 @@ const tick = delay => {
     assert.equal(messages.at(-1).operation, 'read');
     assert.equal(replacements, 0, 'opening must not reload Grafana');
     respond(currentFrame.contentWindow, { ...snapshot, requestId: messages.at(-1).requestId });
-    await Promise.resolve();
+    await new Promise(resolve => setImmediate(resolve));
     assert.equal(saves, 0, 'reading must not save or apply selection');
     for (let repeat = 0; repeat < 2; repeat++) {
         const staleWindow = currentFrame.contentWindow;
@@ -115,7 +124,7 @@ const tick = delay => {
         respond(currentFrame.contentWindow, { action: 'dashbridgeIframeReady' });
         tick(300);
         respond(currentFrame.contentWindow, { ...snapshot, requestId: messages.at(-1).requestId });
-        await Promise.resolve();
+        await new Promise(resolve => setImmediate(resolve));
         assert.equal(group['aria-busy'], undefined);
         assert.equal([...timers.values()].some(timer => timer.delay === 35000), false);
     }
@@ -128,7 +137,7 @@ const tick = delay => {
         respond(currentFrame.contentWindow, { action: 'dashbridgeIframeReady' });
         tick(300);
         respond(currentFrame.contentWindow, { ...editable, requestId: messages.at(-1).requestId });
-        await Promise.resolve();
+        await new Promise(resolve => setImmediate(resolve));
         const body = group.children[1].children[0].children[1];
         const input = body.children[0];
         input.value = adapter;
@@ -142,7 +151,7 @@ const tick = delay => {
         tick(300);
         respond(currentFrame.contentWindow, { ...editable,
             variables: [{ ...editable.variables[0], values: [adapter] }, { ...dependent, values: ['resolved'] }], requestId: messages.at(-1).requestId });
-        await Promise.resolve();
+        await new Promise(resolve => setImmediate(resolve));
         assert.equal(currentFrame, sourceFrame, 'source has already navigated and must not reload on commit');
         assert.equal(new URL(panel.src).searchParams.get('var-x'), adapter);
         assert.equal(new URL(panel.src).searchParams.get('var-child'), 'resolved', 'commit saves Grafana-resolved dependencies');
@@ -150,6 +159,31 @@ const tick = delay => {
     }
     assert.equal(updates, 2, 'both adapters preserve the already navigated source');
     assert.equal(navigations, 2, 'each selection navigates once');
+    respond(currentFrame.contentWindow, { action: 'dashbridgeIframeReady' }); tick(300);
+    respond(currentFrame.contentWindow, { ...snapshot, requestId: messages.at(-1).requestId });
+    await new Promise(resolve => setImmediate(resolve));
+    const beforeOverflow = { src: panel.src, saves, replacements };
+    const overflowBody = group.children[1].children[0].children[1];
+    overflowBody.children[0].value = 'small'; overflowBody.children[0].events.input();
+    overflowBody.children.find(child => child.textContent === 'Применить').events.click();
+    respond(currentFrame.contentWindow, { action: 'dashbridgeIframeReady' }); tick(300);
+    respond(currentFrame.contentWindow, { ...snapshot, variables: [
+        { ...snapshot.variables[0], values: ['small'] },
+        { name: 'expanded', label: 'Expanded', type: 'textbox', values: ['x'.repeat(5000)], supported: true, options: [] },
+    ], requestId: messages.at(-1).requestId });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(panel.src, beforeOverflow.src, 'Grafana-resolved overflow cannot mutate profile');
+    assert.equal(saves, beforeOverflow.saves, 'invalid resolved selection never reaches persistence');
+    assert.equal(replacements, beforeOverflow.replacements + 1, 'source is restored after rejected resolution');
+    assert.match(group.children[2].textContent, /4096/);
+    // A later refresh must retry the last accepted snapshot, not the rejected
+    // over-budget response (which would fail locally before any transport).
+    const beforeRetry = replacements;
+    overflowBody.children.find(child => child.textContent === 'Обновить варианты').events.click();
+    assert.equal(replacements, beforeRetry + 1, 'failed resolution must retain the previous accepted snapshot');
+    respond(currentFrame.contentWindow, { action: 'dashbridgeIframeReady' }); tick(300);
+    respond(currentFrame.contentWindow, { ...snapshot, requestId: messages.at(-1).requestId });
+    await new Promise(resolve => setImmediate(resolve));
     closeButton.events.click();
     now += 61000;
     toggle.events.click();

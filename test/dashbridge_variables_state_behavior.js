@@ -31,6 +31,12 @@ assert.deepEqual(new URL(api.apply(first, [{ ...field, multi: false }])).searchP
 assert.deepEqual(new URL(api.apply(first, [{ ...field, values: ['x', '$__all'] }])).searchParams.getAll('var-x'), ['$__all']);
 assert.equal(new URL(api.apply(first, [{ ...field, skipUrlSync: true }])).searchParams.get('var-x'), 'old');
 assert.ok(api.normalize({ variables: [field] }));
+const manyHosts = Array.from({ length: 100 }, (_, index) => `instance-${index}.corporate-monitoring.example:9100`);
+assert.throws(() => api.apply(first, [{ ...field, values: manyHosts }]), /4096/,
+    'accepted variable snapshot must not produce an unpersistable panel URL');
+const prefix = 'https://example.test/d-solo/u/name?panelId=1&var-x=';
+assert.equal(api.apply(prefix + 'a', [{ ...field, values: ['a'.repeat(4096 - prefix.length)] }]).length, 4096);
+assert.throws(() => api.apply(prefix + 'a', [{ ...field, values: ['a'.repeat(4097 - prefix.length)] }]), /4096/);
 assert.equal(api.normalize({ variables: [field, field] }), null);
 assert.equal(api.normalize({ variables: [{ ...field, values: [{}] }] }), null);
 assert.equal(api.normalize({ variables: [{ ...field, options: [{ value: '<img>', text: {} }] }] }), null);

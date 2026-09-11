@@ -1,4 +1,4 @@
-/* Modal Panels Styling (фон подложки — общий, из theme.css: --modal-overlay-bg) */
+/* Modal Panels Styling (фон подложки - общий, из theme.css: --modal-overlay-bg) */
 .modal-overlay {
     display: none;
     position: fixed;

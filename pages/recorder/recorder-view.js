@@ -49,7 +49,7 @@
                 const sensitiveLocator = [locator.id, locator.name, locator.accessibleName, locator.ariaLabel, locator.labelText]
                     .some(value => sensitiveNamePattern.test(String(value || '')));
                 if (step.type === 'change') return `${target}: ${step._dashbridge?.secret || sensitiveLocator ? '••••••••' : String(step.value ?? '').slice(0, 80)}`;
-                if (step.type === 'keyDown') return `${step.key || ''} — ${target}`;
+                if (step.type === 'keyDown') return `${step.key || ''} - ${target}`;
                 return target || step.type;
             }
 
@@ -212,7 +212,7 @@
                     return;
                 }
                 const displayUrl = state.revealSensitiveDetails ? request.url : redactSensitiveUrl(request.url);
-                ui.requestDetailsSummary.textContent = `${request.method || '—'} · ${request.status || 'без ответа'} · ${displayUrl || ''}`;
+                ui.requestDetailsSummary.textContent = `${request.method || '-'} · ${request.status || 'без ответа'} · ${displayUrl || ''}`;
                 const preview = request.responseBody === undefined ? undefined
                     : request.bodyBase64 ? `[base64, ${formatBytes(request.bodyBytes)}]`
                         : String(request.responseBody).slice(0, 64 * 1024) + (String(request.responseBody).length > 64 * 1024 ? '\n…[обрезано в интерфейсе]' : '');
@@ -234,7 +234,7 @@
             }
 
             function comparisonValue(request) {
-                if (!request) return '—';
+                if (!request) return '-';
                 const duration = requestDuration(request);
                 return `${request.status || 0} · ${formatBytes(request.bodyBytes || request.encodedDataLength)}${duration === null ? '' : ` · ${Math.round(duration)} мс`}`;
             }
@@ -299,7 +299,7 @@
                     heading.appendChild(headingCell); ui.comparisonBody.appendChild(heading);
                     for (const item of items) {
                         const row = document.createElement('tr'); row.className = `comparison-row-${item.status}`;
-                        const values = [comparisonLabels[item.status] || item.status, item.method, item.url, comparisonValue(item.baseline), comparisonValue(item.current), item.differences.join(', ') || '—'];
+                        const values = [comparisonLabels[item.status] || item.status, item.method, item.url, comparisonValue(item.baseline), comparisonValue(item.current), item.differences.join(', ') || '-'];
                         values.forEach((value, index) => {
                             const cell = document.createElement('td'); cell.textContent = String(value);
                             if (index === 0) cell.className = 'comparison-result';

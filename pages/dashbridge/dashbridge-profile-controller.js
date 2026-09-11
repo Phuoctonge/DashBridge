@@ -19,6 +19,7 @@
         }
         let profilesLoaded = false;
         let storageSyncVersion = 0;
+        let saveFailed = false;
 
         const getTabActiveProfileId = () => {
             try { return sessionStorage.getItem(TAB_ACTIVE_PROFILE_KEY) || null; }
@@ -37,14 +38,21 @@
             const profiles = getProfiles();
             return profiles.find(profile => profile.id === getActiveProfileId()) || profiles[0] || null;
         };
-        const saveProfiles = () => profileStore.save(getProfiles(), getActiveProfileId()).then(result => {
-            document.documentElement.dataset.dashbridgeStorageDirty = 'false';
-            return result;
-        }).catch(error => {
-            document.documentElement.dataset.dashbridgeStorageDirty = 'true';
-            console.error('Не удалось сохранить профили DashBridge:', error);
-            return { current: false, error: error.message || String(error) };
-        });
+        const saveProfiles = () => {
+            // A new local draft supersedes every storage read already in flight.
+            storageSyncVersion += 1;
+            return profileStore.save(getProfiles(), getActiveProfileId()).then(result => {
+                saveFailed = false;
+                document.documentElement.dataset.dashbridgeStorageDirty = 'false';
+                return result;
+            }).catch(error => {
+                saveFailed = true;
+                document.documentElement.dataset.dashbridgeStorageDirty = 'true';
+                console.error('Не удалось сохранить профили DashBridge:', error);
+                void showAlert('Изменения не сохранены: ' + (error.message || String(error)));
+                return { current: false, error: error.message || String(error) };
+            });
+        };
         const savePanels = () => {
             const profile = getActiveProfile();
             if (profile) {
@@ -54,7 +62,9 @@
             return undefined;
         };
         const profileStorageSignature = (profileList, selectedProfileId) => {
-            try { return JSON.stringify({ profiles: profileList, activeProfileId: selectedProfileId }); }
+            try { return JSON.stringify({ profiles: profileList, activeProfileId: selectedProfileId },
+                (_key, item) => item && typeof item === 'object' && !Array.isArray(item)
+                    ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item); }
             catch { return ''; }
         };
         const dashboardLayoutSignature = profile => {
@@ -95,9 +105,11 @@
             if (!profilesLoaded) return;
             const syncVersion = ++storageSyncVersion;
             await profileStore.flush();
+            if (saveFailed) return; // Preserve the unsaved draft after storage/conflict errors.
             if (syncVersion !== storageSyncVersion) return;
-            const stored = await profileStore.load();
-            if (syncVersion !== storageSyncVersion) return;
+            const stored = await profileStore.load({ deferBaseline: true });
+            if (saveFailed || syncVersion !== storageSyncVersion) return;
+            stored.accept?.();
             const nextProfiles = stored.profiles;
             nextProfiles.forEach(profile => { profile.timeState = timeState.normalize(profile.timeState); });
             const activeProfileId = getActiveProfileId();
@@ -152,9 +164,9 @@
             setTabActiveProfileId(id);
             const profile = getActiveProfile();
             setPanels(profile ? [...(profile.panels || [])] : []);
-            loadActiveProfileTimeState(); await saveProfiles(); renderProfileSwitcher();
+            loadActiveProfileTimeState(); const saved = await saveProfiles(); renderProfileSwitcher();
             syncTimeControlsFromState(); await renderDashboard();
-            root.DashBridgeAnalytics?.outcome('dashbridge.profile_switched', 'success');
+            if (!saved?.error) root.DashBridgeAnalytics?.outcome('dashbridge.profile_switched', 'success');
         };
         const createProfile = async name => {
             const currentProfile = getActiveProfile();
@@ -163,14 +175,17 @@
             const newProfile = { id: crypto.randomUUID(), name: name.trim().slice(0, 120), panels: [], timeState: timeState.defaults() };
             const profiles = getProfiles(); profiles.push(newProfile);
             setTabActiveProfileId(newProfile.id); setPanels([]); loadActiveProfileTimeState();
-            await saveProfiles(); renderProfileSwitcher(); syncTimeControlsFromState(); await renderDashboard();
-            root.DashBridgeAnalytics?.outcome('dashbridge.profile_created', 'success');
+            const saved = await saveProfiles(); renderProfileSwitcher(); syncTimeControlsFromState(); await renderDashboard();
+            if (!saved?.error) root.DashBridgeAnalytics?.outcome('dashbridge.profile_created', 'success');
         };
         const renameActiveProfile = newName => {
             const profile = getActiveProfile();
             if (!profile || !newName.trim()) return;
-            profile.name = newName.trim().slice(0, 120); void saveProfiles(); renderProfileSwitcher();
-            root.DashBridgeAnalytics?.outcome('dashbridge.profile_renamed', 'success');
+            profile.name = newName.trim().slice(0, 120);
+            void saveProfiles().then(saved => {
+                if (!saved?.error) root.DashBridgeAnalytics?.outcome('dashbridge.profile_renamed', 'success');
+            });
+            renderProfileSwitcher();
         };
         const cloneProfile = async (name, sourceId = getActiveProfileId()) => {
             const source = getProfiles().find(profile => profile.id === sourceId);
@@ -188,6 +203,11 @@
             if (Array.isArray(copy.report?.panelOrder)) {
                 copy.report.panelOrder = copy.report.panelOrder.map(id => ids.get(id)).filter(Boolean);
             }
+            for (const key of ['panelOrder', 'selectedIds', 'forcedIds']) {
+                if (Array.isArray(copy.report?.attachments?.[key])) {
+                    copy.report.attachments[key] = copy.report.attachments[key].map(id => ids.get(id)).filter(Boolean);
+                }
+            }
             const current = getActiveProfile();
             if (current) current.panels = getPanels();
             invalidateActiveProfileRuntime();
@@ -200,18 +220,21 @@
             if (result?.error) await showAlert('Копия создана, но не сохранена: ' + result.error);
         };
         const deleteProfile = async id => {
-            const profiles = getProfiles();
-            if (profiles.length <= 1) return showAlert('Нельзя удалить единственный профиль.');
-            const profile = profiles.find(item => item.id === id);
+            if (getProfiles().length <= 1) return showAlert('Нельзя удалить единственный профиль.');
+            const profile = getProfiles().find(item => item.id === id);
             if (!profile || !await showConfirm(`Удалить профиль «${profile.name}»?\nВсе панели этого профиля будут потеряны.`)) return;
-            const index = profiles.findIndex(item => item.id === id); profiles.splice(index, 1);
+            const profiles = getProfiles();
+            const index = profiles.findIndex(item => item.id === id);
+            if (index < 0) return;
+            if (profiles.length <= 1) return showAlert('Нельзя удалить единственный профиль.');
+            profiles.splice(index, 1);
             if (getActiveProfileId() === id) {
                 invalidateActiveProfileRuntime();
                 const next = profiles[Math.max(0, index - 1)]; setTabActiveProfileId(next.id);
                 setPanels([...(next.panels || [])]); loadActiveProfileTimeState(); syncTimeControlsFromState(); await renderDashboard();
             }
-            await saveProfiles(); renderProfileSwitcher();
-            root.DashBridgeAnalytics?.outcome('dashbridge.profile_deleted', 'success');
+            const saved = await saveProfiles(); renderProfileSwitcher();
+            if (!saved?.error) root.DashBridgeAnalytics?.outcome('dashbridge.profile_deleted', 'success');
         };
         const getCurrentProfilePanelIdentities = () => new Set(getPanels()
             .map(panel => getProfilePanelIdentity(panel.src)).filter(Boolean));

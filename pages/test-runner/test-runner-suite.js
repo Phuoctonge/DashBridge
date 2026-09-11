@@ -777,7 +777,7 @@ const suiteA = [
         name: 'Engine Detection',
         async run(tabId, env) {
             const engine = env.probe?.engine;
-            if (!engine || engine === 'none') return { pass: false, details: 'canvas не найден — движок не определён' };
+            if (!engine || engine === 'none') return { pass: false, details: 'canvas не найден - движок не определён' };
             return { pass: true, details: engine === 'flot' ? 'Flot (canvas.flot-base)' : 'uPlot (canvas)' };
         },
     },

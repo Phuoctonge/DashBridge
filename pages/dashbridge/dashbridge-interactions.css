@@ -380,7 +380,9 @@
     inset: 0 !important;
     width: 100% !important;
     height: 100% !important;
-    z-index: 500;
+    /* Header: 100; fullscreen content: 150; dialogs: 200 and above.
+       All card settings/confirmation overlays must remain interactive. */
+    z-index: 150;
     border-radius: 0 !important;
     border: none !important;
     margin: 0 !important;
@@ -457,4 +459,19 @@
 .threshold-notification-status {
     color: #e24d42;
     font-weight: 700;
+}
+.frame-load-notice {
+    position: absolute;
+    inset: auto 0.75rem 0.75rem;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    background: var(--card-bg);
+    color: var(--text-main);
+    font-size: 0.875rem;
 }

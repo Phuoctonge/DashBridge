@@ -45,7 +45,9 @@
                 ? ['$__all'] : variable.multi ? variable.values : variable.values.slice(0, 1);
             for (const value of values) url.searchParams.append(key, value);
         }
-        if (url.href.length > 100000) throw new RangeError('Слишком длинный адрес панели');
+        // Match local-state-schema's persisted HTTP URL budget before a caller
+        // navigates a frame or mutates the profile draft.
+        if (url.href.length > 4096) throw new RangeError('Выберите меньше значений: адрес панели превышает 4096 символов и не может быть сохранён.');
         return url.href;
     }
     function resetDependents(src, variables, changedName) {

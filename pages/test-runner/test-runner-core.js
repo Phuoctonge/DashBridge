@@ -29,7 +29,7 @@ function coreSleeep(ms) {
  * Ждём, пока вкладка перейдёт в статус complete или истечёт таймаут.
  * @param {number} tabId
  * @param {number} [timeoutMs]
- * @returns {Promise<boolean>} true — загрузилась, false — таймаут
+ * @returns {Promise<boolean>} true - загрузилась, false - таймаут
  */
 function waitForTabComplete(tabId, timeoutMs = CORE_TAB_LOAD_TIMEOUT_MS) {
     return new Promise(resolve => {
@@ -78,10 +78,10 @@ async function waitForProbeReady(tabId) {
 }
 
 /**
- * Ждёт появления хотя бы одного <canvas> на странице — признак того,
+ * Ждёт появления хотя бы одного <canvas> на странице - признак того,
  * что Grafana отрендерила панели. Без canvas B/C/D тесты не имеют смысла.
  * @param {number} tabId
- * @returns {Promise<boolean>} true — canvas найден, false — таймаут
+ * @returns {Promise<boolean>} true - canvas найден, false - таймаут
  */
 async function waitForCanvasReady(tabId) {
     for (let i = 0; i < CORE_CANVAS_PING_ATTEMPTS; i++) {
@@ -95,13 +95,13 @@ async function waitForCanvasReady(tabId) {
         } catch (_) { /* вкладка ещё не готова */ }
         await coreSleeep(CORE_PING_INTERVAL_MS);
     }
-    return false; // продолжаем даже без canvas — probe сам сообщит об ошибке
+    return false; // продолжаем даже без canvas - probe сам сообщит об ошибке
 }
 
 /**
  * Запускает probe в MAIN world и возвращает его результат.
  * Функция dashbridgeRunProbe должна быть доступна через files: [...] в executeScript
- * либо мы передаём её текст напрямую. Здесь используем прямой вызов — probe.js
+ * либо мы передаём её текст напрямую. Здесь используем прямой вызов - probe.js
  * загружается как отдельный файл в executeScript.files.
  */
 async function runProbeInTab(tabId) {
@@ -112,7 +112,7 @@ async function runProbeInTab(tabId) {
             files: ['pages/test-runner/test-runner-probe.js'],
         });
         // probe.js объявляет и сразу вызывает dashbridgeRunProbe(),
-        // результат последнего выражения файла — возврат функции.
+        // результат последнего выражения файла - возврат функции.
         // Но файл может только объявить функцию; вызовем отдельно:
         const callResults = await chrome.scripting.executeScript({
             target: { tabId },
@@ -403,8 +403,8 @@ let runnerState = {
     skipped: 0,
     results: [],        // [{ url, grafanaVersion, engine, tests: [...] }]
     currentUrl: null,
-    onProgress: null,   // callback(state) — вызывается после каждого теста/URL
-    onComplete: null,   // callback(state) — вызывается по завершении
+    onProgress: null,   // callback(state) - вызывается после каждого теста/URL
+    onComplete: null,   // callback(state) - вызывается по завершении
 };
 
 function emitProgress() {
@@ -497,16 +497,16 @@ function recordNotRunTests(urlResult, tests, reason, options) {
 /**
  * Запускает полный прогон по списку URL.
  *
- * @param {string[]} urls          — список URL Grafana дашбордов
+ * @param {string[]} urls          - список URL Grafana дашбордов
  * @param {object}   [options]
- * @param {Function} [options.onProgress]  — callback после каждого теста
- * @param {Function} [options.onComplete]  — callback по окончании
- * @param {Function} [options.onTestFinalized] — awaited disk-spool hook after
+ * @param {Function} [options.onProgress]  - callback после каждого теста
+ * @param {Function} [options.onComplete]  - callback по окончании
+ * @param {Function} [options.onTestFinalized] - awaited disk-spool hook after
  *     every executed test; may return a compact replacement for runnerState.
- * @param {boolean}  [options.keepTab]     — не закрывать вкладку после теста (debug)
- * @param {string[]|null} [options.selectedTestIds] — null запускает весь профиль;
+ * @param {boolean}  [options.keepTab]     - не закрывать вкладку после теста (debug)
+ * @param {string[]|null} [options.selectedTestIds] - null запускает весь профиль;
  *     массив ограничивает его явно выбранными стабильными ID.
- * @param {Function} [options.onUrlFinalized] — awaited hook after one URL is
+ * @param {Function} [options.onUrlFinalized] - awaited hook after one URL is
  *     completely finished.  It may return a compact replacement retained in
  *     the runner snapshot; the original result is then eligible for GC.
  * @returns {Promise<object>} снимок финального состояния
@@ -610,7 +610,7 @@ async function runTestsForUrls(urls, {
             tests: [],
         };
 
-        // Добавляем urlResult в results ДО запуска тестов — как живой объект.
+        // Добавляем urlResult в results ДО запуска тестов - как живой объект.
         // onProgress будет видеть его с обновляющимся массивом tests во время прогона.
         runnerState.results.push(urlResult);
 
@@ -623,7 +623,7 @@ async function runTestsForUrls(urls, {
         try {
             const registration = await ensureEarlyGrafanaRuntimeForUrl(url);
             if (!registration.ok) throw new Error(`Не удалось подготовить Grafana runtime: ${registration.reason}`);
-            // 1. Открыть НОВОЕ ОКНО с фокусом — единственный способ получить
+            // 1. Открыть НОВОЕ ОКНО с фокусом - единственный способ получить
             //    полноценный рендеринг canvas и виртуализацию панелей Grafana.
             //    URL остаётся исходным: после загрузки отключаем scheduler через RefreshPicker.
             const win = await chrome.windows.create({
@@ -656,7 +656,7 @@ async function runTestsForUrls(urls, {
             // 4. Ждём готовности DashBridge в MAIN world
             await waitForProbeReady(tabId);
 
-            // 4b. Ждём появления canvas — признак того, что панели отрендерились.
+            // 4b. Ждём появления canvas - признак того, что панели отрендерились.
             //     Без этого B/C/D тесты упадут с "Нет видимой панели".
             await waitForCanvasReady(tabId);
 
@@ -883,7 +883,7 @@ async function runTestsForUrls(urls, {
                 try { await chrome.tabs.remove(tabId); } catch (_) { }
             }
             urlResult.finishedAt = Date.now();
-            // urlResult уже в runnerState.results (добавлен до try) — не пушим повторно
+            // urlResult уже в runnerState.results (добавлен до try) - не пушим повторно
 
             // A full diagnostic can contain gigabytes of DOM/network/image data.
             // Keep it live only while this URL is executing.  This belongs in

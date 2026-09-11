@@ -57,7 +57,7 @@
                     details.append(option('seriesQueryFilterHighlightEnabled', 'Подсвечивать превышения', rule.seriesQueryFilterHighlightEnabled !== false));
                 }
                 const hint = document.createElement('small');
-                hint.textContent = 'В единицах данных: память — байты, после CPU/RAM-преобразования — проценты (0–100).';
+                hint.textContent = 'В единицах данных: память - байты, после CPU/RAM-преобразования - проценты (0–100).';
                 details.append(hint); setting.append(details);
                 const toggle = setting.querySelector(`[data-rule-field="${prefix}Enabled"]`);
                 const sync = () => {

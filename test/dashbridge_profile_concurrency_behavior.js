@@ -12,14 +12,19 @@ const stored = {
     ],
     dashbridge_activeProfileId: 'profile-a'
 };
-const context = {
+const context = { navigator: { locks: { request: async (_name, callback) => callback() } },
     URL, console,
     crypto: { randomUUID: () => 'generated-profile' },
     chrome: {
         runtime: { id: 'extension-id', getURL: path => `chrome-extension://extension-id/${path || ''}` },
         storage: { local: {
             async get() { return structuredClone(stored); },
-            async set(values) { Object.assign(stored, structuredClone(values)); }
+            async set(values) {
+                // Chromium storage can return nested object keys in sorted order.
+                const reordered = JSON.parse(JSON.stringify(values, (_key, value) => value && typeof value === 'object' && !Array.isArray(value)
+                    ? Object.fromEntries(Object.keys(value).sort().map(key => [key, value[key]])) : value));
+                Object.assign(stored, reordered);
+            }
         } }
     },
 };
@@ -37,7 +42,9 @@ context.profileStorage = context.DashBridgeBackgroundProfileStorage.create({
 });
 
 (async () => {
-    const commit = (message, sender) => context.profileStorage.queueProfilePatch(message, sender);
+    const expected = () => Object.fromEntries(context.DashBridgeLocalStateSchema.normalizeProfiles(
+        stored.dashbridge_profiles, { mode: 'load' }).items.map(profile => [profile.id, JSON.stringify(profile)]));
+    const commit = (message, sender) => context.profileStorage.queueProfilePatch({ expectedProfiles: expected(), ...message }, sender);
     const sender = {};
     await commit({
         upserts: [{ id: 'profile-a', name: 'A from tab 1', panels: [] }],
@@ -59,5 +66,12 @@ context.profileStorage = context.DashBridgeBackgroundProfileStorage.create({
     assert.deepStrictEqual(stored.dashbridge_profiles.map(profile => profile.id), ['profile-b'],
         'a stale save of another profile must not resurrect a deleted profile');
     assert.strictEqual(stored.dashbridge_profiles[0].name, 'B after deletion');
-    console.log('PASS profile patches preserve concurrent changes from separate DashBridge tabs');
+    const baseline = expected();
+    await commit({ upserts: [{ ...stored.dashbridge_profiles[0], name: 'new name' }], deleteProfileIds: [], activeProfileId: 'profile-b' }, sender);
+    await assert.rejects(commit({ expectedProfiles: baseline,
+        upserts: [{ id: 'profile-b', name: 'B after deletion', panels: [], report: { template: 'stale' } }],
+        deleteProfileIds: [], activeProfileId: 'profile-b' }, sender), /другой вкладке/);
+    assert.strictEqual(stored.dashbridge_profiles[0].name, 'new name');
+    await assert.rejects(commit({ expectedProfiles: baseline, upserts: [], deleteProfileIds: ['profile-b'], activeProfileId: 'profile-b' }, sender), /другой вкладке/);
+    console.log('PASS profile patches preserve concurrent changes and reject stale same-profile edits');
 })().catch(error => { console.error(error); process.exit(1); });

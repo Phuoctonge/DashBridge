@@ -7,6 +7,7 @@
         savePanels,
         normalizePanelMetadataText,
         escapeHtml,
+        getTransformSettings = () => ({}),
     }) {
         const reportEngine = window.DashBridgeReport;
 
@@ -41,7 +42,7 @@
                             <div><h4>${escapeHtml(panel.title || 'Панель Grafana')}</h4><span class="report-panel-auto-status">${escapeHtml(config.enabled ? `${sourceLabel} · ${includeLabel}` : 'Не добавляется в сообщение')}</span></div>
                         </div>
                         <div class="report-panel-card-actions">
-                            <label class="report-switch"><input class="report-enabled" type="checkbox" ${checked(config.enabled)}> Добавлять</label>
+                            <label class="report-switch"><span class="switch"><input class="report-enabled" type="checkbox" ${checked(config.enabled)} role="switch"><span class="slider" aria-hidden="true"></span></span><span>Добавлять</span></label>
                             <button class="btn btn-outline report-open-panel-editor" type="button">Редактировать фразы</button>
                         </div>
                     </div>
@@ -49,9 +50,12 @@
         }
 
         function openPanelEditor(panel, onSaved = null) {
+            const ownerProfileId = getActiveProfile()?.id;
+            let baselinePanel = JSON.stringify(panel.report);
             const config = reportEngine.normalizePanel(panel.report, panel);
             const graphEnabled = !!panel.tools?.thresholdEnabled;
-            const cpuCapacityEnabled = !!panel.tools?.cpuCapacityFilterEnabled;
+            const isLoadPanel = window.DashBridgeGrafanaPanelAnalysis?.classifyPanelTitle(panel.title, getTransformSettings()) === 'load';
+            const cpuCapacityEnabled = isLoadPanel && !!panel.tools?.cpuCapacityFilterEnabled;
             const source = (config.sla.source === 'graph' && !graphEnabled)
                 || (config.sla.source === 'cpu_capacity' && !cpuCapacityEnabled) ? 'none' : config.sla.source;
             const selected = (value, current) => value === current ? 'selected' : '';
@@ -67,10 +71,11 @@
                     <div class="report-panel-editor-setup">
                         <section class="report-editor-setup-card">
                             <h4>Добавление в сводку</h4>
-                            <label class="report-switch"><input class="report-editor-enabled" type="checkbox" ${checked(config.enabled)}> Добавлять эту панель</label>
+                            <label class="report-switch"><span class="switch"><input class="report-editor-enabled" type="checkbox" ${checked(config.enabled)} role="switch"><span class="slider" aria-hidden="true"></span></span><span>Добавлять эту панель</span></label>
                             <label class="report-field">Показывать фразу
                                 <select class="report-editor-include-mode">
                                     <option value="always" ${selected('always', config.includeMode)}>Всегда</option>
+                                    <option value="issue_only" ${selected('issue_only', config.includeMode)}>При предупреждении или нарушении SLA</option>
                                     <option value="critical_only" ${selected('critical_only', config.includeMode)}>Только при нарушении SLA</option>
                                 </select>
                             </label>
@@ -79,9 +84,9 @@
                             <h4>Результат панели</h4>
                             <label class="report-field">Источник результата
                                 <select class="report-editor-source">
-                                    <option value="graph" ${selected('graph', source)} ${graphEnabled ? '' : 'disabled'}>Автоматически по порогу графика${graphEnabled ? '' : ' — не настроен'}</option>
-                                    <option value="cpu_capacity" ${selected('cpu_capacity', source)} ${cpuCapacityEnabled ? '' : 'disabled'}>По фильтру Load Average: vCPU × коэффициент${cpuCapacityEnabled ? '' : ' — не настроен'}</option>
-                                    <option value="none" ${selected('none', source)}>Без SLA — информационная фраза</option>
+                                    <option value="graph" ${selected('graph', source)} ${graphEnabled ? '' : 'disabled'}>Автоматически по порогу графика${graphEnabled ? '' : ' - не настроен'}</option>
+                                    ${isLoadPanel ? `<option value="cpu_capacity" ${selected('cpu_capacity', source)} ${cpuCapacityEnabled ? '' : 'disabled'}>По фильтру Load Average: vCPU × коэффициент${cpuCapacityEnabled ? '' : ' - не настроен'}</option>` : ''}
+                                    <option value="none" ${selected('none', source)}>Без SLA - информационная фраза</option>
                                     <option value="custom" ${selected('custom', source)}>Собственный SLA</option>
                                 </select>
                             </label>
@@ -96,7 +101,7 @@
                         </section>
                     </div>
                     <div class="report-panel-editor-copy">
-                        <div class="report-subsection-heading"><h5>Текст для сообщения</h5><span>Порог, единица и серверы подставятся автоматически. Выберите поле и нажмите значок, чтобы вставить его.</span></div>
+                        <div class="report-subsection-heading"><h5>Тексты по состояниям</h5><span>Поля в фигурных скобках подставляются автоматически. Списки выводятся только если их переменная добавлена в шаблон.</span></div>
                         <div class="report-emoji-toolbar" aria-label="Вставить значок">${['🟢','⚠️','🔴','⏱️','✅','❌','🖥','🛠'].map(icon => `<button type="button" data-emoji="${icon}">${icon}</button>`).join('')}</div>
                         <div class="report-template-grid report-editor-threshold-templates">
                             <label class="report-field">Если требования соблюдены<textarea class="report-editor-normal">${escapeHtml(config.templates.normal)}</textarea></label>
@@ -112,7 +117,8 @@
                                 <label class="report-field report-editor-warning-fields">Предупредительный уровень<input class="report-editor-warning-value" type="number" step="any" value="${config.sla.warningValue ?? ''}" placeholder="необязательно"></label>
                             </div>
                             <label class="report-field report-editor-warning-fields">Если достигнут предупредительный уровень<textarea class="report-editor-warning">${escapeHtml(config.templates.warning)}</textarea></label>
-                            <label class="report-switch"><input class="report-editor-details-enabled" type="checkbox" ${checked(config.detailsEnabled)}> Добавлять подробный список серверов</label>
+                            <p class="report-settings-hint">Подробный список строк добавляется автоматически, если в шаблоне есть соответствующая переменная, например {{criticalList}} или {{warningList}}.</p>
+                            <div class="report-list-limit-setting"><label class="report-field">Максимум строк в списках этой панели <input class="report-editor-list-limit" type="number" min="1" max="50" step="1" value="${config.listLimit ?? ''}" placeholder="Без ограничений"></label><input class="report-editor-list-limit-range" type="range" min="1" max="50" step="1" value="${config.listLimit ?? 10}" aria-label="Максимум строк в списках этой панели"><small>Пустое поле - без ограничений. Лимит действует на criticalList, warningList и allSeriesList.</small></div>
                             <label class="report-field">Если данные графика недоступны<textarea class="report-editor-unavailable">${escapeHtml(config.templates.unavailable)}</textarea></label>
                         </div>
                     </details>
@@ -122,6 +128,13 @@
             document.body.appendChild(overlay);
             overlay.style.display = 'flex';
             const sourceControl = overlay.querySelector('.report-editor-source');
+            const limitControl = overlay.querySelector('.report-editor-list-limit');
+            const limitRange = overlay.querySelector('.report-editor-list-limit-range');
+            limitRange.setAttribute('aria-label', 'Максимум строк в списках этой панели');
+            limitRange.addEventListener('input', () => { limitControl.value = limitRange.value; });
+            limitControl.addEventListener('input', () => {
+                if (limitControl.value && limitControl.checkValidity()) limitRange.value = limitControl.value;
+            });
             const sync = () => {
                 const currentSource = sourceControl.value;
                 overlay.querySelector('.report-editor-custom-sla').hidden = currentSource !== 'custom';
@@ -144,6 +157,7 @@
                 if (currentSource === 'none') include.value = 'always';
                 include.disabled = currentSource === 'none';
                 include.querySelector('[value="critical_only"]').disabled = currentSource === 'none';
+                include.querySelector('[value="issue_only"]').disabled = currentSource === 'none';
             };
             const close = () => overlay.remove();
             overlay.querySelector('.report-panel-editor-close').addEventListener('click', close);
@@ -160,12 +174,28 @@
                 activeTextarea.focus();
             }));
             overlay.querySelector('.report-panel-editor-save').addEventListener('click', async () => {
+                const currentPanel = getPanels().find(item => item.id === panel.id);
+                const conflict = getActiveProfile()?.id !== ownerProfileId || !currentPanel
+                    || JSON.stringify(currentPanel.report) !== baselinePanel;
+                if (conflict) {
+                    const notice = overlay.querySelector('.report-panel-editor-error');
+                    notice.textContent = 'Панель изменена или удалена. Скопируйте черновик и откройте настройки заново.';
+                    notice.hidden = false;
+                    return;
+                }
+                panel = currentPanel;
                 const currentSource = sourceControl.value;
                 const valueText = overlay.querySelector('.report-editor-sla-value').value.trim();
                 const value = valueText === '' ? null : Number(valueText);
                 const warningText = overlay.querySelector('.report-editor-warning-value').value.trim();
                 const warningValue = warningText === '' ? null : Number(warningText);
                 const error = overlay.querySelector('.report-panel-editor-error');
+                if (!limitControl.checkValidity()) {
+                    error.textContent = 'Укажите целое число от 1 до 50 или очистите поле для режима без ограничений.';
+                    error.hidden = false;
+                    limitControl.reportValidity();
+                    return;
+                }
                 if (currentSource === 'custom' && !Number.isFinite(value)) {
                     error.textContent = 'Укажите числовое значение собственного SLA.';
                     error.hidden = false;
@@ -197,7 +227,7 @@
                         operator,
                         value: ['none', 'cpu_capacity'].includes(currentSource) ? null : value,
                         warningValue: ['none', 'cpu_capacity'].includes(currentSource) ? null : warningValue,
-                        unit: '',
+                        unit: currentSource === config.sla.source ? config.sla.unit : '',
                         evaluation: currentSource === 'cpu_capacity'
                             ? (panel.tools?.cpuCapacityFilterMode === 'last' ? 'latest' : 'period_max')
                             : overlay.querySelector('.report-editor-evaluation').value,
@@ -211,9 +241,16 @@
                         listItem: config.templates.listItem,
                         details: config.templates.details,
                     },
-                    detailsEnabled: overlay.querySelector('.report-editor-details-enabled').checked,
+                    detailsEnabled: config.detailsEnabled,
+                    listLimit: (() => { const raw = overlay.querySelector('.report-editor-list-limit').value.trim(); return raw ? Number(raw) : null; })(),
                 }, panel);
-                await savePanels();
+                baselinePanel = JSON.stringify(panel.report);
+                const saved = await savePanels();
+                if (saved?.error) {
+                    error.textContent = 'Изменения не сохранены: ' + saved.error;
+                    error.hidden = false;
+                    return;
+                }
                 globalThis.DashBridgeAnalytics?.outcome('dashbridge.report_panel_settings_saved', 'success');
                 onSaved?.(panel);
                 close();
@@ -226,7 +263,7 @@
                 <div class="report-variable-row"><dt><code>${name}</code></dt><dd>${description}</dd></div>`).join('')}</dl></section>`;
             return `<details class="report-variable-reference">
                 <summary>Справочник переменных шаблона</summary>
-                <p>Переменные можно вставлять в общий шаблон, фразы панели, строки списков и блок подробностей.</p>
+                <p>Общие переменные доступны в общем шаблоне, фразах панели, строках списков и блоке подробностей. Переменные панели доступны в её фразах и подробностях, переменные строки - внутри списков.</p>
                 <div class="report-variable-groups">
                     ${group('Общие переменные', [
                         ['{{profileName}}', 'Название текущего профиля DashBridge.'],
@@ -236,8 +273,10 @@
                         ['{{stableLoadDuration}}', 'Продолжительность удержания стабильной нагрузки.'],
                         ['{{period}}', 'Выбранный на сводном дашборде период Grafana.'],
                         ['{{generatedAt}}', 'Дата и время формирования сообщения.'],
-                        ['{{panels}}', 'Все включённые фразы панелей в порядке карточек дашборда.'],
-                        ['{{panel:ключ}}', 'Фраза конкретной панели. Вместо «ключ» используется значение поля «Ключ панели».'],
+                    ])}
+                    ${group('Вставки только общего шаблона', [
+                        ['{{panels}}', 'Все включённые фразы в порядке списка «Панели сообщения». По умолчанию он совпадает с порядком графиков.'],
+                        ['{{panel:ключ}}', 'Фраза конкретной панели. Вместо «ключ» используется значение поля «Ключ панели». Внутри фраз и списков эти вставки недоступны.'],
                     ])}
                     ${group('Переменные панели', [
                         ['{{panelTitle}}', 'Название панели Grafana.'],
@@ -279,9 +318,12 @@
 
         function openSettings(focusPanelId = null) {
             const profile = getActiveProfile();
+            let baselineReport = JSON.stringify(profile?.report);
             if (!profile) return;
             const profileConfig = reportEngine.normalizeProfile(profile.report);
             const orderedPanels = reportEngine.orderPanels(getPanels(), profileConfig.panelOrder);
+            const baselineEnabled = new Map(orderedPanels.map(panel => [panel.id,
+                reportEngine.normalizePanel(panel.report, panel).enabled]));
             const loadTestTemplate = '{{testName}}\nКонтур: {{environment}}\n\nПрошло {{stableLoadDuration}} удержания стабильной нагрузки, {{testDuration}} с начала теста.\n\n{{panels}}';
             const hasTestHeader = profileConfig.template.includes('{{testName}}')
                 || profileConfig.template.includes('{{testDuration}}')
@@ -290,12 +332,12 @@
             overlay.className = 'modal-overlay report-settings-overlay';
             overlay.innerHTML = `
                 <section class="modal-content report-settings-modal" role="dialog" aria-modal="true">
-                    <div class="report-settings-header"><h3>Настройка сообщения — ${escapeHtml(profile.name)}</h3><button type="button" class="btn btn-outline report-close">Закрыть</button></div>
+                    <div class="report-settings-header"><h3>Настройка сообщения - ${escapeHtml(profile.name)}</h3><button type="button" class="btn btn-outline report-close">Закрыть</button></div>
                     <p class="report-settings-intro">Здесь задаётся структура общей сводки. Фразы каждой панели редактируются рядом с её графиком или кнопкой в списке ниже.</p>
                     <details class="report-editor-section report-collapsible-section">
                         <summary class="report-section-heading"><h4>Шапка сообщения</h4><span>необязательно</span></summary>
                         <div class="report-section-body">
-                        <label class="report-switch"><input class="report-test-header" type="checkbox" ${hasTestHeader ? 'checked' : ''}> Добавить сведения о нагрузочном тесте</label>
+                        <label class="report-switch"><span class="switch"><input class="report-test-header" type="checkbox" ${hasTestHeader ? 'checked' : ''} role="switch"><span class="slider" aria-hidden="true"></span></span><span>Добавить сведения о нагрузочном тесте</span></label>
                         <div class="report-field-grid report-context-fields" ${hasTestHeader ? '' : 'hidden'}>
                             <label class="report-field">Название теста<input class="report-test-name" maxlength="500" value="${escapeHtml(profileConfig.context.testName)}"></label>
                             <label class="report-field">Контур / окружение<input class="report-environment" maxlength="500" value="${escapeHtml(profileConfig.context.environment)}"></label>
@@ -310,9 +352,10 @@
                         <label class="report-field"><textarea class="report-profile-template">${escapeHtml(profileConfig.template)}</textarea></label>
                         </div>
                     </details>
-                    <div class="report-panel-list-heading"><h3>Панели сообщения</h3><p>Перетаскивайте панели, чтобы изменить порядок фраз, и подключайте их одной галочкой. Расположение графиков не изменится.</p></div>
+                    <div class="report-panel-list-heading"><h3>Панели сообщения</h3><p>Перетаскивайте панели, чтобы изменить порядок фраз, и включайте нужные панели переключателем. Расположение графиков не изменится.</p></div>
                     <div class="report-panel-list">${orderedPanels.map(panel => reportPanelCardMarkup(panel)).join('')}</div>
                     ${reportVariableReferenceMarkup()}
+                    <p class="report-save-error" role="alert" hidden></p>
                     <div class="modal-actions report-settings-actions"><button type="button" class="btn btn-outline report-cancel">Отмена</button><button type="button" class="btn btn-primary report-save">Сохранить</button></div>
                 </section>`;
             document.body.appendChild(overlay);
@@ -381,6 +424,7 @@
                     openPanelEditor(panel, updated => {
                         const next = reportEngine.normalizePanel(updated.report, updated);
                         enabled.checked = next.enabled;
+                        baselineEnabled.set(updated.id, next.enabled);
                         card.dataset.reportEnabled = String(next.enabled);
                         card.querySelector('.report-panel-auto-status').textContent = next.enabled
                             ? `${next.sla.source === 'graph' ? 'Порог графика' : next.sla.source === 'custom' ? 'Собственный SLA' : next.sla.source === 'cpu_capacity' ? 'SLA по vCPU' : 'Информационная панель'} · ${next.includeMode === 'always' ? 'показывать всегда' : 'только при нарушении'}`
@@ -389,6 +433,15 @@
                 });
             });
             overlay.querySelector('.report-save').addEventListener('click', async () => {
+                const currentProfile = getActiveProfile();
+                const enabledConflict = getPanels().some(panel => baselineEnabled.has(panel.id)
+                    && baselineEnabled.get(panel.id) !== reportEngine.normalizePanel(panel.report, panel).enabled);
+                if (currentProfile?.id !== profile.id || JSON.stringify(currentProfile?.report) !== baselineReport || enabledConflict) {
+                    const notice = overlay.querySelector('.report-save-error');
+                    notice.textContent = 'Профиль изменён в другой вкладке. Скопируйте черновик и откройте настройки заново.';
+                    notice.hidden = false;
+                    return;
+                }
                 overlay.querySelectorAll('.report-panel-card').forEach(card => {
                     const panel = getPanels().find(item => item.id === card.dataset.panelId);
                     if (!panel) return;
@@ -396,9 +449,10 @@
                         ...panel.report,
                         enabled: card.querySelector('.report-enabled').checked,
                     }, panel);
+                    baselineEnabled.set(panel.id, panel.report.enabled);
                 });
-                profile.report = reportEngine.normalizeProfile({
-                    ...profile.report,
+                currentProfile.report = reportEngine.normalizeProfile({
+                    ...currentProfile.report,
                     template: overlay.querySelector('.report-profile-template').value,
                     panelOrder: [...overlay.querySelectorAll('.report-panel-card')]
                         .map(card => card.dataset.panelId),
@@ -409,7 +463,14 @@
                         stableLoadStartedAt: overlay.querySelector('.report-stable-started').value,
                     },
                 });
-                await savePanels();
+                baselineReport = JSON.stringify(currentProfile.report);
+                const saved = await savePanels();
+                if (saved?.error) {
+                    const notice = overlay.querySelector('.report-save-error');
+                    notice.textContent = 'Изменения не сохранены: ' + saved.error;
+                    notice.hidden = false;
+                    return;
+                }
                 globalThis.DashBridgeAnalytics?.outcome('dashbridge.report_template_saved', 'success');
                 close();
             });

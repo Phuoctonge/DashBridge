@@ -362,7 +362,7 @@ async function captureTargetDataScope(tabId, panelId) {
  * Применяет настройки к панели через applyPanelTools и ждёт применения.
  * @param {number} tabId
  * @param {string} panelId
- * @param {object} settings — visualSettings и/или transformSettings
+ * @param {object} settings - visualSettings и/или transformSettings
  */
 async function applySettingsAndWait(tabId, panelId, settings, { refresh = true, verifyPersistence = false } = {}) {
     const transform = { ...(settings?.transformSettings || {}) };
@@ -480,7 +480,7 @@ async function resetAllSettings(tabId, panelId) {
  * В блоке finally гарантированно сбрасывает настройки.
  *
  * @param {number} tabId
- * @param {object} env — тестовое окружение (env.panelId, env.hasLegend, env.hasCPU, …)
+ * @param {object} env - тестовое окружение (env.panelId, env.hasLegend, env.hasCPU, …)
  * @param {Array<{label: string, settings: object|function, invariant: function}>} transitions
  * @returns {Promise<{pass: boolean, skip?: boolean, details: string[]}>}
  */

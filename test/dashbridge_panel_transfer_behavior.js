@@ -39,7 +39,9 @@ const sourcePanel = {
 const profile = {
     name: 'Production / CPU',
     timeState: { from: 'now-6h', to: 'now', refresh: '30s' },
-    report: { enabled: true, template: 'Report: {{panels}}' },
+    report: { enabled: true, template: 'Report: {{panels}}', attachments: {
+        slaOnly: false, heading: false, layout: 'grid', panelOrder: ['source-panel'], selectedIds: ['source-panel'], forcedIds: ['source-panel']
+    } },
 };
 const payload = transfer.createPanelExportPayload({
     profile,
@@ -67,6 +69,12 @@ assert.strictEqual(imported.panels[0].tools.thresholdValue, 80);
 assert.strictEqual(imported.panels[0].futurePanelField.keep, true, 'round-trip must retain compatible fields');
 assert.strictEqual(imported.hasTimeState, true);
 assert.strictEqual(imported.hasReport, true);
+assert.equal(imported.report.attachments.slaOnly, false);
+assert.equal(imported.report.attachments.heading, false);
+assert.equal(imported.report.attachments.layout, 'grid');
+assert.deepStrictEqual(Array.from(imported.report.attachments.panelOrder), [imported.panels[0].id]);
+assert.deepStrictEqual(Array.from(imported.report.attachments.selectedIds), [imported.panels[0].id]);
+assert.deepStrictEqual(Array.from(imported.report.attachments.forcedIds), [imported.panels[0].id]);
 
 const secondPanel = { ...sourcePanel, id: 'second', src: sourcePanel.src.replace('panelId=7', 'panelId=8') };
 const orderedPayload = transfer.createPanelExportPayload({

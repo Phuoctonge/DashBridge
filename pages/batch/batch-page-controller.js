@@ -153,6 +153,7 @@
                 documentRef.getElementById('seriesDashUrl').value = mainUrl;
                 documentRef.getElementById('seriesTimestamps').value = mainSlices;
                 resetSeriesDashboardSelection(panelPicker);
+                documentRef.getElementById('seriesDashUrl').dispatchEvent(new Event('change'));
                 pageState.save();
                 showToast('URL и временные срезы скопированы в Series', 'success');
             });

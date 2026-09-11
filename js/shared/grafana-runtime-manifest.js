@@ -36,11 +36,12 @@
     ]);
     const matchesForHostname = hostname => {
         const host = String(hostname || '').trim().toLowerCase().replace(/\.$/, '');
-        if (!host || !/^[a-z0-9.-]+$/.test(host)) return [];
-        return [
-            `*://${host}/d/*`, `*://${host}/d-solo/*`,
-            `*://${host}/*/d/*`, `*://${host}/*/d-solo/*`
-        ];
+        const parts = /^([a-z0-9.-]+)(?::([0-9]+))?$/.exec(host);
+        if (!parts || (parts[2] && Number(parts[2]) > 65535)) return [];
+        // Chromium accepts a port with explicit schemes, but rejects *://host:port.
+        const schemes = parts[2] ? ['http', 'https'] : ['*'];
+        return schemes.flatMap(scheme => ['/d/*', '/d-solo/*', '/*/d/*', '/*/d-solo/*']
+            .map(route => `${scheme}://${host}${route}`));
     };
     root.DashBridgeGrafanaRuntimeManifest = Object.freeze({ files, matchesForHostname });
 })(globalThis);

@@ -198,7 +198,7 @@ assert(reportUi.includes('report-collapsible-section')
     && reportUi.includes('Дополнительные настройки'),
     'each graph must expose a focused two-outcome phrase editor with optional advanced settings');
 assert(reportUi.includes('Автоматически по порогу графика')
-    && reportUi.includes('Без SLA — информационная фраза')
+    && reportUi.includes('Без SLA - информационная фраза')
     && reportUi.includes('Только при нарушении SLA'),
     'common panel setup must use outcome-oriented choices and automatic Grafana thresholds');
 assert(profileController.includes('dashboardLayoutSignature')

@@ -16,7 +16,7 @@ for required in (
     "Как в DashBridge",
     "value=\"light\"",
     "value=\"dark\"",
-    "panel.grafanaTheme = overlay.querySelector('#iframeSettingsTheme').value",
+    "target.grafanaTheme = overlay.querySelector('#iframeSettingsTheme').value",
     "url.searchParams.set('theme', resolveTheme(panel))",
     "windowRef.addEventListener('dashbridge-theme-change'",
 ):

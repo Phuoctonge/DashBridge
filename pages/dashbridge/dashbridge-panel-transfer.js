@@ -87,6 +87,11 @@
         }
 
         report.panelOrder = [...new Set(report.panelOrder.map(id => importedIds.get(id)).filter(Boolean))];
+        for (const key of ['panelOrder', 'selectedIds', 'forcedIds']) {
+            if (Array.isArray(report.attachments?.[key])) {
+                report.attachments[key] = [...new Set(report.attachments[key].map(id => importedIds.get(id)).filter(Boolean))];
+            }
+        }
         return {
             version: data.version,
             profileName,

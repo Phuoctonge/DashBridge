@@ -76,8 +76,8 @@ assert(moduleSource.includes('const nativeValueCell = tableCell?.nextElementSibl
     'vCPU cells must inherit Grafana typography classes from the native min column');
 assert(!moduleSource.includes('font-variant-numeric:tabular-nums'),
     'custom numeric typography must not override Grafana legend fonts');
-assert(moduleSource.includes(": '—';") && moduleSource.includes("text === '—' ? 'Количество vCPU не определено'"),
-    'missing helper capacity must retain the column and display an em dash');
+assert(moduleSource.includes(": '-';") && moduleSource.includes("text === '-' ? 'Количество vCPU не определено'"),
+    'missing helper capacity must retain the column and display a hyphen');
 assert(moduleSource.includes('new MutationObserver(controller.schedule)'),
     'vCPU column must survive Grafana legend remounts');
 assert(moduleSource.includes('const stop = () =>')

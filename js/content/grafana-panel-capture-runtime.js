@@ -540,8 +540,8 @@
                 }
                 if (result.fallback === 'download') {
                     showCaptureNotice(result.insecureContext
-                        ? 'Буфер изображений недоступен на HTTP — файл сохранён.'
-                        : 'Не удалось скопировать изображение — файл сохранён.');
+                        ? 'Буфер изображений недоступен на HTTP - файл сохранён.'
+                        : 'Не удалось скопировать изображение - файл сохранён.');
                 }
                 publishDiagnostic({
                     phase: 'complete', resultStage: result.stage || 'complete', ok: true,

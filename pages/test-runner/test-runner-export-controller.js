@@ -13,6 +13,7 @@ function create({
     serializeSpoolArtifact,
     localExportTimestamp,
     localIsoTimestamp,
+    onExportStateChange = () => {},
 }) {
     if (typeof getSnapshot !== 'function' || typeof getSpool !== 'function'
         || typeof categoryLabel !== 'function' || typeof formatDuration !== 'function'
@@ -21,6 +22,7 @@ function create({
         throw new Error('DashBridgeTestExportController requires snapshot, spool, formatting, and serialization dependencies');
     }
 
+let exporting = false;
 // --- Отчёт (текстовый / Markdown) ---
 
 function buildTextReport(snapshot) {
@@ -44,7 +46,7 @@ function buildTextReport(snapshot) {
         const passed = urlResult.tests.filter(t => !t.skip && !t.aborted && t.pass).length;
         const failed = urlResult.tests.filter(t => !t.skip && !t.aborted && !t.pass).length;
         lines.push(`## ${urlResult.url}`);
-        lines.push(`Engine: ${urlResult.engine || '—'}  Grafana: ${urlResult.grafanaVersion ? 'v' + urlResult.grafanaVersion : '—'}`);
+        lines.push(`Engine: ${urlResult.engine || '-'}  Grafana: ${urlResult.grafanaVersion ? 'v' + urlResult.grafanaVersion : '-'}`);
         lines.push(`✓ ${passed} / ${urlResult.completed ?? urlResult.tests.length - urlSkipped - urlAborted}${urlSkipped > 0 ? `  ◌ ${urlSkipped} пропущено` : ''}${urlAborted > 0 ? `  ⊘ ${urlAborted} не запущено` : ''}${urlResult.probeError ? '  ⚠ ' + urlResult.probeError : ''}`);
         lines.push('');
         lines.push('| ID  | Категория     | Тест                                                  | Результат | Детали                                               |');
@@ -76,7 +78,7 @@ function buildFailureReport(snapshot) {
     const aborted = snapshot.abortedNotRun || 0;
     const active = (snapshot.completed ?? snapshot.done) - skipped;
     const lines = [
-        '# DashBridge E2E — ошибки и пропуски',
+        '# DashBridge E2E - ошибки и пропуски',
         `Дата: ${new Date().toLocaleString('ru-RU')}`,
         `Провалено: ${snapshot.failed} из ${active}${skipped ? `; пропущено: ${skipped}` : ''}${aborted ? `; не запущено: ${aborted}` : ''}`,
         ''
@@ -87,11 +89,11 @@ function buildFailureReport(snapshot) {
         if (!notable.length) return;
 
         lines.push(`## ${urlResult.url}`);
-        lines.push(`Engine: ${urlResult.engine || '—'}; Grafana: ${urlResult.grafanaVersion ? `v${urlResult.grafanaVersion}` : '—'}`);
+        lines.push(`Engine: ${urlResult.engine || '-'}; Grafana: ${urlResult.grafanaVersion ? `v${urlResult.grafanaVersion}` : '-'}`);
         notable.forEach(test => {
             const status = test.aborted ? 'NOT RUN' : (test.skip ? 'SKIP' : 'FAIL');
-            const duration = formatDuration(test.durationMs) || '—';
-            lines.push(`- [${status}] [${test.id}] ${test.name} (${duration})${test.details ? ` — ${test.details}` : ''}`);
+            const duration = formatDuration(test.durationMs) || '-';
+            lines.push(`- [${status}] [${test.id}] ${test.name} (${duration})${test.details ? ` - ${test.details}` : ''}`);
         });
         lines.push('');
     });
@@ -106,8 +108,12 @@ async function copyFailureReport() {
 }
 
 async function exportDiagnostics() {
+    if (exporting) return;
     const snapshot = getSnapshot();
     if (!snapshot?.results?.length) return;
+    const spool = getSpool();
+    exporting = true;
+    onExportStateChange(true);
     if (elExportDiagnosticsBtn) elExportDiagnosticsBtn.disabled = true;
     const exportDate = new Date();
     const filename = `dashbridge-e2e-diagnostics-${localExportTimestamp(exportDate)}.json`;
@@ -158,7 +164,7 @@ async function exportDiagnostics() {
         const writable = await fileHandle.createWritable();
         let progress;
         try {
-            progress = await serializeSpoolArtifact(snapshot, getSpool(), exportMetadata,
+            progress = await serializeSpoolArtifact(snapshot, spool, exportMetadata,
                 chunk => writable.write(chunk), updateSerializationProgress);
             await writable.close();
         } catch (error) {
@@ -197,7 +203,9 @@ async function exportDiagnostics() {
             elStatusLine.className = 'tr-status tr-status-fail';
         }
     } finally {
+        exporting = false;
         if (elExportDiagnosticsBtn) elExportDiagnosticsBtn.disabled = false;
+        onExportStateChange(false);
     }
 }
 
@@ -228,6 +236,7 @@ async function copyTextToClipboard(text, button) {
         copyReport,
         copyTextToClipboard,
         exportDiagnostics,
+        isExporting: () => exporting,
     });
 }
 

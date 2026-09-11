@@ -118,19 +118,19 @@
     border-bottom-color: var(--border) !important;
 }
 
-/* Options: секция "Интерфейс" — полупрозрачный светлый фон */
+/* Options: секция "Интерфейс" - полупрозрачный светлый фон */
 [data-theme="dark"] [style*="background: rgba(241, 245, 249"],
 [data-theme="dark"] [style*="background:rgba(241, 245, 249"] {
     background: var(--bg-elevated) !important;
 }
 
-/* Options: блок Maintenance — полупрозрачный тёмный фон */
+/* Options: блок Maintenance - полупрозрачный тёмный фон */
 [data-theme="dark"] [style*="background: rgba(0,0,0,0.02)"],
 [data-theme="dark"] [style*="background:rgba(0,0,0,0.02)"] {
     background: var(--bg-elevated) !important;
 }
 
-/* Options: плавающая кнопка сохранения — полупрозрачный белый */
+/* Options: плавающая кнопка сохранения - полупрозрачный белый */
 [data-theme="dark"] [style*="background: rgba(255, 255, 255, 0.8)"],
 [data-theme="dark"] [style*="background:rgba(255, 255, 255, 0.8)"] {
     background: var(--card-bg) !important;

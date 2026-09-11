@@ -63,7 +63,6 @@ const uiCode = [
     .join('\n');
 [
     'DashBridgeTestReport.createArtifactStreamPlan',
-    'serializeSpoolArtifact(snapshot, getSpool(), exportMetadata,',
     'function showDiagnostic(test, urlResult)',
     'Предупреждения Grafana (не влияют на PASS/FAIL)',
     'Доказательства переходов:',

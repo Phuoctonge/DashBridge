@@ -32,7 +32,7 @@
     function create({ getFrameOrigin: resolveFrameOrigin = getFrameOrigin, getPanelForIframe, getPanels,
         acceptReportSnapshot, acceptPanelAnalysis, capturePanel,
         setCapturePrepared, savePanels, syncPanelAnalysisAction,
-        acceptTitleResponse, acceptPanelToolsApplied = () => undefined,
+        acceptTitleResponse, acceptPanelToolsApplied = () => undefined, acceptFrameLocation = () => undefined,
         postToDashboardFrame = post, getCrosshairMode,
         getCrosshairThickness, sendTimeUpdate, applyPanelTools,
         retryPanelAnalysis, acceptLegendSeries, acceptThresholdStatus,
@@ -63,6 +63,11 @@
             // old cards are unmounted. Reject every message from those stale
             // frames, even when another profile reused the same panel UUID.
             if (!sourcePanel) return;
+
+            if (event.data.action === 'dashbridgeFrameLocation') {
+                acceptFrameLocation(event.data, sourceIframe);
+                return;
+            }
 
             if (event.data.action === 'panelReportSnapshot' && typeof event.data.requestId === 'string') {
                 acceptReportSnapshot(event.data.requestId, sourceIframe, event.data.snapshot);

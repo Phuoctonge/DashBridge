@@ -20,7 +20,7 @@ check = CheckCollector()
 
 check("Options exposes the Grafana iframe allowlist", 'id="settingGrafanaIframeDomains"' in OPTIONS_HTML)
 check("Options explain the shared Grafana domain scope", "Укажите домены корпоративных Grafana для встраивания в <strong>Единый дашборд Grafana</strong> и использования инструментов DashBridge на панелях." in OPTIONS_HTML)
-check("Options stores normalized Grafana hosts", "parseGrafanaIframeDomains" in OPTIONS_JS and "grafanaIframeDomains:" in OPTIONS_JS)
+check("Options commits normalized Grafana hosts through the broker", "parseGrafanaIframeDomains" in OPTIONS_JS and "dashbridge-grafana-connections-replace" in OPTIONS_JS)
 check("Content publishes Grafana menu scope from the allowlist", "dashbridgeGrafanaMenuEnabled" in CONTENT and "grafanaIframeDomains" in CONTENT)
 check("Content exposes the extension icon only inside the Grafana allowlist", "syncGrafanaIconUrl(allowed)" in CONTENT
       and "if (allowed) document.documentElement.dataset.dashbridgeIconUrl" in CONTENT)
@@ -34,7 +34,7 @@ check("Install, startup and settings changes synchronize runtime before DNR", BA
       and "const rules = await queueRulesSync();" in INFRASTRUCTURE)
 check("Failed GUI capture removes its temporary window", "await chromeRef.windows.remove(captureWindow.id).catch(() => undefined);" in (ROOT / "js/background-gui-capture.js").read_text(encoding="utf-8"))
 check("Rules are scoped to subframes", "resourceTypes: ['sub_frame']" in DNR_RULES)
-check("Rules use a host anchor instead of a global filter", "urlFilter: `||${host}/`" in DNR_RULES)
-check("Rules are restricted to DashBridge tab IDs", "tabIds: [tabId]" in DNR_RULES)
+check("Rules use an exact HTTP host instead of a global filter", "regexFilter: '^https?://'" in DNR_RULES)
+check("Rules are restricted to DashBridge tab IDs", "tabIds: normalizedTabIds" in DNR_RULES)
 check("Manifest has no static DNR rule resource", '"declarative_net_request"' not in MANIFEST)
 check.finish()

@@ -52,6 +52,28 @@ const restored = () => {
     assert.equal(classes.size, 0);
 };
 (async () => {
+    frame.dataset.dashbridgeRendered = 'false';
+    const offscreen = await capture.captureSelection([panels[0]], { allowUnrendered: true });
+    assert.equal(offscreen.images.length, 1, 'prepared report capture may move an unrendered offscreen iframe into the viewport first');
+    frame.dataset.dashbridgeRendered = 'true'; restored();
+    let dataReady = false;
+    onCapture = async () => { assert(dataReady, 'PNG must wait for selected panel data'); return { ok: true, dataUrl: 'png' }; };
+    const ready = await capture.captureSelection([panels[0]], { allowUnrendered: true, waitForData: async panel => {
+        assert.equal(panel.id, 'a'); assert.equal(styles.get('position').value, 'fixed');
+        await new Promise(resolve => setTimeout(resolve, 5)); dataReady = true;
+    } });
+    assert.equal(ready.images.length, 1); restored();
+    onCapture = async () => { throw new Error('must not capture a panel whose data timed out'); };
+    const timeout = await capture.captureSelection([panels[0]], { waitForData: async () => { throw new Error('data timeout'); } });
+    assert.equal(timeout.images.length, 0); assert.match(timeout.errors[0].error, /data timeout/); restored();
+    const waitingAbort = new AbortController();
+    await assert.rejects(capture.captureSelection([panels[0]], { signal: waitingAbort.signal,
+        waitForData: async (_panel, signal) => {
+            assert.equal(signal, waitingAbort.signal); waitingAbort.abort();
+            throw new DOMException('cancelled', 'AbortError');
+        }
+    }), { name: 'AbortError' }); restored();
+    onCapture = async () => ({ ok: true, dataUrl: 'png' });
     const visibility = [];
     const result = await capture.captureSelection(panels, { onCaptureVisibility: value => visibility.push(value) });
     assert.equal(result.images.length, 2);

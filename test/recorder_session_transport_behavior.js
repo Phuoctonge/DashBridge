@@ -91,7 +91,7 @@ const transport = context.DashBridgeRecorderSessionTransport.create({
         && call[1].tabId === 7 && call[2] === '1.3'));
     assert.deepStrictEqual(
         calls.filter(call => call[0] === 'command').map(call => call[2]),
-        ['Network.enable', 'Page.enable', 'Page.setLifecycleEventsEnabled',
+        ['Network.enable', 'Page.enable', 'Page.getFrameTree', 'Page.setLifecycleEventsEnabled',
             'Network.setCacheDisabled', 'Network.setBypassServiceWorker'],
     );
     assert(ports[0].messages.some(message => message.type === 'bind' && message.tabId === 7));

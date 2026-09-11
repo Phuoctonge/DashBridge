@@ -9,7 +9,7 @@
             throw new Error('Выберите от 1 до 8 панелей.');
         }
         if (!['auto', 'column', 'grid'].includes(layout)) throw new Error('Неизвестная раскладка.');
-        const columns = count === 1 || layout === 'column' || (layout === 'auto' && count === 2) ? 1 : 2;
+        const columns = count === 1 || layout === 'column' || (layout === 'auto' && count <= 3) ? 1 : 2;
         const rows = Math.ceil(count / columns);
         const gap = 16;
         const header = heading ? 80 : 0;

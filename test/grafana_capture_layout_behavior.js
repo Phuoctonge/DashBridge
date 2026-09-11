@@ -124,7 +124,7 @@ assert(dashboardCss.includes('.panel-card.dashbridge-panel-capture-active .panel
     'DashBridge capture must hide its toolbar immediately instead of capturing an opacity transition');
 assert(tools.includes('panelCaptureInProgress') && dashboardCapture.includes('panelCaptureInProgress'), 'both hosts must reject overlapping captures');
 assert(tools.includes("result.fallback === 'download'")
-    && tools.includes("'Буфер изображений недоступен на HTTP — файл сохранён.'")
+    && tools.includes("'Буфер изображений недоступен на HTTP - файл сохранён.'")
     && tools.includes("setTimeout(removeCaptureNotice, 5000)")
     && tools.includes("notice.setAttribute('role', 'status')")
     && tools.includes("close.setAttribute('aria-label', 'Закрыть уведомление')")

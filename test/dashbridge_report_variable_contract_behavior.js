@@ -51,7 +51,10 @@ const rendered = report.renderPanel(panel, {
         { name: 'srv-warning', value: 75, level: 'warning', cpuCapacity: 4, threshold: 3.2 },
         { name: 'srv-normal', value: 55, level: 'normal', cpuCapacity: 2, threshold: 1.6 },
     ],
-}, { period: '15 минут', generatedAt: '31.08.2026 12:00' });
+}, { profileName: 'Production', testName: 'Load test 42', environment: 'production',
+    testStartedAt: '2026-08-31T10:00', stableLoadStartedAt: '2026-08-31T11:00',
+    testDuration: '2 часа', stableLoadDuration: '1 час',
+    period: '15 минут', generatedAt: '31.08.2026 12:00' });
 
 assert.strictEqual(rendered.included, true);
 for (const name of panelVariables) {

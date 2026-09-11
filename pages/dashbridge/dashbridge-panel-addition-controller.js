@@ -4,7 +4,8 @@
     function create({ normalizePanelUrl, buildSoloPanelUrl, getPanelIdentity, parsePanelIds,
         parseDashboardUrl, fetchDashboardPanels, normalizePanelMetadataText, showAlert,
         currentProfileHasPanel, getCurrentProfilePanelIdentities, getPanels, savePanels,
-        appendPanelCards, documentRef = document, randomUUID = () => crypto.randomUUID() }) {
+        appendPanelCards, showConfirm, configureConnection,
+        documentRef = document, randomUUID = () => crypto.randomUUID() }) {
         if (typeof normalizePanelUrl !== 'function' || typeof buildSoloPanelUrl !== 'function'
             || typeof getPanelIdentity !== 'function' || typeof parsePanelIds !== 'function'
             || typeof parseDashboardUrl !== 'function' || typeof fetchDashboardPanels !== 'function'
@@ -12,6 +13,7 @@
             || typeof currentProfileHasPanel !== 'function'
             || typeof getCurrentProfilePanelIdentities !== 'function'
             || typeof getPanels !== 'function' || typeof savePanels !== 'function'
+            || typeof showConfirm !== 'function' || typeof configureConnection !== 'function'
             || typeof appendPanelCards !== 'function') {
             throw new TypeError('DashBridge panel addition controller dependencies are incomplete');
         }
@@ -27,6 +29,25 @@
         const dashboardPickerLoad = documentRef.getElementById('loadDashboardPanelsBtn');
         let dashboardPickerState = null;
         let dashboardPickerLoadVersion = 0;
+        let connectionPending = false;
+        const ensureConnection = async (url, isCurrent) => {
+            if (connectionPending) return false;
+            connectionPending = true;
+            try {
+                const result = await configureConnection(url, false);
+                if (!isCurrent()) return false;
+                if (result.configured) return true;
+                const accepted = await showConfirm(`Хост ${result.host} отсутствует в настройках «Grafana → Подключение».\nДобавить его в подключения и продолжить?`);
+                if (!accepted || !isCurrent()) return false;
+                await configureConnection(url, true);
+                return isCurrent();
+            } catch (error) {
+                await showAlert(`Не удалось подготовить подключение Grafana: ${error?.message || error}`);
+                return false;
+            } finally {
+                connectionPending = false;
+            }
+        };
 
         const closeSingleModal = () => {
             singleModal.style.display = 'none';
@@ -140,6 +161,11 @@
                     await showAlert('Эта панель уже есть в текущем профиле.');
                     return;
                 }
+                const owner = getPanels();
+                const input = documentRef.getElementById('newPanelUrl').value;
+                if (!await ensureConnection(url, () => getPanels() === owner
+                    && documentRef.getElementById('newPanelUrl').value === input)) return;
+                if (currentProfileHasPanel(url)) return;
                 const addedPanel = { id: randomUUID(), src: url, width, height: '350px' };
                 getPanels().push(addedPanel);
                 savePanels();
@@ -194,6 +220,13 @@
                     await showAlert('Все указанные панели уже есть в текущем профиле.');
                     return;
                 }
+                const owner = getPanels();
+                const idsInput = documentRef.getElementById('quickAddPanelIds').value;
+                if (!await ensureConnection(panelUrls[0], () => getPanels() === owner
+                    && documentRef.getElementById('quickAddDashboardUrl').value.trim() === dashboardUrl
+                    && documentRef.getElementById('quickAddPanelIds').value === idsInput)) return;
+                const currentIdentities = getCurrentProfilePanelIdentities();
+                if (newPanels.some(panel => currentIdentities.has(getPanelIdentity(panel.src)))) return;
                 getPanels().push(...newPanels);
                 savePanels();
                 appendPanelCards(newPanels);
@@ -237,6 +270,10 @@
                 dashboardPickerLoad.textContent = 'Загрузка…';
                 dashboardPickerStatus.textContent = 'Получаем список панелей Grafana…';
                 try {
+                    const owner = getPanels();
+                    if (!await ensureConnection(dashboardUrl, () => getPanels() === owner
+                        && loadVersion === dashboardPickerLoadVersion
+                        && dashboardPickerUrl.value.trim() === dashboardUrl)) return;
                     const result = await fetchDashboardPanels(dashboardUrl);
                     if (loadVersion !== dashboardPickerLoadVersion
                         || dashboardPicker.style.display !== 'flex') return;
@@ -271,6 +308,10 @@
             });
             dashboardPickerAdd.addEventListener('click', async () => {
                 if (!dashboardPickerState) return;
+                const pickerState = dashboardPickerState;
+                const owner = getPanels();
+                if (!await ensureConnection(pickerState.dashboardUrl, () => getPanels() === owner
+                    && dashboardPickerState === pickerState)) return;
                 const selectedIndexes = [...dashboardPickerList
                     .querySelectorAll('input[type="checkbox"]:checked')]
                     .map(input => Number(input.dataset.panelIndex))

@@ -188,7 +188,7 @@
                 button.disabled = true;
                 closeHeaderMenus();
                 try {
-                    const name = await showPrompt('Название копии профиля:', `${source.name.slice(0, 112)} — копия`);
+                    const name = await showPrompt('Название копии профиля:', `${source.name.slice(0, 112)} - копия`);
                     if (name?.trim()) await cloneProfile(name.trim(), source.id);
                 } finally { button.disabled = false; }
             });

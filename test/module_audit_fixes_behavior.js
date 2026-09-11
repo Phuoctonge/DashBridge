@@ -127,17 +127,19 @@ async function analyticsNetwork() {
 }
 async function worklogStableIds() {
     const source = read('pages/worklog/worklog.js');
+    const history = source.slice(source.indexOf('    function saveToHistory()'), source.indexOf('    // --- Helpers ---'));
     const handler = source.slice(source.indexOf('sendAllBtn.onclick = async () => {'), source.lastIndexOf('\n});'));
     let finish; const posted = new Promise(resolve => { finish = resolve; });
     const rows = ['a', 'b'].map(id => ({ id, issueId: `${id}-1`, timeSpent: '1h', dateStarted: '2026-09-06', status: 'new' }));
     const commits = []; const submits = [];
     const context = vm.createContext({ worklogs: rows, sendingWorklogs: false, sendAllBtn: {},
+        historyStack: [], redoStack: [], MAX_HISTORY: 5,
         document: { querySelectorAll: () => [] },
         parseDate: () => new Date(), jiraClient: { submitWorklog: input => { submits.push(input.key); return posted; } },
         worklogWriter: { write: async value => commits.push(structuredClone(value)) },
         sortOrder: 'desc', issueCache: {}, findWorklogRow: () => null, renderTable() {}, updateStats() {},
         DashBridgeAnalytics: null, DashBridgeAnalyticsContract: null, console, alert: assert.fail, setTimeout: fn => fn() });
-    vm.runInContext(handler, context);
+    vm.runInContext(history + '\n' + handler, context);
     const sending = context.sendAllBtn.onclick();
     await context.sendAllBtn.onclick(); assert.equal(submits.length, 1, 'double click cannot send another batch');
     context.worklogs = [rows[1]]; finish({ ok: true }); await sending;

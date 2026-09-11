@@ -182,7 +182,7 @@
         const executeStep = async (step, index) => {
             if (state.stopRequested) throw new Error('Операция остановлена пользователем');
             state.activeStepId = index + 1;
-            setStatus(`Replay: шаг ${index + 1}/${state.steps.length} — ${step.type}`);
+            setStatus(`Replay: шаг ${index + 1}/${state.steps.length} - ${step.type}`);
             const progress = getOperationProgressController();
             progress?.update({ phase: `Replay: шаг ${index + 1} из ${state.steps.length}`, done: index,
                 total: state.steps.length, success: index, failed: 0, message: `${step.type} ${stepLabel(step)}` });
@@ -196,17 +196,35 @@
             progress?.update({ phase: `Replay: выполнен шаг ${index + 1} из ${state.steps.length}`, done: index + 1,
                 total: state.steps.length, success: index + 1, failed: 0, message: `${step.type} ${stepLabel(step)}` });
         };
+        let running = false;
         const start = async () => {
-            if (!state.steps.length) return;
+            if (running || state.starting || state.stopping || state.importing
+                || ['recording', 'replaying'].includes(state.mode) || !state.steps.length) return;
+            running = true; state.starting = true; state.stopRequested = false;
+            updateControls();
             const progress = getOperationProgressController();
+            let collecting = false;
+            const checkCancelled = () => {
+                if (state.stopRequested) throw new Error('Операция остановлена пользователем');
+            };
             try {
                 await progress?.openPictureInPicture({ title: 'Traffic Recorder · Replay', phase: 'Подготовка replay', width: 390, height: 300 });
+                checkCancelled();
                 await ensureDebuggerPermission();
+                checkCancelled();
                 const replaySteps = normalizeReplaySteps(state.steps.map(step => structuredClone(step)));
-                await stopActiveSession(false); resetSession({ keepSteps: true, keepBaseline: true }); state.steps = replaySteps;
+                await stopActiveSession(false);
+                checkCancelled();
+                resetSession({ keepSteps: true, keepBaseline: true }); state.steps = replaySteps;
+                collecting = true;
                 state.sessionOptions = { disableCache: ui.disableCache.checked, disableCookies: ui.disableCookies.checked };
                 state.mode = 'replaying'; state.createdAt = new Date().toISOString(); state.sessionStartedAt = Date.now(); updateControls();
-                const tabId = await createControlledTab(buildRecorderWindowLayout()); await attachNetwork(tabId);
+                const tabId = await createControlledTab(buildRecorderWindowLayout());
+                checkCancelled();
+                await attachNetwork(tabId);
+                checkCancelled();
+                state.starting = false;
+                updateControls();
                 for (let index = 0; index < replaySteps.length; index += 1) await executeStep(replaySteps[index], index);
                 await stopActiveSession(false); buildComparison();
                 progress?.finish({ status: 'complete', message: `Replay завершён: ${replaySteps.length} шагов` });
@@ -214,8 +232,9 @@
                 root.DashBridgeAnalytics?.outcome('recorder.replay_finished', 'success');
             } catch (error) {
                 await stopActiveSession(false);
-                if (state.baselineRequests.size && state.requests.size) buildComparison();
+                if (collecting && state.baselineRequests.size && state.requests.size) buildComparison();
                 if (state.stopRequested) {
+                    progress?.cancel();
                     setStatus('Replay остановлен пользователем.');
                     root.DashBridgeAnalytics?.outcome('recorder.replay_finished', 'cancelled');
                 }
@@ -224,8 +243,10 @@
                     setStatus(`Replay остановлен: ${error?.message || error}`, true);
                     root.DashBridgeAnalytics?.outcome('recorder.replay_finished', 'error');
                 }
+            } finally {
+                running = false; state.starting = false;
+                updateControls(); scheduleRender();
             }
-            scheduleRender();
         };
         return Object.freeze({ start, waitForTabComplete, waitForNetworkIdle, executeStep });
     }

@@ -8,7 +8,7 @@
     }
 
     const parseGrafanaTableDisplayValue = value => {
-        const normalized = String(value || '').trim().replace(/[−–—]/g, '-');
+        const normalized = String(value || '').trim().replace(/[−–-]/g, '-');
         const plain = normalized.replace(/[  \s]/g, '').replace(',', '.');
         if (/^[-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?$/i.test(plain)) {
             const numeric = Number(plain);

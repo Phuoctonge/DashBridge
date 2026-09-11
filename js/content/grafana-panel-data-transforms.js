@@ -60,7 +60,7 @@
                     String(value).toLowerCase().includes(idleKeyword)
                 );
             };
-            // BUG-D fix: trimCpuServerLabel и trimCpuServerText были идентичны — оставлена одна функция.
+            // BUG-D fix: trimCpuServerLabel и trimCpuServerText были идентичны - оставлена одна функция.
             const trimCpuServerLabel = value => {
                 if (tools.trimDomainEnabled === false) return String(value);
                 const domain = String(tools.trimDomain || '.passport.local:9182').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -158,7 +158,7 @@
                 const rawServer = String(instance || display)
                     .replace(totalPattern, '')
                     .replace(availPattern, '');
-                // Удаляем суффикс домена, затем только хвостовой порт (:1234) — не все двоеточия.
+                // Удаляем суффикс домена, затем только хвостовой порт (:1234) - не все двоеточия.
                 const trimmed = tools.trimDomainEnabled === false
                     ? rawServer
                     : rawServer.replace(domainRegex, '').replace(/:\d+$/, '');

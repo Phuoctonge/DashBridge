@@ -40,7 +40,7 @@ const storageArea = (data, writes) => ({
         Object.assign(data, structuredClone(values));
     }
 });
-const context = {
+const context = { navigator: { locks: { request: async (_name, callback) => callback() } },
     URL, URLSearchParams, Date, Number, String, structuredClone, console,
     globalThis: null,
     localStorage: {

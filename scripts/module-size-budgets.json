@@ -10,14 +10,14 @@
       "reason": "MAIN dispatcher and tightly coupled panel/threshold coordination facade, including its privacy-safe settings event bridge; extracted lifecycles remain separate owners."
     },
     "js/content/grafana-threshold-visuals.js": {
-      "maxLines": 780,
+      "maxLines": 800,
       "maxBytes": 49152,
-      "reason": "Single renderer lifecycle covering the shared uPlot/Flot threshold contract."
+      "reason": "Single renderer lifecycle covering the shared uPlot/Flot threshold contract, including foreground projection into its existing highlight overlay; no separate observers or resource owner."
     },
     "js/content/grafana-panel-data-runtime.js": {
-      "maxLines": 720,
+      "maxLines": 740,
       "maxBytes": 49152,
-      "reason": "Single fetch/XHR interception and request-correlation lifecycle; pure transforms are already extracted."
+      "reason": "Single document fetch/XHR interception and request-correlation lifecycle, including rebinding current generation callbacks without stacking wrappers; pure transforms are already extracted."
     },
     "js/content/grafana-legend-visuals.js": {
       "maxLines": 1000,
@@ -45,9 +45,9 @@
       "reason": "Single causal transition/reset lifecycle; splitting would divide one state machine."
     },
     "pages/test-runner/test-runner-ui.js": {
-      "maxLines": 730,
+      "maxLines": 780,
       "maxBytes": 40960,
-      "reason": "Single Test Runner page/run-state controller; diagnostic windows and export/clipboard resource owners are extracted."
+      "reason": "Single Test Runner page/run-state controller, including synchronous startup/cancellation and exclusive spool ownership across export/pagehide; splitting these guards would divide one lifecycle. Diagnostic windows and export/clipboard owners are already extracted."
     }
   }
 }

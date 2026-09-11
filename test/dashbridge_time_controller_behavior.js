@@ -89,7 +89,7 @@ const timeState = {
     }
 };
 
-const context = { console, URL, URLSearchParams, Intl, Date, setTimeout, clearTimeout };
+const context = { console, URL, URLSearchParams, Intl, Date, DOMException, setTimeout, clearTimeout };
 context.globalThis = context;
 vm.runInNewContext(fs.readFileSync('pages/dashbridge/dashbridge-time-controller.js', 'utf8'), context);
 const controller = context.DashBridgeTimeController.create({
@@ -105,13 +105,13 @@ const controller = context.DashBridgeTimeController.create({
     panelBootstrap: { applyToUrl: url => url },
     getTransformSettings: () => ({ removeFill: true }),
     postToDashboardFrame: (iframe, message) => { sent.push({ iframe, message }); return true; },
-    navigateDashboardFrame: (iframe, url) => { navigated.push({ iframe, url }); },
+    navigateDashboardFrame: (iframe, url) => { navigated.push({ iframe, url }); iframe.src = url; },
     refreshAllPanels: async () => { refreshCount += 1; },
     runtimeScopeId: 'scope-1',
     documentRef,
     windowRef,
     navigatorRef: { clipboard: { writeText: async () => {}, readText: async () => '{}' } },
-    setTimer: callback => { callback(); return 1; }
+    setTimer: (callback, delay) => { if (delay >= 90_000) return setTimeout(callback, delay); callback(); return 1; }
 });
 
 assert.strictEqual(JSON.stringify(controller.loadProfileState()), JSON.stringify(profile.timeState),
@@ -175,6 +175,14 @@ frames = [loadedFrame];
 listeners.get('dashbridge-theme-change')();
 assert.strictEqual(navigated.length, 3, 'follow-theme iframe navigates on theme change');
 assert.deepStrictEqual(new URL(navigated[2].url).searchParams.getAll('var-instance'), ['selected', 'second']);
+frames = [deferredFrame];
+deferredFrame.src = '';
+panels[1].grafanaTheme = 'follow';
+listeners.get('dashbridge-theme-change')();
+assert.equal(new URL(deferredFrame.dataset.src).searchParams.get('theme'), 'dark', 'queued follow-theme panel receives the latest theme');
+assert.equal(navigated.length, 3, 'theme change does not bypass the startup queue');
+panels[1].grafanaTheme = 'light';
+frames = [loadedFrame];
 
 console.log('PASS DashBridge time controller owns profile state, URL policy and iframe lifecycle');
 
@@ -226,3 +234,65 @@ assert.doesNotThrow(() => applyRange(selected.from, selected.to));
 assert.equal(controller.getState().from, selected.from, 'storage error cannot block time apply');
 assert.equal(openHistory().length, 1, 'history survives in memory when storage fails');
 console.log('PASS recent time ranges: cap, deduplication, exact replay, mixed/relative, invalid/storage failure');
+
+timeState.forReport = () => ({ from: '1788951600000', to: '1788955200000', refresh: '' });
+elements['iframe-panel-1'] = loadedFrame;
+elements['iframe-panel-2'] = deferredFrame;
+deferredFrame.src = 'about:blank';
+const originalSources = [loadedFrame.src, deferredFrame.dataset.src || deferredFrame.src];
+const originalState = JSON.stringify(controller.getState());
+const originalSaves = saveCount;
+const lease = controller.beginReport();
+assert.throws(() => controller.beginReport(), /Уже/);
+assert.equal(new URL(loadedFrame.src).searchParams.get('from'), '1788951600000');
+assert.equal(new URL(loadedFrame.src).searchParams.has('refresh'), false);
+assert.equal(controller.getReportFrameSource(loadedFrame), originalSources[0]);
+assert.equal(controller.getReportFrameSource(deferredFrame), originalSources[1], 'queued panel retains its intended source during report');
+controller.sendTimeUpdate(loadedFrame);
+assert.equal(sent.at(-1).message.refresh, '');
+assert.equal(JSON.stringify(controller.getState()), originalState);
+assert.equal(saveCount, originalSaves, 'temporary override never writes profile storage');
+lease.release(); lease.release();
+assert.deepStrictEqual([loadedFrame.src, deferredFrame.src], originalSources);
+const changedLease = controller.beginReport();
+loadedFrame.src = 'https://grafana.example/d-solo/changed/a';
+changedLease.release();
+assert.equal(loadedFrame.src, 'https://grafana.example/d-solo/changed/a', 'release must not overwrite an external navigation');
+delete elements['iframe-panel-2'];
+assert.throws(() => controller.beginReport(), /Панель отсутствует/);
+assert.equal(loadedFrame.src, 'https://grafana.example/d-solo/changed/a', 'partial acquisition restores earlier frames');
+console.log('PASS report lease: fixed period, no persistence, restore, idempotence, external navigation and acquisition failure');
+void (async () => {
+    elements['iframe-panel-2'] = deferredFrame;
+    for (const frame of [loadedFrame, deferredFrame]) {
+        frame.removeEventListener = function(type) { delete this.listeners[type]; };
+    }
+    const readyLease = controller.beginReport();
+    let ready = false;
+    readyLease.ready.then(() => { ready = true; });
+    await Promise.resolve();
+    assert.equal(ready, false, 'collection waits for new documents');
+    loadedFrame.listeners.load(); deferredFrame.listeners.load();
+    await readyLease.ready;
+    readyLease.release();
+    const abort = new AbortController();
+    const cancelled = controller.beginReport({ signal: abort.signal });
+    abort.abort();
+    await assert.rejects(cancelled.ready, { name: 'AbortError' });
+    cancelled.release();
+    assert.equal(loadedFrame.listeners.load, undefined);
+    assert.equal(deferredFrame.listeners.load, undefined);
+    timeState.forReport = () => controller.getState();
+    loadedFrame.src = controller.applyPanelParamsToUrl(panels[0]);
+    deferredFrame.src = controller.applyPanelParamsToUrl(panels[1]);
+    const beforeReport = loadedFrame.src;
+    const sameRangeLease = controller.beginReport();
+    try {
+        assert.notEqual(loadedFrame.src.split('#')[0], beforeReport.split('#')[0],
+            'an already absolute Refresh Off panel needs a new document, not a same-document fragment navigation');
+        loadedFrame.listeners.load(); deferredFrame.listeners.load();
+        await sameRangeLease.ready;
+    } finally { sameRangeLease.release(); }
+    assert.equal(loadedFrame.src, beforeReport, 'release restores the original URL after a same-range report');
+    console.log('PASS report load readiness and abort clean up listeners and watchdogs');
+})().catch(error => { console.error(error); process.exitCode = 1; });

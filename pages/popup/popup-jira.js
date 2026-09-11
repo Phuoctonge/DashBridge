@@ -84,7 +84,7 @@ async function dashbridgeTransferJiraWorklogs(expectedOrigin, expectedBasePath =
         ? `Найдено ${worklogsToTransfer.length} записей пользователя "${targetUser}".`
         : `Выбраны ВСЕ записи (${worklogsToTransfer.length} шт).`;
     if (!confirm(`${selection}\nЗадача назначения: ${newIssueKey}\n\nПродолжить?`)) return { status: 'cancelled' };
-    const isMove = confirm('Что делаем с исходными записями?\n\n[ОК] — ПЕРЕНЕСТИ\n[Отмена] — ПРОСТО СКОПИРОВАТЬ');
+    const isMove = confirm('Что делаем с исходными записями?\n\n[ОК] - ПЕРЕНЕСТИ\n[Отмена] - ПРОСТО СКОПИРОВАТЬ');
 
     const totals = { copied: 0, deleted: 0, copyFailed: 0, deleteFailed: 0 };
     for (let index = 0; index < worklogsToTransfer.length; index++) {

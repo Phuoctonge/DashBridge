@@ -20,7 +20,7 @@ class DiagnosticSpool {
     async begin(runId) {
         await this.clear();
         if (typeof navigator.storage?.getDirectory !== 'function') {
-            throw new Error('Chrome не предоставляет OPFS — безопасный запуск нескольких дашбордов невозможен');
+            throw new Error('Chrome не предоставляет OPFS - безопасный запуск нескольких дашбордов невозможен');
         }
         this.root = await navigator.storage.getDirectory();
         this.baseDirectory = await this.root.getDirectoryHandle('dashbridge-e2e-spool', { create: true });

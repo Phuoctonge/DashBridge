@@ -7,7 +7,9 @@
     function create({ reportEngine, transportFactory, testRunnerFactory, auditEngine,
         forceLoadPanel, postToDashboardFrame, getPanels, getActiveProfile, getTimeContext,
         attachmentsFactory = null, captureSelection = null, collage = null, copyImage = null,
-        documentRef = document, navigatorRef = navigator, setTimer = setTimeout }) {
+        beginReport = null, getReportFrameSource = frame => frame?.src,
+        saveProfiles = null,
+        documentRef = document, navigatorRef = navigator, setTimer = setTimeout, clearTimer = clearTimeout }) {
         if (!reportEngine?.normalizePanel || !reportEngine?.orderPanels
             || !transportFactory?.create || !testRunnerFactory?.create
             || typeof forceLoadPanel !== 'function' || typeof postToDashboardFrame !== 'function'
@@ -17,6 +19,7 @@
         }
         let activePreview = null;
         let closeActivePreview = null;
+        let reportPeriod = null;
 
         const getEffectivePanelSla = panel => {
             const config = reportEngine.normalizePanel(panel.report, panel);
@@ -63,6 +66,15 @@
 
         const collect = async (signal = null, onProgress = () => {}, { requirePanels = true } = {}) => {
             transport.throwIfAborted(signal);
+            const contextSignature = () => JSON.stringify({
+                profile: { id: getActiveProfile()?.id, name: getActiveProfile()?.name,
+                    report: { ...getActiveProfile()?.report, attachments: undefined } },
+                time: getTimeContext(),
+                panels: getPanels().map(panel => ({ id: panel.id, src: panel.src, title: panel.title, report: panel.report,
+                    threshold: [panel.tools?.thresholdEnabled, panel.tools?.thresholdValue, panel.tools?.thresholdUnit],
+                    capacity: [panel.tools?.cpuCapacityFilterEnabled, panel.tools?.cpuCapacityFilterCoefficient, panel.tools?.cpuCapacityFilterMode] })),
+            });
+            const initialContext = contextSignature();
             const profile = getActiveProfile();
             const reportPanels = reportEngine.orderPanels(
                 getPanels(), reportEngine.normalizeProfile(profile?.report).panelOrder
@@ -80,15 +92,20 @@
                 return snapshot;
             }));
             transport.throwIfAborted(signal);
+            if (initialContext !== contextSignature()) throw new Error('Параметры дашборда изменились во время сбора. Обновите данные сообщения.');
             const timeContext = getTimeContext();
+            const generatedTime = new Date();
             const context = {
-                period: documentRef.getElementById('timePickerLabel')?.textContent?.trim() || `${timeContext.from} — ${timeContext.to}`,
-                generatedAt: new Date().toLocaleString('ru-RU')
+                profileName: profile?.name || '',
+                period: reportPeriod || documentRef.getElementById('timePickerLabel')?.textContent?.trim() || `${timeContext.from} - ${timeContext.to}`,
+                generatedAt: generatedTime.toLocaleString('ru-RU', {
+                    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
+                })
             };
             const profileContext = reportEngine.normalizeProfile(profile.report).context;
             Object.assign(context, profileContext, {
-                testDuration: reportEngine.formatDuration(profileContext.testStartedAt),
-                stableLoadDuration: reportEngine.formatDuration(profileContext.stableLoadStartedAt)
+                testDuration: reportEngine.formatDuration(profileContext.testStartedAt, generatedTime),
+                stableLoadDuration: reportEngine.formatDuration(profileContext.stableLoadStartedAt, generatedTime)
             });
             const panelResults = reportPanels.map((panel, index) => {
                 const rendered = reportEngine.renderPanel(panel, snapshots[index], context);
@@ -105,10 +122,10 @@
             collect: (signal, onProgress) => collect(signal, onProgress, { requirePanels: false })
         });
 
-        const generate = async (output, status, warnings, signal = null) => {
+        const generate = async (output, status, warnings, signal = null, { requirePanels = true } = {}) => {
             const collected = await collect(signal, message => {
                 if (status.isConnected) status.textContent = message;
-            });
+            }, { requirePanels });
             const { reportPanels, problems } = collected;
             warnings.textContent = problems.map(item => `${item.panel.title || 'Панель'}: ${item.snapshot.error || 'данные недоступны'}`).join('\n');
             warnings.hidden = !problems.length;
@@ -129,18 +146,24 @@
             const overlay = documentRef.createElement('div');
             overlay.className = 'modal-overlay report-preview-overlay';
             overlay.innerHTML = `<section class="modal-content report-preview-modal" role="dialog" aria-modal="true" aria-labelledby="reportPreviewTitle">
-                <div class="report-preview-header"><div><h3 id="reportPreviewTitle">Сводное сообщение</h3><p>Текст и изображение отправляются отдельно.</p></div><button type="button" class="btn btn-outline report-close">Закрыть</button></div>
+                <div class="report-preview-header"><div><h3 id="reportPreviewTitle">Сводное сообщение</h3><p>Текст и изображение отправляются отдельно.</p></div><div class="report-preview-header-actions"><button type="button" class="btn btn-outline report-regenerate">Обновить данные</button><button type="button" class="btn btn-outline report-close">Закрыть</button></div></div>
                 <div class="report-preview-tabs" role="tablist" aria-label="Содержимое сообщения">
                     <button type="button" role="tab" id="reportTextTab" aria-controls="reportTextPanel" aria-selected="true">Текст</button>
                     <button type="button" role="tab" id="reportImagesTab" aria-controls="reportImagesPanel" aria-selected="false" tabindex="-1">Скриншоты</button>
                 </div>
+                <button type="button" class="btn btn-primary report-combined">Сформировать текст и скриншоты</button>
                 <div id="reportTextPanel" class="report-text-panel" role="tabpanel" aria-labelledby="reportTextTab">
                 <div class="report-text-body">
                 <div class="report-preview-status" role="status">Подготовка…</div>
                 <div class="report-preview-warnings" hidden></div>
                 <textarea class="report-preview-output" aria-label="Сформированное сообщение"></textarea>
+                <details class="report-generated-draft" hidden><summary>Данные обновлены - посмотреть новый текст</summary>
+                    <p>Ваши правки сохранены в поле выше. Новый вариант можно применить отдельно.</p>
+                    <textarea class="report-generated-output" readonly aria-label="Новый сформированный вариант"></textarea>
+                    <button type="button" class="btn btn-outline report-apply-generated">Использовать новый текст</button>
+                </details>
                 </div>
-                <div class="report-preview-footer"><button type="button" class="btn btn-outline report-regenerate">Обновить данные</button><button type="button" class="btn btn-primary report-copy">Копировать текст</button></div>
+                <div class="report-preview-footer"><button type="button" class="btn btn-primary report-copy">Копировать текст</button></div>
                 </div>
                 <div id="reportImagesPanel" class="report-attachments-host" role="tabpanel" aria-labelledby="reportImagesTab" hidden></div>
             </section>`;
@@ -150,7 +173,23 @@
             const status = overlay.querySelector('.report-preview-status');
             const warnings = overlay.querySelector('.report-preview-warnings');
             const regenerate = overlay.querySelector('.report-regenerate');
+            const combined = overlay.querySelector('.report-combined');
+            combined.hidden = !beginReport;
+            const copy = overlay.querySelector('.report-copy');
+            const generatedDraft = overlay.querySelector('.report-generated-draft');
+            const generatedOutput = overlay.querySelector('.report-generated-output');
+            let lastGenerated = '';
+            const syncCopy = () => { copy.disabled = !output.value.trim(); };
+            output.addEventListener('input', syncCopy);
+            overlay.querySelector('.report-apply-generated').addEventListener('click', () => {
+                output.value = generatedOutput.value;
+                lastGenerated = output.value;
+                generatedDraft.hidden = true;
+                syncCopy(); output.focus();
+            });
+            syncCopy();
             const tabs = [...overlay.querySelectorAll('[role="tab"]')];
+            let verifyCapturedReport = null;
             const selectTab = index => {
                 tabs.forEach((tab, current) => {
                     tab.setAttribute('aria-selected', String(current === index));
@@ -168,7 +207,17 @@
                     event.preventDefault(); selectTab(next); tabs[next].focus();
                 });
             });
+            const previewProfileId = getActiveProfile()?.id;
             const attachments = attachmentsFactory?.create({
+                preferences: reportEngine.normalizeProfile(getActiveProfile()?.report).attachments,
+                onPreferencesChange: async preferences => {
+                    const profile = getActiveProfile();
+                    if (!profile || profile.id !== previewProfileId || !saveProfiles) return;
+                    profile.panels = getPanels();
+                    profile.report = { ...profile.report, attachments: preferences };
+                    const saved = await saveProfiles();
+                    if (saved?.error) throw new Error(saved.error);
+                },
                 host: overlay.querySelector('.report-attachments-host'), overlay,
                 getPanels: () => reportEngine.orderPanels(getPanels(), reportEngine.normalizeProfile(getActiveProfile()?.report).panelOrder),
                 getContext: () => ({
@@ -177,24 +226,80 @@
                     period: documentRef.getElementById('timePickerLabel')?.textContent?.trim(),
                     panels: getPanels().map(panel => ({ id: panel.id, src: panel.src, title: panel.title,
                         paused: panel.paused, tools: panel.tools, grafanaTheme: panel.grafanaTheme, report: panel.report,
-                        frameSrc: documentRef.getElementById('iframe-' + panel.id)?.src }))
+                        frameSrc: getReportFrameSource(documentRef.getElementById('iframe-' + panel.id)) }))
                 }),
-                captureSelection, collage, copyImage, documentRef
+                captureSelection: async (selected, options) => {
+                    const captured = await captureSelection(selected, { ...options,
+                        waitForData: async (panel, signal) => {
+                            const snapshot = await transport.requestPanelSnapshot({ ...panel,
+                                report: { ...panel.report, sla: { source: 'none', evaluation: 'latest' } } }, signal);
+                            transport.throwIfAborted(signal);
+                            if (!['ok', 'no_threshold', 'critical', 'warning', 'breached'].includes(snapshot?.state)) {
+                                throw new Error(snapshot?.error || snapshot?.dataStatusText || 'Данные панели для скриншота не готовы.');
+                            }
+                        }
+                    });
+                    await verifyCapturedReport?.(options.signal);
+                    return captured;
+                }, collage, copyImage, documentRef,
+                requestReport: beginReport ? () => run(true) : null
             });
             let running = false;
             let runController = null;
-            const run = async () => {
+            const run = async (withImages = false) => {
                 if (running) return;
                 running = true;
                 runController = new AbortController();
                 const controller = runController;
+                const deadline = withImages ? setTimer(() => controller.abort(), 240_000) : null;
                 regenerate.disabled = true;
+                combined.disabled = true;
                 attachments?.setCollecting(true);
                 warnings.hidden = true;
                 warnings.textContent = '';
+                let lease = null;
                 try {
-                    const collected = await generate(output, status, warnings, controller.signal);
-                    attachments?.setReport(collected);
+                    if (withImages) {
+                        status.textContent = 'Фиксируем период и загружаем панели без автообновления…';
+                        lease = beginReport({ signal: controller.signal });
+                        reportPeriod = lease.period;
+                        await lease.ready;
+                        transport.throwIfAborted(controller.signal);
+                    }
+                    for (let attempt = 0; attempt < (withImages ? 2 : 1); attempt += 1) {
+                        const candidate = { value: '' };
+                        const collected = await generate(candidate, status, warnings, controller.signal,
+                            { requirePanels: !withImages });
+                        if (output.value !== lastGenerated) {
+                            generatedOutput.value = candidate.value;
+                            generatedDraft.hidden = false;
+                            status.textContent += ' Ваши правки сохранены; новый вариант доступен ниже.';
+                        } else {
+                            output.value = candidate.value;
+                            lastGenerated = candidate.value;
+                            generatedDraft.hidden = true;
+                        }
+                        syncCopy();
+                        attachments?.setReport(collected);
+                        if (withImages) {
+                            verifyCapturedReport = async signal => {
+                                const current = await Promise.all(collected.reportPanels.map(panel => transport.requestPanelSnapshot(panel, signal)));
+                                if (JSON.stringify(current) !== JSON.stringify(collected.snapshots)) {
+                                    const error = new Error('Данные изменились во время снимков. Коллаж отклонён; сформируйте общий отчёт заново.');
+                                    error.code = 'REPORT_CHANGED';
+                                    throw error;
+                                }
+                            };
+                            attachments?.setCollecting(false);
+                            selectTab(1);
+                            const outcome = await attachments?.captureReport(controller.signal);
+                            if (outcome?.error?.code === 'REPORT_CHANGED' && attempt === 0) {
+                                status.textContent = 'Графики обновились. Повторяем общий сбор в том же периоде…';
+                                continue;
+                            }
+                        }
+                        break;
+                    }
                 }
                 catch (error) {
                     globalThis.DashBridgeAnalytics?.outcome('dashbridge.report_generated',
@@ -202,15 +307,21 @@
                     if (error?.name !== 'AbortError' && status.isConnected) status.textContent = error.message || String(error);
                 }
                 finally {
+                    if (deadline !== null) clearTimer(deadline);
+                    verifyCapturedReport = null;
+                    lease?.release();
+                    reportPeriod = null;
                     if (runController === controller) {
                         runController = null;
                         running = false;
                         if (regenerate.isConnected) regenerate.disabled = false;
+                        if (combined.isConnected) combined.disabled = false;
                         attachments?.setCollecting(false);
                     }
                 }
             };
             const close = () => {
+                root.removeEventListener?.('pagehide', close);
                 runController?.abort();
                 attachments?.stop();
                 if (activePreview === overlay) {
@@ -220,9 +331,11 @@
                 overlay.remove();
             };
             closeActivePreview = close;
+            root.addEventListener?.('pagehide', close, { once: true });
             overlay.querySelector('.report-close').addEventListener('click', close);
             overlay.addEventListener('click', event => { if (event.target === overlay) close(); });
-            regenerate.addEventListener('click', run);
+            regenerate.addEventListener('click', () => { void run(); });
+            combined.addEventListener('click', () => { void run(true); });
             overlay.querySelector('.report-copy').addEventListener('click', async event => {
                 const button = event.currentTarget;
                 try {

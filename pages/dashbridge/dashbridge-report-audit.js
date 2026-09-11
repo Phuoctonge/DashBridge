@@ -8,6 +8,7 @@
         return normalized.length > 160 ? `${normalized.slice(0, 157)}…` : normalized;
     };
     const listVariableValue = (item, series, name) => ({
+        ...item.variables,
         name: series?.name || '', rawName: series?.name || '',
         vCpu: series?.cpuCapacity, cpuCapacity: series?.cpuCapacity,
         seriesThreshold: series?.threshold ?? series?.cpuCapacityThreshold,
@@ -49,6 +50,7 @@
             }
         };
         const context = {
+            profileName: 'Audit profile',
             testName: 'Audit test', environment: 'audit',
             testStartedAt: '2026-01-01T10:00', stableLoadStartedAt: '2026-01-01T11:00',
             testDuration: '2 часа', stableLoadDuration: '1 час',

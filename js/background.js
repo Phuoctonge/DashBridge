@@ -1,5 +1,5 @@
 // Popup открывается автоматически через "default_popup" в manifest.json.
-// Если потребуется кастомный размер окна — убери default_popup из манифеста
+// Если потребуется кастомный размер окна - убери default_popup из манифеста
 // и раскомментируй обработчик ниже:
 //
 // chrome.action.onClicked.addListener(() => {
@@ -9,6 +9,8 @@
 importScripts('../vendor/jszip.min.js', 'shared/grafana-settings.js', 'shared/url-validation.js', 'shared/dnr-rules.js', 'shared/grafana-runtime-manifest.js', 'shared/local-state-schema.js', 'shared/grafana-panel-identity.js', 'shared/analytics-contract.js', 'shared/analytics-config.js', 'background-grafana-infrastructure.js', 'background-profile-storage.js', 'background-gui-capture.js', 'background-update-indicator.js', 'background-analytics.js');
 
 const GRAFANA_TAB_VISUAL_STATE_PREFIX = 'grafanaVisualState:';
+importScripts('background-batch-capture.js');
+globalThis.DashBridgeBackgroundBatchCapture?.create();
 
 function isTrustedExtensionPage(sender, page) {
     if (sender?.id !== chrome.runtime.id || typeof sender.url !== 'string') return false;
@@ -126,6 +128,32 @@ const guiCaptureController = DashBridgeBackgroundGuiCapture.create({ zipConstruc
 // Do not replace the branch-specific checks with a single "extension sender" test:
 // content scripts and extension pages intentionally have different authority.
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type === 'dashbridge-grafana-connections-replace') {
+        if (!isTrustedExtensionPage(_sender, 'pages/options/options.html')) {
+            sendResponse({ ok: false, error: 'Unexpected sender' }); return;
+        }
+        grafanaInfrastructure.replaceConnections(message.expected, message.hosts)
+            .then(result => sendResponse({ ok: true, ...result }))
+            .catch(error => sendResponse({ ok: false, error: error.message }));
+        return true;
+    }
+    if (message?.type === 'dashbridge-grafana-connection') {
+        if (!isTrustedExtensionPage(_sender, 'pages/dashbridge/dashbridge.html')
+            || typeof message.url !== 'string' || message.url.length > 16_384
+            || typeof message.add !== 'boolean') {
+            sendResponse({ ok: false, error: 'Untrusted Grafana connection request' });
+            return undefined;
+        }
+        void (async () => {
+            try {
+                const result = await grafanaInfrastructure.configureConnection(message.url, message.add);
+                sendResponse({ ok: true, ...result });
+            } catch (error) {
+                sendResponse({ ok: false, error: error?.message || String(error) });
+            }
+        })();
+        return true;
+    }
     if (message?.type === 'dashbridge-apply-update-indicator') {
         if (!isTrustedExtensionPage(_sender, 'pages/popup/popup.html')
             || typeof message.version !== 'string' || message.version.length > 32) {

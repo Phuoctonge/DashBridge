@@ -1,5 +1,29 @@
-// Этот скрипт работает внутри iframe Графаны и "жестко" вырезает шапку
-if (window.name === 'dashbridge-iframe') {
+// Location recovery remains available on Home/login, independently of panel tools.
+(function installFrameLocationProbe() {
+    if (window.name !== 'dashbridge-iframe') return;
+    const extensionOrigin = new URL(chrome.runtime.getURL('')).origin;
+    const inspect = event => {
+        if (event.source !== window.parent || event.origin !== extensionOrigin
+            || event.data?.action !== 'dashbridgeInspectLocation'
+            || typeof event.data.requestId !== 'string' || event.data.requestId.length > 128) return;
+        const url = new URL(location.href);
+        url.hash = '';
+        const panelRoute = /\/d(?:-solo)?\/[^/]+\//.test(url.pathname);
+        const documentReady = panelRoute && document.readyState === 'complete';
+        const ready = panelRoute && !!document.querySelector(
+            'canvas, table, [role="table"], [role="grid"], [data-testid="panel content"], .panel-content'
+        );
+        const home = /^Home\s*-.*Grafana$/i.test(document.title)
+            || Array.from(document.querySelectorAll('h1, h2')).some(el => el.textContent.trim() === 'Welcome to Grafana');
+        window.parent.postMessage({ action: 'dashbridgeFrameLocation',
+            requestId: event.data.requestId, url: url.href, documentReady, ready, home }, extensionOrigin);
+    };
+    window.addEventListener('message', inspect);
+    window.addEventListener('pagehide', () => window.removeEventListener('message', inspect), { once: true });
+})();
+
+// Panel messages and layout must never treat Grafana Home or login as a panel.
+if (window.name === 'dashbridge-iframe' && /\/d(?:-solo)?\/[^/]+\//.test(location.pathname)) {
     const extensionOrigin = new URL(chrome.runtime.getURL("")).origin;
     // Tell the parent that this window has reached the Grafana document. This
     // is safer than relying on iframe `load`, which can belong to about:blank.

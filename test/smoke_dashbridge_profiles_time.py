@@ -43,7 +43,7 @@ checks = {
         and "detectGrafanaTimeFormat(urlValue)" in TIME_STATE,
     "time controls are present": all(token in HTML for token in ['id="absTimeFrom"', 'id="absTimeTo"', 'id="applyAbsoluteTime"']),
     "crosshair mode is stored": "dashbridge_crosshairMode" in JS,
-    "active panels load eagerly and paused panels remain excluded": "navigateDashboardFrame(iframe, iframe.dataset.src)" in PANEL_CARD_CONTROLLER
+    "active panels enter startup queue and paused panels remain excluded": "scheduleFrameLoad(iframe, iframe.dataset.src)" in PANEL_CARD_CONTROLLER
         and "if (!panel.paused)" in PANEL_CARD_CONTROLLER and "dashbridgeLazyLoadEnabled" not in JS,
     "quick panel addition UI is present": all(token in HTML for token in ['id="quickAddPanelsBtn"', 'id="quickAddDashboardUrl"', 'id="quickAddPanelIds"']),
     "quick panel addition builds d-solo URLs": "function buildDashBridgeSoloPanelUrl" in PANEL_URL and "url.searchParams.set('panelId', panelId)" in PANEL_URL,

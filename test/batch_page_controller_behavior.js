@@ -19,8 +19,9 @@ class FakeElement {
         this.removed = false;
         this.classList = { add() {}, remove() {} };
     }
-    addEventListener(type, listener) { this.listeners[type] = listener; }
-    emit(type) { return this.listeners[type]?.({ target: this, currentTarget: this }); }
+    addEventListener(type, listener) { (this.listeners[type] ||= []).push(listener); }
+    emit(type) { for (const listener of this.listeners[type] || []) listener({ target: this, currentTarget: this }); }
+    dispatchEvent(event) { this.emit(event.type); }
     replaceChildren() { this.replaced = true; }
     closest() { return { id: 'captureThemeMain' }; }
     append(...children) { this.children.push(...children); }
@@ -70,7 +71,7 @@ const timers = [];
 const context = {
     document: documentRef,
     setTimeout(callback) { timers.push(callback); return timers.length; },
-    Date,
+    Date, Event,
 };
 context.globalThis = context;
 vm.createContext(context);
@@ -144,10 +145,13 @@ assert.strictEqual(elements.userPanelsGroup.style.display, 'block');
 
 elements.dashUrl.value = 'https://grafana.example/d/uid/name';
 elements.timestamps.value = 'now-1h, now';
+let seriesUrlChanges = 0;
+elements.seriesDashUrl.addEventListener('change', () => { seriesUrlChanges += 1; });
 elements.copyMainSettingsToSeriesBtn.emit('click');
 assert.strictEqual(elements.seriesDashUrl.value, elements.dashUrl.value);
 assert.strictEqual(elements.seriesTimestamps.value, elements.timestamps.value);
 assert(pickerCalls.some(call => call[0] === 'clear'));
+assert.strictEqual(seriesUrlChanges, 1, 'programmatic URL copy must invalidate consumers of the previous URL');
 elements.getPanelsBtn.emit('click');
 assert(pickerCalls.some(call => call[0] === 'open' && call[1].context === 'main'));
 

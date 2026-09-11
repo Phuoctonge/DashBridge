@@ -237,7 +237,7 @@
                 appendText(current, 'td', notApplicable ? 'report-audit-muted'
                     : variable.hasData ? 'report-audit-pass' : 'report-audit-warning',
                 notApplicable ? 'Не требуется' : variable.hasData ? 'Да' : 'Нет');
-                appendText(current, 'td', '', variable.value || (notApplicable ? 'Ожидаемо пусто' : '—'));
+                appendText(current, 'td', '', variable.value || (notApplicable ? 'Ожидаемо пусто' : '-'));
             });
         };
         const open = () => {

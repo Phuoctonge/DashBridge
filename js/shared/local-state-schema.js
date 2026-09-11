@@ -88,6 +88,7 @@
         if (!isPlainObject(value)) fail(`${label}: ожидается объект.`);
         if (value.enabled !== undefined && typeof value.enabled !== 'boolean') fail(`${label}.enabled: ожидается boolean.`);
         if (value.detailsEnabled !== undefined && typeof value.detailsEnabled !== 'boolean') fail(`${label}.detailsEnabled: ожидается boolean.`);
+        if (value.listLimit !== undefined && value.listLimit !== null && (!Number.isInteger(value.listLimit) || value.listLimit < 1 || value.listLimit > 50)) fail(`${label}.listLimit: ожидается целое число от 1 до 50 или null.`);
         const source = value.sla?.source === undefined ? 'none' : value.sla.source;
         if (value.sla !== undefined && !isPlainObject(value.sla)) fail(`${label}.sla: ожидается объект.`);
         if (!REPORT_SOURCES.has(source)) fail(`${label}.sla.source: недопустимый источник.`);
@@ -123,7 +124,8 @@
                 warningValue: warningValue === undefined || warningValue === null ? null : Number(warningValue),
                 unit: optionalString(value.sla?.unit, `${label}.sla.unit`, 64) },
             templates: templates ? { ...templates } : undefined,
-            detailsEnabled: value.detailsEnabled === true
+            detailsEnabled: value.detailsEnabled !== false,
+            listLimit: Number.isInteger(value.listLimit) && value.listLimit >= 1 && value.listLimit <= 50 ? value.listLimit : null
         };
     }
 
@@ -138,6 +140,21 @@
         const panelOrder = value.panelOrder?.map((id, index) => idField(id, `${label}.panelOrder[${index}]`));
         if (panelOrder && new Set(panelOrder).size !== panelOrder.length) {
             fail(`${label}.panelOrder: идентификаторы не должны повторяться.`);
+        }
+        if (value.attachments !== undefined) {
+            const options = value.attachments;
+            if (!isPlainObject(options)) fail(`${label}.attachments: ожидается объект.`);
+            for (const key of ['slaOnly', 'heading']) {
+                if (options[key] !== undefined && typeof options[key] !== 'boolean') fail(`${label}.attachments.${key}: ожидается boolean.`);
+            }
+            if (options.layout !== undefined && !['auto', 'column', 'grid'].includes(options.layout)) fail(`${label}.attachments.layout: неизвестная раскладка.`);
+            for (const [key, limit] of [['panelOrder', 1000], ['selectedIds', 8], ['forcedIds', 8]]) {
+                const ids = options[key];
+                if (ids === undefined || (key === 'selectedIds' && ids === null)) continue;
+                if (!Array.isArray(ids) || ids.length > limit) fail(`${label}.attachments.${key}: превышен лимит ${limit}.`);
+                ids.forEach((id, index) => idField(id, `${label}.attachments.${key}[${index}]`));
+                if (new Set(ids).size !== ids.length) fail(`${label}.attachments.${key}: идентификаторы повторяются.`);
+            }
         }
         return { ...value, enabled: value.enabled !== false,
             template: optionalString(value.template, `${label}.template`, 20_000),
@@ -339,6 +356,8 @@
     }
 
     root.DashBridgeLocalStateSchema = Object.freeze({
+        profileFingerprint: value => JSON.stringify(value, (_key, item) => item && typeof item === 'object' && !Array.isArray(item)
+            ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item),
         isSafeId: value => typeof value === 'string' && SAFE_ID_PATTERN.test(value),
         normalizeProfiles,
         normalizeWorklogs,

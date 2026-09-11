@@ -36,3 +36,7 @@ assert.throws(() => schema.normalizeProfiles([{ ...base, report: {
     template: '{{panels}}', panelOrder: ['panel-1', 'panel-1']
 } }]), /повторяться/u);
 console.log('PASS dashboard report settings are validated during profile import');
+for (const forcedIds of [null, 'panel-1', ['panel-1', 'panel-1'], Array.from({ length: 9 }, (_, i) => `panel-${i}`)]) {
+    assert.throws(() => schema.normalizeProfiles([{ ...base, report: { attachments: { forcedIds } } }]), /forcedIds/);
+}
+assert.deepStrictEqual(Array.from(schema.normalizeProfiles([{ ...base, report: { attachments: { forcedIds: ['panel-1'] } } }]).items[0].report.attachments.forcedIds), ['panel-1']);

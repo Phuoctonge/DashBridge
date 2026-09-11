@@ -67,7 +67,7 @@ main { padding: .5rem var(--page-gutter) 2rem; container: recorder / inline-size
 .network-switches { display: grid; grid-template-columns: minmax(0,1fr); align-items: start; gap: .75rem; margin-top: 0; }
 .network-switch-card { padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-elevated); }
 .network-switch-card > label { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; align-items: center; cursor: pointer; }
-.network-switches input { grid-row: 1 / span 2; width: 17px; height: 17px; accent-color: var(--primary); }
+.network-switch-card > small { display: block; margin-top: .375rem; margin-left: 2.875rem; }
 .network-switches span { font-size: .875rem; font-weight: 600; }
 .network-switches small { color: var(--text-muted); font-size: .8125rem; line-height: 1.5; }
 .incognito-setup { display: flex; flex-direction: column; align-items: stretch; gap: 9px; margin: 10px 0 0 25px; padding-top: 10px; border-top: 1px solid rgba(245,158,11,.35); color: var(--warning); }

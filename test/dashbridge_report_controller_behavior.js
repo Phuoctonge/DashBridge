@@ -17,6 +17,7 @@ const context = {
     navigator: { clipboard: { writeText: async () => undefined } },
     CSS: { escape: value => String(value) },
     setTimeout,
+    clearTimeout,
     AbortController,
     console,
 };
@@ -82,11 +83,26 @@ const controller = context.DashBridgeReportController.create({
         'the saved message order must control collection and composition without changing dashboard layout');
     assert.deepStrictEqual(result.problems.map(item => item.panel.id), ['ram']);
     assert.strictEqual(result.context.testDuration, 'duration:2026-01-01');
+    assert.strictEqual(result.context.profileName, 'Prod', 'panel rendering receives the active profile name');
     assert(progress.includes('Получаем данные панелей: 2 из 2…'));
+    profile.report.panelOrder = [];
+    panels.forEach(panel => { panel.report.enabled = false; });
+    const imageOnly = await controller.collect(null, () => undefined, { requirePanels: false });
+    assert.deepStrictEqual(imageOnly.reportPanels, [], 'image-only combined reports may proceed when forced attachments are configured without text panels');
+    panels.forEach(panel => { panel.report.enabled = true; });
+    profile.report.panelOrder = ['ram', 'cpu'];
     calls.length = 0;
     await liveCollector(null, () => undefined);
     assert.deepStrictEqual(calls.sort(), ['cpu', 'ram'], 'Message Test Runner must reuse the same live collector');
     assert.throws(() => context.DashBridgeReportController.create({}), /dependencies are incomplete/);
+    const request = transport.requestPanelSnapshot;
+    transport.requestPanelSnapshot = async panel => {
+        const result = await request(panel);
+        profile.name = 'Changed during collection';
+        return result;
+    };
+    await assert.rejects(controller.collect(), /изменились во время сбора/,
+        'a report must not combine old snapshots with newly changed dashboard context');
     console.log('PASS DashBridge report controller preserves SLA, collection and test-runner contracts');
 })().catch(error => {
     console.error(error);

@@ -186,15 +186,25 @@
             const card = documentRef.createElement('div');
             card.className = 'batch-series-card';
             card.dataset.querySignatures = JSON.stringify(signatures || []);
-            card.innerHTML = `<h3 style="margin-top:0; font-size:14px; color:var(--primary);">Панель ID: ${escapeHtml(panelId)} — ${escapeHtml(panelTitle)}</h3>
+            card.innerHTML = `<h3 style="margin-top:0; font-size:14px; color:var(--primary);">Панель ID: ${escapeHtml(panelId)} - ${escapeHtml(panelTitle)}</h3>
                 <input type="hidden" class="series-panel-url" value="${escapeHtml(panelUrl)}">
                 <p>Series будут определены для каждого временного среза и отфильтрованы по ключевым фразам.</p>`;
             container.appendChild(card);
         };
 
+        let preparationGeneration = 0;
+        const invalidatePreparation = () => {
+            preparationGeneration += 1;
+            documentRef.getElementById('seriesLoaderStatus').hidden = true;
+        };
         const loadSelectedPanels = async () => {
+            invalidatePreparation();
+            const generation = preparationGeneration;
             const dashboardUrl = documentRef.getElementById('seriesDashUrl').value.trim();
             const panelIds = panelPicker.getSeriesSelectedPanelIds();
+            const isCurrent = () => generation === preparationGeneration
+                && dashboardUrl === documentRef.getElementById('seriesDashUrl').value.trim()
+                && JSON.stringify(panelIds) === JSON.stringify(panelPicker.getSeriesSelectedPanelIds());
             if (!dashboardUrl) return showToast('Введите URL дашборда для Series', 'error');
             if (!panelIds.length) return showToast('Выберите хотя бы одну панель', 'error');
             const loader = documentRef.getElementById('seriesLoaderStatus');
@@ -203,6 +213,7 @@
             try {
                 let loadedCards = 0;
                 const { payload } = await fetchDashboardDefinition(dashboardUrl);
+                if (!isCurrent()) return;
                 for (const panelId of panelIds) {
                     const panelUrl = buildPanelUrl(dashboardUrl, panelId, {
                         theme: getCaptureTheme('captureThemeSeries'),
@@ -226,15 +237,20 @@
                     );
                 }
             } catch (error) {
+                if (!isCurrent()) return;
                 logMessage(`Ошибка подготовки панелей: ${error.message}`, true);
                 showToast('Не удалось подготовить панели', 'error');
             } finally {
-                loader.hidden = true;
+                if (generation === preparationGeneration) loader.hidden = true;
             }
         };
 
         const setup = () => {
+            const dashboardUrl = documentRef.getElementById('seriesDashUrl');
+            dashboardUrl.addEventListener('input', invalidatePreparation);
+            dashboardUrl.addEventListener('change', invalidatePreparation);
             documentRef.getElementById('getSeriesPanelsBtn').addEventListener('click', () => {
+                invalidatePreparation();
                 void panelPicker.open({
                     dashboardUrl: documentRef.getElementById('seriesDashUrl').value.trim(),
                     context: 'series',

@@ -122,6 +122,15 @@ document.addEventListener("DOMContentLoaded", () => {
         redoStack = [];
     }
 
+    function acknowledgeHistory(logId) {
+        // Undo can restore draft fields or removed rows, but cannot undo a Jira POST.
+        // Reconcile both branches before persistence, even if the local commit fails.
+        const reconcile = snapshot => JSON.stringify(JSON.parse(snapshot).map(log =>
+            log.id === logId ? { ...log, status: 'sent' } : log));
+        historyStack = historyStack.map(reconcile);
+        redoStack = redoStack.map(reconcile);
+    }
+
     function undo() {
         if (historyStack.length === 0) return;
         const popped = historyStack.pop();
@@ -594,7 +603,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     console.error(`[Jira Error] ${result.status}: ${result.errorText}`);
                 }
                 status = result.ok ? 'sent' : 'error';
-                if (result.ok) succeeded += 1;
+                if (result.ok) { succeeded += 1; acknowledgeHistory(log.id); }
             } catch (e) {
                 console.error("[Worklog Error]", e);
                 status = 'error';

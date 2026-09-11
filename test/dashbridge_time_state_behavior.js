@@ -24,6 +24,11 @@ vm.createContext(context);
 vm.runInContext(fs.readFileSync('js/shared/grafana-panel-bootstrap.js', 'utf8'), context);
 vm.runInContext(fs.readFileSync('pages/dashbridge/dashbridge-time-state.js', 'utf8'), context);
 const state = vm.runInContext('DashBridgeTimeState', context);
+const reportNow = 1788955200000;
+assert.deepStrictEqual(JSON.parse(JSON.stringify(state.forReport({ from: 'now-1h', to: 'now', refresh: '5s' }, reportNow))),
+    { from: String(reportNow - 3600000), to: String(reportNow), refresh: '' });
+assert.throws(() => state.forReport({ from: 'now/d', to: 'now' }), /абсолютный/);
+assert.throws(() => state.forReport({ from: 'now+1h', to: 'now' }), /позже/);
 
 assert.deepStrictEqual(JSON.parse(JSON.stringify(state.defaults())), {
     from: 'now-1h', to: 'now', refresh: ''

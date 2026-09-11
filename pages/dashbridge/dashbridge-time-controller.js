@@ -11,7 +11,7 @@
     function create({ timeState, getActiveProfile, saveProfiles, getPanels, getPanelTools,
         legendSelection, panelBootstrap, getTransformSettings, postToDashboardFrame,
         navigateDashboardFrame, refreshAllPanels, runtimeScopeId, documentRef = document, windowRef = window,
-        navigatorRef = navigator, setTimer = setTimeout }) {
+        navigatorRef = navigator, setTimer = setTimeout, clearTimer = clearTimeout }) {
         if (!timeState?.defaults || !timeState?.normalize || !timeState?.applyToUrl
             || !timeState?.formatForInput || !timeState?.formatForLabel
             || typeof getActiveProfile !== 'function' || typeof saveProfiles !== 'function'
@@ -23,6 +23,8 @@
         }
 
         let state = timeState.defaults();
+        let reportLease = null;
+        let reportGeneration = 0;
         let recentRanges = [];
 
         const parseTimeInput = value => {
@@ -78,7 +80,7 @@
                 const button = documentRef.createElement('button');
                 button.type = 'button';
                 button.className = 'recent-time-range';
-                button.textContent = `${timeState.formatForInput(range.from)} — ${timeState.formatForInput(range.to)}`;
+                button.textContent = `${timeState.formatForInput(range.from)} - ${timeState.formatForInput(range.to)}`;
                 button.addEventListener('click', () => {
                     // Use exact stored instants; formatting the inputs would discard milliseconds.
                     documentRef.getElementById('absTimeFrom').value = range.from;
@@ -119,7 +121,7 @@
             const timePickerButton = documentRef.getElementById('timePickerBtn');
             if (timePickerButton) timePickerButton.title = state.from.toString().startsWith('now-')
                 ? `Выбрать время: ${timeLabel.textContent}`
-                : `Выбрать время: ${timeState.formatForInput(state.from)} — ${timeState.formatForInput(state.to)}`;
+                : `Выбрать время: ${timeState.formatForInput(state.from)} - ${timeState.formatForInput(state.to)}`;
             const refreshLabel = documentRef.getElementById('refreshPickerLabel');
             if (refreshLabel) refreshLabel.textContent = state.refresh === 'auto' ? 'Авто'
                 : state.refresh ? state.refresh.replace(/(\d+)([smhd])/, (_match, count, unit) => `${count} ${{ s: 'с', m: 'мин', h: 'ч', d: 'дн' }[unit]}`) : 'Выкл.';
@@ -133,7 +135,7 @@
             if (documentRef.getElementById('timePickerLabel')) updateLabels();
         };
 
-        const applyGlobalParamsToUrl = urlValue => timeState.applyToUrl(urlValue, state);
+        const applyGlobalParamsToUrl = urlValue => timeState.applyToUrl(urlValue, reportLease?.time || state);
 
         const applyPanelLegendFilterToUrl = (panel, urlValue) => {
             try {
@@ -224,14 +226,15 @@
         };
 
         const sendTimeUpdate = iframe => {
+            const effective = reportLease?.time || state;
             const panel = getPanelForIframe(iframe);
             if (!panel) return false;
             const timeUrl = iframe.dataset.src || iframe.src;
             return postToDashboardFrame(iframe, {
                 type: 'DASHBRIDGE_TIME_UPDATE',
-                from: timeState.formatForUrl(timeUrl, state.from),
-                to: timeState.formatForUrl(timeUrl, state.to),
-                refresh: state.refresh
+                from: timeState.formatForUrl(timeUrl, effective.from),
+                to: timeState.formatForUrl(timeUrl, effective.to),
+                refresh: effective.refresh
             });
         };
 
@@ -250,7 +253,11 @@
         windowRef.addEventListener('dashbridge-theme-change', () => {
             documentRef.querySelectorAll('iframe[name="dashbridge-iframe"]').forEach(iframe => {
                 const panel = getPanelForIframe(iframe);
-                if ((panel?.grafanaTheme || 'follow') !== 'follow' || !iframe.src || iframe.src === 'about:blank') return;
+                if ((panel?.grafanaTheme || 'follow') !== 'follow') return;
+                if (!iframe.src || iframe.src === 'about:blank') {
+                    if (iframe.dataset.src) iframe.dataset.src = applyPanelParamsToUrl(panel);
+                    return;
+                }
                 navigateDashboardFrame(iframe, applyPanelParamsToUrl(panel));
             });
         });
@@ -404,9 +411,62 @@
             updateLabels();
         };
 
+        const beginReport = ({ signal } = {}) => {
+            if (reportLease) throw new Error('Уже формируется общий отчёт.');
+            const time = timeState.forReport(state);
+            const navigationId = `${Date.now()}-${++reportGeneration}`;
+            const frames = new Map();
+            const pending = [];
+            const cleanups = [];
+            const lease = { time, frames };
+            const release = () => {
+                if (reportLease !== lease) return;
+                reportLease = null;
+                cleanups.forEach(cleanup => cleanup());
+                frames.forEach((saved, frame) => {
+                    if (frame.isConnected && frame.src === saved.temporary) navigateDashboardFrame(frame, saved.src);
+                });
+            };
+            reportLease = lease;
+            try {
+                getPanels().filter(panel => !panel.paused).forEach(panel => {
+                    const frame = documentRef.getElementById('iframe-' + panel.id);
+                    if (!frame) throw new Error('Панель отсутствует. Перезагрузите дашборд.');
+                    const temporaryUrl = new URL(applyPanelParamsToUrl(panel));
+                    // Assigning the same URL with a fragment can retain the old
+                    // document, which never sends a new iframe-ready message.
+                    // Use the existing refresh cache-buster for a full navigation.
+                    temporaryUrl.searchParams.set('_t', navigationId);
+                    const saved = { src: frame.dataset.src || frame.src, temporary: temporaryUrl.toString() };
+                    frames.set(frame, saved);
+                    if (frame.removeEventListener) pending.push(new Promise((resolve, reject) => {
+                        let timer;
+                        const cleanup = () => {
+                            frame.removeEventListener('load', loaded);
+                            signal?.removeEventListener('abort', aborted);
+                            clearTimer(timer);
+                        };
+                        const loaded = () => { cleanup(); resolve(); };
+                        const aborted = () => { cleanup(); reject(new DOMException('Подготовка отменена', 'AbortError')); };
+                        cleanups.push(cleanup);
+                        frame.addEventListener('load', loaded, { once: true });
+                        signal?.addEventListener('abort', aborted, { once: true });
+                        timer = setTimer(() => { cleanup(); reject(new Error('Панель не загрузилась за 90 секунд.')); }, 90_000);
+                        if (signal?.aborted) aborted();
+                    }));
+                    navigateDashboardFrame(frame, saved.temporary);
+                });
+                return { time, period: timeState.formatForLabel(time.from, time.to), ready: Promise.all(pending), release };
+            } catch (error) { release(); throw error; }
+        };
+        const getReportFrameSource = frame => {
+            const saved = reportLease?.frames.get(frame);
+            return saved && frame.src === saved.temporary ? saved.src : (frame?.dataset.src || frame?.src);
+        };
+
         return Object.freeze({ loadProfileState, saveProfileState, syncControls, updateLabels,
             applyPanelParamsToUrl, getPanelForIframe, sendTimeUpdate, broadcast, setupControls, getState,
-            resolveTheme });
+            resolveTheme, beginReport, getReportFrameSource });
     }
 
     root.DashBridgeTimeController = Object.freeze({ create });

@@ -39,7 +39,7 @@ const chrome = {
         setBadgeBackgroundColor: async () => {}, setTitle: async () => {},
     },
 };
-const context = {
+const context = { navigator: { locks: { request: async (_name, callback) => callback() } },
     chrome, importScripts() {}, console, setTimeout, clearTimeout, URL, Date, Uint8Array,
     crypto: { randomUUID: () => 'generated-id' },
     fetch: async () => ({ blob: async () => ({ size: 1 }) }),
@@ -86,6 +86,14 @@ const grafanaSender = (url, frameId = 0) => ({
 });
 
 (async () => {
+    for (const sender of [grafanaSender('https://grafana.test/d/uid/name'),
+        { id: 'extension-id', url: chrome.runtime.getURL('pages/popup/popup.html') },
+        { id: 'foreign', url: chrome.runtime.getURL('pages/dashbridge/dashbridge.html') }]) {
+        const response = await new Promise(resolve => messageListener({
+            type: 'dashbridge-grafana-connection', url: 'https://new.test/d/a', add: true
+        }, sender, resolve));
+        assert.strictEqual(response.ok, false, 'only the exact DashBridge page may configure a connection');
+    }
     assert.strictEqual(await isTrustedGrafanaContentSender(grafanaSender('https://grafana.test/d/uid/name')), true);
     assert.strictEqual(await isTrustedGrafanaContentSender(grafanaSender('https://grafana.test/base/d-solo/uid/name')), true);
     assert.strictEqual(await isTrustedGrafanaContentSender(grafanaSender('https://grafana.test/public/page')), false,

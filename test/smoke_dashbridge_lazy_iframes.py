@@ -22,8 +22,8 @@ checks = {
         "iframe.loading = 'eager'" in renderer,
     'paused card does not create an iframe':
         "panel.paused ? this.createPausedPanelBody(panel) : this.createLivePanelBody" in renderer,
-    'active iframe starts during dashboard render':
-        re.search(r"if \(!panel\.paused\)\s*\{\s*navigateDashboardFrame\(iframe, iframe\.dataset\.src\)", cards) is not None,
+    'active iframe enters bounded startup queue during render':
+        re.search(r"if \(!panel\.paused\)\s*\{\s*scheduleFrameLoad\(iframe, iframe\.dataset\.src\)", cards) is not None,
     'header contains current-profile ZIP button':
         'id="captureAllPanelsBtn"' in html and 'captureAllDashboardPanels' in src
         and 'captureAll' in capture,

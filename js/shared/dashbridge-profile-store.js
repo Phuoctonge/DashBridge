@@ -1,7 +1,8 @@
 // Durable profile persistence, independent from Dashboard rendering.
 // Keep a per-tab baseline so concurrent DashBridge tabs commit only the
 // profiles they actually changed instead of replacing one stale whole array.
-const dashBridgeProfileFingerprint = value => JSON.stringify(value);
+const dashBridgeProfileFingerprint = value => DashBridgeLocalStateSchema.profileFingerprint(
+    DashBridgeLocalStateSchema.normalizeProfiles([value], { mode: 'load' }).items[0]);
 let dashBridgeProfileBaseline = new Map();
 
 const dashBridgeProfilePatchWrite = (payload, revision) => new Promise((resolve, reject) => {
@@ -9,10 +10,13 @@ const dashBridgeProfilePatchWrite = (payload, revision) => new Promise((resolve,
     const upserts = payload.profiles.filter(profile =>
         dashBridgeProfileBaseline.get(profile.id) !== dashBridgeProfileFingerprint(profile));
     const deleteProfileIds = [...dashBridgeProfileBaseline.keys()].filter(id => !currentById.has(id));
+    const expectedProfiles = Object.fromEntries([...upserts.map(profile => profile.id), ...deleteProfileIds]
+        .map(id => [id, dashBridgeProfileBaseline.get(id) ?? null]));
     chrome.runtime.sendMessage({
         type: 'dashbridge-profile-commit', revision,
         activeProfileId: payload.activeProfileId,
         upserts,
+        expectedProfiles,
         deleteProfileIds
     }, response => {
         if (chrome.runtime.lastError) {
@@ -34,7 +38,7 @@ const dashBridgeProfileWriter = DashBridgeStorageWriter.create(null, {
     durableWrite: dashBridgeProfilePatchWrite
 });
 const DashBridgeProfileStore = {
-    async load() {
+    async load({ deferBaseline = false } = {}) {
         const result = await chrome.storage.local.get(['dashbridge_profiles', 'dashbridge_activeProfileId', 'dashbridge_rejected_profiles_backup']);
         const normalized = DashBridgeLocalStateSchema.normalizeProfiles(
             Array.isArray(result.dashbridge_profiles) ? result.dashbridge_profiles : [],
@@ -44,7 +48,7 @@ const DashBridgeProfileStore = {
             ? normalized.items : [{ id: crypto.randomUUID(), name: 'Default', panels: [] }];
         const activeProfileId = profiles.some(item => item.id === result.dashbridge_activeProfileId)
             ? result.dashbridge_activeProfileId : profiles[0].id;
-        dashBridgeProfileBaseline = new Map(profiles.map(profile => [
+        const baseline = new Map(normalized.items.map(profile => [
             profile.id, dashBridgeProfileFingerprint(profile)
         ]));
         if ((normalized.skippedProfiles || normalized.skippedPanels) && !result.dashbridge_rejected_profiles_backup) {
@@ -56,7 +60,11 @@ const DashBridgeProfileStore = {
                 }
             }).catch(error => console.warn('Не удалось сохранить backup повреждённых профилей:', error));
         }
-        return { profiles, activeProfileId, skippedProfiles: normalized.skippedProfiles, skippedPanels: normalized.skippedPanels };
+        // Cross-tab reads are speculative until the page accepts them. Rejected
+        // reads must not authorize a stale draft against a newer CAS baseline.
+        const accept = () => { dashBridgeProfileBaseline = baseline; };
+        if (!deferBaseline) accept();
+        return { profiles, activeProfileId, skippedProfiles: normalized.skippedProfiles, skippedPanels: normalized.skippedPanels, accept };
     },
     async save(profiles, activeProfileId) {
         if (!Array.isArray(profiles) || !profiles.some(profile => profile?.id === activeProfileId)) {

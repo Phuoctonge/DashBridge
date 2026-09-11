@@ -23,7 +23,14 @@
         const enqueue = operation => {
             let result;
             commitQueue = commitQueue.catch(() => undefined)
-                .then(async () => { result = await operation(); });
+                .then(async () => {
+                    if (typeof root.navigator?.locks?.request !== 'function') {
+                        throw new Error('Web Locks недоступны: изменения не сохранены.');
+                    }
+                    // Migration runs in an extension page; the local queue alone
+                    // cannot serialize its read-to-marker transaction with CAS.
+                    result = await root.navigator.locks.request('dashbridge-profile-storage', operation);
+                });
             return commitQueue.then(() => result);
         };
 
@@ -52,6 +59,27 @@
             const normalizedStored = localStateSchema.normalizeProfiles(
                 Array.isArray(stored.dashbridge_profiles) ? stored.dashbridge_profiles : [], { mode: 'load' }
             );
+            const expected = message.expectedProfiles;
+            if (!expected || typeof expected !== 'object' || Array.isArray(expected)) {
+                throw new Error('Обновите страницу DashBridge перед сохранением профиля.');
+            }
+            for (const id of [...normalizedUpserts.items.map(profile => profile.id), ...deleteProfileIds]) {
+                const current = normalizedStored.items.find(profile => profile.id === id);
+                const incoming = normalizedUpserts.items.find(profile => profile.id === id);
+                const fingerprint = current ? localStateSchema.profileFingerprint(current) : null;
+                // A checkpoint may repeat an already acknowledged commit.
+                if (incoming && localStateSchema.profileFingerprint(incoming) === fingerprint) continue;
+                if (!incoming && !current) continue;
+                let expectedFingerprint = expected[id];
+                // Older open pages may send a JSON fingerprint with native key order.
+                if (typeof expectedFingerprint === 'string') {
+                    try { expectedFingerprint = localStateSchema.profileFingerprint(JSON.parse(expectedFingerprint)); }
+                    catch { expectedFingerprint = undefined; }
+                }
+                if (!Object.prototype.hasOwnProperty.call(expected, id) || expectedFingerprint !== fingerprint) {
+                    throw new Error('Профиль изменён в другой вкладке. Изменения не сохранены. Сохраните черновик и откройте актуальную версию профиля.');
+                }
+            }
             const profiles = normalizedStored.items.filter(profile => !deleteProfileIds.has(profile.id));
             const indexById = new Map(profiles.map((profile, index) => [profile.id, index]));
             normalizedUpserts.items.forEach(profile => {

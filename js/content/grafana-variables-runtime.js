@@ -6,6 +6,7 @@
     if (root === root.parent) return;
     let stopped = false;
     let busy = false;
+    let activeOperation = null;
     let timer = null;
     let wake = null;
     const pause = () => new Promise(resolve => {
@@ -61,10 +62,10 @@
         };
     }
 
-    async function inspect(refreshName, change) {
+    async function inspect(refreshName, change, operation) {
         if (typeof root.System?.import !== 'function') return null;
         const runtime = await root.System.import('@grafana/runtime');
-        if (stopped) return null;
+        if (stopped || operation.cancelled) return null;
         const scenes = sceneVariables();
         if (scenes) {
             if (change) {
@@ -80,6 +81,7 @@
                 const variable = scenes.find(item => item.state?.name === refreshName);
                 if (typeof variable?.refreshOptions === 'function') await variable.refreshOptions();
             }
+            if (stopped || operation.cancelled) return null;
             return { adapter: 'scenes', variables: scenes.map(variable => projectVariable(variable, true)) };
         }
         const variables = runtime.getTemplateSrv?.().getVariables?.();
@@ -95,6 +97,17 @@
             || !Array.isArray(request.values) || request.values.length > 5000
             || request.values.some(value => typeof value !== 'string' || value.length > 16000))) return;
         busy = true;
+        const operation = { cancelled: false, cancel: null };
+        activeOperation = operation;
+        // Grafana adapters may never settle. The owner's deadline must also free
+        // busy, while cancelled inspect continuations may neither mutate nor reply.
+        const cancelled = new Promise((_, reject) => {
+            operation.cancel = () => {
+                operation.cancelled = true;
+                reject(new Error('Grafana ещё не подготовила переменные. Повторите запрос.'));
+            };
+        });
+        const deadlineTimer = setTimeout(operation.cancel, 20000);
         try {
             const deadline = Date.now() + 20000;
             let snapshot;
@@ -103,7 +116,7 @@
             let refreshName = request.operation === 'refresh' ? String(request.name || '').slice(0, 200) : '';
             let change = request.operation === 'set' ? { name: request.name, values: request.values } : null;
             do {
-                snapshot = await inspect(refreshName, change);
+                snapshot = await Promise.race([inspect(refreshName, change, operation), cancelled]);
                 if (snapshot && change && snapshot.adapter !== 'scenes') throw new Error('Требуется загрузка панели.');
                 if (snapshot) change = null;
                 if (snapshot) refreshName = '';
@@ -115,7 +128,7 @@
                 // still need a short settle window during Grafana startup.
                 const readyRead = request.operation === 'read' && snapshot?.variables.length > 0;
                 if (snapshot && !snapshot.variables.some(variable => variable.loading) && (readyRead || stable >= 3)) break;
-                await pause();
+                await Promise.race([pause(), cancelled]);
             } while (!stopped && Date.now() < deadline);
             if (stopped) return;
             if (!snapshot || snapshot.variables.some(variable => variable.loading)) {
@@ -131,10 +144,15 @@
             if (!stopped) document.dispatchEvent(new CustomEvent('dashbridgeVariablesResponse', {
                 detail: { requestId: request.requestId, error: String(error.message || error).slice(0, 240) }
             }));
-        } finally { busy = false; }
+        } finally {
+            clearTimeout(deadlineTimer);
+            clearTimeout(timer); timer = null; wake = null;
+            if (activeOperation === operation) { activeOperation = null; busy = false; }
+        }
     }
     function stop() {
         stopped = true;
+        activeOperation?.cancel();
         clearTimeout(timer);
         wake?.();
         document.removeEventListener('dashbridgeVariablesRequest', handle);

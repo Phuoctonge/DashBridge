@@ -1,7 +1,7 @@
 // Test Runner MAIN-world environment probe.
 // Выполняется в MAIN world Grafana через chrome.scripting.executeScript.
 // Возвращает снэпшот окружения: версию, движок, рантаймы, первую видимую панель.
-// НЕ импортирует ничего — работает как самодостаточная функция-аргумент.
+// НЕ импортирует ничего - работает как самодостаточная функция-аргумент.
 
 function dashbridgeRunProbe() {
     const isFlot = document.querySelectorAll('canvas.flot-base').length > 0;
@@ -53,7 +53,7 @@ function dashbridgeRunProbe() {
                 break;
             }
         }
-        // Если visiblePanels не дали ключа — прямой поиск по атрибуту
+        // Если visiblePanels не дали ключа - прямой поиск по атрибуту
         if (!firstPanelId) {
             const byAttr = [...document.querySelectorAll('[data-viz-panel-key^="panel-"]')]
                 .find(el => el.offsetHeight > 50);
@@ -62,7 +62,7 @@ function dashbridgeRunProbe() {
                 firstPanelKey = firstPanelId;
             }
         }
-        // Последний резерв — findPanel()
+        // Последний резерв - findPanel()
         if (!firstPanelId && typeof dom.findPanel === 'function') {
             const found = dom.findPanel({});
             if (found) {
@@ -88,7 +88,7 @@ function dashbridgeRunProbe() {
         }
     }
 
-    // Панели в DOM (без учёта виртуализации) — для v10 Flot все 90 будут здесь
+    // Панели в DOM (без учёта виртуализации) - для v10 Flot все 90 будут здесь
     // В режиме viewPanel добавляем селекторы fullscreen-враппера
     const allPanelCount = document.querySelectorAll(
         '.react-grid-item, [data-panelid], [data-viz-panel-key^="panel-"],' +
@@ -96,8 +96,8 @@ function dashbridgeRunProbe() {
     ).length;
 
     // Ищем «лучшую» панель для тестов B/C/D: с canvas И легендой (≥2 серии).
-    // stat/gauge/text панели не имеют ни заливки ни серий — apply() на них бесполезен.
-    // В v10 легенда (.graph-legend-series) может лежать СНАРУЖИ [data-panelid] —
+    // stat/gauge/text панели не имеют ни заливки ни серий - apply() на них бесполезен.
+    // В v10 легенда (.graph-legend-series) может лежать СНАРУЖИ [data-panelid] -
     // внутри .panel-container или .panel-wrapper рядом с canvas.
     const legendItemsSel = [
         '.graph-legend-series',
@@ -130,7 +130,7 @@ function dashbridgeRunProbe() {
             items = [...container.querySelectorAll(legendItemsSel)];
             if (items.length >= 2) return items;
         }
-        // 3. Глобальный поиск — для v10 где легенда рядом с панелью
+        // 3. Глобальный поиск - для v10 где легенда рядом с панелью
         if (dom && typeof dom.legendItems === 'function') {
             const fromDom = dom.legendItems(el);
             if (fromDom.length >= 2) return fromDom;
@@ -157,7 +157,7 @@ function dashbridgeRunProbe() {
         }
     }
 
-    // Если не нашли панель с canvas+легендой≥2 — берём любую с canvas+хоть 1 легендой
+    // Если не нашли панель с canvas+легендой≥2 - берём любую с canvas+хоть 1 легендой
     if (!firstGraphPanelId) {
         for (const el of allKeyed) {
             if (!el.querySelector('canvas')) continue;
@@ -173,7 +173,7 @@ function dashbridgeRunProbe() {
         }
     }
 
-    // Последний резерв — любая панель с canvas
+    // Последний резерв - любая панель с canvas
     if (!firstGraphPanelId) {
         for (const el of allKeyed) {
             if (el.querySelector('canvas')) {
@@ -186,14 +186,14 @@ function dashbridgeRunProbe() {
         }
     }
 
-    // viewPanel режим: если DOM не дал panelId — строим из URL параметра.
+    // viewPanel режим: если DOM не дал panelId - строим из URL параметра.
     // При ?viewPanel=5 Grafana рендерит одну панель но враппер может не иметь data-атрибутов.
     if (!firstGraphPanelId && viewPanelId) {
         firstGraphPanelId = viewPanelId;
         legendCount = legendCount || 0;
         // Пробуем взять canvas snapshot напрямую (без panelId-враппера)
     }
-    // Также если firstPanelId не определён — используем viewPanelParam
+    // Также если firstPanelId не определён - используем viewPanelParam
     if (!firstPanelId && viewPanelId) {
         firstPanelId = viewPanelId;
         firstPanelKey = firstPanelId;
@@ -243,7 +243,7 @@ function dashbridgeRunProbe() {
         visiblePanelCount: visiblePanels.length,
         firstPanelId,
         firstPanelKey,
-        firstGraphPanelId,   // панель с canvas+легендой — для B/C/D тестов
+        firstGraphPanelId,   // панель с canvas+легендой - для B/C/D тестов
         legendCount,
         legendSelector,
         canvasDataUrl,

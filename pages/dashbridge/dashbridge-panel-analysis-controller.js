@@ -60,7 +60,7 @@
             dialog.setAttribute('role', 'dialog');
             dialog.setAttribute('aria-modal', 'true');
             const header = makeElement('div', 'dashboard-panel-analysis-header');
-            const heading = makeElement('h3', '', `Анализ ${type.toUpperCase()} — ${analysisApi?.baseTitle(panel.title) || panel.title || ''}`);
+            const heading = makeElement('h3', '', `Анализ ${type.toUpperCase()} - ${analysisApi?.baseTitle(panel.title) || panel.title || ''}`);
             const closeButton = makeElement('button', 'dashboard-panel-analysis-close');
             closeButton.type = 'button'; closeButton.title = 'Закрыть'; closeButton.setAttribute('aria-label', 'Закрыть');
             closeButton.innerHTML = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg>';
@@ -137,7 +137,7 @@
                     const valueNumber = Number(item.value);
                     const value = makeElement('td', Number.isFinite(valueNumber) && valueNumber >= critical
                         ? 'critical' : (Number.isFinite(valueNumber) && valueNumber >= warning ? 'warning' : 'normal'));
-                    value.textContent = Number.isFinite(valueNumber) ? `${valueNumber.toFixed(2)}%` : '—';
+                    value.textContent = Number.isFinite(valueNumber) ? `${valueNumber.toFixed(2)}%` : '-';
                     row.append(server, value); body.appendChild(row);
                 });
                 table.append(head, body); output.appendChild(table);

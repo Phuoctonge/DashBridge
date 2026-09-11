@@ -4,7 +4,7 @@
 // прогресс-бар, копирование отчёта.
 // Зависит от: test-runner-core.js (DashBridgeTestRunner),
 //             test-runner-suite.js (DASHBRIDGE_TEST_SUITE),
-//             test-runner-probe.js (dashbridgeRunProbe — загружается core'ом),
+//             test-runner-probe.js (dashbridgeRunProbe - загружается core'ом),
 //             operation-progress-window.js (DashBridgeOperationProgress)
 
 'use strict';
@@ -49,6 +49,8 @@ let operationProgressSnapshot = null;
 let diagnosticSpool = null;
 let diagnosticViewer = null;
 let exportController = null;
+let runOperation = null;
+let pageDisposed = false;
 
 function esc(str) {
     return String(str ?? '')
@@ -149,8 +151,8 @@ function buildUrlHeader(urlResult, index) {
     const aborted = urlResult.tests.filter(t => t.aborted).length;
     const passed = urlResult.tests.filter(t => !t.skip && !t.aborted && t.pass).length;
     const failed = urlResult.tests.filter(t => !t.skip && !t.aborted && !t.pass).length;
-    const engine = urlResult.engine || '—';
-    const version = urlResult.grafanaVersion ? `v${urlResult.grafanaVersion}` : '—';
+    const engine = urlResult.engine || '-';
+    const version = urlResult.grafanaVersion ? `v${urlResult.grafanaVersion}` : '-';
     const dur = urlResult.finishedAt && urlResult.startedAt
         ? formatDuration(urlResult.finishedAt - urlResult.startedAt)
         : '';
@@ -249,7 +251,7 @@ function renderProgress(snapshot) {
         parts.push(`✓ ${snapshot.passed} пройдено, ✗ ${snapshot.failed} провалено`);
     }
 
-    elProgressText.textContent = parts.join('  —  ');
+    elProgressText.textContent = parts.join('  -  ');
 }
 
 function renderSummary(snapshot) {
@@ -282,9 +284,12 @@ function renderSummary(snapshot) {
 }
 
 function setButtonState(running) {
+    running = running || !!runOperation;
+    const busy = running || !!exportController?.isExporting();
+    if (elClearBtn) elClearBtn.disabled = busy;
     if (elScreenshotsEnabled) elScreenshotsEnabled.disabled = running;
     if (elRunBtn) {
-        elRunBtn.disabled = running;
+        elRunBtn.disabled = busy;
         const label = elRunBtn.querySelector('.tr-btn-label');
         if (label) label.textContent = running ? 'Запуск…' : 'Запустить тесты';
     }
@@ -294,7 +299,7 @@ function setButtonState(running) {
         elCopyFailBtn.disabled = running || !(lastSnapshot?.failed || lastSnapshot?.skipped || lastSnapshot?.abortedNotRun);
     }
     if (elExportDiagnosticsBtn) {
-        elExportDiagnosticsBtn.disabled = running || !lastSnapshot?.results?.length;
+        elExportDiagnosticsBtn.disabled = busy || !lastSnapshot?.results?.length;
     }
     if (elUrlInput) { elUrlInput.disabled = running; }
     if (elSelectTestsBtn) elSelectTestsBtn.disabled = running;
@@ -385,7 +390,8 @@ function updateSelectionSummary() {
     elSelectionSummary.textContent = ids === null
         ? `Все сценарии профиля: ${profileTests.length}`
         : `Выбрано: ${ids.length} из ${profileTests.length}`;
-    if (elRunBtn) elRunBtn.disabled = !!DashBridgeTestRunner.getSnapshot().running || (Array.isArray(ids) && ids.length === 0);
+    if (elRunBtn) elRunBtn.disabled = !!runOperation || !!exportController?.isExporting()
+        || !!DashBridgeTestRunner.getSnapshot().running || (Array.isArray(ids) && ids.length === 0);
 }
 
 async function openTestSelector() {
@@ -446,6 +452,7 @@ async function persistCompactTestHistory(snapshot) {
 }
 
 async function handleRun() {
+    if (pageDisposed || runOperation || exportController?.isExporting()) return;
     const rawUrls = elUrlInput ? elUrlInput.value : '';
     const urls = rawUrls.split('\n').map(u => u.trim()).filter(Boolean);
 
@@ -481,57 +488,55 @@ async function handleRun() {
         }
         return;
     }
-    // Open the always-on-top view while the Run click still carries user
-    // activation. All validation that can reject without async work is above.
-    const progressWindowPromise = openOperationProgressWindow(mode);
-    const screenshotsEnabled = elScreenshotsEnabled?.checked !== false;
-    // Сохраняем ввод и выбранный профиль для следующего запуска.
-    try { await chrome.storage.local.set({ trLastUrls: cleanedUrls, trRunMode: mode, trTestSelection: testSelection }); } catch (_) { }
-
-    // Очищаем таблицу
-    if (elResultsTable) elResultsTable.innerHTML = '';
-    if (elEmptyState) elEmptyState.style.display = 'none';
-    if (elSummaryRow) elSummaryRow.style.display = 'none';
-    if (elStatusLine) { elStatusLine.textContent = ''; elStatusLine.className = 'tr-status'; }
-    lastSnapshot = null;
-
-    // Do this before opening the first Grafana tab. If OPFS is unavailable we
-    // fail early instead of starting a run that can OOM on dashboard #2.
-    diagnosticSpool = new DiagnosticSpool();
-    try {
-        await diagnosticSpool.begin(`run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
-    } catch (error) {
-        await progressWindowPromise;
-        finishOperationProgressWindow(null, { error });
-        diagnosticSpool = null;
-        if (elStatusLine) {
-            elStatusLine.textContent = `⚠ Невозможно подготовить безопасное хранилище диагностики: ${error?.message || String(error)}`;
-            elStatusLine.className = 'tr-status tr-status-fail';
-        }
-        return;
-    }
-
+    const operation = { cancelled: false, started: false };
+    runOperation = operation;
     setButtonState(true);
-    if (elProgress) elProgress.style.display = 'flex';
-    await progressWindowPromise;
-    updateOperationProgressWindow();
-
+    let runSpool = null;
+    let progressWindowPromise = Promise.resolve(false);
     try {
+        // Open the always-on-top view while the Run click still carries user
+        // activation. All validation that can reject without async work is above.
+        progressWindowPromise = openOperationProgressWindow(mode).catch(() => false);
+        const screenshotsEnabled = elScreenshotsEnabled?.checked !== false;
+        // Сохраняем ввод и выбранный профиль для следующего запуска.
+        try { await chrome.storage.local.set({ trLastUrls: cleanedUrls, trRunMode: mode, trTestSelection: testSelection }); } catch (_) { }
+        if (operation.cancelled) return;
+        await diagnosticSpool?.clear();
+        diagnosticSpool = null;
+
+        // Очищаем таблицу
+        if (elResultsTable) elResultsTable.innerHTML = '';
+        if (elEmptyState) elEmptyState.style.display = 'none';
+        if (elSummaryRow) elSummaryRow.style.display = 'none';
+        if (elStatusLine) { elStatusLine.textContent = ''; elStatusLine.className = 'tr-status'; }
+        lastSnapshot = null;
+
+        // Do this before opening the first Grafana tab. If OPFS is unavailable we
+        // fail early instead of starting a run that can OOM on dashboard #2.
+        runSpool = new DiagnosticSpool();
+        await runSpool.begin(`run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+        diagnosticSpool = runSpool;
+        if (elProgress) elProgress.style.display = 'flex';
+        await progressWindowPromise;
+        if (operation.cancelled) return;
+        updateOperationProgressWindow();
+
+        operation.started = true;
         await DashBridgeTestRunner.run(urls, {
             mode,
             screenshotsEnabled,
             selectedTestIds,
             async onTestFinalized(testResult, context) {
-                return diagnosticSpool.persistTest(testResult, context.urlIndex, context.testIndex, context.url);
+                return runSpool.persistTest(testResult, context.urlIndex, context.testIndex, context.url);
             },
             async onUrlFinalized(urlResult, urlIndex) {
                 if (elStatusLine) {
                     elStatusLine.textContent = `Сохранение полной диагностики дашборда ${urlIndex + 1} на диск…`;
                     elStatusLine.className = 'tr-status tr-status-warn';
                 }
-                const retained = await diagnosticSpool.persistUrl(urlResult, urlIndex);
+                const retained = await runSpool.persistUrl(urlResult, urlIndex);
                 if (elStatusLine) {
-                    elStatusLine.textContent = `Диагностика дашборда ${urlIndex + 1} сохранена; временно на диске ${formatBytes(diagnosticSpool.spoolBytes)}`;
+                    elStatusLine.textContent = `Диагностика дашборда ${urlIndex + 1} сохранена; временно на диске ${formatBytes(runSpool.spoolBytes)}`;
                 }
                 return retained;
             },
@@ -558,23 +563,38 @@ async function handleRun() {
                     elStatusLine.textContent = ok
                         ? `✓ ${modeLabel}: все ${snapshot.passed} тестов пройдены`
                         : (incomplete
-                            ? `⚠ ${modeLabel}: прогон неполный — не запущено ${snapshot.abortedNotRun || 0}`
+                            ? `⚠ ${modeLabel}: прогон неполный - не запущено ${snapshot.abortedNotRun || 0}`
                             : `✗ ${modeLabel}: провалено ${snapshot.failed} из ${snapshot.total}`);
                     elStatusLine.className = `tr-status ${ok ? 'tr-status-ok' : (incomplete ? 'tr-status-warn' : 'tr-status-fail')}`;
                 }
             },
         });
     } catch (e) {
-        setButtonState(false);
+        if (!lastSnapshot && runSpool) {
+            await runSpool.clear();
+            diagnosticSpool = null;
+        }
         finishOperationProgressWindow(lastSnapshot, { error: e });
         if (elStatusLine) {
             elStatusLine.textContent = `⚠ Ошибка запуска: ${e.message || String(e)}`;
             elStatusLine.className = 'tr-status tr-status-warn';
         }
+    } finally {
+        await progressWindowPromise;
+        if (pageDisposed || (operation.cancelled && !operation.started)) {
+            if (pageDisposed && diagnosticSpool !== runSpool) await diagnosticSpool?.clear();
+            await runSpool?.clear();
+            if (pageDisposed || diagnosticSpool === runSpool) diagnosticSpool = null;
+            finishOperationProgressWindow({ aborted: true });
+        }
+        if (pageDisposed) void operationProgressController?.release();
+        runOperation = null;
+        setButtonState(false);
     }
 }
 
 function handleAbort() {
+    if (runOperation) runOperation.cancelled = true;
     DashBridgeTestRunner.abort();
     if (operationProgressSnapshot) {
         operationProgressSnapshot = { ...operationProgressSnapshot, aborted: true };
@@ -588,6 +608,7 @@ function handleAbort() {
 }
 
 function handleClear() {
+    if (runOperation || exportController?.isExporting()) return;
     if (elResultsTable) elResultsTable.innerHTML = '';
     if (elEmptyState) elEmptyState.style.display = 'flex';
     if (elSummaryRow) elSummaryRow.style.display = 'none';
@@ -640,6 +661,10 @@ async function initTestRunnerUI() {
         serializeSpoolArtifact,
         localExportTimestamp,
         localIsoTimestamp,
+        onExportStateChange: exporting => {
+            setButtonState(false);
+            if (!exporting && pageDisposed) void diagnosticSpool?.clear();
+        },
     }) || null;
     diagnosticViewer = globalThis.DashBridgeTestDiagnosticViewer?.create({
         report: DashBridgeTestReport,
@@ -711,9 +736,11 @@ async function initTestRunnerUI() {
         updateSelectionSummary();
     });
     window.addEventListener('pagehide', () => {
+        pageDisposed = true;
+        handleAbort();
         stopOperationProgressTimer();
         void operationProgressController?.release();
-        void diagnosticSpool?.clear();
+        if (!runOperation && !exportController?.isExporting()) void diagnosticSpool?.clear();
     }, { once: true });
 
     // Ctrl+Enter в textarea → запуск

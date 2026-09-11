@@ -61,6 +61,12 @@ const appended = [];
 let saves = 0;
 let uuidIndex = 0;
 const alerts = [];
+const connections = [];
+const confirmations = [];
+let configured = true;
+let confirmResult = true;
+let connectionError = false;
+let confirmHook = () => {};
 const identity = url => new URL(url).searchParams.get('panelId');
 const controller = context.DashBridgePanelAdditionController.create({
     normalizePanelUrl: value => `${value}?normalized=1`,
@@ -71,6 +77,12 @@ const controller = context.DashBridgePanelAdditionController.create({
     fetchDashboardPanels: async () => ({ panelList: [] }),
     normalizePanelMetadataText: value => String(value),
     showAlert: async message => { alerts.push(message); },
+    showConfirm: async message => { confirmations.push(message); confirmHook(); return confirmResult; },
+    configureConnection: async (url, add) => {
+        connections.push({ url, add });
+        if (connectionError) throw new Error('storage unavailable');
+        return { configured: configured || add, host: new URL(url).host };
+    },
     currentProfileHasPanel: () => false,
     getCurrentProfilePanelIdentities: () => new Set(panels.map(panel => identity(panel.src))),
     getPanels: () => panels,
@@ -99,6 +111,44 @@ controller.setup();
     assert.strictEqual(appended.length, 3);
     assert.strictEqual(saves, 2);
     assert.deepStrictEqual(alerts, []);
+
+    configured = false;
+    confirmResult = false;
+    elements.newPanelUrl.value = 'https://new.example/d-solo/uid/name';
+    await elements.savePanelBtn.emit('click');
+    assert.strictEqual(panels.length, 3, 'declining the connection must not add a panel');
+    assert(confirmations[0].includes('new.example'));
+    assert(!connections.some(item => item.add));
+    confirmResult = true;
+    await elements.savePanelBtn.emit('click');
+    assert.strictEqual(panels.length, 4);
+    assert(connections.at(-1).add, 'accepted host is registered before rendering');
+
+    elements.newPanelUrl.value = 'https://stale.example/d-solo/uid/name';
+    confirmHook = () => { elements.newPanelUrl.value = ''; };
+    const writes = connections.filter(item => item.add).length;
+    await elements.savePanelBtn.emit('click');
+    assert.strictEqual(panels.length, 4, 'closing or changing input cancels pending addition');
+    assert.strictEqual(connections.filter(item => item.add).length, writes);
+    confirmHook = () => {};
+    connectionError = true;
+    elements.newPanelUrl.value = 'https://error.example/d-solo/uid/name';
+    await elements.savePanelBtn.emit('click');
+    assert.strictEqual(panels.length, 4);
+    assert(alerts.at(-1).includes('storage unavailable'));
+    connectionError = false;
+
+    elements.quickAddDashboardUrl.value = 'https://quick.example/d/uid/name';
+    elements.quickAddPanelIds.value = '10,11';
+    confirmResult = false;
+    await elements.saveQuickPanelsBtn.emit('click');
+    assert.strictEqual(panels.length, 4, 'ID-list addition also requires host confirmation');
+    assert(confirmations.at(-1).includes('quick.example'));
+
+    elements.dashboardPanelPickerUrl.value = 'https://picker.example/d/uid/name';
+    await elements.loadDashboardPanelsBtn.emit('click');
+    assert(confirmations.at(-1).includes('picker.example'));
+    assert.strictEqual(elements.loadDashboardPanelsBtn.disabled, false);
 
     elements.dashboardPanelPickerOverlay.style.display = 'flex';
     elements.dashboardPanelPickerUrl.value = 'https://grafana.example/d/uid/name';
