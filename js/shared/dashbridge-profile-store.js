@@ -42,13 +42,13 @@ const DashBridgeProfileStore = {
         const result = await chrome.storage.local.get(['dashbridge_profiles', 'dashbridge_activeProfileId', 'dashbridge_rejected_profiles_backup']);
         let rawProfiles = Array.isArray(result.dashbridge_profiles) ? result.dashbridge_profiles : [];
         let seededDefault = false;
-        if (!rawProfiles.length) {
+        if (!rawProfiles.some(profile => profile?.isSystemDefault === true)) {
             try {
                 const response = await fetch('dashbridge-default-profile.json', { cache: 'no-store' });
                 if (response.ok) {
                     const seed = await response.json();
                     if (seed && typeof seed === 'object' && Array.isArray(seed.panels)) {
-                        rawProfiles = [{ ...seed, name: seed.name || 'dashbridge', isSystemDefault: true }];
+                        rawProfiles = [...rawProfiles, { ...seed, name: seed.name || 'dashbridge', isSystemDefault: true }];
                         seededDefault = true;
                     }
                 }
@@ -63,7 +63,9 @@ const DashBridgeProfileStore = {
         if (seededDefault || !result.dashbridge_profiles?.length) {
             await chrome.storage.local.set({
                 dashbridge_profiles: profiles,
-                dashbridge_activeProfileId: profiles[0].id
+                dashbridge_activeProfileId: result.dashbridge_activeProfileId
+                    && profiles.some(profile => profile.id === result.dashbridge_activeProfileId)
+                    ? result.dashbridge_activeProfileId : profiles[0].id
             });
         }
         const activeProfileId = profiles.some(item => item.id === result.dashbridge_activeProfileId)
