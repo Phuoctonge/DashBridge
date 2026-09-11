@@ -101,8 +101,13 @@ const DashBridgeProfileStore = {
         if (!Array.isArray(profiles) || !profiles.some(profile => profile?.id === activeProfileId)) {
             throw new TypeError('Активный профиль отсутствует в сохраняемом списке.');
         }
-        const nextProfiles = profiles.map(profile => profile?.systemKey === 'dashbridge' && dashBridgeSystemProfileBaseline
-            ? structuredClone(dashBridgeSystemProfileBaseline) : profile);
+        const nextProfiles = profiles.map(profile => {
+            if (profile?.systemKey !== 'dashbridge' || !dashBridgeSystemProfileBaseline) return profile;
+            // The system layout is managed by the extension, but the time range
+            // and refresh interval are deliberately user-owned preferences.
+            return { ...structuredClone(dashBridgeSystemProfileBaseline),
+                timeState: structuredClone(profile.timeState || dashBridgeSystemProfileBaseline.timeState) };
+        });
         return dashBridgeProfileWriter.write({ profiles: nextProfiles, activeProfileId });
     },
     flush() { return dashBridgeProfileWriter.flush(); },
