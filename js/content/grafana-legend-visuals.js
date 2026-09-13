@@ -1074,7 +1074,7 @@
                                     cell.removeAttribute('aria-sort'); cell.removeAttribute('data-sort');
                                     cell.querySelectorAll('[aria-sort], [data-sort]').forEach(el => { el.removeAttribute('aria-sort'); el.removeAttribute('data-sort'); });
                                     cell.querySelectorAll('svg, span, div').forEach(el => { if (/sort|arrow|caret/i.test(String(el.className?.baseVal || el.className || ''))) el.classList.remove('active', 'selected'); });
-                                    cell.querySelectorAll('svg').forEach(el => el.remove());
+                                    cell.querySelectorAll('svg').forEach(el => { el.style.visibility = 'hidden'; });
                                 });
                                 const body = table.querySelector('tbody');
                                 const bodyRows = Array.from(body?.querySelectorAll(':scope > tr') || []);
