@@ -1064,7 +1064,9 @@
                                 const current = lastHeader.getAttribute('aria-sort');
                                 const next = current === 'ascending' ? 'descending' : current === 'descending' ? 'none' : 'ascending';
                                 if (next === 'none') lastHeader.removeAttribute('aria-sort'); else lastHeader.setAttribute('aria-sort', next);
-                                lastHeader.style.backgroundImage = next === 'none' ? '' : 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\'%3E%3Cpath d=\'M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 0 0-1.41 0 1 1 0 0 0 0 1.42l4.24 4.24a1 1 0 0 0 1.42 0l4.24-4.24a1 1 0 0 0 0-1.42Z\'/%3E%3C/svg%3E")';
+                                const path = next === 'ascending' ? 'M7 14l5-5 5 5' : 'M7 10l5 5 5-5';
+                                lastHeader.style.backgroundImage = next === 'none' ? '' : `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='${encodeURIComponent(path)}'/%3E%3C/svg%3E")`;
+                                lastHeader.style.backgroundRepeat = 'no-repeat'; lastHeader.style.backgroundPosition = 'right 3px center'; lastHeader.style.backgroundSize = '12px 12px'; lastHeader.style.paddingRight = next === 'none' ? '4px' : '18px';
                                 headerRow.querySelectorAll('[aria-sort]').forEach(cell => { if (cell !== lastHeader) cell.removeAttribute('aria-sort'); });
                                 headerRow.querySelectorAll('[data-testid*="sort"], [aria-label*="sort" i]').forEach(el => { if (!lastHeader.contains(el)) el.removeAttribute('aria-sort'); });
                                 headerRow.querySelectorAll(':scope > *').forEach(cell => {
