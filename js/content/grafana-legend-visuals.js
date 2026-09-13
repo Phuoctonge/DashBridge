@@ -1043,8 +1043,8 @@
                             return [normalizeColor(color), data[offset + 1]];
                         }).filter(([color]) => color)) : null;
                         rows.forEach((row, index) => {
-                            const cell = row.children[lastColumnIndex];
-                            if (!cell) return;
+                            let cell = row.children[lastColumnIndex];
+                            if (!cell) { cell = headers[headers.length - 1].cloneNode(false); cell.dataset.dashbridgeSummaryColumn = 'last'; row.appendChild(cell); }
                             const iconColor = row.querySelector('[data-testid="series-icon"]')?.style?.background || '';
                             const values = chart ? (seriesByColor?.get(normalizeColor(iconColor)) || data[index + 1]) : data[index]?.data?.map(point => point?.[1]);
                             const finite = Array.from(values || []).map(Number).filter(Number.isFinite);
