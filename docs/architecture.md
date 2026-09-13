@@ -215,6 +215,7 @@ listener снимаются на pagehide и восстанавливаются 
 | Локальные стили серий | `grafana-series-styles.js` | `grafana-visual-engine.js`; fill/line-width, panel-scoped reapply observer, renderer reflow и диагностика с единым cleanup. |
 | Threshold visuals | `grafana-threshold-visuals.js` | `grafana-visual-engine.js`; линии и highlight overlays Flot/uPlot, unit lookup, data/layout observers, RAF и полный cleanup. |
 | Legend renderer adapters | `grafana-legend-visibility-adapters.js` | Flot/uPlot visibility, native legend interaction и renderer-specific reset без layout/palette ownership. |
+| Legend columns | grafana-legend-columns.js | Чистый расчёт статистик и выбранных колонок легенды без DOM/observer lifecycle; потребитель — visual engine. |
 | Legend visuals | `grafana-legend-visuals.js` | `grafana-visual-engine.js`; layout, palette, facade renderer adapters и единый реестр legacy observer cleanup. |
 | Настройки панели | `grafana-panel-settings-modal.js` | Direct Grafana, DashBridge. |
 | Allowlist легенды | `grafana-legend-selection.js` | Tools, карточки. |

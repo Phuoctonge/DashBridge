@@ -7,7 +7,7 @@
             throw new TypeError('Grafana legend visuals dependencies are incomplete');
         }
         const rawColumnStats = window.DashBridgeGrafanaLegendColumns;
-        if (window.name === 'dashbridge-iframe' && !document.getElementById('dashbridge-responsive-legend-style')) { const style = document.createElement('style'); style.id = 'dashbridge-responsive-legend-style'; style.textContent = 'table:has(th) { width:100% !important; max-width:100% !important; table-layout:fixed !important; } table:has(th) tr { display:flex !important; width:100% !important; min-width:0 !important; } table:has(th) td, table:has(th) th { min-width:0 !important; overflow:hidden !important; text-overflow:ellipsis !important; } table:has(th) tr > :first-child { flex:1 1 auto !important; min-width:0 !important; width:auto !important; } table:has(th) tr > :not(:first-child) { flex:0 0 auto !important; width:max-content !important; min-width:max-content !important; } .rdg { grid-template-columns:minmax(0,1fr) max-content !important; overflow-x:hidden !important; } .rdg .rdg-cell:first-child { display:block !important; min-width:0 !important; overflow:hidden !important; text-overflow:ellipsis !important; white-space:nowrap !important; } .rdg .rdg-cell:first-child > * { min-width:0 !important; overflow:hidden !important; text-overflow:ellipsis !important; white-space:nowrap !important; }'; (document.head || document.documentElement).appendChild(style); }
+        if (window.name === 'dashbridge-iframe' && !document.getElementById('dashbridge-responsive-legend-style')) { const style = document.createElement('style'); style.id = 'dashbridge-responsive-legend-style'; style.textContent = 'table:has(th) { width:100% !important; max-width:100% !important; table-layout:fixed !important; } table:has(th) tr { display:flex !important; width:100% !important; min-width:0 !important; } table:has(th) td, table:has(th) th { min-width:0 !important; overflow:hidden !important; text-overflow:ellipsis !important; } table:has(th) tr > :first-child { flex:1 1 auto !important; min-width:0 !important; width:auto !important; } table:has(th) tr > :not(:first-child) { flex:0 0 48px !important; width:48px !important; } .rdg { grid-template-columns:minmax(0,1fr) max-content !important; overflow-x:hidden !important; } .rdg .rdg-cell:first-child { display:block !important; min-width:0 !important; overflow:hidden !important; text-overflow:ellipsis !important; white-space:nowrap !important; } .rdg .rdg-cell:first-child > * { min-width:0 !important; overflow:hidden !important; text-overflow:ellipsis !important; white-space:nowrap !important; }'; (document.head || document.documentElement).appendChild(style); }
 
         const legacyVisualObserverOwners = new Set();
         let legacyObserverDocumentSweepCompleted = false;
@@ -397,7 +397,7 @@
             };
             const legendLayout = window.name === 'dashbridge-iframe'
                 ? applyLegendLayout()
-                : { chartHost, chartBranch, flexContainer, legendElement, layoutChanged: false };
+                : { chartHost: null, chartBranch: null, flexContainer: null, legendElement: null, layoutChanged: false };
             if (window.name === 'dashbridge-iframe' && legendLayout.legendElement) { ensureResponsiveLegendStyles(); legendLayout.legendElement.classList.add('dashbridge-legend-bottom'); }
             if (window.name === 'dashbridge-iframe' && legendLayout.legendElement) { const legend = legendLayout.legendElement; ['width','max-width'].forEach(p => legend.style.setProperty(p, '100%', 'important')); legend.style.setProperty('overflow-x', 'hidden', 'important'); legend.querySelectorAll('table').forEach(table => { ['width','max-width'].forEach(p => table.style.setProperty(p, '100%', 'important')); table.style.setProperty('table-layout', 'fixed', 'important'); const rows = [...table.rows]; const count = rows[0]?.cells.length || 0; rows.forEach(row => { const cell = row.cells[0]; if (cell && !cell.title) cell.title = cell.innerText.trim(); }); const widths = Array.from({ length: count }, (_, i) => i ? Math.max(...rows.map(row => row.cells[i]?.scrollWidth || 0), 0) + 12 : 0); const numericTotal = widths.reduce((sum, width) => sum + width, 0); rows.forEach(row => { row.cells[0]?.style.setProperty('width', `max(0px, calc(100% - ${numericTotal}px))`, 'important'); for (let i = 1; i < count; i++) row.cells[i]?.style.setProperty('width', `${widths[i]}px`, 'important'); }); }); }
             const resizeUPlotAfterLegendLayout = async () => {
@@ -999,7 +999,7 @@
                     const hasMissingLast = Array.from(root.querySelectorAll?.('table') || []).some(table => {
                         const header = table.querySelector('thead tr');
                         const hasLast = header && Array.from(header.children).some(cell => /^last$/i.test(String(cell.textContent || '').trim()));
-                        return hasLast && Array.from(table.querySelectorAll('tbody tr')).some(row => !row.querySelector('[data-dashbridge-summary-column="last"]'));
+                        return hasLast && Array.from(table.querySelectorAll("tbody tr")).some(row => !row.querySelector('[data-dashbridge-summary-column="last"]'));
                     });
                     if (!hasMissingLast) return;
                     queued = true;
@@ -1022,7 +1022,7 @@
                     const cell = headers[headers.length - 1].cloneNode(false);
                     cell.textContent = 'Last'; cell.dataset.dashbridgeSummaryColumn = 'last';
                     headerRow.appendChild(cell);
-                    const rows = Array.from(table.querySelectorAll('tbody tr'));
+                    const rows = Array.from(table.querySelectorAll("tbody tr"));
                     const chart = findUPlotForThreshold(root);
                     const series = chart?.data || getFlotPlot(root)?.getData?.() || [];
                     const rawSeries = chart ? (chart.series || []).slice(1).map((item, index) => ({ label: String(item?.label || ''), values: series[index + 1] })) : series.map(item => ({ label: String(item?.label || ''), values: item?.data?.map(point => point?.[1]) }));
@@ -1045,7 +1045,7 @@
                     const lastHeader = Array.from(headerRow.children).find(cell => /^last$/i.test(String(cell.textContent || '').trim()));
                     const lastColumnIndex = lastHeader ? Array.from(headerRow.children).indexOf(lastHeader) : -1;
                     if (lastColumnIndex >= 0) {
-                        const rows = Array.from(table.querySelectorAll('tbody tr'));
+                        const rows = Array.from(table.querySelectorAll("tbody tr"));
                         const chart = findUPlotForThreshold(root);
                         const data = chart?.data || getFlotPlot(root)?.getData?.() || [];
                         const normalizeColor = value => {
@@ -1073,6 +1073,12 @@
                         });
                         if (!lastHeader.dataset.dashBridgeSortBound) {
                             lastHeader.dataset.dashBridgeSortBound = '1';
+                            lastHeader.style.setProperty('text-align', 'center', 'important');
+                            lastHeader.style.setProperty('justify-content', 'flex-end', 'important');
+                            lastHeader.style.setProperty('position', 'relative', 'important');
+                            lastHeader.style.setProperty('padding-right', '20px', 'important');
+                            lastHeader.style.setProperty('min-width', '56px', 'important');
+                            lastHeader.style.setProperty('width', '56px', 'important');
                             lastHeader.setAttribute('role', lastHeader.getAttribute('role') || 'columnheader');
                             lastHeader.tabIndex = 0;
                             lastHeader.style.paddingLeft = '4px';
@@ -1085,9 +1091,8 @@
                                 lastHeader.style.backgroundImage = '';
                                 lastHeader.querySelector('[data-dashbridge-sort-icon]')?.remove();
                                 if (next !== 'none') {
-                                    const sourceIcon = headerRow.querySelector('svg');
-                                    const icon = sourceIcon ? sourceIcon.cloneNode(true) : document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-                                    icon.dataset.dashbridgeSortIcon = '1'; icon.setAttribute('aria-hidden', 'true'); icon.setAttribute('width', '12'); icon.setAttribute('height', '12'); icon.style.marginLeft = '2px';
+                                    const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                                    icon.dataset.dashbridgeSortIcon = '1'; icon.setAttribute('aria-hidden', 'true'); icon.setAttribute('width', '12'); icon.setAttribute('height', '12'); icon.setAttribute('viewBox', '0 0 24 24'); icon.setAttribute('focusable', 'false'); icon.style.position = 'absolute'; icon.style.right = '4px'; icon.style.top = '50%'; icon.style.margin = '0'; icon.style.verticalAlign = 'middle'; icon.style.transform = 'translateY(-50%)';
                                     icon.style.visibility = 'visible';
                                     if (!icon.querySelector('path')) icon.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'path'));
                                     icon.querySelector('path')?.setAttribute('d', next === 'ascending' ? 'M17,13.41,12.71,9.17a1,1,0,0,0-1.42,0L7.05,13.41a1,1,0,0,0,0,1.42,1,1,0,0,0,1.41,0L12,11.29l3.54,3.54a1,1,0,0,0,.7.29,1,1,0,0,0,.71-.29A1,1,0,0,0,17,13.41Z' : 'M17,9.17a1,1,0,0,0-1.41,0L12,12.71,8.46,9.17a1,1,0,0,0-1.41,0,1,1,0,0,0,0,1.42l4.24,4.24a1,1,0,0,0,1.42,0L17,10.59A1,1,0,0,0,17,9.17Z');
@@ -1156,3 +1161,6 @@
 
     root.DashBridgeGrafanaLegendVisuals = Object.freeze({ create });
 })(window);
+
+
+

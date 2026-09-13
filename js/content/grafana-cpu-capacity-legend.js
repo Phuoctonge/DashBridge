@@ -13,6 +13,13 @@
         const originalOrders = new WeakMap();
 
         const normalizeName = value => String(value || '').trim().toLowerCase();
+        const clearNativeSortIndicators = (panelRoot, except = null) => {
+            panelRoot?.querySelectorAll?.('table thead th, table thead [role="columnheader"]').forEach(header => {
+                if (header === except || header.classList?.contains('dashbridge-vcpu-legend-header')) return;
+                header.removeAttribute('aria-sort');
+                header.querySelectorAll?.('svg').forEach(icon => { icon.style.visibility = 'hidden'; });
+            });
+        };
         const matchEntry = label => {
             const normalizedLabel = normalizeName(label);
             let best = null;
@@ -97,8 +104,6 @@
                     white-space:nowrap !important;
                 }
                 .dashbridge-vcpu-legend-header { color:inherit; font-weight:inherit; }
-                .dashbridge-vcpu-legend-header[data-dashbridge-sort="asc"]::after { content:' ▲'; font-size:.72em; }
-                .dashbridge-vcpu-legend-header[data-dashbridge-sort="desc"]::after { content:' ▼'; font-size:.72em; }
             `;
             document.documentElement.appendChild(style);
         };
@@ -140,6 +145,20 @@
                 header.setAttribute('aria-sort', direction === 'asc'
                     ? 'ascending'
                     : direction === 'desc' ? 'descending' : 'none');
+                header.querySelector?.('[data-dashbridge-vcpu-sort-icon]')?.remove();
+                if (direction && typeof document !== 'undefined') {
+                    const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                    icon.dataset.dashbridgeVcpuSortIcon = '1';
+                    icon.setAttribute('aria-hidden', 'true'); icon.setAttribute('width', '12');
+                    icon.setAttribute('height', '12'); icon.setAttribute('viewBox', '0 0 24 24');
+                    icon.setAttribute('focusable', 'false'); icon.style.marginLeft = '2px';
+                    icon.style.verticalAlign = 'middle';
+                    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    path.setAttribute('d', direction === 'asc'
+                        ? 'M17,13.41,12.71,9.17a1,1,0,0,0-1.42,0L7.05,13.41a1,1,0,0,0,0,1.42,1,1,0,0,0,1.41,0L12,11.29l3.54,3.54a1,1,0,0,0,.7.29,1,1,0,0,0,.71-.29A1,1,0,0,0,17,13.41Z'
+                        : 'M17,9.17a1,1,0,0,0-1.41,0L12,12.71,8.46,9.17a1,1,0,0,0-1.41,0,1,1,0,0,0,0,1.42l4.24,4.24a1,1,0,0,0,1.42,0L17,10.59A1,1,0,0,0,17,9.17Z');
+                    icon.appendChild(path); header.appendChild(icon);
+                }
             });
             if (!direction && !restoreOriginal) return 0;
             const groups = new Map();
@@ -183,7 +202,7 @@
         };
 
         const renderColumn = (panelRoot, state = tools) => {
-            if (!state.cpuCapacityFilterEnabled) {
+            if (!state.cpuCapacityFilterEnabled || state.legendColumns?.vcpu === false) {
                 removeColumn(panelRoot);
                 return 0;
             }
@@ -237,6 +256,7 @@
                         sortDirection = sortDirection === null
                             ? 'desc'
                             : sortDirection === 'desc' ? 'asc' : null;
+                        clearNativeSortIndicators(panelRoot, headerCell);
                         sortRows(panelRoot, { restoreOriginal: sortDirection === null });
                     };
                 }
@@ -258,7 +278,7 @@
 
         const sync = (panelRoot, state = tools) => {
             if (activeRoot && activeRoot !== panelRoot) stopController(activeRoot);
-            if (!state.cpuCapacityFilterEnabled) {
+            if (!state.cpuCapacityFilterEnabled || state.legendColumns?.vcpu === false) {
                 stopController(panelRoot);
                 activeRoot = null;
                 sortDirection = null;
@@ -295,7 +315,8 @@
                     sortDirection = null;
                     panelRoot.querySelectorAll?.('.dashbridge-vcpu-legend-header').forEach(vcpuHeader => {
                         delete vcpuHeader.dataset.dashbridgeSort;
-                        vcpuHeader.setAttribute('aria-sort', 'none');
+                        vcpuHeader.removeAttribute('aria-sort');
+                        vcpuHeader.querySelector('[data-dashbridge-vcpu-sort-icon]')?.remove();
                     });
                 };
                 panelRoot.addEventListener?.('click', controller.nativeSortListener, true);
@@ -317,3 +338,5 @@
 
     root.DashBridgeGrafanaCpuCapacityLegend = Object.freeze({ create });
 })(globalThis);
+
+

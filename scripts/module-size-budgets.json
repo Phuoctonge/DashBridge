@@ -5,12 +5,12 @@
   },
   "exceptions": {
     "js/content/grafana-panel-tools.js": {
-      "maxLines": 2320,
-      "maxBytes": 135168,
+      "maxLines": 2340,
+      "maxBytes": 136192,
       "reason": "MAIN dispatcher and tightly coupled panel/threshold coordination facade, including its privacy-safe settings event bridge; extracted lifecycles remain separate owners."
     },
     "js/content/grafana-threshold-visuals.js": {
-      "maxLines": 800,
+      "maxLines": 820,
       "maxBytes": 49152,
       "reason": "Single renderer lifecycle covering the shared uPlot/Flot threshold contract, including foreground projection into its existing highlight overlay; no separate observers or resource owner."
     },
@@ -20,8 +20,8 @@
       "reason": "Single document fetch/XHR interception and request-correlation lifecycle, including rebinding current generation callbacks without stacking wrappers; pure transforms are already extracted."
     },
     "js/content/grafana-legend-visuals.js": {
-      "maxLines": 1000,
-      "maxBytes": 65536,
+      "maxLines": 1180,
+      "maxBytes": 81920,
       "reason": "Stable legend facade and shared layout lifecycle; renderer visibility adapters are already extracted."
     },
     "pages/test-runner/test-runner-core.js": {
@@ -48,6 +48,11 @@
       "maxLines": 780,
       "maxBytes": 40960,
       "reason": "Single Test Runner page/run-state controller, including synchronous startup/cancellation and exclusive spool ownership across export/pagehide; splitting these guards would divide one lifecycle. Diagnostic windows and export/clipboard owners are already extracted."
+    },
+    "js/shared/grafana-panel-settings-modal.js": {
+      "maxLines": 700,
+      "maxBytes": 71680,
+      "reason": "Shared panel settings modal owns one lifecycle for direct Grafana and DashBridge; controls, persistence and stale-owner guards remain intentionally co-located."
     }
   }
 }

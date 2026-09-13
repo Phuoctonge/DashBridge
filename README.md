@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="manifest.json"><img src="https://img.shields.io/badge/version-2.4.3-4361ee?style=flat-square" alt="Version 2.4.3"></a>
+  <a href="manifest.json"><img src="https://img.shields.io/badge/version-2.4.4-4361ee?style=flat-square" alt="Version 2.4.4"></a>
   <a href="manifest.json"><img src="https://img.shields.io/badge/Chrome-Manifest%20V3-4285f4?style=flat-square&amp;logo=googlechrome&amp;logoColor=white" alt="Chrome Manifest V3"></a>
   <a href="#возможности"><img src="https://img.shields.io/badge/interface-%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9-22a06b?style=flat-square" alt="Русский интерфейс"></a>
 </p>
@@ -25,6 +25,8 @@
 ---
 
 ## О расширении
+
+История изменений опубликована в [CHANGELOG.md](CHANGELOG.md).
 
 **DashBridge** - расширение для инженеров сопровождения и мониторинга. Оно объединяет нужные графики Grafana в одном дашборде, позволяет фильтровать и преобразовывать метрики, контролировать пороговые значения и массово сохранять снимки за выбранные периоды.
 
@@ -369,3 +371,5 @@ AI-анализ и ревью репозитория начинают с [AGENTS
   <strong>DashBridge</strong><br>
   Меньше ручной работы - больше времени на анализ.
 </div>
+
+

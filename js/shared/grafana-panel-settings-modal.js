@@ -116,7 +116,7 @@
             <div class="panel-tools-transform"><label class="panel-tools-option"><span>Убрать заливку графика</span><span class="switch"><input type="checkbox" ${attribute}="removeFill" ${state.removeFill ? 'checked' : ''}><span class="slider"></span></span></label><small class="panel-tools-toggle-hint" data-toggle-hint="removeFill" ${state.removeFill ? '' : 'hidden'}>Оставляет только линии без цветной области под ними.</small></div>
             <div class="panel-tools-transform"><label class="panel-tools-option"><span>Утолщить линии графика</span><span class="switch"><input type="checkbox" ${attribute}="thickenLines" ${state.thickenLines ? 'checked' : ''}><span class="slider"></span></span></label><small class="panel-tools-toggle-hint" data-toggle-hint="thickenLines" ${state.thickenLines ? '' : 'hidden'}>Делает линии заметнее; толщину можно настроить ниже.</small><label class="thicken-lines-container" style="display:${state.thickenLines ? 'flex' : 'none'}"><span>Толщина</span><input type="range" ${attribute}="thickenLinesValue" min="0.5" max="5" step="0.5" value="${width}"><span class="thicken-lines-display">+${width.toFixed(1)}</span></label></div>
             <div class="panel-tools-transform"><label class="panel-tools-option"><span>Переместить легенду: справа ↔ снизу</span><span class="switch"><input type="checkbox" ${attribute}="invertLegend" ${state.invertLegend ? 'checked' : ''}><span class="slider"></span></span></label><small class="panel-tools-toggle-hint" data-toggle-hint="invertLegend" ${state.invertLegend ? '' : 'hidden'}>Справа удобнее длинные названия, снизу остаётся больше ширины графика.</small></div>
-            <div class="panel-tools-transform"><label class="panel-tools-option"><span>Столбцы сводки</span><span class="panel-tools-hint">Столбцы этой панели определяются автоматически.</span></label><div class="panel-tools-column-options"></div></div>`;
+            <div class="panel-tools-transform"><label class="panel-tools-option"><span>Настроить столбцы сводки</span><span class="switch"><input type="checkbox" data-key="legendColumnsEnabled" ${state.legendColumnsEnabled ? 'checked' : ''}><span class="slider"></span></span></label><div class="panel-tools-threshold panel-tools-column-options" ${state.legendColumnsEnabled ? '' : 'hidden'}></div></div>`;
     };
     const normalizeExternalText = (value, maxLength = 96) => String(value ?? '')
         .replace(/[\u0000-\u001f\u007f]/g, '')
@@ -254,16 +254,19 @@
         });
     };
 
-    const bindAdvancedControls = ({ overlay, state, getLegendSeries, getLegendColumns, getThresholdStatus, onSave, cpuCapacityFilterCoefficientDefault = 0.8 }) => {
+    const bindAdvancedControls = ({ overlay, state, panelKind = null, getLegendSeries, getLegendColumns, getThresholdStatus, onSave, cpuCapacityFilterCoefficientDefault = 0.8 }) => {
         const defaultCpuCapacityCoefficient = Number.isFinite(Number(cpuCapacityFilterCoefficientDefault))
             && Number(cpuCapacityFilterCoefficientDefault) >= 0.01 && Number(cpuCapacityFilterCoefficientDefault) <= 10
             ? Number(cpuCapacityFilterCoefficientDefault) : 0.8;
         const legendSelection = globalThis.DashBridgeGrafanaLegendSelection;
         const columnContainer = overlay.querySelector('.panel-tools-column-options');
+        const columnEditor = overlay.querySelector('[data-key="legendColumnsEnabled"]');
+        columnEditor?.addEventListener('change', () => { if (columnContainer) columnContainer.hidden = !columnEditor.checked; });
         const renderColumns = columns => {
             if (!columnContainer || !Array.isArray(columns)) return;
             const names = [...new Set(columns.map(value => String(value || '').trim()).filter(Boolean))];
             if (!names.some(name => /^last$/i.test(name))) names.push('Last');
+            if (panelKind === 'load' && !names.some(name => /^vcpu$/i.test(name))) names.push('vCPU');
             columnContainer.replaceChildren(...names.map(name => {
                 const key = name.toLowerCase(); const label = document.createElement('label'); label.className = 'panel-tools-option';
                 const text = document.createElement('span'); text.textContent = /^last$/i.test(name) ? 'Last (последнее значение)' : name;
@@ -590,6 +593,9 @@
         ensureStyles(); document.querySelector('.dashbridge-panel-settings-overlay')?.remove();
         const overlay = createOverlay();
         overlay.innerHTML = `<div class="dashbridge-panel-settings" role="dialog" aria-modal="true" aria-labelledby="dashbridge-panel-settings-title"><div class="panel-tools-modal-header"><h3 id="dashbridge-panel-settings-title">Настройки графика</h3><button type="button" class="btn btn-outline panel-tools-reset-all">Сбросить всё</button></div><div class="panel-tools-scroll"><p class="panel-tools-hint">Применяются только к этому графику.</p>${visualFields(state)}${content}</div><div class="panel-tools-footer"><button type="button" class="cancel">Отмена</button><button type="button" class="save">Сохранить</button></div></div>`;
+        const columnSettings = overlay.querySelector('.panel-tools-column-options')?.closest('.panel-tools-transform');
+        const thresholdSettings = overlay.querySelector('.panel-alert-threshold');
+        if (columnSettings && thresholdSettings) thresholdSettings.after(columnSettings);
         Object.entries(state).forEach(([key, value]) => { const input = overlay.querySelector(`[data-key="${key}"]`); if (input) input.type === 'checkbox' ? input.checked = !!value : input.value = value; });
         onReady?.(overlay);
         // Keep unsaved panel settings open until the user explicitly cancels
@@ -606,6 +612,9 @@
         document.body.appendChild(overlay); return overlay;
     };
     const create = ({ html }) => { ensureStyles(); document.querySelector('.dashbridge-panel-settings-overlay')?.remove(); const overlay = createOverlay(); overlay.innerHTML = html; document.body.appendChild(overlay); return overlay; };
-    const readVisualState = root => ({ legendColumns: Object.fromEntries(Array.from(root.querySelectorAll('[data-key^="legendColumn_"]')).map(input => [input.dataset.key.slice(13), input.checked])), removeFill: root.querySelector('[name="removeFill"], [data-key="removeFill"]')?.checked || false, thickenLines: root.querySelector('[name="thickenLines"], [data-key="thickenLines"]')?.checked || false, thickenLinesValue: Number(root.querySelector('[name="thickenLinesValue"], [data-key="thickenLinesValue"]')?.value || 1.5), invertLegend: root.querySelector('[name="invertLegend"], [data-key="invertLegend"]')?.checked || false });
+    const readVisualState = root => ({ legendColumnsEnabled: root.querySelector('[data-key="legendColumnsEnabled"]')?.checked !== false, legendColumns: Object.fromEntries(Array.from(root.querySelectorAll('[data-key^="legendColumn_"]')).map(input => [input.dataset.key.slice(13), input.checked])), removeFill: root.querySelector('[name="removeFill"], [data-key="removeFill"]')?.checked || false, thickenLines: root.querySelector('[name="thickenLines"], [data-key="thickenLines"]')?.checked || false, thickenLinesValue: Number(root.querySelector('[name="thickenLinesValue"], [data-key="thickenLinesValue"]')?.value || 1.5), invertLegend: root.querySelector('[name="invertLegend"], [data-key="invertLegend"]')?.checked || false });
     window.DashBridgePanelSettingsModal = { open, create, readVisualState, visualFields, legendFields, transformFields, thresholdFields, bindAdvancedControls, selectLegendSeriesByPatterns, resolveUnitOptions, normalizeExternalText };
 })();
+
+
+

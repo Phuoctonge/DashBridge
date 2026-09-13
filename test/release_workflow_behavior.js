@@ -7,7 +7,7 @@ const manifest = JSON.parse(fs.readFileSync('manifest.json', 'utf8'));
 const workflow = fs.readFileSync('.github/workflows/release.yml', 'utf8');
 const builder = fs.readFileSync('scripts/build-release.ps1', 'utf8');
 
-assert.strictEqual(manifest.version, '2.4.3');
+assert.strictEqual(manifest.version, '2.4.4');
 assert(workflow.includes("- 'v*'")
     && workflow.includes('run: npm ci')
     && workflow.indexOf('run: npm ci') < workflow.indexOf('node test/run-all-tests.js')
@@ -57,3 +57,4 @@ assert(builder.includes(singleBackslashNormalization),
     'release verification must normalize Windows ZIP entry separators');
 
 console.log('PASS tagged releases test, package and publish a minimal extension archive');
+

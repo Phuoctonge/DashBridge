@@ -19,7 +19,7 @@
         compactCaptureMain: new Set([true, false]), compactCaptureSeries: new Set([true, false]),
     });
     const BOOLEAN_TOOL_KEYS = new Set([
-        'removeFill', 'thickenLines', 'invertLegend', 'invertIdle', 'convertMemToUsed', 'forceMemByteUnit',
+        'removeFill', 'thickenLines', 'invertLegend', 'legendColumnsEnabled', 'invertIdle', 'convertMemToUsed', 'forceMemByteUnit',
         'seriesQueryFilterEnabled', 'seriesQueryFilterHighlightEnabled',
         'cpuCapacityFilterEnabled', 'cpuCapacityFilterHighlightEnabled', 'cpuCapacityFilterLoad1',
         'cpuCapacityFilterLoad5', 'cpuCapacityFilterLoad15', 'thresholdEnabled', 'thresholdNotifyEnabled',
@@ -370,3 +370,4 @@
         normalizeImportedLocal
     });
 })(globalThis);
+

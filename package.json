@@ -1,6 +1,6 @@
 {
   "name": "dashbridge-development",
-  "version": "2.4.3",
+  "version": "2.4.4",
   "private": true,
   "description": "Development-only analysis and browser verification for the DashBridge extension.",
   "scripts": {
@@ -21,3 +21,4 @@
     "eslint": "10.9.1"
   }
 }
+
