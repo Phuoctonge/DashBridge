@@ -991,6 +991,23 @@
             };
             const tables = Array.from(root.querySelectorAll?.('table') || []).filter(table => table.querySelector('th, [role="columnheader"]'));
             const requested = columns && typeof columns === 'object' ? columns : {};
+            if (requested.last === true && root && typeof MutationObserver === 'function' && !root.__dashBridgeLegendColumnsObserver) {
+                let queued = false;
+                const host = root;
+                const observer = new MutationObserver(() => {
+                    if (queued) return;
+                    const hasMissingLast = Array.from(root.querySelectorAll?.('table') || []).some(table => {
+                        const header = table.querySelector('thead tr');
+                        const hasLast = header && Array.from(header.children).some(cell => /^last$/i.test(String(cell.textContent || '').trim()));
+                        return hasLast && Array.from(table.querySelectorAll('tbody tr')).some(row => !row.querySelector('[data-dashbridge-summary-column="last"]'));
+                    });
+                    if (!hasMissingLast) return;
+                    queued = true;
+                    queueMicrotask(() => { queued = false; applyLegendColumns({ root, columns: requested }); });
+                });
+                observer.observe(host, { childList: true, subtree: true });
+                root.__dashBridgeLegendColumnsObserver = observer;
+            }
             let changed = 0;
             for (const table of tables) {
                 const headerRow = table.querySelector('thead tr') || table.querySelector('tr');
@@ -1065,9 +1082,18 @@
                                 const current = lastHeader.getAttribute('aria-sort');
                                 const next = current === 'descending' ? 'ascending' : current === 'ascending' ? 'none' : 'descending';
                                 if (next === 'none') lastHeader.removeAttribute('aria-sort'); else lastHeader.setAttribute('aria-sort', next);
-                                const path = next === 'ascending' ? 'M7 14l5-5 5 5' : 'M7 10l5 5 5-5';
-                                lastHeader.style.backgroundImage = next === 'none' ? '' : `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='${encodeURIComponent(path)}'/%3E%3C/svg%3E")`;
-                                lastHeader.style.backgroundRepeat = 'no-repeat'; lastHeader.style.backgroundPosition = 'right 3px center'; lastHeader.style.backgroundSize = '12px 12px'; lastHeader.style.paddingRight = next === 'none' ? '4px' : '18px';
+                                lastHeader.style.backgroundImage = '';
+                                lastHeader.querySelector('[data-dashbridge-sort-icon]')?.remove();
+                                if (next !== 'none') {
+                                    const sourceIcon = headerRow.querySelector('svg');
+                                    const icon = sourceIcon ? sourceIcon.cloneNode(true) : document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                                    icon.dataset.dashbridgeSortIcon = '1'; icon.setAttribute('aria-hidden', 'true'); icon.setAttribute('width', '12'); icon.setAttribute('height', '12'); icon.style.marginLeft = '2px';
+                                    icon.style.visibility = 'visible';
+                                    if (!icon.querySelector('path')) icon.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'path'));
+                                    icon.querySelector('path')?.setAttribute('d', next === 'ascending' ? 'M17,13.41,12.71,9.17a1,1,0,0,0-1.42,0L7.05,13.41a1,1,0,0,0,0,1.42,1,1,0,0,0,1.41,0L12,11.29l3.54,3.54a1,1,0,0,0,.7.29,1,1,0,0,0,.71-.29A1,1,0,0,0,17,13.41Z' : 'M17,9.17a1,1,0,0,0-1.41,0L12,12.71,8.46,9.17a1,1,0,0,0-1.41,0,1,1,0,0,0,0,1.42l4.24,4.24a1,1,0,0,0,1.42,0L17,10.59A1,1,0,0,0,17,9.17Z');
+                                    lastHeader.appendChild(icon);
+                                }
+                                lastHeader.style.paddingRight = '4px';
                                 headerRow.querySelectorAll('[aria-sort]').forEach(cell => { if (cell !== lastHeader) cell.removeAttribute('aria-sort'); });
                                 headerRow.querySelectorAll('[data-testid*="sort"], [aria-label*="sort" i]').forEach(el => { if (!lastHeader.contains(el)) el.removeAttribute('aria-sort'); });
                                 headerRow.querySelectorAll(':scope > *').forEach(cell => {
@@ -1076,6 +1102,11 @@
                                     cell.querySelectorAll('[aria-sort], [data-sort]').forEach(el => { el.removeAttribute('aria-sort'); el.removeAttribute('data-sort'); });
                                     cell.querySelectorAll('svg, span, div').forEach(el => { if (/sort|arrow|caret/i.test(String(el.className?.baseVal || el.className || ''))) el.classList.remove('active', 'selected'); });
                                     cell.querySelectorAll('svg').forEach(el => { el.style.visibility = 'hidden'; });
+                                });
+                                headerRow.querySelectorAll(':scope > *').forEach(cell => {
+                                    if (cell === lastHeader || cell.dataset.dashbridgeLastSortBound) return;
+                                    cell.dataset.dashbridgeLastSortBound = '1';
+                                    cell.addEventListener('click', () => { lastHeader.removeAttribute('aria-sort'); lastHeader.querySelector('[data-dashbridge-sort-icon]')?.remove(); lastHeader.style.backgroundImage = ''; }, { capture: true });
                                 });
                                 const body = table.querySelector('tbody');
                                 const bodyRows = Array.from(body?.querySelectorAll(':scope > tr') || []);
