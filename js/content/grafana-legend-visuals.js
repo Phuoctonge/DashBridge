@@ -1066,6 +1066,12 @@
                                 if (next === 'none') lastHeader.removeAttribute('aria-sort'); else lastHeader.setAttribute('aria-sort', next);
                                 headerRow.querySelectorAll('[aria-sort]').forEach(cell => { if (cell !== lastHeader) cell.removeAttribute('aria-sort'); });
                                 headerRow.querySelectorAll('[data-testid*="sort"], [aria-label*="sort" i]').forEach(el => { if (!lastHeader.contains(el)) el.removeAttribute('aria-sort'); });
+                                headerRow.querySelectorAll(':scope > *').forEach(cell => {
+                                    if (cell === lastHeader) return;
+                                    cell.removeAttribute('aria-sort'); cell.removeAttribute('data-sort');
+                                    cell.querySelectorAll('[aria-sort], [data-sort]').forEach(el => { el.removeAttribute('aria-sort'); el.removeAttribute('data-sort'); });
+                                    cell.querySelectorAll('svg, span, div').forEach(el => { if (/sort|arrow|caret/i.test(String(el.className?.baseVal || el.className || ''))) el.classList.remove('active', 'selected'); });
+                                });
                                 const body = table.querySelector('tbody');
                                 const bodyRows = Array.from(body?.querySelectorAll(':scope > tr') || []);
                                 if (next === 'none') { bodyRows.sort((a, b) => Number(a.dataset.dashBridgeOriginalIndex || 0) - Number(b.dataset.dashBridgeOriginalIndex || 0)); }
