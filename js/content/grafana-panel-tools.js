@@ -831,7 +831,7 @@
             // empty legend prove that native visibility cannot be applied yet;
             // canvas presence does not mean that the missing legend is ready.
             || tools.seriesQueryFilterEnabled === true
-            || tools.cpuCapacityFilterEnabled === true);
+            || tools.cpuCapacityFilterEnabled === true\r\n            || (tools.legendColumns && Object.keys(tools.legendColumns).length > 0));
     const applyPersistentVisualState = async () => {
         const targetPanel = getTargetPanel();
         const targetRoot = window.DashBridgeGrafanaDom?.outerPanel(targetPanel) || targetPanel || document;
@@ -1518,7 +1518,7 @@
                 // Table panels never mount a chart renderer. Waiting for one
                 // leaves a document-wide observer alive and delays the command
                 // until the outer 20-second bridge timeout.
-                if (renderedTable && !chartSurface) {
+                if (renderedTable && !chartSurface && !(tools.legendColumns && Object.keys(tools.legendColumns).length > 0)) {
                     finish();
                     return;
                 }
@@ -1535,7 +1535,7 @@
                     seriesConfig: hasLegendVisibilityWork(tools) ? seriesConfig : null,
                     mode: tools.legendMode || 'fast_complete_hide'
                 });
-            if (!fastLegend || tools.removeFill || tools.thickenLines || tools.invertLegend) {
+            if (!fastLegend || tools.removeFill || tools.thickenLines || tools.invertLegend || (tools.legendColumns && Object.keys(tools.legendColumns).length > 0)) {
                 await window.DashBridgeGrafanaVisualEngine?.apply({
                     panelId: getPanelStateKey(targetPanel) || tools.targetPanelId || null,
                     seriesConfig: hasLegendVisibilityWork(tools) ? seriesConfig : null,
