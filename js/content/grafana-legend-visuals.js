@@ -1071,6 +1071,7 @@
                                     cell.removeAttribute('aria-sort'); cell.removeAttribute('data-sort');
                                     cell.querySelectorAll('[aria-sort], [data-sort]').forEach(el => { el.removeAttribute('aria-sort'); el.removeAttribute('data-sort'); });
                                     cell.querySelectorAll('svg, span, div').forEach(el => { if (/sort|arrow|caret/i.test(String(el.className?.baseVal || el.className || ''))) el.classList.remove('active', 'selected'); });
+                                    cell.querySelectorAll('svg').forEach(el => el.remove());
                                 });
                                 const body = table.querySelector('tbody');
                                 const bodyRows = Array.from(body?.querySelectorAll(':scope > tr') || []);
@@ -1080,6 +1081,7 @@
                             });
                             Array.from(table.querySelectorAll('tbody > tr')).forEach((row, i) => { row.dataset.dashBridgeOriginalIndex = String(i); });
                         }
+                        lastHeader.querySelectorAll('svg').forEach(el => el.remove());
                         lastHeader.style.paddingLeft = '4px'; lastHeader.style.paddingRight = '4px';
                         lastHeader.style.minWidth = '0';
                         table.querySelectorAll('tbody > tr').forEach(row => { const cell = row.children[lastColumnIndex]; if (cell) { cell.style.color = 'inherit'; cell.style.font = 'inherit'; cell.style.paddingLeft = '4px'; cell.style.paddingRight = '4px'; } });
