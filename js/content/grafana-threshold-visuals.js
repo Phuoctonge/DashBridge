@@ -65,7 +65,7 @@
             const formatThreshold = (value, rawUnit) => {
                 const normalized = String(rawUnit || '').toLowerCase();
                 const absolute = Math.abs(Number(value));
-                if (/^mins?$/.test(normalized) && absolute > 0 && absolute < 1) {
+                if (/^mins$/.test(normalized) && absolute > 0 && absolute < 1) {
                     const seconds = Number((Number(value) * 60).toPrecision(4));
                     if (Number.isInteger(seconds) || seconds >= 0.1) return `${seconds} s`;
                 }
