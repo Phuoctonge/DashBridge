@@ -540,6 +540,7 @@ DashBridgeIframeMessageController.create({
     applyPanelTools,
     retryPanelAnalysis: dashBridgePanelAnalysisController.retryForFrame,
     acceptLegendSeries: dashBridgePanelToolsController.acceptLegendSeries,
+    acceptLegendColumns: dashBridgePanelToolsController.acceptLegendColumns,
     acceptThresholdStatus: dashBridgePanelToolsController.acceptThresholdStatus,
     broadcastCrosshair,
     hideCrosshair,

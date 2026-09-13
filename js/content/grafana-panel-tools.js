@@ -1592,6 +1592,14 @@
             window.parent.postMessage({ action: 'panelLegendSeries', requestId: event.data.requestId, series }, extensionOrigin);
             return;
         }
+        if (event.data?.action === 'getPanelLegendColumns') {
+            const root = window.DashBridgeGrafanaDom?.outerPanel(getTargetPanel()) || document;
+            const table = Array.from(root.querySelectorAll?.('table') || []).find(item => item.querySelector('tbody [class*="LegendLabel"]'));
+            const headers = Array.from(table?.querySelectorAll?.('thead th, thead td, thead [role="columnheader"]') || [])
+                .map(cell => String(cell.textContent || '').trim()).filter(Boolean);
+            window.parent.postMessage({ action: 'panelLegendColumns', requestId: event.data.requestId, columns: headers.filter(name => !/^name$/i.test(name)) }, extensionOrigin);
+            return;
+        }
         if (event.data?.action === 'getPanelThresholdStatus') {
             // The settings dialog requests this explicitly so the detected unit
             // is shown immediately, rather than waiting for the next data update.
@@ -2137,6 +2145,7 @@
             advanced: {
                 cpuCapacityFilterCoefficientDefault: defaultCpuCapacityCoefficient,
                 getLegendSeries: () => getPanelLegendSeries(panel),
+                getLegendColumns: async () => Array.from(panel.querySelectorAll('table thead th')).map(cell => cell.textContent.trim()).filter(name => name && !/^name$/i.test(name)),
                 getThresholdStatus: () => getThresholdUnitStatus({ root: thresholdRoot, panelId: panelKey }),
                 formatThresholdUnit: status => status?.unit
                     ? `Единица: ${status.unit}`

@@ -35,7 +35,7 @@
         acceptTitleResponse, acceptPanelToolsApplied = () => undefined, acceptFrameLocation = () => undefined,
         postToDashboardFrame = post, getCrosshairMode,
         getCrosshairThickness, sendTimeUpdate, applyPanelTools,
-        retryPanelAnalysis, acceptLegendSeries, acceptThresholdStatus,
+        retryPanelAnalysis, acceptLegendSeries, acceptLegendColumns, acceptThresholdStatus,
         broadcastCrosshair, hideCrosshair, windowRef = window,
         documentRef = document, locationRef = location, chromeRef = chrome }) {
         const required = [
@@ -138,6 +138,10 @@
             if (event.data.action === 'panelLegendSeries'
                 && typeof event.data.requestId === 'string') {
                 acceptLegendSeries(event.data, sourcePanel);
+                return;
+            }
+            if (event.data.action === 'panelLegendColumns') {
+                acceptLegendColumns?.(event.data, sourcePanel);
                 return;
             }
             if (event.data.action === 'panelThresholdStatus') {

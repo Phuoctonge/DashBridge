@@ -6,6 +6,7 @@
         if (typeof debugLog !== 'function') {
             throw new TypeError('Grafana legend visuals dependencies are incomplete');
         }
+        const rawColumnStats = window.DashBridgeGrafanaLegendColumns;
         if (window.name === 'dashbridge-iframe' && !document.getElementById('dashbridge-responsive-legend-style')) { const style = document.createElement('style'); style.id = 'dashbridge-responsive-legend-style'; style.textContent = 'table:has(th) { width:100% !important; max-width:100% !important; table-layout:fixed !important; } table:has(th) tr { display:flex !important; width:100% !important; min-width:0 !important; } table:has(th) td, table:has(th) th { min-width:0 !important; overflow:hidden !important; text-overflow:ellipsis !important; } table:has(th) tr > :first-child { flex:1 1 auto !important; min-width:0 !important; width:auto !important; } table:has(th) tr > :not(:first-child) { flex:0 0 auto !important; width:max-content !important; min-width:max-content !important; } .rdg { grid-template-columns:minmax(0,1fr) max-content !important; overflow-x:hidden !important; } .rdg .rdg-cell:first-child { display:block !important; min-width:0 !important; overflow:hidden !important; text-overflow:ellipsis !important; white-space:nowrap !important; } .rdg .rdg-cell:first-child > * { min-width:0 !important; overflow:hidden !important; text-overflow:ellipsis !important; white-space:nowrap !important; }'; (document.head || document.documentElement).appendChild(style); }
 
         const legacyVisualObserverOwners = new Set();
@@ -997,11 +998,11 @@
                     const rows = Array.from(table.querySelectorAll('tbody tr'));
                     const chart = findUPlotForThreshold(root);
                     const series = chart?.data || getFlotPlot(root)?.getData?.() || [];
+                    const computed = rawColumnStats?.compute({ series: rows.map((row, index) => ({ label: row.textContent.trim(), values: chart ? series[index + 1] : series[index]?.data?.map(point => point?.[1]) })), columns: { last: true } }) || [];
                     rows.forEach((row, index) => {
                         const valueCell = document.createElement('td');
-                        const values = chart ? series[index + 1] : series[index]?.data?.map(point => point?.[1]);
-                        const finite = Array.from(values || []).filter(value => Number.isFinite(Number(value)));
-                        valueCell.textContent = finite.length ? String(finite[finite.length - 1]) : '-';
+                        const value = computed[index]?.stats?.last;
+                        valueCell.textContent = Number.isFinite(value) ? String(value) : '-';
                         valueCell.dataset.dashbridgeSummaryColumn = 'last'; row.appendChild(valueCell);
                     });
                     changed += 1;

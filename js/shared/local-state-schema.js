@@ -35,7 +35,6 @@
         'seriesQueryFilterMode', 'seriesQueryFilterInputUnit', 'cpuCapacityFilterMode',
         'thresholdInputUnit', 'thresholdUnit'
     ]);
-    const LEGEND_COLUMN_KEYS = new Set(['mean', 'max', 'total', 'last']);
 
     const isPlainObject = value => typeof value === 'object' && value !== null && !Array.isArray(value);
     const fail = message => { throw new TypeError(message); };
@@ -80,7 +79,7 @@
                 }
                 normalized[key] = [...item];
             } else if (key === 'legendColumns') {
-                if (!isPlainObject(item) || Object.keys(item).some(column => !LEGEND_COLUMN_KEYS.has(column)
+                if (!isPlainObject(item) || Object.keys(item).length > 64 || Object.keys(item).some(column => !column || column.length > 128
                     || typeof item[column] !== 'boolean')) fail(`${label}.legendColumns: некорректная карта столбцов.`);
                 normalized[key] = Object.fromEntries(Object.entries(item));
             }

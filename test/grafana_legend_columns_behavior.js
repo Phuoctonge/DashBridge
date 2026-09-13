@@ -1,0 +1,10 @@
+'use strict';
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const context = { window: {}, console };
+vm.runInNewContext(fs.readFileSync('js/content/grafana-legend-columns.js', 'utf8'), context);
+const api = context.window.DashBridgeGrafanaLegendColumns;
+assert.deepEqual(JSON.parse(JSON.stringify(api.summarize([1, 2, 4]))), { mean: 7 / 3, max: 4, min: 1, total: 7, last: 4 });
+assert.deepEqual(JSON.parse(JSON.stringify(api.compute({ series: [{ label: 'A', values: [1, 2, 4] }], columns: { mean: true, max: false, last: true } })[0].columns)), { mean: 7 / 3, min: 1, total: 7, last: 4 });
+console.log('PASS raw legend column statistics');

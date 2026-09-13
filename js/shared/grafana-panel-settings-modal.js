@@ -116,7 +116,7 @@
             <div class="panel-tools-transform"><label class="panel-tools-option"><span>Убрать заливку графика</span><span class="switch"><input type="checkbox" ${attribute}="removeFill" ${state.removeFill ? 'checked' : ''}><span class="slider"></span></span></label><small class="panel-tools-toggle-hint" data-toggle-hint="removeFill" ${state.removeFill ? '' : 'hidden'}>Оставляет только линии без цветной области под ними.</small></div>
             <div class="panel-tools-transform"><label class="panel-tools-option"><span>Утолщить линии графика</span><span class="switch"><input type="checkbox" ${attribute}="thickenLines" ${state.thickenLines ? 'checked' : ''}><span class="slider"></span></span></label><small class="panel-tools-toggle-hint" data-toggle-hint="thickenLines" ${state.thickenLines ? '' : 'hidden'}>Делает линии заметнее; толщину можно настроить ниже.</small><label class="thicken-lines-container" style="display:${state.thickenLines ? 'flex' : 'none'}"><span>Толщина</span><input type="range" ${attribute}="thickenLinesValue" min="0.5" max="5" step="0.5" value="${width}"><span class="thicken-lines-display">+${width.toFixed(1)}</span></label></div>
             <div class="panel-tools-transform"><label class="panel-tools-option"><span>Переместить легенду: справа ↔ снизу</span><span class="switch"><input type="checkbox" ${attribute}="invertLegend" ${state.invertLegend ? 'checked' : ''}><span class="slider"></span></span></label><small class="panel-tools-toggle-hint" data-toggle-hint="invertLegend" ${state.invertLegend ? '' : 'hidden'}>Справа удобнее длинные названия, снизу остаётся больше ширины графика.</small></div>
-            <div class="panel-tools-transform"><label class="panel-tools-option"><span>Столбцы сводки</span><span class="panel-tools-hint">Столбцы легенды определяются автоматически.</span></label><label class="panel-tools-option"><span>Mean</span><span class="switch"><input type="checkbox" ${attribute}="legendColumn_mean" ${state.legendColumns?.mean !== false ? 'checked' : ''}><span class="slider"></span></span></label><label class="panel-tools-option"><span>Max</span><span class="switch"><input type="checkbox" ${attribute}="legendColumn_max" ${state.legendColumns?.max !== false ? 'checked' : ''}><span class="slider"></span></span></label><label class="panel-tools-option"><span>Total</span><span class="switch"><input type="checkbox" ${attribute}="legendColumn_total" ${state.legendColumns?.total !== false ? 'checked' : ''}><span class="slider"></span></span></label><label class="panel-tools-option"><span>Last (последнее значение)</span><span class="switch"><input type="checkbox" ${attribute}="legendColumn_last" ${state.legendColumns?.last === true ? 'checked' : ''}><span class="slider"></span></span></label></div>`;
+            <div class="panel-tools-transform"><label class="panel-tools-option"><span>Столбцы сводки</span><span class="panel-tools-hint">Столбцы этой панели определяются автоматически.</span></label><div class="panel-tools-column-options"></div></div>`;
     };
     const normalizeExternalText = (value, maxLength = 96) => String(value ?? '')
         .replace(/[\u0000-\u001f\u007f]/g, '')
@@ -254,11 +254,23 @@
         });
     };
 
-    const bindAdvancedControls = ({ overlay, state, getLegendSeries, getThresholdStatus, onSave, cpuCapacityFilterCoefficientDefault = 0.8 }) => {
+    const bindAdvancedControls = ({ overlay, state, getLegendSeries, getLegendColumns, getThresholdStatus, onSave, cpuCapacityFilterCoefficientDefault = 0.8 }) => {
         const defaultCpuCapacityCoefficient = Number.isFinite(Number(cpuCapacityFilterCoefficientDefault))
             && Number(cpuCapacityFilterCoefficientDefault) >= 0.01 && Number(cpuCapacityFilterCoefficientDefault) <= 10
             ? Number(cpuCapacityFilterCoefficientDefault) : 0.8;
         const legendSelection = globalThis.DashBridgeGrafanaLegendSelection;
+        const columnContainer = overlay.querySelector('.panel-tools-column-options');
+        const renderColumns = columns => {
+            if (!columnContainer || !Array.isArray(columns)) return;
+            const names = [...new Set(columns.map(value => String(value || '').trim()).filter(Boolean))];
+            if (!names.some(name => /^last$/i.test(name))) names.push('Last');
+            columnContainer.replaceChildren(...names.map(name => {
+                const key = name.toLowerCase(); const label = document.createElement('label'); label.className = 'panel-tools-option';
+                const text = document.createElement('span'); text.textContent = /^last$/i.test(name) ? 'Last (последнее значение)' : name;
+                const wrap = document.createElement('span'); wrap.className = 'switch'; const input = document.createElement('input'); input.type = 'checkbox'; input.dataset.key = `legendColumn_${key}`; input.checked = key === 'last' ? state.legendColumns?.[key] === true : state.legendColumns?.[key] !== false; const slider = document.createElement('span'); slider.className = 'slider'; wrap.append(input, slider); label.append(text, wrap); return label;
+            }));
+        };
+        void getLegendColumns?.().then(renderColumns).catch(() => undefined);
         const field = name => overlay.querySelector(`[name="${name}"], [data-key="${name}"]`);
         const list = overlay.querySelector('.panel-tools-legend-list');
         const selectFilter = field('legendSelectFilter');
@@ -594,6 +606,6 @@
         document.body.appendChild(overlay); return overlay;
     };
     const create = ({ html }) => { ensureStyles(); document.querySelector('.dashbridge-panel-settings-overlay')?.remove(); const overlay = createOverlay(); overlay.innerHTML = html; document.body.appendChild(overlay); return overlay; };
-    const readVisualState = root => ({ legendColumns: Object.fromEntries(['mean','max','total','last'].map(key => [key, root.querySelector(`[data-key="legendColumn_${key}"]`)?.checked === true])), removeFill: root.querySelector('[name="removeFill"], [data-key="removeFill"]')?.checked || false, thickenLines: root.querySelector('[name="thickenLines"], [data-key="thickenLines"]')?.checked || false, thickenLinesValue: Number(root.querySelector('[name="thickenLinesValue"], [data-key="thickenLinesValue"]')?.value || 1.5), invertLegend: root.querySelector('[name="invertLegend"], [data-key="invertLegend"]')?.checked || false });
+    const readVisualState = root => ({ legendColumns: Object.fromEntries(Array.from(root.querySelectorAll('[data-key^="legendColumn_"]')).map(input => [input.dataset.key.slice(13), input.checked])), removeFill: root.querySelector('[name="removeFill"], [data-key="removeFill"]')?.checked || false, thickenLines: root.querySelector('[name="thickenLines"], [data-key="thickenLines"]')?.checked || false, thickenLinesValue: Number(root.querySelector('[name="thickenLinesValue"], [data-key="thickenLinesValue"]')?.value || 1.5), invertLegend: root.querySelector('[name="invertLegend"], [data-key="invertLegend"]')?.checked || false });
     window.DashBridgePanelSettingsModal = { open, create, readVisualState, visualFields, legendFields, transformFields, thresholdFields, bindAdvancedControls, selectLegendSeriesByPatterns, resolveUnitOptions, normalizeExternalText };
 })();

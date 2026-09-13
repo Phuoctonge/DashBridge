@@ -16,6 +16,7 @@
         }
 
         const legendWaiters = new Map();
+        const legendColumnWaiters = new Map();
         const thresholdWaiters = new Map();
         const thresholdStates = new Map();
         const titleWaiters = new Map();
@@ -217,6 +218,13 @@
                 clearTimer(timer); legendWaiters.delete(panel.id); resolve([]);
             }
         });
+        const requestLegendColumns = (panel, iframe) => new Promise(resolve => {
+            const timer = setTimer(() => { legendColumnWaiters.delete(panel.id); resolve([]); }, 2500);
+            legendColumnWaiters.set(panel.id, columns => { clearTimer(timer); resolve(columns); });
+            if (!postToDashboardFrame(iframe, { action: 'getPanelLegendColumns', requestId: panel.id })) {
+                clearTimer(timer); legendColumnWaiters.delete(panel.id); resolve([]);
+            }
+        });
 
         const requestThresholdStatus = (panel, iframe) => new Promise(resolve => {
             const timer = setTimer(() => { thresholdWaiters.delete(panel.id); resolve(null); }, 1500);
@@ -272,6 +280,7 @@
                 advanced: {
                     cpuCapacityFilterCoefficientDefault: panelSettings.grafanaCpuCapacityCoefficient,
                     getLegendSeries: () => requestLegendSeries(panel, iframe),
+                    getLegendColumns: () => requestLegendColumns(panel, iframe),
                     getThresholdStatus: () => requestThresholdStatus(panel, iframe),
                     formatThresholdUnit
                 },
@@ -339,6 +348,11 @@
             resolve(Array.isArray(message.series) ? message.series : []);
             return true;
         };
+        const acceptLegendColumns = (message, panel) => {
+            const resolve = panel && legendColumnWaiters.get(message?.requestId);
+            if (!resolve || panel.id !== message.requestId) return false;
+            legendColumnWaiters.delete(message.requestId); resolve(Array.isArray(message.columns) ? message.columns : []); return true;
+        };
         const acceptThresholdStatus = (message, panel) => {
             const resolve = panel && thresholdWaiters.get(message?.requestId);
             if (resolve && panel.id === message.requestId) {
@@ -359,7 +373,7 @@
             documentRef.querySelector(`.threshold-notification[data-panel-id="${cssEscape(panelId)}"]`)?.remove();
         };
 
-        return Object.freeze({ normalizeTools, apply, open, acceptApplied, acceptTitleResponse, acceptLegendSeries,
+        return Object.freeze({ normalizeTools, apply, open, acceptApplied, acceptTitleResponse, acceptLegendSeries, acceptLegendColumns,
             acceptThresholdStatus, updateThresholdStatus, removePanel });
     }
 
