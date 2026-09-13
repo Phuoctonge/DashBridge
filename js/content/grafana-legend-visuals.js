@@ -1021,10 +1021,17 @@
                         const rows = Array.from(table.querySelectorAll('tbody tr'));
                         const chart = findUPlotForThreshold(root);
                         const data = chart?.data || getFlotPlot(root)?.getData?.() || [];
+                        const normalizeColor = value => String(value || '').replace(/\s+/g, '').toLowerCase();
+                        const seriesByColor = chart ? new Map((chart.series || []).slice(1).map((item, offset) => {
+                            let color = '';
+                            try { color = typeof item.stroke === 'function' ? item.stroke(chart, offset + 1) : item.stroke; } catch { /* fallback to row order */ }
+                            return [normalizeColor(color), data[offset + 1]];
+                        }).filter(([color]) => color)) : null;
                         rows.forEach((row, index) => {
                             const cell = row.children[lastColumnIndex];
                             if (!cell) return;
-                            const values = chart ? data[index + 1] : data[index]?.data?.map(point => point?.[1]);
+                            const iconColor = row.querySelector('[data-testid="series-icon"]')?.style?.background || '';
+                            const values = chart ? (seriesByColor?.get(normalizeColor(iconColor)) || data[index + 1]) : data[index]?.data?.map(point => point?.[1]);
                             const finite = Array.from(values || []).map(Number).filter(Number.isFinite);
                             const value = finite.length ? finite[finite.length - 1] : null;
                             const unit = Array.from(row.querySelectorAll('td')).map(cell => cell.textContent.trim().match(/^[+-]?[\d\s.,]+\s*([^\d\s.,+-].*)$/)?.[1]).find(Boolean) || '';
