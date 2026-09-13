@@ -1005,7 +1005,9 @@
                         const valueCell = headers[headers.length - 1].cloneNode(false);
                         const label = row.querySelector('.css-7pp3mx-LegendLabel,[class*="LegendLabel"]')?.textContent?.trim() || row.textContent.trim();
                         const value = computedByLabel.get(label)?.stats?.last;
-                        valueCell.textContent = Number.isFinite(value) ? String(value) : '-';
+                        const unit = row.querySelector('td:nth-child(2)')?.textContent?.trim().match(/[^\d\s.,+-].*$/)?.[0] || '';
+                        valueCell.textContent = Number.isFinite(value)
+                            ? `${Number(value.toPrecision(4))}${unit ? ` ${unit}` : ''}` : '-';
                         valueCell.dataset.dashbridgeSummaryColumn = 'last'; row.appendChild(valueCell);
                     });
                     changed += 1;
