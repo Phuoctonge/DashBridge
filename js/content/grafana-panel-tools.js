@@ -1544,7 +1544,8 @@
                     removeFill: tools.removeFill,
                     thickenLines: tools.thickenLines,
                     thickenLinesValue: tools.thickenLinesValue !== undefined ? Number(tools.thickenLinesValue) : 1.5,
-                    invertLegend: tools.invertLegend
+                    invertLegend: tools.invertLegend,
+                    legendColumns: tools.legendColumns
                 });
             }
             await startThresholdReporting();
@@ -1892,7 +1893,8 @@
                 removeFill: false,
                 thickenLines: false,
                 thickenLinesValue: tools.thickenLinesValue !== undefined ? Number(tools.thickenLinesValue) : 1.5,
-                invertLegend: false
+                invertLegend: false,
+                legendColumns: tools.legendColumns
             });
             window.DashBridgeGrafanaVisualEngine?.resetSeriesVisibility?.({ root });
         } else {
