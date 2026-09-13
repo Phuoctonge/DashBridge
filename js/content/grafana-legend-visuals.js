@@ -1060,14 +1060,11 @@
                             lastHeader.style.paddingLeft = '4px';
                             lastHeader.style.paddingRight = '4px';
                             lastHeader.style.cursor = 'pointer';
-                            const nativeSortIcon = headerRow.querySelector('svg')?.cloneNode(true);
                             lastHeader.addEventListener('click', () => {
                                 const current = lastHeader.getAttribute('aria-sort');
                                 const next = current === 'ascending' ? 'descending' : current === 'descending' ? 'none' : 'ascending';
                                 if (next === 'none') lastHeader.removeAttribute('aria-sort'); else lastHeader.setAttribute('aria-sort', next);
-                                const existingIcon = lastHeader.querySelector('[data-dashbridge-sort-icon]');
-                                if (next === 'none') existingIcon?.remove();
-                                else if (!existingIcon && nativeSortIcon) { const icon = nativeSortIcon.cloneNode(true); icon.dataset.dashbridgeSortIcon = '1'; icon.setAttribute('aria-hidden', 'true'); lastHeader.appendChild(icon); }
+                                lastHeader.style.backgroundImage = next === 'none' ? '' : 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\'%3E%3Cpath d=\'M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 0 0-1.41 0 1 1 0 0 0 0 1.42l4.24 4.24a1 1 0 0 0 1.42 0l4.24-4.24a1 1 0 0 0 0-1.42Z\'/%3E%3C/svg%3E")';
                                 headerRow.querySelectorAll('[aria-sort]').forEach(cell => { if (cell !== lastHeader) cell.removeAttribute('aria-sort'); });
                                 headerRow.querySelectorAll('[data-testid*="sort"], [aria-label*="sort" i]').forEach(el => { if (!lastHeader.contains(el)) el.removeAttribute('aria-sort'); });
                                 headerRow.querySelectorAll(':scope > *').forEach(cell => {
@@ -1085,7 +1082,6 @@
                             });
                             Array.from(table.querySelectorAll('tbody > tr')).forEach((row, i) => { row.dataset.dashBridgeOriginalIndex = String(i); });
                         }
-                        lastHeader.querySelectorAll('svg:not([data-dashbridge-sort-icon])').forEach(el => el.remove());
                         lastHeader.style.paddingLeft = '4px'; lastHeader.style.paddingRight = '4px';
                         lastHeader.style.minWidth = '0';
                         table.querySelectorAll('tbody > tr').forEach(row => { const cell = row.children[lastColumnIndex]; if (cell) { cell.style.color = 'inherit'; cell.style.font = 'inherit'; cell.style.paddingLeft = '4px'; cell.style.paddingRight = '4px'; } });
