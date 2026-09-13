@@ -404,7 +404,8 @@
         && typeof state.legendVisibility === 'object'
         && Object.values(state.legendVisibility).some(visible => visible === false);
     const hasVisualWork = (state = tools) => hasLegendVisibilityWork(state)
-        || !!state.removeFill || !!state.thickenLines || !!state.invertLegend;
+        || !!state.removeFill || !!state.thickenLines || !!state.invertLegend
+        || (state.legendColumns && Object.keys(state.legendColumns).length > 0);
     let legendVisibilityRestoreAfterNextQuery = false;
     let thresholdRestoreAfterNextQuery = false;
     const hasPersistentVisualWork = (state = tools) => hasVisualWork(state)
