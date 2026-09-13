@@ -1027,7 +1027,7 @@
                             const values = chart ? data[index + 1] : data[index]?.data?.map(point => point?.[1]);
                             const finite = Array.from(values || []).map(Number).filter(Number.isFinite);
                             const value = finite.length ? finite[finite.length - 1] : null;
-                            const unit = row.querySelector('td:nth-child(2)')?.textContent?.trim().match(/[^\d\s.,+-].*$/)?.[0] || '';
+                            const unit = Array.from(row.querySelectorAll('td')).map(cell => cell.textContent.trim().match(/[^\d\s.,+-].*$/)?.[0]).find(Boolean) || '';
                             const text = Number.isFinite(value) ? `${Number(value.toPrecision(4))}${unit ? ` ${unit}` : ''}` : '-';
                             if (cell.textContent !== text) { cell.textContent = text; changed += 1; }
                         });
