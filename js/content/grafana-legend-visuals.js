@@ -1015,7 +1015,7 @@
                     const normalizeLabel = value => String(value || '').replace(/\s+/g, ' ').trim();
                     const computedByLabel = new Map(computed.map(item => [normalizeLabel(item.label), item]));
                     rows.forEach((row, index) => {
-                        const valueCell = (row.children[headers.length - 1] || headers[headers.length - 1]).cloneNode(false);
+                        const valueCell = (row.children[1] || row.children[0] || headers[headers.length - 1]).cloneNode(false);
                         const labelElement = row.querySelector('button[title],[class*="LegendLabel"]');
                         const label = normalizeLabel(labelElement?.getAttribute('title') || labelElement?.textContent || row.textContent);
                         const value = computedByLabel.get(label)?.stats?.last ?? byColor?.get(colorKey(row.querySelector('[data-testid="series-icon"]')?.style?.background))?.stats?.last ?? computed[index]?.stats?.last;
@@ -1044,7 +1044,8 @@
                         }).filter(([color]) => color)) : null;
                         rows.forEach((row, index) => {
                             let cell = row.children[lastColumnIndex];
-                            if (!cell) { cell = (row.children[Math.max(0, lastColumnIndex - 1)] || headers[headers.length - 1]).cloneNode(false); cell.dataset.dashbridgeSummaryColumn = 'last'; row.appendChild(cell); }
+                            if (!cell) { cell = (row.children[1] || row.children[0] || headers[headers.length - 1]).cloneNode(false); cell.dataset.dashbridgeSummaryColumn = 'last'; row.appendChild(cell); }
+                            cell.querySelectorAll?.('svg').forEach(icon => { icon.style.visibility = 'hidden'; });
                             const iconColor = row.querySelector('[data-testid="series-icon"]')?.style?.background || '';
                             const values = chart ? (seriesByColor?.get(normalizeColor(iconColor)) || data[index + 1]) : data[index]?.data?.map(point => point?.[1]);
                             const finite = Array.from(values || []).map(Number).filter(Number.isFinite);
