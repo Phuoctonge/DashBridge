@@ -51,6 +51,7 @@
         resetFlotSeriesVisibility,
         resetSeriesVisibility,
         stopLegacyVisualObservers,
+        applyLegendColumns,
     } = window.DashBridgeGrafanaLegendVisuals.create({ debugLog });
     const {
         getThresholdDebug,
@@ -94,13 +95,14 @@
         getFlotPlot,
     });
     window.DashBridgeGrafanaVisualEngine = {
-        async apply({ panelId = null, seriesConfig = null, mode = 'fast_click_toggle', removeFill = false, thickenLines = false, thickenLinesValue = 1.5, invertLegend = false } = {}) {
+        async apply({ panelId = null, seriesConfig = null, mode = 'fast_click_toggle', removeFill = false, thickenLines = false, thickenLinesValue = 1.5, invertLegend = false, legendColumns = {} } = {}) {
             const targetPanel = window.DashBridgeGrafanaDom?.findPanel?.({ panelId }) || document;
             const root = window.DashBridgeGrafanaDom?.outerPanel?.(targetPanel) || targetPanel || document;
             // Threshold highlights derive their width from the live renderer.
             // Always repaint them after a style command so toggle order cannot
             // leave an overlay calculated from the previous series width.
             const completeStyleApply = result => {
+                applyLegendColumns({ root, columns: legendColumns });
                 scheduleThresholdHighlightRender(root);
                 return result;
             };

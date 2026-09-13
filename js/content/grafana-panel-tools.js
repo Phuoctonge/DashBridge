@@ -127,7 +127,7 @@
     // This file may be injected more than once. Keep state on `window` so
     // the already-installed fetch/XHR interceptor receives later commands.
     const tools = window.__dashbridgePanelToolsState || (window.__dashbridgePanelToolsState = {
-        removeFill: false, thickenLines: false, thickenLinesValue: 1.5, invertLegend: false,
+        removeFill: false, thickenLines: false, thickenLinesValue: 1.5, invertLegend: false, legendColumns: {},
         legendFilter: [], legendSelectionVersion: null, legendVisibleSeries: [], legendMode: 'fast_complete_hide',
         forceMemByteUnit: false
     });
@@ -2118,7 +2118,7 @@
                 && Number(savedState.cpuCapacityFilterCoefficient) > 0
                 ? Number(savedState.cpuCapacityFilterCoefficient) : defaultCpuCapacityCoefficient
         } : {
-            removeFill: false, thickenLines: false, thickenLinesValue: 1.5, invertLegend: false,
+            removeFill: false, thickenLines: false, thickenLinesValue: 1.5, invertLegend: false, legendColumns: {},
             capturePrepared: document.documentElement.dataset.dashbridgeCapturePrepared === 'true',
             legendFilter: [], legendSelectionVersion: null, legendVisibleSeries: [], legendMode: 'fast_complete_hide', legendSearch: '', legendSelectFilter: '', legendIgnoreFilter: '', invertIdle: false,
             convertMemToUsed: false, forceMemByteUnit: false, seriesQueryFilterEnabled: false, seriesQueryFilterHighlightEnabled: true, seriesQueryFilterValue: 0,

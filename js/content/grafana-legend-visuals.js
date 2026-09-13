@@ -976,6 +976,49 @@
             legacyObserverDiagnostic.activeOwners = legacyVisualObserverOwners.size;
             legacyObserverDiagnostic.lastActionAt = Date.now();
         };
+
+        const applyLegendColumns = ({ root = document, columns = {} } = {}) => {
+            const tables = Array.from(root.querySelectorAll?.('table') || []).filter(table => table.querySelector('th, [role="columnheader"]'));
+            const requested = columns && typeof columns === 'object' ? columns : {};
+            let changed = 0;
+            for (const table of tables) {
+                const headerRow = table.querySelector('thead tr') || table.querySelector('tr');
+                const headers = Array.from(headerRow?.querySelectorAll?.(':scope > th, :scope > td, :scope > [role="columnheader"]') || []);
+                if (!headers.length) continue;
+                const names = headers.map(cell => String(cell.textContent || '').trim());
+                const lastIndex = names.findIndex(name => /^last$/i.test(name));
+                const hide = (name, index) => requested[name.toLowerCase()] === false || requested[name] === false
+                    ? index : -1;
+                const hidden = new Set(names.map((name, index) => hide(name, index)).filter(index => index >= 0));
+                if (requested.last === true && lastIndex < 0) {
+                    const cell = document.createElement(headers[0].tagName.toLowerCase() === 'th' ? 'th' : 'td');
+                    cell.textContent = 'Last'; cell.dataset.dashbridgeSummaryColumn = 'last';
+                    headerRow.appendChild(cell);
+                    const rows = Array.from(table.querySelectorAll('tbody tr'));
+                    const chart = findUPlotForThreshold(root);
+                    const series = chart?.data || getFlotPlot(root)?.getData?.() || [];
+                    rows.forEach((row, index) => {
+                        const valueCell = document.createElement('td');
+                        const values = chart ? series[index + 1] : series[index]?.data?.map(point => point?.[1]);
+                        const finite = Array.from(values || []).filter(value => Number.isFinite(Number(value)));
+                        valueCell.textContent = finite.length ? String(finite[finite.length - 1]) : '-';
+                        valueCell.dataset.dashbridgeSummaryColumn = 'last'; row.appendChild(valueCell);
+                    });
+                    changed += 1;
+                }
+                const allHeaders = Array.from(headerRow.children);
+                allHeaders.forEach((cell, index) => {
+                    const name = String(cell.textContent || '').trim().toLowerCase();
+                    const shouldHide = requested[name] === false;
+                    if (cell.hidden !== shouldHide) { cell.hidden = shouldHide; changed += 1; }
+                    table.querySelectorAll(`tbody tr`).forEach(row => {
+                        const target = row.children[index];
+                        if (target && target.hidden !== shouldHide) { target.hidden = shouldHide; changed += 1; }
+                    });
+                });
+            }
+            return changed;
+        };
     
 
 
@@ -992,6 +1035,7 @@
             resetFlotSeriesVisibility,
             resetSeriesVisibility,
             stopLegacyVisualObservers,
+            applyLegendColumns,
         });
     }
 
