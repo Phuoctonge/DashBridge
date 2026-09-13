@@ -979,6 +979,16 @@
         };
 
         const applyLegendColumns = ({ root = document, columns = {} } = {}) => {
+            const formatLast = (value, row) => {
+                const unitText = Array.from(row.querySelectorAll('td')).map(cell => cell.textContent).join(' ');
+                if (/\b(?:ms|s|sec|min|mins)\b/i.test(unitText)) {
+                    const absolute = Math.abs(value);
+                    if (absolute >= 60_000) return `${Number((value / 60_000).toPrecision(3))} mins`;
+                    if (absolute >= 1_000) return `${Number((value / 1_000).toPrecision(3))} s`;
+                    return `${Number(value.toPrecision(3))} ms`;
+                }
+                return String(Number(value.toPrecision(4)));
+            };
             const tables = Array.from(root.querySelectorAll?.('table') || []).filter(table => table.querySelector('th, [role="columnheader"]'));
             const requested = columns && typeof columns === 'object' ? columns : {};
             let changed = 0;
@@ -1009,9 +1019,7 @@
                         const labelElement = row.querySelector('button[title],[class*="LegendLabel"]');
                         const label = normalizeLabel(labelElement?.getAttribute('title') || labelElement?.textContent || row.textContent);
                         const value = computedByLabel.get(label)?.stats?.last ?? byColor?.get(colorKey(row.querySelector('[data-testid="series-icon"]')?.style?.background))?.stats?.last ?? computed[index]?.stats?.last;
-                        const unit = Array.from(row.querySelectorAll('td')).map(cell => cell.textContent.trim().match(/^[+-]?[\d\s.,]+\s*([^\d\s.,+-].*)$/)?.[1]).find(Boolean) || '';
-                        valueCell.textContent = Number.isFinite(value)
-                            ? `${Number(value.toPrecision(4))}${unit ? ` ${unit}` : ''}` : '-';
+                        valueCell.textContent = Number.isFinite(value) ? formatLast(value, row) : '-';
                         valueCell.dataset.dashbridgeSummaryColumn = 'last'; row.appendChild(valueCell);
                     });
                     changed += 1;
@@ -1041,8 +1049,7 @@
                             const values = chart ? (seriesByColor?.get(normalizeColor(iconColor)) || data[index + 1]) : data[index]?.data?.map(point => point?.[1]);
                             const finite = Array.from(values || []).map(Number).filter(Number.isFinite);
                             const value = finite.length ? finite[finite.length - 1] : null;
-                            const unit = Array.from(row.querySelectorAll('td')).map(cell => cell.textContent.trim().match(/^[+-]?[\d\s.,]+\s*([^\d\s.,+-].*)$/)?.[1]).find(Boolean) || '';
-                            const text = Number.isFinite(value) ? `${Number(value.toPrecision(4))}${unit ? ` ${unit}` : ''}` : '-';
+                            const text = Number.isFinite(value) ? formatLast(value, row) : '-';
                             if (cell.textContent !== text) { cell.textContent = text; changed += 1; }
                         });
                     }
