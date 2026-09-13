@@ -6,6 +6,7 @@
         if (typeof debugLog !== 'function') {
             throw new TypeError('Grafana legend visuals dependencies are incomplete');
         }
+        if (window.name === 'dashbridge-iframe' && !document.getElementById('dashbridge-responsive-legend-style')) { const style = document.createElement('style'); style.id = 'dashbridge-responsive-legend-style'; style.textContent = 'table:has(th) { width:100% !important; max-width:100% !important; table-layout:fixed !important; } table:has(th) tr { display:flex !important; width:100% !important; min-width:0 !important; } table:has(th) td, table:has(th) th { min-width:0 !important; overflow:hidden !important; text-overflow:ellipsis !important; } table:has(th) tr > :first-child { flex:1 1 auto !important; min-width:0 !important; width:auto !important; } table:has(th) tr > :not(:first-child) { flex:0 0 auto !important; width:max-content !important; min-width:max-content !important; } .rdg { grid-template-columns:minmax(0,1fr) max-content !important; overflow-x:hidden !important; } .rdg .rdg-cell:first-child { display:block !important; min-width:0 !important; overflow:hidden !important; text-overflow:ellipsis !important; white-space:nowrap !important; } .rdg .rdg-cell:first-child > * { min-width:0 !important; overflow:hidden !important; text-overflow:ellipsis !important; white-space:nowrap !important; }'; (document.head || document.documentElement).appendChild(style); }
 
         const legacyVisualObserverOwners = new Set();
         let legacyObserverDocumentSweepCompleted = false;
@@ -98,8 +99,23 @@
                     .dashbridge-legend-bottom table,
                     .dashbridge-legend-bottom .u-legend,
                     .dashbridge-legend-bottom tbody { width:100% !important; max-width:100% !important; min-width:0 !important; table-layout:fixed !important; overflow-x:hidden !important; }
+                    .dashbridge-legend-bottom td,
+                    .dashbridge-legend-bottom th { min-width:0 !important; }
+                    .dashbridge-legend-bottom * { box-sizing:border-box !important; min-width:0 !important; max-width:100% !important; }
+                    .dashbridge-legend-bottom,
+                    .dashbridge-legend-bottom * {
+                        overflow-x:hidden !important;
+                    }
+                    .dashbridge-legend-bottom [class*="LegendLabel"],
+                    .dashbridge-legend-bottom [class*="legend-label"] {
+                        display:block !important;
+                        width:100% !important;
+                        overflow:hidden !important;
+                        text-overflow:ellipsis !important;
+                        white-space:nowrap !important;
+                    }
                 `;
-                document.head.appendChild(style);
+                (document.head || document.documentElement).appendChild(style);
             };
     
             // Мы вызовем resize позже, после манипуляций с DOM
@@ -378,7 +394,11 @@
                 };
                 return { chartHost, chartBranch, flexContainer, legendElement, layoutChanged: true };
             };
-            const legendLayout = applyLegendLayout();
+            const legendLayout = window.name === 'dashbridge-iframe'
+                ? applyLegendLayout()
+                : { chartHost, chartBranch, flexContainer, legendElement, layoutChanged: false };
+            if (window.name === 'dashbridge-iframe' && legendLayout.legendElement) { ensureResponsiveLegendStyles(); legendLayout.legendElement.classList.add('dashbridge-legend-bottom'); }
+            if (window.name === 'dashbridge-iframe' && legendLayout.legendElement) { const legend = legendLayout.legendElement; ['width','max-width'].forEach(p => legend.style.setProperty(p, '100%', 'important')); legend.style.setProperty('overflow-x', 'hidden', 'important'); legend.querySelectorAll('table').forEach(table => { ['width','max-width'].forEach(p => table.style.setProperty(p, '100%', 'important')); table.style.setProperty('table-layout', 'fixed', 'important'); const rows = [...table.rows]; const count = rows[0]?.cells.length || 0; rows.forEach(row => { const cell = row.cells[0]; if (cell && !cell.title) cell.title = cell.innerText.trim(); }); const widths = Array.from({ length: count }, (_, i) => i ? Math.max(...rows.map(row => row.cells[i]?.scrollWidth || 0), 0) + 12 : 0); const numericTotal = widths.reduce((sum, width) => sum + width, 0); rows.forEach(row => { row.cells[0]?.style.setProperty('width', `max(0px, calc(100% - ${numericTotal}px))`, 'important'); for (let i = 1; i < count; i++) row.cells[i]?.style.setProperty('width', `${widths[i]}px`, 'important'); }); }); }
             const resizeUPlotAfterLegendLayout = async () => {
                 if (!legendLayout) return false;
                 if (legendLayout.layoutChanged) {
