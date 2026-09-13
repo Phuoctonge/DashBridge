@@ -1051,7 +1051,25 @@
                             const value = finite.length ? finite[finite.length - 1] : null;
                             const text = Number.isFinite(value) ? formatLast(value, row) : '-';
                             if (cell.textContent !== text) { cell.textContent = text; changed += 1; }
+                            cell.dataset.dashBridgeLastRaw = Number.isFinite(value) ? String(value) : '';
                         });
+                        if (!lastHeader.dataset.dashBridgeSortBound) {
+                            lastHeader.dataset.dashBridgeSortBound = '1';
+                            lastHeader.setAttribute('role', lastHeader.getAttribute('role') || 'columnheader');
+                            lastHeader.tabIndex = 0;
+                            lastHeader.addEventListener('click', () => {
+                                const current = lastHeader.getAttribute('aria-sort');
+                                const next = current === 'ascending' ? 'descending' : current === 'descending' ? 'none' : 'ascending';
+                                lastHeader.setAttribute('aria-sort', next);
+                                headerRow.querySelectorAll('[aria-sort]').forEach(cell => { if (cell !== lastHeader) cell.removeAttribute('aria-sort'); });
+                                const body = table.querySelector('tbody');
+                                const bodyRows = Array.from(body?.querySelectorAll(':scope > tr') || []);
+                                if (next === 'none') { bodyRows.sort((a, b) => Number(a.dataset.dashBridgeOriginalIndex || 0) - Number(b.dataset.dashBridgeOriginalIndex || 0)); }
+                                else bodyRows.sort((a, b) => (Number(a.children[lastColumnIndex]?.dataset.dashBridgeLastRaw || NaN) - Number(b.children[lastColumnIndex]?.dataset.dashBridgeLastRaw || NaN)) * (next === 'ascending' ? 1 : -1));
+                                bodyRows.forEach(row => body?.appendChild(row));
+                            });
+                            Array.from(table.querySelectorAll('tbody > tr')).forEach((row, i) => { row.dataset.dashBridgeOriginalIndex = String(i); });
+                        }
                     }
                 }
                 const allHeaders = Array.from(headerRow.children);
