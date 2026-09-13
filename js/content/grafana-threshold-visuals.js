@@ -62,7 +62,16 @@
             line.setAttribute('data-dashbridge-threshold-line', 'true');
             line.setAttribute('data-dashbridge-threshold-scale', aboveScale ? 'above' : belowScale ? 'below' : 'inside');
             // Match settings display precision; keep raw values untouched for comparisons and geometry.
-            const thresholdText = `Порог: ${Number(displayValue.toPrecision(12))}${unit ? ` ${unit}` : ''}`;
+            const formatThreshold = (value, rawUnit) => {
+                const normalized = String(rawUnit || '').toLowerCase();
+                const absolute = Math.abs(Number(value));
+                if (/^mins?$/.test(normalized) && absolute > 0 && absolute < 1) {
+                    const seconds = Number((Number(value) * 60).toPrecision(4));
+                    if (Number.isInteger(seconds) || seconds >= 0.1) return `${seconds} s`;
+                }
+                return `${Number(Number(value).toPrecision(6))}${rawUnit ? ` ${rawUnit}` : ''}`;
+            };
+            const thresholdText = `Порог: ${formatThreshold(displayValue, unit)}`;
             line.title = aboveScale
                 ? `${thresholdText} (выше текущей шкалы)`
                 : belowScale

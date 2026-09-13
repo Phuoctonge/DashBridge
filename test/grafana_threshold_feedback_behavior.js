@@ -61,7 +61,7 @@ vm.runInContext(visualSource.slice(visualSource.indexOf('        const drawThres
     visualSource.indexOf('        const watchThresholdDataChanges =')) + '\nglobalThis.draw = drawThresholdLine;', context);
 const root = { ...makeNode(), querySelectorAll: () => [], querySelector: () => null };
 for (const [value, unit, expected] of [
-    [3.9999999999999996, 's', '4 s'], [0.30000000000000004, 'min', '0.3 min'],
+    [3.9999999999999996, 's', '4 s'], [0.08333333333333333, 'mins', '5 s'], [0.30000000000000004, 'min', '0.3 min'],
     [999.9999999999999, 'ms', '1000 ms'], [0.000000123456, 's', '1.23456e-7 s'],
     [90, '%', '90 %'], [1.23456789, 'GiB', '1.23456789 GiB'], [0, '', '0']
 ]) {
