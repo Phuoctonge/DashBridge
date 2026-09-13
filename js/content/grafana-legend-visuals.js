@@ -1064,8 +1064,6 @@
                                 const current = lastHeader.getAttribute('aria-sort');
                                 const next = current === 'ascending' ? 'descending' : current === 'descending' ? 'none' : 'ascending';
                                 if (next === 'none') lastHeader.removeAttribute('aria-sort'); else lastHeader.setAttribute('aria-sort', next);
-                                const marker = lastHeader.querySelector('[data-dashbridge-sort-marker]');
-                                if (marker) marker.textContent = next === 'ascending' ? ' ↑' : next === 'descending' ? ' ↓' : '';
                                 headerRow.querySelectorAll('[aria-sort]').forEach(cell => { if (cell !== lastHeader) cell.removeAttribute('aria-sort'); });
                                 headerRow.querySelectorAll('[data-testid*="sort"], [aria-label*="sort" i]').forEach(el => { if (!lastHeader.contains(el)) el.removeAttribute('aria-sort'); });
                                 const body = table.querySelector('tbody');
@@ -1074,7 +1072,6 @@
                                 else bodyRows.sort((a, b) => (Number(a.children[lastColumnIndex]?.dataset.dashBridgeLastRaw || NaN) - Number(b.children[lastColumnIndex]?.dataset.dashBridgeLastRaw || NaN)) * (next === 'ascending' ? 1 : -1));
                                 bodyRows.forEach(row => body?.appendChild(row));
                             });
-                            const marker = document.createElement('span'); marker.dataset.dashbridgeSortMarker = '1'; marker.setAttribute('aria-hidden', 'true'); marker.style.marginLeft = '2px'; lastHeader.appendChild(marker);
                             Array.from(table.querySelectorAll('tbody > tr')).forEach((row, i) => { row.dataset.dashBridgeOriginalIndex = String(i); });
                         }
                         lastHeader.style.paddingLeft = '4px'; lastHeader.style.paddingRight = '4px';
