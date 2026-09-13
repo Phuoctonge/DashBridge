@@ -49,7 +49,7 @@ async def main():
         await page.wait_for_timeout(500)
         await page.screenshot(path="artifacts-legend-00-initial.png", full_page=False)
         await snapshot(table, "initial")
-        for step, name in enumerate(["Max", "Last", "Max", "Last", "Max", "Last"], start=1):
+        for step, name in enumerate(["Max", "Last", "Last", "Max"], start=1):
             header = table.locator("thead th", has_text=name).last
             if await header.count() == 0:
                 print({"step": step, "missing": name}, flush=True)
