@@ -831,7 +831,8 @@
             // empty legend prove that native visibility cannot be applied yet;
             // canvas presence does not mean that the missing legend is ready.
             || tools.seriesQueryFilterEnabled === true
-            || tools.cpuCapacityFilterEnabled === true`r`n            || (tools.legendColumns && Object.keys(tools.legendColumns).length > 0));
+            || tools.cpuCapacityFilterEnabled === true
+            || (tools.legendColumns && Object.keys(tools.legendColumns).length > 0));
     const applyPersistentVisualState = async () => {
         const targetPanel = getTargetPanel();
         const targetRoot = window.DashBridgeGrafanaDom?.outerPanel(targetPanel) || targetPanel || document;
