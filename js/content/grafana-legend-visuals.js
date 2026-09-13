@@ -992,16 +992,19 @@
                     ? index : -1;
                 const hidden = new Set(names.map((name, index) => hide(name, index)).filter(index => index >= 0));
                 if (requested.last === true && lastIndex < 0) {
-                    const cell = document.createElement(headers[0].tagName.toLowerCase() === 'th' ? 'th' : 'td');
+                    const cell = headers[headers.length - 1].cloneNode(false);
                     cell.textContent = 'Last'; cell.dataset.dashbridgeSummaryColumn = 'last';
                     headerRow.appendChild(cell);
                     const rows = Array.from(table.querySelectorAll('tbody tr'));
                     const chart = findUPlotForThreshold(root);
                     const series = chart?.data || getFlotPlot(root)?.getData?.() || [];
-                    const computed = rawColumnStats?.compute({ series: rows.map((row, index) => ({ label: row.textContent.trim(), values: chart ? series[index + 1] : series[index]?.data?.map(point => point?.[1]) })), columns: { last: true } }) || [];
+                    const rawSeries = chart ? (chart.series || []).slice(1).map((item, index) => ({ label: String(item?.label || ''), values: series[index + 1] })) : series.map(item => ({ label: String(item?.label || ''), values: item?.data?.map(point => point?.[1]) }));
+                    const computed = rawColumnStats?.compute({ series: rawSeries, columns: { last: true } }) || [];
+                    const computedByLabel = new Map(computed.map(item => [item.label.trim(), item]));
                     rows.forEach((row, index) => {
-                        const valueCell = document.createElement('td');
-                        const value = computed[index]?.stats?.last;
+                        const valueCell = headers[headers.length - 1].cloneNode(false);
+                        const label = row.querySelector('.css-7pp3mx-LegendLabel,[class*="LegendLabel"]')?.textContent?.trim() || row.textContent.trim();
+                        const value = computedByLabel.get(label)?.stats?.last;
                         valueCell.textContent = Number.isFinite(value) ? String(value) : '-';
                         valueCell.dataset.dashbridgeSummaryColumn = 'last'; row.appendChild(valueCell);
                     });
