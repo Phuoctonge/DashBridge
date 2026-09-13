@@ -44,6 +44,10 @@ async def main():
         table = page.locator("table").filter(has=page.locator('button[class*="LegendLabel"]')).first
         await table.wait_for(state="visible", timeout=30000)
         await page.wait_for_timeout(3000)
+        print({'engine': await page.evaluate("Object.keys(window).filter(k => k.includes('DashBridge')).slice(0,20)")}, flush=True)
+        await page.evaluate("window.DashBridgeGrafanaVisualEngine.apply({root: document, legendColumns: {last: true}})")
+        await page.wait_for_timeout(500)
+        await page.screenshot(path="artifacts-legend-00-initial.png", full_page=False)
         await snapshot(table, "initial")
         for step, name in enumerate(["Max", "Last", "Max", "Last", "Max", "Last"], start=1):
             header = table.locator("thead th", has_text=name).last
@@ -52,6 +56,7 @@ async def main():
                 break
             await header.click()
             await page.wait_for_timeout(700)
+            await page.screenshot(path=f"artifacts-legend-{step}-{name}.png", full_page=False)
             await snapshot(table, f"{step}:{name}")
         print({"pageErrors": errors}, flush=True)
         await context.close()
