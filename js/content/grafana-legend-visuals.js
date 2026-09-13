@@ -1000,13 +1000,15 @@
                     const series = chart?.data || getFlotPlot(root)?.getData?.() || [];
                     const rawSeries = chart ? (chart.series || []).slice(1).map((item, index) => ({ label: String(item?.label || ''), values: series[index + 1] })) : series.map(item => ({ label: String(item?.label || ''), values: item?.data?.map(point => point?.[1]) }));
                     const computed = rawColumnStats?.compute({ series: rawSeries, columns: { last: true } }) || [];
+                    const colorKey = value => { const text = String(value || '').replace(/\s+/g, '').toLowerCase(); const hex = text.match(/^#([0-9a-f]{6})$/); return hex ? `rgb(${parseInt(hex[1].slice(0, 2), 16)},${parseInt(hex[1].slice(2, 4), 16)},${parseInt(hex[1].slice(4), 16)})` : text; };
+                    const byColor = chart ? new Map((chart.series || []).slice(1).map((item, offset) => [colorKey(typeof item.stroke === 'function' ? item.stroke(chart, offset + 1) : item.stroke), computed[offset]])) : null;
                     const normalizeLabel = value => String(value || '').replace(/\s+/g, ' ').trim();
                     const computedByLabel = new Map(computed.map(item => [normalizeLabel(item.label), item]));
                     rows.forEach((row, index) => {
                         const valueCell = headers[headers.length - 1].cloneNode(false);
                         const labelElement = row.querySelector('button[title],[class*="LegendLabel"]');
                         const label = normalizeLabel(labelElement?.getAttribute('title') || labelElement?.textContent || row.textContent);
-                        const value = computedByLabel.get(label)?.stats?.last ?? computed[index]?.stats?.last;
+                        const value = computedByLabel.get(label)?.stats?.last ?? byColor?.get(colorKey(row.querySelector('[data-testid="series-icon"]')?.style?.background))?.stats?.last ?? computed[index]?.stats?.last;
                         const unit = Array.from(row.querySelectorAll('td')).map(cell => cell.textContent.trim().match(/^[+-]?[\d\s.,]+\s*([^\d\s.,+-].*)$/)?.[1]).find(Boolean) || '';
                         valueCell.textContent = Number.isFinite(value)
                             ? `${Number(value.toPrecision(4))}${unit ? ` ${unit}` : ''}` : '-';
@@ -1021,7 +1023,12 @@
                         const rows = Array.from(table.querySelectorAll('tbody tr'));
                         const chart = findUPlotForThreshold(root);
                         const data = chart?.data || getFlotPlot(root)?.getData?.() || [];
-                        const normalizeColor = value => String(value || '').replace(/\s+/g, '').toLowerCase();
+                        const normalizeColor = value => {
+                            const text = String(value || '').replace(/\s+/g, '').toLowerCase();
+                            const hex = text.match(/^#([0-9a-f]{6})$/i);
+                            if (hex) return `rgb(${parseInt(hex[1].slice(0, 2), 16)},${parseInt(hex[1].slice(2, 4), 16)},${parseInt(hex[1].slice(4, 6), 16)})`;
+                            return text.replace(/^rgba\(([^,]+),([^,]+),([^,]+),[^)]+\)$/, 'rgb($1,$2,$3)');
+                        };
                         const seriesByColor = chart ? new Map((chart.series || []).slice(1).map((item, offset) => {
                             let color = '';
                             try { color = typeof item.stroke === 'function' ? item.stroke(chart, offset + 1) : item.stroke; } catch { /* fallback to row order */ }
