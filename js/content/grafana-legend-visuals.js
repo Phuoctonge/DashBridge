@@ -1062,7 +1062,7 @@
                             lastHeader.style.cursor = 'pointer';
                             lastHeader.addEventListener('click', () => {
                                 const current = lastHeader.getAttribute('aria-sort');
-                                const next = current === 'ascending' ? 'descending' : current === 'descending' ? 'none' : 'ascending';
+                                const next = current === 'descending' ? 'ascending' : current === 'ascending' ? 'none' : 'descending';
                                 if (next === 'none') lastHeader.removeAttribute('aria-sort'); else lastHeader.setAttribute('aria-sort', next);
                                 const path = next === 'ascending' ? 'M7 14l5-5 5 5' : 'M7 10l5 5 5-5';
                                 lastHeader.style.backgroundImage = next === 'none' ? '' : `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='${encodeURIComponent(path)}'/%3E%3C/svg%3E")`;
