@@ -69,7 +69,7 @@
                     const seconds = Number((Number(value) * 60).toPrecision(4));
                     if (Number.isInteger(seconds) || seconds >= 0.1) return `${seconds} s`;
                 }
-                return `${Number(Number(value).toPrecision(6))}${rawUnit ? ` ${rawUnit}` : ''}`;
+                return `${Number(Number(value).toPrecision(12))}${rawUnit ? ` ${rawUnit}` : ''}`;
             };
             const thresholdText = `Порог: ${formatThreshold(displayValue, unit)}`;
             line.title = aboveScale
