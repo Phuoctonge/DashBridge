@@ -1000,17 +1000,38 @@
                     const series = chart?.data || getFlotPlot(root)?.getData?.() || [];
                     const rawSeries = chart ? (chart.series || []).slice(1).map((item, index) => ({ label: String(item?.label || ''), values: series[index + 1] })) : series.map(item => ({ label: String(item?.label || ''), values: item?.data?.map(point => point?.[1]) }));
                     const computed = rawColumnStats?.compute({ series: rawSeries, columns: { last: true } }) || [];
-                    const computedByLabel = new Map(computed.map(item => [item.label.trim(), item]));
+                    const normalizeLabel = value => String(value || '').replace(/\s+/g, ' ').trim();
+                    const computedByLabel = new Map(computed.map(item => [normalizeLabel(item.label), item]));
                     rows.forEach((row, index) => {
                         const valueCell = headers[headers.length - 1].cloneNode(false);
-                        const label = row.querySelector('.css-7pp3mx-LegendLabel,[class*="LegendLabel"]')?.textContent?.trim() || row.textContent.trim();
-                        const value = computedByLabel.get(label)?.stats?.last;
+                        const labelElement = row.querySelector('button[title],[class*="LegendLabel"]');
+                        const label = normalizeLabel(labelElement?.getAttribute('title') || labelElement?.textContent || row.textContent);
+                        const value = computedByLabel.get(label)?.stats?.last ?? computed[index]?.stats?.last;
                         const unit = row.querySelector('td:nth-child(2)')?.textContent?.trim().match(/[^\d\s.,+-].*$/)?.[0] || '';
                         valueCell.textContent = Number.isFinite(value)
                             ? `${Number(value.toPrecision(4))}${unit ? ` ${unit}` : ''}` : '-';
                         valueCell.dataset.dashbridgeSummaryColumn = 'last'; row.appendChild(valueCell);
                     });
                     changed += 1;
+                }
+                if (requested.last === true) {
+                    const lastHeader = Array.from(headerRow.children).find(cell => /^last$/i.test(String(cell.textContent || '').trim()));
+                    const lastColumnIndex = lastHeader ? Array.from(headerRow.children).indexOf(lastHeader) : -1;
+                    if (lastColumnIndex >= 0) {
+                        const rows = Array.from(table.querySelectorAll('tbody tr'));
+                        const chart = findUPlotForThreshold(root);
+                        const data = chart?.data || getFlotPlot(root)?.getData?.() || [];
+                        rows.forEach((row, index) => {
+                            const cell = row.children[lastColumnIndex];
+                            if (!cell) return;
+                            const values = chart ? data[index + 1] : data[index]?.data?.map(point => point?.[1]);
+                            const finite = Array.from(values || []).map(Number).filter(Number.isFinite);
+                            const value = finite.length ? finite[finite.length - 1] : null;
+                            const unit = row.querySelector('td:nth-child(2)')?.textContent?.trim().match(/[^\d\s.,+-].*$/)?.[0] || '';
+                            const text = Number.isFinite(value) ? `${Number(value.toPrecision(4))}${unit ? ` ${unit}` : ''}` : '-';
+                            if (cell.textContent !== text) { cell.textContent = text; changed += 1; }
+                        });
+                    }
                 }
                 const allHeaders = Array.from(headerRow.children);
                 allHeaders.forEach((cell, index) => {
