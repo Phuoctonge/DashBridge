@@ -1098,7 +1098,7 @@
                     const hasMissingLast = Array.from(root.querySelectorAll?.('table') || []).some(table => {
                         const header = table.querySelector('thead tr');
                         const hasLast = header && Array.from(header.children).some(cell => /^last$/i.test(String(cell.textContent || '').trim()));
-                        return hasLast && Array.from(table.querySelectorAll('tbody tr')).some(row => !row.querySelector('[data-dashbridge-summary-column="last"]'));
+                        return hasLast && Array.from(table.tBodies?.[0]?.rows || []).some(row => !row.querySelector('[data-dashbridge-summary-column="last"]'));
                     });
                     if (hasMissingLast || refreshVisualState) applyLegendColumnsForEnvironment(environment, { root, columns: requested });
                 };
@@ -1156,7 +1156,7 @@
                     const cell = headers[headers.length - 1].cloneNode(false);
                     cell.textContent = 'Last'; cell.dataset.dashbridgeSummaryColumn = 'last';
                     headerRow.appendChild(cell);
-                    const rows = Array.from(table.querySelectorAll("tbody tr"));
+                    const rows = Array.from(table.tBodies?.[0]?.rows || []);
                     // DashBridge isolates one Grafana panel per iframe. Resolve the
                     // renderer from the iframe document so this path uses the same
                     // uPlot instance as the diagnostics/threshold pipeline.
@@ -1195,7 +1195,7 @@
                     const lastHeader = Array.from(headerRow.children).find(cell => /^last$/i.test(String(cell.textContent || '').trim()));
                     const lastColumnIndex = lastHeader ? Array.from(headerRow.children).indexOf(lastHeader) : -1;
                     if (lastColumnIndex >= 0) {
-                        const rows = Array.from(table.querySelectorAll("tbody tr"));
+                        const rows = Array.from(table.tBodies?.[0]?.rows || []);
                         const chart = resolveLegendRenderer();
                         const data = resolveLegendData(chart);
                         const computed = computeLastStats(chart, data);
@@ -1358,7 +1358,7 @@
                     const name = String(cell.textContent || '').trim().toLowerCase();
                     const shouldHide = requested[name] === false;
                     if (cell.hidden !== shouldHide) { cell.hidden = shouldHide; changed += 1; }
-                    table.querySelectorAll(`tbody tr`).forEach(row => {
+                    Array.from(table.tBodies?.[0]?.rows || []).forEach(row => {
                         const target = row.children[index];
                         if (target && target.hidden !== shouldHide) { target.hidden = shouldHide; changed += 1; }
                     });
