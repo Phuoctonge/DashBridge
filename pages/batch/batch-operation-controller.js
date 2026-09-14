@@ -33,7 +33,14 @@
             progress.finish(); await releaseWindow(); setProcessing(false); return true;
         };
         const capturePanelToZip = async (win, tabId, panelId, filename, archive, captureOptions = {}) => {
-            const captured = await captureGrafanaPanelImage({ tabId, windowId: win.id, panelId, settleMs: 300, ...captureOptions });
+            const captured = await captureGrafanaPanelImage({
+                tabId, windowId: win.id, panelId, settleMs: 300,
+                onDiagnostic: detail => logMessage(
+                    `Причина ошибки снимка [${panelId}]: ${detail.stage}/${detail.reason}`
+                        + (detail.error ? ` (${detail.error})` : ''), true,
+                ),
+                ...captureOptions,
+            });
             if (!captured) { logMessage(`Unable to capture panel: ${filename}`, true); return false; }
             const bytes = BatchCaptureUtils.base64ToUint8Array(captured.dataUrl.split(',')[1]);
             await archive.add(filename, bytes, bytes.byteLength); logMessage(`Saved: ${filename} (${bytes.length} bytes)`); return true;

@@ -1584,6 +1584,31 @@
     const panelReportSnapshotCancellers = new Map();
     window.__dashbridgePanelReportSnapshotCancellers = panelReportSnapshotCancellers;
     window.__dashbridgePanelToolsRuntimeGeneration = (window.__dashbridgePanelToolsRuntimeGeneration || 0) + 1;
+    const discoverIframeLegendColumns = root => {
+        const text = cell => String(cell?.textContent || '').replace(/\s+/g, ' ').trim();
+        const cells = row => Array.from(row?.children || []).filter(cell =>
+            /^(?:TH|TD)$/i.test(cell.tagName || '')
+            || cell.getAttribute?.('role') === 'columnheader'
+            || cell.getAttribute?.('role') === 'cell'
+            || cell.getAttribute?.('role') === 'gridcell'
+        );
+        const isName = value => /^(?:name|series|metric|имя|серия|метрика)$/iu.test(value);
+        const candidates = [];
+        if (root?.matches?.('table, [role="table"], [role="grid"]')) candidates.push(root);
+        candidates.push(...Array.from(root?.querySelectorAll?.('table, [role="table"], [role="grid"]') || []));
+        candidates.sort((a, b) => Number(!!b.querySelector?.('.graph-legend-series, [class*="LegendLabel"]'))
+            - Number(!!a.querySelector?.('.graph-legend-series, [class*="LegendLabel"]')));
+        for (const table of [...new Set(candidates)]) {
+            const rows = Array.from(table.querySelectorAll?.('thead tr, [role="row"], tr') || []);
+            const header = rows.find(row => cells(row).some(cell =>
+                /^(?:TH)$/i.test(cell.tagName || '') || cell.getAttribute?.('role') === 'columnheader'))
+                || rows.find(row => isName(text(cells(row)[0])));
+            const names = cells(header).map(text).filter(Boolean);
+            if (names.length < 2) continue;
+            return names.filter((name, index) => !(index === 0 && isName(name)));
+        }
+        return [];
+    };
     const processPanelToolsMessage = async event => {
         if (event.origin !== extensionOrigin) return;
         if (isDashboardIframe ? event.source !== window.parent : event.source !== window) return;
@@ -1595,10 +1620,8 @@
         }
         if (event.data?.action === 'getPanelLegendColumns') {
             const root = window.DashBridgeGrafanaDom?.outerPanel(getTargetPanel()) || document;
-            const table = Array.from(root.querySelectorAll?.('table') || []).find(item => item.querySelector('tbody [class*="LegendLabel"]'));
-            const headers = Array.from(table?.querySelectorAll?.('thead th, thead td, thead [role="columnheader"]') || [])
-                .map(cell => String(cell.textContent || '').trim()).filter(Boolean);
-            window.parent.postMessage({ action: 'panelLegendColumns', requestId: event.data.requestId, columns: headers.filter(name => !/^name$/i.test(name)) }, extensionOrigin);
+            const columns = discoverIframeLegendColumns(root);
+            window.parent.postMessage({ action: 'panelLegendColumns', requestId: event.data.requestId, columns }, extensionOrigin);
             return;
         }
         if (event.data?.action === 'getPanelThresholdStatus') {

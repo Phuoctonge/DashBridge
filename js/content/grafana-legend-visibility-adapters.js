@@ -14,9 +14,35 @@
         const getFlotPlot = root => {
             const $ = window.jQuery || window.$;
             if (!$ || !root) return null;
-            const host = $(root).find('.graph-panel__chart, .flot-base, canvas').toArray()
-                .find(element => !!$(element).data('plot'));
-            return host ? $(host).data('plot') : null;
+            const isPlot = value => value && typeof value.getData === 'function' && typeof value.setData === 'function';
+            // Keep this selector valid for legacy jQuery used by old Grafana.
+            // CSS Selectors Level 4's `i` flag is accepted by native querySelector,
+            // but jQuery/Sizzle throws before the save handler can finish.
+            const flotDiscoverySelector = '.graph-panel__chart, .flot-base, .flot-overlay, canvas, [class*="graph"], [class*="Graph"]';
+            const candidates = new Set([root]);
+            const add = value => { if (value) candidates.add(value); };
+            (root.querySelectorAll?.(flotDiscoverySelector) || []).forEach(add);
+            // Do not pass discovery selectors through jQuery/Sizzle at all:
+            // old Grafana bundles can reject otherwise valid CSS syntax before
+            // the visual command reaches its save promise. Native discovery is
+            // sufficient; jQuery is used below only for its data cache.
+            ($(root).find?.('.graph-panel__chart, .flot-base, .flot-overlay, canvas').toArray?.() || []).forEach(add);
+            for (let parent = root.parentElement, depth = 0; parent && depth < 8; parent = parent.parentElement, depth += 1) add(parent);
+            for (const element of candidates) {
+                let data;
+                try { data = $(element).data?.(); } catch { data = null; }
+                if (isPlot(data?.plot)) return data.plot;
+                if (isPlot(data?.flotPlot)) return data.flotPlot;
+                if (data && typeof data === 'object') {
+                    const embedded = Object.values(data).find(isPlot);
+                    if (embedded) return embedded;
+                }
+                try {
+                    const direct = $(element).data?.('plot');
+                    if (isPlot(direct)) return direct;
+                } catch { /* legacy jQuery data access can reject detached nodes */ }
+            }
+            return null;
         };
     
         const getFlotRowLabel = row => {
@@ -106,10 +132,14 @@
                     const originalSetData = plot.setData;
                     controller.originalSetData = originalSetData;
                     controller.lastFullData = plot.getData();
+                    plot.__dashBridgeLastFullData = controller.lastFullData;
                     controller.needsApply = true;
     
                     plot.setData = function (data, ...args) {
-                        if (Array.isArray(data)) controller.lastFullData = data;
+                        if (Array.isArray(data)) {
+                            controller.lastFullData = data;
+                            this.__dashBridgeLastFullData = data;
+                        }
                         return originalSetData.call(this, filterData(data), ...args);
                     };
                 }
@@ -158,6 +188,7 @@
                     row.style.display = style.display;
                     row.style.opacity = style.opacity;
                 });
+                if (controller.plot) delete controller.plot.__dashBridgeLastFullData;
                 flotVisibilityControllers.delete(root);
             }
             const uPlotController = uPlotFastVisibilityControllers.get(root);
@@ -220,6 +251,13 @@
                 }
             }
             return null;
+        };
+        const getFlotLegendData = root => {
+            const controller = flotVisibilityControllers.get(root);
+            const plot = getFlotPlot(root);
+            if (Array.isArray(plot?.__dashBridgeLastFullData)) return plot.__dashBridgeLastFullData;
+            if (Array.isArray(controller?.lastFullData)) return controller.lastFullData;
+            return plot?.getData?.() || [];
         };
     
         const applyUPlotNativeLegendVisibility = async ({ root, seriesConfig }) => {
@@ -553,12 +591,13 @@
                 row.style.display = style.display;
                 row.style.opacity = style.opacity;
             });
+            if (controller.plot) delete controller.plot.__dashBridgeLastFullData;
             flotVisibilityControllers.delete(root);
             return true;
         };
         return Object.freeze({
             applyUPlotFastCompleteHide, applyUPlotNativeLegendVisibility,
-            getFlotPlot, getFlotRowLabel, getUPlotLegendRuntime,
+            getFlotPlot, getFlotLegendData, getFlotRowLabel, getUPlotLegendRuntime,
             installFlotVisibilityController, resetFlotSeriesVisibility, resetSeriesVisibility
         });
     }

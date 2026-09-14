@@ -89,15 +89,17 @@
         };
 
         const ensureStyle = () => {
+            if (window.name !== 'dashbridge-iframe') return;
             if (document.getElementById('dashbridge-vcpu-legend-style')) return;
             const style = document.createElement('style');
             style.id = 'dashbridge-vcpu-legend-style';
             style.textContent = `
                 .dashbridge-vcpu-legend-cell {
                     box-sizing:border-box !important;
-                    width:48px !important;
+                    width:max-content !important;
                     min-width:48px !important;
-                    max-width:48px !important;
+                    max-width:100% !important;
+                    flex:0 0 auto !important;
                     padding-left:6px !important;
                     padding-right:6px !important;
                     text-align:right !important;
@@ -131,6 +133,10 @@
                 else row.appendChild(cell);
             }
             if (cell.textContent !== text) cell.textContent = text;
+            cell.style.setProperty('width', '48px', 'important');
+            cell.style.setProperty('min-width', '48px', 'important');
+            cell.style.setProperty('max-width', '48px', 'important');
+            cell.style.setProperty('flex', '0 0 48px', 'important');
             cell.title = header
                 ? 'Количество виртуальных CPU'
                 : (text === '-' ? 'Количество vCPU не определено' : `${text} vCPU`);
@@ -260,6 +266,22 @@
                         sortRows(panelRoot, { restoreOriginal: sortDirection === null });
                     };
                 }
+            }
+            for (const table of tables) {
+                const rowsInTable = Array.from(table.querySelectorAll('tr'));
+                const columnCount = Math.max(0, ...rowsInTable.map(row => row.children.length));
+                if (columnCount < 2) continue;
+                table.classList.add('dashbridge-vcpu-table');
+                const columnWidths = Array.from({ length: columnCount }, (_, columnIndex) => Math.max(0,
+                    ...rowsInTable.map(row => row.children[columnIndex]?.getBoundingClientRect?.().width || 0)));
+                const template = `minmax(0,1fr) 48px${columnCount > 2
+                    ? ` ${columnWidths.slice(2).map(width => `${Math.ceil(width)}px`).join(' ')}` : ''}`;
+                rowsInTable.forEach(row => {
+                    row.style.setProperty('display', 'grid', 'important');
+                    row.style.setProperty('grid-template-columns', template, 'important');
+                    row.style.setProperty('width', '100%', 'important');
+                    row.children[0]?.style.setProperty('min-width', '0', 'important');
+                });
             }
             changes += sortRows(panelRoot);
             return changes;

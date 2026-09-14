@@ -107,12 +107,13 @@ assert(controllerSchedule.includes('renderColumn(panelRoot, controller.state)')
 const visualEngine = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-legend-visibility-adapters.js'), 'utf8')
     + fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-legend-visuals.js'), 'utf8');
 assert(visualEngine.includes('.dashbridge-legend-bottom tr > .dashbridge-vcpu-legend-cell')
-    && visualEngine.includes('flex:0 0 48px !important'),
-    'bottom legends must keep the vCPU header and values on one fixed column grid');
+    && visualEngine.includes('flex:0 0 auto !important')
+    && !visualEngine.includes('table:has(th) tr > :not(:first-child) { flex:0 0 48px !important; width:48px !important; }'),
+    'bottom legends must let each metric column use its measured content width');
 assert(visualEngine.includes('.dashbridge-legend-bottom tr > :not(:first-child)')
     && visualEngine.includes('text-align:right !important')
-    && !visualEngine.includes('min-width:max-content !important'),
-    'live bottom legends must keep vCPU/min/max/current in equal fixed-width columns');
+    && visualEngine.includes('widths[i]}px'),
+    'live bottom legends must keep every metric value readable while names yield first');
 assert(moduleSource.includes("sortDirection === null")
     && moduleSource.includes("sortDirection === 'desc' ? 'asc' : null")
     && moduleSource.includes('restoreOriginal: sortDirection === null'),
@@ -127,6 +128,50 @@ assert(moduleSource.includes("if (left.value === null) return 1;")
     'unknown vCPU values must stay below finite values in both directions');
 assert(moduleSource.includes("difference || left.index - right.index"),
     'equal vCPU values must preserve their current stable order');
+assert(visualEngine.includes('// Sorted native rows no longer share the renderer\'s series order.')
+    && visualEngine.includes('findComputed(label)?.stats?.last'),
+    'Last refresh must match values by legend label instead of relying on sorted row position');
+assert(visualEngine.includes('validLength = chart ? data?.[0]?.length : null')
+    && visualEngine.includes('Math.min(values?.length || 0, limit)'),
+    'Last values must ignore stale uPlot buffer entries beyond the current time range');
+assert(visualEngine.includes('legendColumnsObserverFrame')
+    && visualEngine.includes('requestAnimationFrame(() => {')
+    && !visualEngine.includes('queueMicrotask(() => { queued = false; applyLegendColumns({ root, columns: requested }); });'),
+    'Legend column refreshes must coalesce DOM mutations to one animation frame');
+assert(visualEngine.includes("document.addEventListener('dashbridgePanelDataSettled', onDataSettled)")
+    && visualEngine.includes('const structuralChange = mutations.some'),
+    'Last must refresh after Grafana data settlement and structural table remounts');
+assert(visualEngine.includes('nativeCellStyleCache')
+    && visualEngine.includes('copyNativeCellPresentation')
+    && visualEngine.includes('Never reuse a cached')
+    && visualEngine.includes("properties: [['color', style.color]]")
+    && visualEngine.includes('window.DashBridgeGrafanaDom?.legendLabel?.(row)'),
+    'Legend Last must compute dynamic row color per label while caching only stable native presentation');
+assert(visualEngine.includes("attributeFilter: ['class']")
+    && visualEngine.includes('attributeName === \'class\'')
+    && visualEngine.includes('forceRefresh'),
+    'Legend Last must resync row colors when Grafana toggles series classes on click');
+assert(visualEngine.includes('__dashbridgeRawLegendSeries')
+    && !visualEngine.includes('debugLastValues?.[index + 1]'),
+    'DashBridge Last refresh must reuse pre-filter raw series instead of sorted row indexes');
+assert(visualEngine.includes("window.name === 'dashbridge-iframe' || !rawColumnStats?.compute")
+    && visualEngine.includes('rawColumnStats.compute({ series: rawSeries, columns: { last: true } })'),
+    'direct Grafana must retain the native raw-series Last calculation');
+const visibilitySource = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-legend-visibility-adapters.js'), 'utf8');
+assert(visibilitySource.includes('const getFlotLegendData = root => {')
+    && visibilitySource.includes('controller?.lastFullData')
+    && visibilitySource.includes('__dashBridgeLastFullData')
+    && visibilitySource.includes('getFlotLegendData'),
+    'Last must use the preserved full Flot data after a single-series visibility selection');
+assert(visibilitySource.includes('const candidates = new Set([root])')
+    && visibilitySource.includes("data?.flotPlot")
+    && visibilitySource.includes('Object.values(data).find(isPlot)'),
+    'Flot lookup must inspect the panel root and generic jQuery data paths after a Grafana remount');
+assert(visualEngine.includes('getFlotRowLabel(row)')
+    && visualEngine.split('getFlotRowLabel(row)').length >= 3,
+    'Last row matching must use the legacy Flot label adapter for every summary refresh');
+assert(visualEngine.includes('ops\\/m') && visualEngine.includes('genericUnit'),
+    'Last formatting must preserve Grafana units such as ops/m');
 
 const sortStart = moduleSource.indexOf('const sortRows');
 const sortEnd = moduleSource.indexOf('        const renderColumn', sortStart);

@@ -7,6 +7,8 @@ const calls = [];
 let outputCanvas = null;
 let runtimeAvailable = true;
 let ensureRuntimeCalls = 0;
+let captureSource = 'data:image/png;base64,source';
+const diagnostics = [];
 function FakeImage() {
     this.naturalWidth = 1400;
     this.naturalHeight = 900;
@@ -35,7 +37,7 @@ const context = {
             onActivated: { addListener() {}, removeListener() {} },
             onUpdated: { addListener() {}, removeListener() {} },
             onRemoved: { addListener() {}, removeListener() {} },
-            captureVisibleTab: async () => 'data:image/png;base64,source'
+            captureVisibleTab: async () => captureSource
         }
     },
     ensureGrafanaRuntime: async () => {
@@ -90,5 +92,15 @@ vm.runInContext(fs.readFileSync('js/shared/grafana-panel-capture.js', 'utf8'), c
     assert(fallbackCapture, 'Batch compact capture must still work when runtime backfill is required');
     assert.strictEqual(ensureRuntimeCalls, 1,
         'Batch must install the capture runtime when the probe reports it missing');
+    captureSource = '';
+    const failedCapture = await context.captureGrafanaPanelImage({
+        tabId: 42, windowId: 7, panelId: '2', settleMs: 0,
+        prepared: true, onDiagnostic: detail => diagnostics.push(detail),
+    });
+    assert.equal(failedCapture, null);
+    assert.equal(diagnostics.at(-1).stage, 'capture-visible-tab');
+    assert.equal(diagnostics.at(-1).reason, 'empty-result');
+    assert.equal(diagnostics.at(-1).error, null,
+        'Batch must expose the failing capture stage and reason');
     console.log('PASS Batch panel lookup and scrolling share the Grafana MAIN world');
 })().catch(error => { console.error(error); process.exit(1); });

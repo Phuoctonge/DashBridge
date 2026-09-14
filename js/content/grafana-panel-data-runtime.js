@@ -26,7 +26,7 @@
         if (!transforms) throw new Error('DashBridge Grafana panel data transforms are unavailable');
         const {
             trimResponseDomainLabels, transformCpuData, transformMemData, restoreMemByteUnit,
-            collectResponseTableRecords, filterSeriesByThreshold, getFieldLegendNames,
+            collectResponseTableRecords, filterSeriesByThreshold, getFieldLegendNames, getFrameLegendNames,
             collectResponseSeriesNames, collectResponseFilterVisibleNames,
             collectThresholdHighlightRules, collectCpuCapacityEntries, filterLegendData,
             hasSourceSeriesFilterScope, hasDataTransform
@@ -182,6 +182,44 @@
             ));
             return new Set(matched.map(result => result.refId));
         };
+        const captureRawLegendSeries = (data, targetRefIds) => {
+            // A direct Grafana panel can briefly have no resolved query signature
+            // while its first refresh is settling. Do not replace a valid cache
+            // with an empty snapshot in that interval.
+            if (targetRefIds instanceof Set && targetRefIds.size === 0 && !isTargetPanelView()) return;
+            if (targetRefIds instanceof Set && targetRefIds.size === 0) targetRefIds = null;
+            const allowed = targetRefIds === null ? null : new Set(targetRefIds || []);
+            const series = [];
+            Object.entries(data?.results || {}).forEach(([refId, result]) => {
+                if (allowed && !allowed.has(String(refId))) return;
+                (result.frames || []).forEach(frame => {
+                    const fields = frame.schema?.fields || [];
+                    fields.forEach((field, index) => {
+                        if (field?.type === 'time' || field?.name === 'Time') return;
+                        const candidates = getFrameLegendNames(frame, field);
+                        const label = candidates.find(value => !/^(?:value|series|metric|значение|серия|метрика)$/iu.test(value))
+                            || candidates[0] || '';
+                        const values = frame.data?.values?.[index];
+                        if (!label || !values || typeof values[Symbol.iterator] !== 'function') return;
+                        const rawValues = Array.from(values);
+                        let last = null;
+                        for (let valueIndex = rawValues.length - 1; valueIndex >= 0; valueIndex -= 1) {
+                            const numeric = Number(rawValues[valueIndex]);
+                            if (Number.isFinite(numeric)) { last = numeric; break; }
+                        }
+                        const latest = last === null ? [] : [last];
+                        series.push({ label: String(label), values: latest, data: latest });
+                    });
+                });
+            });
+            window.__dashbridgeRawLegendSeries = series.slice(0, 20_000);
+            window.__dashbridgeRawLegendSeriesOwner = owner;
+        };
+        registerRuntimeCleanup(() => {
+            if (window.__dashbridgeRawLegendSeriesOwner !== owner) return;
+            delete window.__dashbridgeRawLegendSeries;
+            delete window.__dashbridgeRawLegendSeriesOwner;
+        });
         const calculatedTitleOriginalText = new WeakMap();
         const markCalculatedTitle = () => {
             const suffix = ' calculated';
@@ -569,6 +607,12 @@
                             } catch { /* DOM fallback remains available when a datasource response is not JSON. */ }
                         }
                         const targetRefIds = getTargetQueryRefIds(requestBody);
+                        if (hasPersistentVisualWork()) {
+                            try {
+                                const decoded = await decodeNativeFetchResponse(response.clone());
+                                captureRawLegendSeries(decoded, targetRefIds);
+                            } catch { /* Last remains fail-open when the response is not a data frame. */ }
+                        }
                         const scope = targetRefIds === null
                             ? 'iframe'
                             : (targetRefIds.size ? 'query-signature' : 'none');
@@ -590,6 +634,7 @@
                         // Consume directly: cloning would leave an unread tee buffering the body.
                         originalResponseText = await response.text();
                         const decoded = JSON.parse(originalResponseText);
+                        if (hasPersistentVisualWork()) captureRawLegendSeries(decoded, getTargetQueryRefIds(requestBody));
                         if (analysisCaptureActive && panelAnalysisRequestMatches(analysisCapture, requestBody, requestStartedAt)) {
                             observePanelAnalysisResponse(analysisCapture, decoded, requestBody, requestStartedAt);
                         }
@@ -691,6 +736,7 @@
                             const decoded = window.DashBridgeGrafanaNetwork.readXhrJson(this);
                             if (!decoded.supported) throw new Error(`Unsupported XHR responseType: ${decoded.type}`);
                             if (decoded.error) throw decoded.error;
+                            if (hasPersistentVisualWork()) captureRawLegendSeries(decoded.data, getTargetQueryRefIds(body));
                             if (captureRequestMatches) {
                                 observePanelAnalysisResponse(analysisCapture, decoded.data, body, requestStartedAt);
                             }

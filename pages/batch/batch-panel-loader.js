@@ -70,6 +70,24 @@ function createBatchPanelLoader({ log }) {
             const renderer = panel.querySelector('.flot-base, .uplot canvas, .graph-panel__chart canvas, canvas')
                 || Array.from(panel.querySelectorAll('svg')).find(svg => svg.getBoundingClientRect().height > 1) || panel;
             if (renderer.getBoundingClientRect().height <= 1) return;
+            const interceptor = window.__dashbridgeDataInterceptorDiagnostic;
+            const requestSettled = interceptor?.activeRequests === 0
+                && interceptor.events?.some(event => event.stage === 'request-complete');
+            const chart = window.DashBridgeGrafanaVisualEngine?.findUPlot?.(panel);
+            const chartHasPoints = Array.isArray(chart?.data)
+                && chart.data.some(values => Array.isArray(values) && values.length > 0);
+            const flotHasPoints = typeof window.jQuery === 'function'
+                && (window.jQuery(renderer).data('plot')?.getData?.() || [])
+                    .some(series => Array.isArray(series?.data) && series.data.length > 0);
+            const svgHasGeometry = [...panel.querySelectorAll('svg path, svg polyline, svg rect')].some(element => {
+                try { return element.getBBox().width > 0 && element.getBBox().height > 0; }
+                catch { return false; }
+            });
+            if (!requestSettled || !(chartHasPoints || flotHasPoints || svgHasGeometry)) {
+                stableFrames = 0;
+                schedule();
+                return;
+            }
             const currentRect = [rect.x, rect.y, rect.width, rect.height].map(value => Math.round(value * 10) / 10);
             if (previousRect && currentRect.every((value, index) => value === previousRect[index])) stableFrames++;
             else stableFrames = 0;
@@ -147,24 +165,18 @@ function createBatchPanelLoader({ log }) {
         log(previousSeriesFilter ? 'Быстрое переключение на серию…' : `Загрузка панели ${panelId}…`);
         if (signal?.aborted) return false;
 
-        // A complete-hide selection must be installed at document_start: an
-        // ordinary /d/ viewPanel page can issue its first datasource request
-        // before the post-load command bridge is available. Register the MAIN
-        // runtime explicitly instead of relying on the preceding discovery tab
-        // to have registered it as a side effect.
+        // The runtime must start at document_start for every Batch panel: its
+        // request journal is the causal readiness signal, not an optional tool.
         const targetUrl = new URL(url);
-        const hashParams = new URLSearchParams(targetUrl.hash.slice(1));
-        if (hashParams.has('dashbridgeLegendSelection')) {
-            try {
-                const registration = await ensureEarlyGrafanaRuntimeForUrl(targetUrl.toString());
-                if (!registration.ok) {
-                    log(`Не удалось подготовить ранний фильтр панели ${panelId}: ${registration.reason || 'неизвестная ошибка'}`, true);
-                    return null;
-                }
-            } catch (error) {
-                log(`Не удалось подготовить ранний фильтр панели ${panelId}: ${error.message}`, true);
+        try {
+            const registration = await ensureEarlyGrafanaRuntimeForUrl(targetUrl.toString());
+            if (!registration.ok) {
+                log(`Не удалось подготовить runtime панели ${panelId}: ${registration.reason || 'неизвестная ошибка'}`, true);
                 return null;
             }
+        } catch (error) {
+            log(`Не удалось подготовить runtime панели ${panelId}: ${error.message}`, true);
+            return null;
         }
 
         return new Promise(resolve => {

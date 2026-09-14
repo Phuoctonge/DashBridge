@@ -127,6 +127,13 @@
                 return;
             }
             if (event.data.action === 'dashbridgePanelRendered') {
+                // A rendered surface proves that the document reached the
+                // expected Grafana route even if the document-start ready
+                // message raced the parent's listener during iframe startup.
+                // Restore the transport gate here so hover/crosshair/time
+                // messages are not blocked forever by a missed ready event.
+                sourceIframe.dataset.dashbridgeOrigin = event.origin;
+                sourceIframe.dataset.dashbridgeLoaded = 'true';
                 sourceIframe.dataset.dashbridgeRendered = 'true';
                 retryPanelAnalysis(sourceIframe);
                 if (new URLSearchParams(locationRef.search).has('guiCapture')) {

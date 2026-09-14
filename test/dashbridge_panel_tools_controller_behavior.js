@@ -39,6 +39,7 @@ const panel = {
     id: 'panel-1', title: 'Memory Usage',
     tools: {
         legendMode: 'fast_complete_hide', legendFilter: ['idle'],
+        legendColumnsEnabled: true, legendColumns: { mean: false, max: true, total: false, last: true },
         seriesFilterSettingsVersion: 2, seriesQueryFilterEnabled: true,
         seriesQueryFilterValue: 80, seriesQueryFilterInputUnit: 's', seriesQueryFilterMode: 'last',
         thresholdEnabled: true, thresholdValue: 90, thresholdInputUnit: 'ms', thresholdNotifyEnabled: true,
@@ -82,6 +83,8 @@ assert.strictEqual(tools.seriesQueryFilterMode, 'last');
 assert.strictEqual(tools.seriesQueryFilterInputUnit, 's');
 assert.strictEqual(tools.thresholdInputUnit, 'ms');
 assert.strictEqual(tools.cpuCapacityFilterCoefficient, 0.8);
+assert.strictEqual(tools.legendColumnsEnabled, true);
+assert.strictEqual(JSON.stringify(tools.legendColumns), JSON.stringify({ mean: false, max: true, total: false, last: true }));
 controller.apply(panel, iframe);
 assert.strictEqual(messages.at(-1).action, 'applyPanelTools');
 assert.strictEqual(messages.at(-1).transformSettings.grafanaCpuCapacityCoefficient, 0.8);

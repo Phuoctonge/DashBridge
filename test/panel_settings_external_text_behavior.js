@@ -81,6 +81,10 @@ assert(source.includes("const legendMode = 'fast_complete_hide';")
 assert(source.includes("['thickenLinesValue', 1.5]")
     && source.includes('updateThicknessControls(); updateSeriesFilterUnits();'),
     'Reset All must restore the line-width draft and every derived control');
+assert(source.includes("field('legendColumnsEnabled').checked = true")
+    && source.includes("[data-key^=\"legendColumn_\"]")
+    && source.includes("input.dataset.key.slice(13) !== 'last'"),
+    'Reset All must restore the default summary columns while preserving the Last default');
 assert(!source.includes('state.thresholdRawValue = null')
     && !source.includes('state.seriesQueryFilterRawValue = null')
     && source.includes('thresholdUnitControl.reset(); seriesFilterUnitControl.reset();'),

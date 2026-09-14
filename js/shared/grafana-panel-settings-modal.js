@@ -261,7 +261,8 @@
         const legendSelection = globalThis.DashBridgeGrafanaLegendSelection;
         const columnContainer = overlay.querySelector('.panel-tools-column-options');
         const columnEditor = overlay.querySelector('[data-key="legendColumnsEnabled"]');
-        columnEditor?.addEventListener('change', () => { if (columnContainer) columnContainer.hidden = !columnEditor.checked; });
+        let legendColumnsResetRequested = false;
+        columnEditor?.addEventListener('change', () => { legendColumnsResetRequested = false; if (columnContainer) columnContainer.hidden = !columnEditor.checked; });
         const renderColumns = columns => {
             if (!columnContainer || !Array.isArray(columns)) return;
             const names = [...new Set(columns.map(value => String(value || '').trim()).filter(Boolean))];
@@ -270,7 +271,7 @@
             columnContainer.replaceChildren(...names.map(name => {
                 const key = name.toLowerCase(); const label = document.createElement('label'); label.className = 'panel-tools-option';
                 const text = document.createElement('span'); text.textContent = /^last$/i.test(name) ? 'Last (последнее значение)' : name;
-                const wrap = document.createElement('span'); wrap.className = 'switch'; const input = document.createElement('input'); input.type = 'checkbox'; input.dataset.key = `legendColumn_${key}`; input.checked = key === 'last' ? state.legendColumns?.[key] === true : state.legendColumns?.[key] !== false; const slider = document.createElement('span'); slider.className = 'slider'; wrap.append(input, slider); label.append(text, wrap); return label;
+                const wrap = document.createElement('span'); wrap.className = 'switch'; const input = document.createElement('input'); input.type = 'checkbox'; input.dataset.key = `legendColumn_${key}`; input.checked = legendColumnsResetRequested ? key !== 'last' : (key === 'last' ? state.legendColumns?.[key] === true : state.legendColumns?.[key] !== false); const slider = document.createElement('span'); slider.className = 'slider'; wrap.append(input, slider); label.append(text, wrap); return label;
             }));
         };
         void getLegendColumns?.().then(renderColumns).catch(() => undefined);
@@ -545,6 +546,10 @@
         thicken?.addEventListener('change', updateThicknessControls);
         thickness?.addEventListener('input', updateThicknessControls);
         overlay.querySelector('.panel-tools-reset-all')?.addEventListener('click', () => {
+            legendColumnsResetRequested = true;
+            if (field('legendColumnsEnabled')) field('legendColumnsEnabled').checked = true;
+            columnContainer?.querySelectorAll('[data-key^="legendColumn_"]').forEach(input => { input.checked = input.dataset.key.slice(13) !== 'last'; });
+            if (columnContainer) columnContainer.hidden = false;
             ['removeFill', 'thickenLines', 'invertLegend', 'invertIdle', 'convertMemToUsed', 'seriesQueryFilterEnabled', 'cpuCapacityFilterEnabled', 'cpuCapacityFilterLoad5', 'cpuCapacityFilterLoad15', 'thresholdEnabled'].forEach(name => { if (field(name)) field(name).checked = false; });
             if (field('cpuCapacityFilterLoad1')) field('cpuCapacityFilterLoad1').checked = true;
             if (field('seriesQueryFilterHighlightEnabled')) field('seriesQueryFilterHighlightEnabled').checked = true;

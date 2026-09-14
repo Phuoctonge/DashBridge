@@ -39,12 +39,18 @@
             const isMemoryPanel = /\b(?:memory|ram)\b|памят/i.test(String(panel.title || ''));
             const hasResponseSeriesFilter = saved.seriesFilterSettingsVersion === 2;
             const keepCompleteHideSelection = saved.legendMode === 'fast_complete_hide';
+            const savedLegendColumns = saved.legendColumns && typeof saved.legendColumns === 'object' && !Array.isArray(saved.legendColumns)
+                ? Object.fromEntries(Object.entries(saved.legendColumns)
+                    .filter(([key, value]) => key.length <= 128 && typeof value === 'boolean'))
+                : {};
             return {
                 removeFill: !!saved.removeFill,
                 thickenLines: !!saved.thickenLines,
                 thickenLinesValue: saved.thickenLinesValue !== undefined ? Number(saved.thickenLinesValue) : 1.5,
                 invertLegend: !!saved.invertLegend,
                 capturePrepared: getCapturePrepared(),
+                legendColumnsEnabled: saved.legendColumnsEnabled === true,
+                legendColumns: savedLegendColumns,
                 legendFilter: keepCompleteHideSelection && Array.isArray(saved.legendFilter) ? saved.legendFilter : [],
                 legendSelectionVersion: keepCompleteHideSelection && Number(saved.legendSelectionVersion) === 2 ? 2 : null,
                 legendVisibleSeries: keepCompleteHideSelection && Array.isArray(saved.legendVisibleSeries) ? saved.legendVisibleSeries : [],

@@ -56,7 +56,7 @@ checks = {
         and ".dashbridge-legend-bottom tr > :not(:first-child)" in visual_engine
         and "display:flex !important" in visual_engine
         and "flex:1 1 0% !important" in visual_engine
-        and "flex:0 0 48px !important" in visual_engine
+        and "flex:0 0 auto !important" in visual_engine
         and "text-align:right !important" in visual_engine,
     "Legend-only layout has no persistent size observer": "const watchLegendLayoutSize" not in visual_engine
         and "__dashbridgeLegendLayoutObserver" not in visual_engine,

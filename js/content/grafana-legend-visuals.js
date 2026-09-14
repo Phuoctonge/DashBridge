@@ -7,7 +7,7 @@
             throw new TypeError('Grafana legend visuals dependencies are incomplete');
         }
         const rawColumnStats = window.DashBridgeGrafanaLegendColumns;
-        if (window.name === 'dashbridge-iframe' && !document.getElementById('dashbridge-responsive-legend-style')) { const style = document.createElement('style'); style.id = 'dashbridge-responsive-legend-style'; style.textContent = 'table:has(th) { width:100% !important; max-width:100% !important; table-layout:fixed !important; } table:has(th) tr { display:flex !important; width:100% !important; min-width:0 !important; } table:has(th) td, table:has(th) th { min-width:0 !important; overflow:hidden !important; text-overflow:ellipsis !important; } table:has(th) tr > :first-child { flex:1 1 auto !important; min-width:0 !important; width:auto !important; } table:has(th) tr > :not(:first-child) { flex:0 0 48px !important; width:48px !important; } .rdg { grid-template-columns:minmax(0,1fr) max-content !important; overflow-x:hidden !important; } .rdg .rdg-cell:first-child { display:block !important; min-width:0 !important; overflow:hidden !important; text-overflow:ellipsis !important; white-space:nowrap !important; } .rdg .rdg-cell:first-child > * { min-width:0 !important; overflow:hidden !important; text-overflow:ellipsis !important; white-space:nowrap !important; }'; (document.head || document.documentElement).appendChild(style); }
+        if (window.name === 'dashbridge-iframe' && !document.getElementById('dashbridge-responsive-legend-style')) { const style = document.createElement('style'); style.id = 'dashbridge-responsive-legend-style'; style.textContent = 'table:has(th) { width:100% !important; max-width:100% !important; table-layout:fixed !important; } table:has(th) tr { display:flex !important; width:100% !important; min-width:0 !important; } table:has(th) td, table:has(th) th { min-width:0 !important; overflow:hidden !important; text-overflow:ellipsis !important; } table:has(th) tr > :first-child { flex:1 1 auto !important; min-width:0 !important; width:auto !important; } table:has(th) tr > :not(:first-child) { flex:0 0 auto !important; width:max-content !important; min-width:max-content !important; } .rdg { grid-template-columns:minmax(0,1fr) max-content !important; overflow-x:hidden !important; } .rdg .rdg-cell:first-child { display:block !important; min-width:0 !important; overflow:hidden !important; text-overflow:ellipsis !important; white-space:nowrap !important; } .rdg .rdg-cell:first-child > * { min-width:0 !important; overflow:hidden !important; text-overflow:ellipsis !important; white-space:nowrap !important; }'; (document.head || document.documentElement).appendChild(style); }
 
         const legacyVisualObserverOwners = new Set();
         let legacyObserverDocumentSweepCompleted = false;
@@ -74,10 +74,10 @@
                         vertical-align:middle !important;
                     }
                     .dashbridge-legend-bottom tr > :not(:first-child) {
-                        width:48px !important;
+                        width:max-content !important;
                         min-width:48px !important;
-                        max-width:48px !important;
-                        flex:0 0 48px !important;
+                        max-width:100% !important;
+                        flex:0 0 auto !important;
                         box-sizing:border-box !important;
                         text-align:right !important;
                         white-space:nowrap !important;
@@ -800,7 +800,7 @@
                 });
                 window.__dashBridgeTooltipObserver.observe(document.body, { childList: true, subtree: true });
     
-                // MutationObserver: отслеживаем изменения размера и DOM-дерева Grafana (в т.ч. перестроение графика при кликах на легенду)
+                // Watch remount/layout signals; iframe marker styles are our own output and must not feed repaint back into itself.
                 if (outerPanel) {
                     if (outerPanel.__dashBridgeObserver) {
                         outerPanel.__dashBridgeObserver.disconnect();
@@ -825,7 +825,9 @@
                         childList: true,
                         subtree: true,
                         attributes: true,
-                        attributeFilter: ['width', 'height', 'class', 'style', 'd']
+                        attributeFilter: window.name === 'dashbridge-iframe'
+                            ? ['width', 'height', 'class', 'd']
+                            : ['width', 'height', 'class', 'style', 'd']
                     });
                     legacyVisualObserverOwners.add(outerPanel);
                     legacyObserverDiagnostic.created += 1;
@@ -917,7 +919,8 @@
         const {
             applyUPlotFastCompleteHide, applyUPlotNativeLegendVisibility,
             getFlotPlot, getFlotRowLabel, getUPlotLegendRuntime,
-            installFlotVisibilityController, resetFlotSeriesVisibility, resetSeriesVisibility
+            installFlotVisibilityController, resetFlotSeriesVisibility, resetSeriesVisibility,
+            getFlotLegendData
         } = visibilityAdapters;
         const getPaletteDebug = () => {
             const uplot = findUPlotForThreshold(document);
@@ -940,6 +943,18 @@
             };
         };
     
+
+        const stopLegendColumnsObserver = target => {
+            if (!target) return;
+            target.__dashBridgeLegendColumnsObserverFrame?.();
+            target.__dashBridgeLegendColumnsObserver?.disconnect?.();
+            if (target.__dashBridgeLegendColumnsObserverDataSettled) {
+                document.removeEventListener('dashbridgePanelDataSettled', target.__dashBridgeLegendColumnsObserverDataSettled);
+            }
+            target.__dashBridgeLegendColumnsObserver = null;
+            target.__dashBridgeLegendColumnsObserverFrame = null;
+            target.__dashBridgeLegendColumnsObserverDataSettled = null;
+        };
 
         // The older universal painter owns a MutationObserver which repaints the
         // captured visual state.  After a legend layout reset it can still carry
@@ -972,6 +987,7 @@
                 }
                 node.__dashBridgeObserver?.disconnect?.();
                 node.__dashBridgeObserver = null;
+                stopLegendColumnsObserver(node);
                 legacyVisualObserverOwners.delete(node);
             });
             legacyObserverDiagnostic.activeOwners = legacyVisualObserverOwners.size;
@@ -979,34 +995,109 @@
         };
 
         const applyLegendColumns = ({ root = document, columns = {} } = {}) => {
+            const lastFiniteValue = (values, limit = values?.length || 0) => {
+                for (let index = Math.min(values?.length || 0, limit) - 1; index >= 0; index -= 1) {
+                    const point = values[index];
+                    const numeric = Number(Array.isArray(point) ? point[1] : point);
+                    if (Number.isFinite(numeric)) return numeric;
+                }
+                return null;
+            };
+            const lastStats = (chart, data) => {
+                const validLength = chart ? data?.[0]?.length : null;
+                const values = chart
+                    ? (chart.series || []).slice(1).map((_item, index) => data[index + 1])
+                    : (data || []).map(item => item?.values || item?.data);
+                return values.map((seriesValues, index) => ({
+                    label: String(chart?.series?.[index + 1]?.label || ''),
+                    stats: { last: lastFiniteValue(seriesValues, validLength || seriesValues?.length || 0) }
+                }));
+            };
+            const computeLastStats = (chart, data) => {
+                if (window.name === 'dashbridge-iframe' || !rawColumnStats?.compute) return lastStats(chart, data);
+                const rawSeries = chart
+                    ? (chart.series || []).slice(1).map((item, index) => ({ label: String(item?.label || ''), values: data[index + 1] }))
+                    : (data || []).map(item => ({
+                        label: String(item?.label || ''),
+                        values: item?.values || item?.data?.map(point => Array.isArray(point) ? point[1] : point)
+                    }));
+                return rawColumnStats.compute({ series: rawSeries, columns: { last: true } });
+            };
             const formatLast = (value, row) => {
-                const unitText = Array.from(row.querySelectorAll('td')).map(cell => cell.textContent).join(' ');
+                const nativeCells = Array.from(row.querySelectorAll('td')).slice(1)
+                    .filter(cell => !cell.dataset?.dashbridgeSummaryColumn && !cell.dataset?.dashBridgeLastRaw);
+                const unitText = nativeCells.map(cell => cell.textContent).join(' ');
+                const percent = nativeCells.map(cell => String(cell.textContent || '').trim())
+                    .map(text => text.match(/^[+-]?\d+(?:[.,](\d+))?(\s*)%$/)).find(Boolean);
+                if (percent) return `${value.toFixed(Math.min(percent[1]?.length || 0, 10))}${percent[2]}%`;
                 if (/\b(?:ms|s|sec|min|mins)\b/i.test(unitText)) {
                     const absolute = Math.abs(value);
                     if (absolute >= 60_000) return `${Number((value / 60_000).toPrecision(3))} mins`;
                     if (absolute >= 1_000) return `${Number((value / 1_000).toPrecision(3))} s`;
                     return `${Number(value.toPrecision(3))} ms`;
                 }
-                return String(Number(value.toPrecision(4)));
+                const genericUnit = unitText.match(/\b(?:ops\/m|req\/s|[a-zA-Zµμ]+\/[a-zA-Z]+)\b/i)?.[0] || '';
+                return genericUnit ? `${Number(value.toPrecision(4))} ${genericUnit}` : String(Number(value.toPrecision(4)));
             };
             const tables = Array.from(root.querySelectorAll?.('table') || []).filter(table => table.querySelector('th, [role="columnheader"]'));
             const requested = columns && typeof columns === 'object' ? columns : {};
+            if (requested.last !== true) stopLegendColumnsObserver(root);
             if (requested.last === true && root && typeof MutationObserver === 'function' && !root.__dashBridgeLegendColumnsObserver) {
                 let queued = false;
+                let legendColumnsObserverFrame = 0;
+                let forceRefresh = false;
                 const host = root;
-                const observer = new MutationObserver(() => {
-                    if (queued) return;
+                const refreshIfNeeded = () => {
+                    legendColumnsObserverFrame = 0;
+                    queued = false;
+                    const refreshVisualState = forceRefresh;
+                    forceRefresh = false;
                     const hasMissingLast = Array.from(root.querySelectorAll?.('table') || []).some(table => {
                         const header = table.querySelector('thead tr');
                         const hasLast = header && Array.from(header.children).some(cell => /^last$/i.test(String(cell.textContent || '').trim()));
-                        return hasLast && Array.from(table.querySelectorAll("tbody tr")).some(row => !row.querySelector('[data-dashbridge-summary-column="last"]'));
+                        return hasLast && Array.from(table.querySelectorAll('tbody tr')).some(row => !row.querySelector('[data-dashbridge-summary-column="last"]'));
                     });
-                    if (!hasMissingLast) return;
+                    if (hasMissingLast || refreshVisualState) applyLegendColumns({ root, columns: requested });
+                };
+                const scheduleRefresh = (visualState = false) => {
+                    forceRefresh ||= visualState;
+                    if (queued) return;
                     queued = true;
-                    queueMicrotask(() => { queued = false; applyLegendColumns({ root, columns: requested }); });
+                    if (typeof requestAnimationFrame === 'function') {
+                        legendColumnsObserverFrame = requestAnimationFrame(refreshIfNeeded);
+                    } else {
+                        legendColumnsObserverFrame = setTimeout(refreshIfNeeded, 0);
+                    }
+                };
+                const observer = new MutationObserver(mutations => {
+                    const structuralChange = mutations.some(mutation => [
+                        ...Array.from(mutation.addedNodes || []),
+                        ...Array.from(mutation.removedNodes || [])
+                    ].some(node => node?.nodeType === 1 && (
+                        node.matches?.('table, thead, tbody, tr') || node.querySelector?.('table, thead, tbody, tr')
+                    )));
+                    const visualStateChange = mutations.some(mutation => mutation.type === 'attributes'
+                        && mutation.attributeName === 'class'
+                        && (mutation.target.matches?.('tr.graph-legend-series, .graph-legend-series')
+                            || mutation.target.closest?.('tr.graph-legend-series, .graph-legend-series')));
+                    if (structuralChange || visualStateChange) scheduleRefresh(visualStateChange);
                 });
-                observer.observe(host, { childList: true, subtree: true });
+                // Data-settled is used for structural remounts; value refreshes
+                // already call the visual engine directly. Do not force a second
+                // Last calculation while the raw snapshot is still settling.
+                const onDataSettled = () => scheduleRefresh();
+                observer.observe(host, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+                document.addEventListener('dashbridgePanelDataSettled', onDataSettled);
                 root.__dashBridgeLegendColumnsObserver = observer;
+                root.__dashBridgeLegendColumnsObserverDataSettled = onDataSettled;
+                root.__dashBridgeLegendColumnsObserverFrame = () => {
+                    if (legendColumnsObserverFrame) {
+                        if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(legendColumnsObserverFrame);
+                        else clearTimeout(legendColumnsObserverFrame);
+                    }
+                    legendColumnsObserverFrame = 0;
+                    queued = false;
+                };
             }
             let changed = 0;
             for (const table of tables) {
@@ -1023,19 +1114,35 @@
                     cell.textContent = 'Last'; cell.dataset.dashbridgeSummaryColumn = 'last';
                     headerRow.appendChild(cell);
                     const rows = Array.from(table.querySelectorAll("tbody tr"));
-                    const chart = findUPlotForThreshold(root);
-                    const series = chart?.data || getFlotPlot(root)?.getData?.() || [];
-                    const rawSeries = chart ? (chart.series || []).slice(1).map((item, index) => ({ label: String(item?.label || ''), values: series[index + 1] })) : series.map(item => ({ label: String(item?.label || ''), values: item?.data?.map(point => point?.[1]) }));
-                    const computed = rawColumnStats?.compute({ series: rawSeries, columns: { last: true } }) || [];
+                    // DashBridge isolates one Grafana panel per iframe. Resolve the
+                    // renderer from the iframe document so this path uses the same
+                    // uPlot instance as the diagnostics/threshold pipeline.
+                    const chart = window.name === 'dashbridge-iframe'
+                        ? (findUPlotForThreshold(document) || findUPlotForThreshold(root))
+                        : findUPlotForThreshold(root);
+                    const series = chart?.data
+                        || (Array.isArray(window.__dashbridgeRawLegendSeries) ? window.__dashbridgeRawLegendSeries : getFlotLegendData(root));
+                    const computed = computeLastStats(chart, series);
+                    const normalizeLabel = value => String(value || '').replace(/\s+/g, ' ').trim();
                     const colorKey = value => { const text = String(value || '').replace(/\s+/g, '').toLowerCase(); const hex = text.match(/^#([0-9a-f]{6})$/); return hex ? `rgb(${parseInt(hex[1].slice(0, 2), 16)},${parseInt(hex[1].slice(2, 4), 16)},${parseInt(hex[1].slice(4), 16)})` : text; };
                     const byColor = chart ? new Map((chart.series || []).slice(1).map((item, offset) => [colorKey(typeof item.stroke === 'function' ? item.stroke(chart, offset + 1) : item.stroke), computed[offset]])) : null;
-                    const normalizeLabel = value => String(value || '').replace(/\s+/g, ' ').trim();
                     const computedByLabel = new Map(computed.map(item => [normalizeLabel(item.label), item]));
-                    rows.forEach((row, index) => {
+                    const findComputed = label => {
+                        const exact = computedByLabel.get(label);
+                        if (exact) return exact;
+                        const matches = computed.filter(item => {
+                            const candidate = normalizeLabel(item.label);
+                            return candidate && label && (candidate.includes(label) || label.includes(candidate));
+                        });
+                        return matches.length === 1 ? matches[0] : null;
+                    };
+                    rows.forEach(row => {
                         const valueCell = (row.children[1] || row.children[0] || headers[headers.length - 1]).cloneNode(false);
                         const labelElement = row.querySelector('button[title],[class*="LegendLabel"]');
-                        const label = normalizeLabel(labelElement?.getAttribute('title') || labelElement?.textContent || row.textContent);
-                        const value = computedByLabel.get(label)?.stats?.last ?? byColor?.get(colorKey(row.querySelector('[data-testid="series-icon"]')?.style?.background))?.stats?.last ?? computed[index]?.stats?.last;
+                        const label = normalizeLabel(getFlotRowLabel(row)
+                            || labelElement?.getAttribute('title') || labelElement?.textContent || row.textContent);
+                        const value = findComputed(label)?.stats?.last
+                            ?? byColor?.get(colorKey(row.querySelector('[data-testid="series-icon"]')?.style?.background))?.stats?.last;
                         valueCell.textContent = Number.isFinite(value) ? formatLast(value, row) : '-';
                         valueCell.dataset.dashbridgeSummaryColumn = 'last'; row.appendChild(valueCell);
                     });
@@ -1046,8 +1153,23 @@
                     const lastColumnIndex = lastHeader ? Array.from(headerRow.children).indexOf(lastHeader) : -1;
                     if (lastColumnIndex >= 0) {
                         const rows = Array.from(table.querySelectorAll("tbody tr"));
-                        const chart = findUPlotForThreshold(root);
-                        const data = chart?.data || getFlotPlot(root)?.getData?.() || [];
+                        const chart = window.name === 'dashbridge-iframe'
+                            ? (findUPlotForThreshold(document) || findUPlotForThreshold(root))
+                            : findUPlotForThreshold(root);
+                        const data = chart?.data
+                            || (Array.isArray(window.__dashbridgeRawLegendSeries) ? window.__dashbridgeRawLegendSeries : getFlotLegendData(root));
+                        const computed = computeLastStats(chart, data);
+                        const normalizeLabel = value => String(value || '').replace(/\s+/g, ' ').trim();
+                        const computedByLabel = new Map(computed.map(item => [normalizeLabel(item.label), item]));
+                        const findComputed = label => {
+                            const exact = computedByLabel.get(label);
+                            if (exact) return exact;
+                            const matches = computed.filter(item => {
+                                const candidate = normalizeLabel(item.label);
+                                return candidate && label && (candidate.includes(label) || label.includes(candidate));
+                            });
+                            return matches.length === 1 ? matches[0] : null;
+                        };
                         const normalizeColor = value => {
                             const text = String(value || '').replace(/\s+/g, '').toLowerCase();
                             const hex = text.match(/^#([0-9a-f]{6})$/i);
@@ -1057,16 +1179,62 @@
                         const seriesByColor = chart ? new Map((chart.series || []).slice(1).map((item, offset) => {
                             let color = '';
                             try { color = typeof item.stroke === 'function' ? item.stroke(chart, offset + 1) : item.stroke; } catch { /* fallback to row order */ }
-                            return [normalizeColor(color), data[offset + 1]];
+                            return [normalizeColor(color), computed[offset]];
                         }).filter(([color]) => color)) : null;
-                        rows.forEach((row, index) => {
+                        const nativeCellStyleCache = new Map();
+                        const copyNativeCellPresentation = (cell, nativeCell, { copyLayout = true, copyTypography = true } = {}) => {
+                            if (!cell || !nativeCell) return;
+                            // A row's label color is stateful (selected/hidden), while
+                            // its typography is usually stable. Never reuse a cached
+                            // presentation for the color-only path: equal class/style
+                            // attributes are shared by rows with different computed color.
+                            let presentation;
+                            if (!copyTypography) {
+                                const style = getComputedStyle(nativeCell);
+                                presentation = {
+                                    className: nativeCell.className,
+                                    properties: [['color', style.color]]
+                                };
+                            } else {
+                                const cacheKey = `${nativeCell.className}\u0000${nativeCell.getAttribute('style') || ''}`;
+                                presentation = nativeCellStyleCache.get(cacheKey);
+                                if (!presentation) {
+                                    const style = getComputedStyle(nativeCell);
+                                    presentation = {
+                                        className: nativeCell.className,
+                                        properties: ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'lineHeight', 'letterSpacing', 'color', 'textAlign', 'paddingTop', 'paddingBottom', 'paddingLeft', 'paddingRight']
+                                            .map(property => [property, style[property]])
+                                    };
+                                    nativeCellStyleCache.set(cacheKey, presentation);
+                                }
+                            }
+                            if (copyLayout) cell.className = presentation.className;
+                            presentation.properties.forEach(([property, value]) => {
+                                // Last keeps its own numeric layout.  Its visual state
+                                // (including dimmed/active color) comes from the row
+                                // label, not from a neighboring summary column.
+                                if (!copyLayout && ['textAlign', 'paddingTop', 'paddingBottom', 'paddingLeft', 'paddingRight'].includes(property)) return;
+                                if (!copyTypography && ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'lineHeight', 'letterSpacing'].includes(property)) return;
+                                cell.style.setProperty(
+                                    property.replace(/[A-Z]/g, match => `-${match.toLowerCase()}`),
+                                    value,
+                                    'important'
+                                );
+                            });
+                        };
+                        rows.forEach(row => {
                             let cell = row.children[lastColumnIndex];
                             if (!cell) { cell = (row.children[1] || row.children[0] || headers[headers.length - 1]).cloneNode(false); cell.dataset.dashbridgeSummaryColumn = 'last'; row.appendChild(cell); }
                             cell.querySelectorAll?.('svg').forEach(icon => { icon.style.visibility = 'hidden'; });
                             const iconColor = row.querySelector('[data-testid="series-icon"]')?.style?.background || '';
-                            const values = chart ? (seriesByColor?.get(normalizeColor(iconColor)) || data[index + 1]) : data[index]?.data?.map(point => point?.[1]);
-                            const finite = Array.from(values || []).map(Number).filter(Number.isFinite);
-                            const value = finite.length ? finite[finite.length - 1] : null;
+                            const labelElement = row.querySelector('button[title],[class*="LegendLabel"]');
+                            const label = normalizeLabel(getFlotRowLabel(row)
+                                || labelElement?.getAttribute('title') || labelElement?.textContent || row.textContent);
+                            // Sorted native rows no longer share the renderer's series order.
+                            // Resolve from the full raw series by label/color; never fall back
+                            // to the rendered row index after a Max/Last sort.
+                            const value = findComputed(label)?.stats?.last
+                                ?? seriesByColor?.get(normalizeColor(iconColor))?.stats?.last;
                             const text = Number.isFinite(value) ? formatLast(value, row) : '-';
                             if (cell.textContent !== text) { cell.textContent = text; changed += 1; }
                             cell.dataset.dashBridgeLastRaw = Number.isFinite(value) ? String(value) : '';
@@ -1077,8 +1245,8 @@
                             lastHeader.style.setProperty('justify-content', 'flex-end', 'important');
                             lastHeader.style.setProperty('position', 'relative', 'important');
                             lastHeader.style.setProperty('padding-right', '20px', 'important');
-                            lastHeader.style.setProperty('min-width', '56px', 'important');
-                            lastHeader.style.setProperty('width', '56px', 'important');
+                            lastHeader.style.setProperty('min-width', 'max-content', 'important');
+                            lastHeader.style.setProperty('width', 'max-content', 'important');
                             lastHeader.setAttribute('role', lastHeader.getAttribute('role') || 'columnheader');
                             lastHeader.tabIndex = 0;
                             lastHeader.style.paddingLeft = '4px';
@@ -1098,7 +1266,7 @@
                                     icon.querySelector('path')?.setAttribute('d', next === 'ascending' ? 'M17,13.41,12.71,9.17a1,1,0,0,0-1.42,0L7.05,13.41a1,1,0,0,0,0,1.42,1,1,0,0,0,1.41,0L12,11.29l3.54,3.54a1,1,0,0,0,.7.29,1,1,0,0,0,.71-.29A1,1,0,0,0,17,13.41Z' : 'M17,9.17a1,1,0,0,0-1.41,0L12,12.71,8.46,9.17a1,1,0,0,0-1.41,0,1,1,0,0,0,0,1.42l4.24,4.24a1,1,0,0,0,1.42,0L17,10.59A1,1,0,0,0,17,9.17Z');
                                     lastHeader.appendChild(icon);
                                 }
-                                lastHeader.style.paddingRight = '4px';
+                                lastHeader.style.paddingRight = '20px';
                                 headerRow.querySelectorAll('[aria-sort]').forEach(cell => { if (cell !== lastHeader) cell.removeAttribute('aria-sort'); });
                                 headerRow.querySelectorAll('[data-testid*="sort"], [aria-label*="sort" i]').forEach(el => { if (!lastHeader.contains(el)) el.removeAttribute('aria-sort'); });
                                 headerRow.querySelectorAll(':scope > *').forEach(cell => {
@@ -1121,9 +1289,25 @@
                             });
                             Array.from(table.querySelectorAll('tbody > tr')).forEach((row, i) => { row.dataset.dashBridgeOriginalIndex = String(i); });
                         }
-                        lastHeader.style.paddingLeft = '4px'; lastHeader.style.paddingRight = '4px';
-                        lastHeader.style.minWidth = '0';
-                        table.querySelectorAll('tbody > tr').forEach(row => { const cell = row.children[lastColumnIndex]; if (cell) { cell.style.color = 'inherit'; cell.style.font = 'inherit'; cell.style.paddingLeft = '4px'; cell.style.paddingRight = '4px'; } });
+                        lastHeader.style.paddingLeft = '4px'; lastHeader.style.paddingRight = '20px';
+                        lastHeader.style.minWidth = 'max-content';
+                        const nativeHeader = headerRow.children[Math.max(1, lastColumnIndex - 1)];
+                        if (nativeHeader) {
+                            lastHeader.className = nativeHeader.className;
+                            const headerStyle = getComputedStyle(nativeHeader);
+                            ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'lineHeight', 'letterSpacing', 'color', 'textAlign', 'paddingTop', 'paddingBottom', 'paddingLeft', 'paddingRight'].forEach(property => { lastHeader.style[property] = headerStyle[property]; });
+                        }
+                        table.querySelectorAll('tbody > tr').forEach(row => {
+                            const cell = row.children[lastColumnIndex];
+                            // The row container often stays black while Grafana dims
+                            // the actual label text.  Use that text node as the style
+                            // source so color, font family and size follow the series.
+                            const labelCell = window.DashBridgeGrafanaDom?.legendLabel?.(row)
+                                || row.querySelector('button[title], [class*="LegendLabel"], .graph-legend-alias, [class*="legend-label" i], [class*="legend-item-name" i], td:first-child, th:first-child')
+                                || row.children[0]
+                                || row.querySelector('td,th');
+                            copyNativeCellPresentation(cell, labelCell, { copyLayout: false, copyTypography: false });
+                        });
                     }
                 }
                 const allHeaders = Array.from(headerRow.children);

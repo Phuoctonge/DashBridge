@@ -96,6 +96,8 @@ assert(calls.some(call => call[0] === 'time') && calls.some(call => call[0] === 
 
 emit({ action: 'dashbridgePanelRendered' });
 assert.strictEqual(frame.dataset.dashbridgeRendered, 'true');
+assert.strictEqual(frame.dataset.dashbridgeLoaded, 'true', 'rendered fallback must reopen iframe transport after a missed ready message');
+assert.strictEqual(frame.dataset.dashbridgeOrigin, 'https://grafana.example');
 assert(calls.some(call => call[0] === 'runtime' && call[1].type === 'dashbridge-gui-capture-ready'));
 emit({ action: 'panelLegendSeries', requestId: 'legend-1' });
 emit({ action: 'panelThresholdStatus', status: {} });

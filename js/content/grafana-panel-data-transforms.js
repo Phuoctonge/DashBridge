@@ -558,7 +558,7 @@
     
         return Object.freeze({
             trimResponseDomainLabels, transformCpuData, transformMemData, restoreMemByteUnit,
-            collectResponseTableRecords, filterSeriesByThreshold, getFieldLegendNames,
+            collectResponseTableRecords, filterSeriesByThreshold, getFieldLegendNames, getFrameLegendNames,
             collectResponseSeriesNames, collectResponseFilterVisibleNames,
             collectThresholdHighlightRules, collectCpuCapacityEntries, filterLegendData,
             hasSourceSeriesFilterScope, hasDataTransform

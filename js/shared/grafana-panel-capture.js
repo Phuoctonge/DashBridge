@@ -64,7 +64,8 @@ async function scrollGrafanaPanelIntoView({ tabId, panelId = null, title = '', t
 
 async function captureGrafanaPanelImage({
     tabId, windowId, panelId = null, settleMs = 800,
-    prepared = false, outputWidth = 1000, outputHeight = 520
+    prepared = false, outputWidth = 1000, outputHeight = 520,
+    onDiagnostic = null,
 }) {
     let rect = null;
     let preparedSessionId = null;
@@ -72,10 +73,20 @@ async function captureGrafanaPanelImage({
         width: Math.min(4096, Math.max(100, Math.round(Number(outputWidth) || 1000))),
         height: Math.min(4096, Math.max(100, Math.round(Number(outputHeight) || 520)))
     } : null;
+    const reportFailure = (stage, reason, error = null) => {
+        const detail = {
+            stage, reason: String(reason || 'unknown'),
+            error: error?.message ? String(error.message) : null,
+        };
+        try { onDiagnostic?.(detail); } catch { /* diagnostics must not break capture cleanup */ }
+        return null;
+    };
     try {
         const expectedUrl = (await chrome.tabs.get(tabId)).url;
         if (prepared) {
-            if (typeof ensureGrafanaRuntime !== 'function') return null;
+            if (typeof ensureGrafanaRuntime !== 'function') {
+                return reportFailure('runtime', 'ensure-runtime-unavailable');
+            }
             // Applying Batch panel tools already installs the MAIN-world runtime.
             // Reinjecting it here would tear down and recreate its observers and
             // can race an in-flight capture restore. Reuse the live capture API
@@ -89,7 +100,7 @@ async function captureGrafanaPanelImage({
             const runtimeReady = runtimeProbe.length > 0 && runtimeProbe.every(item => item.result === true);
             if (!runtimeReady) {
                 const runtime = await ensureGrafanaRuntime(tabId);
-                if (!runtime?.ok) return null;
+                if (!runtime?.ok) return reportFailure('runtime', runtime?.reason || 'runtime-not-ready');
             }
             preparedSessionId = `batch-capture-${Date.now()}-${Math.random().toString(36).slice(2)}`;
             const preparedResults = await chrome.scripting.executeScript({
@@ -100,10 +111,14 @@ async function captureGrafanaPanelImage({
                 }) || { ok: false, reason: 'batch-capture-runtime-unavailable' }
             });
             const preparedResult = preparedResults?.[0]?.result;
-            if (!preparedResult?.ok || !preparedResult.rect) return null;
+            if (!preparedResult?.ok || !preparedResult.rect) {
+                return reportFailure('prepare', preparedResult?.reason || 'panel-preparation-failed');
+            }
             rect = preparedResult.rect;
         } else {
-            if (!await scrollGrafanaPanelIntoView({ tabId, panelId })) return null;
+            if (!await scrollGrafanaPanelIntoView({ tabId, panelId })) {
+                return reportFailure('panel-lookup', 'panel-not-found');
+            }
             const results = await chrome.scripting.executeScript({
                 target: { tabId },
                 world: 'MAIN',
@@ -123,7 +138,7 @@ async function captureGrafanaPanelImage({
                 }
             });
             rect = results?.[0]?.result;
-            if (!rect) return null;
+            if (!rect) return reportFailure('panel-geometry', 'panel-empty-or-zero-size');
         }
         await new Promise(resolve => setTimeout(resolve, settleMs));
         if (prepared) {
@@ -145,8 +160,13 @@ async function captureGrafanaPanelImage({
                 }
             });
         }
-        const source = await captureGrafanaVisibleTab(tabId, expectedUrl);
-        if (!source) return null;
+        let source;
+        try {
+            source = await captureGrafanaVisibleTab(tabId, expectedUrl);
+        } catch (error) {
+            return reportFailure('capture-visible-tab', error?.message || 'capture-failed', error);
+        }
+        if (!source) return reportFailure('capture-visible-tab', 'empty-result');
         const dataUrl = await new Promise(resolve => {
             const image = new Image();
             image.onload = () => {
@@ -155,17 +175,19 @@ async function captureGrafanaPanelImage({
                 const y = Math.max(0, Math.round(rect.y * dpr));
                 const width = Math.min(Math.round(rect.width * dpr), image.naturalWidth - x);
                 const height = Math.min(Math.round(rect.height * dpr), image.naturalHeight - y);
-                if (width <= 0 || height <= 0) return resolve(null);
+                if (width <= 0 || height <= 0) return resolve({ dataUrl: null, reason: 'crop-outside-image' });
                 const canvas = document.createElement('canvas');
                 canvas.width = targetSize?.width || width;
                 canvas.height = targetSize?.height || height;
                 canvas.getContext('2d').drawImage(image, x, y, width, height, 0, 0, canvas.width, canvas.height);
-                resolve(canvas.toDataURL('image/png'));
+                try { resolve({ dataUrl: canvas.toDataURL('image/png'), reason: null }); }
+                catch (error) { resolve({ dataUrl: null, reason: error?.message || 'canvas-export-failed' }); }
             };
-            image.onerror = () => resolve(null);
+            image.onerror = () => resolve({ dataUrl: null, reason: 'image-decode-failed' });
             image.src = source;
         });
-        return dataUrl ? { dataUrl, rect, width: targetSize?.width || null, height: targetSize?.height || null } : null;
+        if (!dataUrl?.dataUrl) return reportFailure('crop', dataUrl?.reason || 'crop-failed');
+        return { dataUrl: dataUrl.dataUrl, rect, width: targetSize?.width || null, height: targetSize?.height || null };
     } finally {
         if (preparedSessionId) {
             await chrome.scripting.executeScript({
