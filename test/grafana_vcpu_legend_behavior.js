@@ -138,6 +138,10 @@ assert(visualEngine.includes("const seriesValues = chart ? seriesItem : (seriesI
     && visualEngine.includes("const label = chart")
     && visualEngine.includes(": seriesItem?.label"),
     'DashBridge Flot Last must retain each Flot series label for legend row matching');
+assert(visualEngine.includes('const flot = getFlotPlot(root)')
+    && visualEngine.includes('if (flot) return getFlotLegendData(root)')
+    && visualEngine.includes('__dashbridgeRawLegendSeries'),
+    'DashBridge Flot Last must prefer live/full Flot data over the raw response cache');
 assert(visualEngine.includes('legendColumnsObserverFrame')
     && visualEngine.includes('requestAnimationFrame(() => {')
     && !visualEngine.includes('queueMicrotask(() => { queued = false; applyLegendColumns({ root, columns: requested }); });'),

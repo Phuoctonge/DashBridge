@@ -1053,10 +1053,17 @@
             const resolveLegendRenderer = () => environment === 'native'
                 ? findUPlotForThreshold(root)
                 : (findUPlotForThreshold(document) || findUPlotForThreshold(root));
-            const resolveLegendData = chart => chart?.data
-                || (environment === 'dashbridge' && Array.isArray(window.__dashbridgeRawLegendSeries)
+            const resolveLegendData = chart => {
+                if (chart?.data) return chart.data;
+                // A Flot panel must always use its live/full plot data. The
+                // raw response cache is a uPlot settling fallback only and can
+                // otherwise shadow Flot's series ordering after a remount.
+                const flot = getFlotPlot(root);
+                if (flot) return getFlotLegendData(root);
+                return environment === 'dashbridge' && Array.isArray(window.__dashbridgeRawLegendSeries)
                     ? window.__dashbridgeRawLegendSeries
-                    : getFlotLegendData(root));
+                    : getFlotLegendData(root);
+            };
             const resolveDashBridgeDebug = () => {
                 if (environment !== 'dashbridge') return null;
                 return window.DashBridgeGrafanaVisualEngine?.getThresholdDebug?.() || null;
