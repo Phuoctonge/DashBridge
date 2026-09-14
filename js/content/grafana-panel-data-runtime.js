@@ -132,28 +132,8 @@
             const targetRefIds = getAnalysisQueryRefIds(requestBody, session.signatures);
             return targetRefIds === null || targetRefIds.size > 0;
         };
-        const createResponseFilterWorkspace = (data, targetRefIds, helperRefIds = new Set()) => {
-            const privateHelperRefIds = new Set(helperRefIds || []);
-            if (targetRefIds === null) {
-                return { data, isolated: false, helperRefIds: privateHelperRefIds };
-            }
-            const includedRefIds = new Set([...targetRefIds, ...privateHelperRefIds]);
-            return {
-                data: {
-                    ...data,
-                    results: Object.fromEntries(Object.entries(data?.results || {})
-                        .filter(([refId]) => includedRefIds.has(String(refId))))
-                },
-                isolated: true,
-                helperRefIds: privateHelperRefIds
-            };
-        };
-        const commitResponseFilterWorkspace = (target, workspace) => {
-            if (!workspace?.isolated) return target;
-            workspace.helperRefIds.forEach(refId => delete target.results?.[refId]);
-            Object.assign(target.results, workspace.data.results);
-            return target;
-        };
+        const createResponseFilterWorkspace = (...args) => globalThis.DashBridgeGrafanaPanelDataTransformsRuntime.createWorkspace(...args);
+        const commitResponseFilterWorkspace = (...args) => globalThis.DashBridgeGrafanaPanelDataTransformsRuntime.commitWorkspace(...args);
         const prepareCpuCapacityRequestBody = requestBody => {
             const capacityFilter = window.DashBridgeGrafanaCpuCapacityFilter;
             if (!capacityFilter || !tools.cpuCapacityFilterEnabled) return { body: requestBody, changed: false };

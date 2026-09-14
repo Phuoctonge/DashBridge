@@ -4,17 +4,14 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-panel-data-runtime.js'), 'utf8');
-const start = source.indexOf('const createResponseFilterWorkspace');
-const end = source.indexOf('    const prepareCpuCapacityRequestBody', start);
-assert(start >= 0 && end > start, 'response-filter workspace helpers must remain independently testable');
+const source = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-panel-data-transforms-runtime.js'), 'utf8');
 
 const context = {};
 context.globalThis = context;
 vm.createContext(context);
-vm.runInContext(`${source.slice(start, end)}
-globalThis.createWorkspace = createResponseFilterWorkspace;
-globalThis.commitWorkspace = commitResponseFilterWorkspace;`, context);
+vm.runInContext(source, context);
+context.createWorkspace = context.DashBridgeGrafanaPanelDataTransformsRuntime.createWorkspace;
+context.commitWorkspace = context.DashBridgeGrafanaPanelDataTransformsRuntime.commitWorkspace;
 
 const original = { results: {
     A: { value: 'target' },
@@ -38,17 +35,18 @@ const iframeData = { results: { A: { value: 1 } } };
 const iframeWorkspace = context.createWorkspace(iframeData, null, new Set());
 assert.strictEqual(iframeWorkspace.data, iframeData, 'single-panel iframe keeps the zero-copy fast path');
 
-const cpuIndex = source.indexOf('capacityFilter?.filterResponse?.(scopedData');
-const seriesIndex = source.indexOf('sourceFilter = filterSeriesByThreshold(scopedData).metrics;');
+const runtimeSource = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-panel-data-runtime.js'), 'utf8');
+const cpuIndex = runtimeSource.indexOf('capacityFilter?.filterResponse?.(scopedData');
+const seriesIndex = runtimeSource.indexOf('sourceFilter = filterSeriesByThreshold(scopedData).metrics;');
 assert(cpuIndex >= 0 && seriesIndex > cpuIndex,
     'vCPU calculation must finish before the generic threshold evaluates the scoped series');
-const scopeMismatchStart = source.indexOf('if (targetRefIds !== null && !targetRefIds.size)');
-const scopeMismatchEnd = source.indexOf("if (scope === 'query-signature')", scopeMismatchStart);
+const scopeMismatchStart = runtimeSource.indexOf('if (targetRefIds !== null && !targetRefIds.size)');
+const scopeMismatchEnd = runtimeSource.indexOf("if (scope === 'query-signature')", scopeMismatchStart);
 const cleanupOnlyCall = 'window.DashBridgeGrafanaCpuCapacityFilter?.filterResponse?.(data, requestBody);';
 assert(scopeMismatchStart >= 0 && scopeMismatchEnd > scopeMismatchStart
-    && source.slice(scopeMismatchStart, scopeMismatchEnd).includes(cleanupOnlyCall),
+    && runtimeSource.slice(scopeMismatchStart, scopeMismatchEnd).includes(cleanupOnlyCall),
     'unscoped cleanup must omit filter options so filtering and domain trimming stay disabled');
-assert(!source.replace(cleanupOnlyCall, '').includes('filterResponse?.(data, requestBody'),
+assert(!runtimeSource.replace(cleanupOnlyCall, '').includes('filterResponse?.(data, requestBody'),
     'only disabled helper cleanup may receive the unscoped dashboard response');
 
 console.log('PASS response filters are isolated to the selected Grafana panel');

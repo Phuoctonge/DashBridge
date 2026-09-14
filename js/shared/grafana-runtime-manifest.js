@@ -31,6 +31,7 @@
         'js/content/grafana-cpu-capacity-legend.js',
         'js/content/grafana-panel-capture-runtime.js',
         'js/content/grafana-panel-data-transforms.js',
+        'js/content/grafana-panel-data-transforms-runtime.js',
         'js/content/grafana-panel-data-runtime.js',
         'js/content/grafana-panel-menu-runtime.js',
         'js/content/grafana-panel-tools.js'
