@@ -1020,7 +1020,10 @@
                 });
             };
             const computeLastStats = (chart, data) => {
-                if (environment === 'dashbridge' || !rawColumnStats?.compute) return lastStats(chart, data);
+                // uPlot DashBridge has a renderer-owned lastValues snapshot. Flot
+                // does not, so preserve the working raw-column calculation for
+                // that renderer while keeping native Grafana unchanged.
+                if ((environment === 'dashbridge' && chart) || !rawColumnStats?.compute) return lastStats(chart, data);
                 const rawSeries = chart
                     ? (chart.series || []).slice(1).map((item, index) => ({ label: String(item?.label || ''), values: data[index + 1] }))
                     : (data || []).map(item => ({

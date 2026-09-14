@@ -171,9 +171,9 @@ assert(visualEngine.includes('const resolveLegendRenderer')
     && visualEngine.includes('findUPlotForThreshold(document)')
     && visualEngine.includes("environment === 'native'"),
     'native and DashBridge Last paths must resolve renderer data independently');
-assert(visualEngine.includes("environment === 'dashbridge' || !rawColumnStats?.compute")
+assert(visualEngine.includes("(environment === 'dashbridge' && chart) || !rawColumnStats?.compute")
     && visualEngine.includes('rawColumnStats.compute({ series: rawSeries, columns: { last: true } })'),
-    'direct Grafana must retain the native raw-series Last calculation');
+    'DashBridge Flot and native Grafana must retain the raw-series Last calculation');
 const visibilitySource = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-legend-visibility-adapters.js'), 'utf8');
 assert(visibilitySource.includes('const getFlotLegendData = root => {')
     && visibilitySource.includes('controller?.lastFullData')
