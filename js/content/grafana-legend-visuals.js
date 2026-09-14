@@ -1390,8 +1390,6 @@
             resetSeriesVisibility,
             stopLegacyVisualObservers,
             applyLegendColumns,
-            applyNativeLegendColumns,
-            applyDashBridgeLegendColumns,
         });
     }
 
