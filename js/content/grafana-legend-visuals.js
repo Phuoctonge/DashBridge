@@ -1005,13 +1005,19 @@
             };
             const lastStats = (chart, data) => {
                 const validLength = chart ? data?.[0]?.length : null;
-                const values = chart
+                const series = chart
                     ? (chart.series || []).slice(1).map((_item, index) => data[index + 1])
-                    : (data || []).map(item => item?.values || item?.data);
-                return values.map((seriesValues, index) => ({
-                    label: String(chart?.series?.[index + 1]?.label || ''),
-                    stats: { last: lastFiniteValue(seriesValues, validLength || seriesValues?.length || 0) }
-                }));
+                    : (data || []);
+                return series.map((seriesItem, index) => {
+                    const seriesValues = chart ? seriesItem : (seriesItem?.values || seriesItem?.data);
+                    const label = chart
+                        ? chart.series?.[index + 1]?.label
+                        : seriesItem?.label;
+                    return {
+                        label: String(label || ''),
+                        stats: { last: lastFiniteValue(seriesValues, validLength || seriesValues?.length || 0) }
+                    };
+                });
             };
             const computeLastStats = (chart, data) => {
                 if (environment === 'dashbridge' || !rawColumnStats?.compute) return lastStats(chart, data);

@@ -134,6 +134,10 @@ assert(visualEngine.includes('// Sorted native rows no longer share the renderer
 assert(visualEngine.includes('validLength = chart ? data?.[0]?.length : null')
     && visualEngine.includes('Math.min(values?.length || 0, limit)'),
     'Last values must ignore stale uPlot buffer entries beyond the current time range');
+assert(visualEngine.includes("const seriesValues = chart ? seriesItem : (seriesItem?.values || seriesItem?.data)")
+    && visualEngine.includes("const label = chart")
+    && visualEngine.includes(": seriesItem?.label"),
+    'DashBridge Flot Last must retain each Flot series label for legend row matching');
 assert(visualEngine.includes('legendColumnsObserverFrame')
     && visualEngine.includes('requestAnimationFrame(() => {')
     && !visualEngine.includes('queueMicrotask(() => { queued = false; applyLegendColumns({ root, columns: requested }); });'),
