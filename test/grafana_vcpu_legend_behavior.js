@@ -152,9 +152,22 @@ assert(visualEngine.includes("attributeFilter: ['class']")
     && visualEngine.includes('forceRefresh'),
     'Legend Last must resync row colors when Grafana toggles series classes on click');
 assert(visualEngine.includes('__dashbridgeRawLegendSeries')
-    && !visualEngine.includes('debugLastValues?.[index + 1]'),
-    'DashBridge Last refresh must reuse pre-filter raw series instead of sorted row indexes');
-assert(visualEngine.includes("window.name === 'dashbridge-iframe' || !rawColumnStats?.compute")
+    && visualEngine.includes('resolveDashBridgeLastValues')
+    && visualEngine.includes('getThresholdDebug')
+    && visualEngine.includes('resolveDashBridgeDebug')
+    && visualEngine.includes('resolveDashBridgeLast(label, index, debugLastValues, debug?.series, chart)')
+    && visualEngine.includes('resolveDashBridgeLast(label, rows.indexOf(row), debugLastValues, debug?.series, chart)'),
+    'DashBridge Last must prefer renderer lastValues while retaining label/color fallback');
+assert(visualEngine.includes('const applyNativeLegendColumns')
+    && visualEngine.includes('const applyDashBridgeLegendColumns')
+    && /window\.name === 'dashbridge-iframe'\s*\?\s*applyDashBridgeLegendColumns/.test(visualEngine),
+    'Last must route through separate native Grafana and DashBridge entry points');
+assert(visualEngine.includes('const resolveLegendRenderer')
+    && visualEngine.includes("environment === 'dashbridge'")
+    && visualEngine.includes('findUPlotForThreshold(document)')
+    && visualEngine.includes("environment === 'native'"),
+    'native and DashBridge Last paths must resolve renderer data independently');
+assert(visualEngine.includes("environment === 'dashbridge' || !rawColumnStats?.compute")
     && visualEngine.includes('rawColumnStats.compute({ series: rawSeries, columns: { last: true } })'),
     'direct Grafana must retain the native raw-series Last calculation');
 const visibilitySource = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-legend-visibility-adapters.js'), 'utf8');

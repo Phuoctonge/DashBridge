@@ -994,7 +994,7 @@
             legacyObserverDiagnostic.lastActionAt = Date.now();
         };
 
-        const applyLegendColumns = ({ root = document, columns = {} } = {}) => {
+        const applyLegendColumnsForEnvironment = (environment, { root = document, columns = {} } = {}) => {
             const lastFiniteValue = (values, limit = values?.length || 0) => {
                 for (let index = Math.min(values?.length || 0, limit) - 1; index >= 0; index -= 1) {
                     const point = values[index];
@@ -1014,7 +1014,7 @@
                 }));
             };
             const computeLastStats = (chart, data) => {
-                if (window.name === 'dashbridge-iframe' || !rawColumnStats?.compute) return lastStats(chart, data);
+                if (environment === 'dashbridge' || !rawColumnStats?.compute) return lastStats(chart, data);
                 const rawSeries = chart
                     ? (chart.series || []).slice(1).map((item, index) => ({ label: String(item?.label || ''), values: data[index + 1] }))
                     : (data || []).map(item => ({
@@ -1041,6 +1041,33 @@
             };
             const tables = Array.from(root.querySelectorAll?.('table') || []).filter(table => table.querySelector('th, [role="columnheader"]'));
             const requested = columns && typeof columns === 'object' ? columns : {};
+            const resolveLegendRenderer = () => environment === 'native'
+                ? findUPlotForThreshold(root)
+                : (findUPlotForThreshold(document) || findUPlotForThreshold(root));
+            const resolveLegendData = chart => chart?.data
+                || (environment === 'dashbridge' && Array.isArray(window.__dashbridgeRawLegendSeries)
+                    ? window.__dashbridgeRawLegendSeries
+                    : getFlotLegendData(root));
+            const resolveDashBridgeDebug = () => {
+                if (environment !== 'dashbridge') return null;
+                return window.DashBridgeGrafanaVisualEngine?.getThresholdDebug?.() || null;
+            };
+            const resolveDashBridgeLastValues = debug => debug?.lastValues || null;
+            const resolveDashBridgeLast = (label, rowIndex, debugLastValues, debugSeries, chart) => {
+                if (environment !== 'dashbridge' || !Array.isArray(debugLastValues)) return null;
+                const normalize = value => String(value || '').replace(/\s+/g, ' ').trim();
+                const target = normalize(label);
+                const debugIndex = Array.isArray(debugSeries)
+                    ? debugSeries.findIndex(item => normalize(item?.label) === target)
+                    : -1;
+                const indexed = debugIndex >= 0 ? Number(debugLastValues[debugIndex]) : Number.NaN;
+                if (Number.isFinite(indexed)) return indexed;
+                // The renderer's order is the only safe positional fallback for
+                // a remounted table whose labels are not exposed by Grafana.
+                const seriesIndex = chart?.series?.findIndex?.(item => normalize(item?.label) === target);
+                const positional = seriesIndex > 0 ? Number(debugLastValues[seriesIndex]) : Number(debugLastValues[rowIndex + 1]);
+                return Number.isFinite(positional) ? positional : null;
+            };
             if (requested.last !== true) stopLegendColumnsObserver(root);
             if (requested.last === true && root && typeof MutationObserver === 'function' && !root.__dashBridgeLegendColumnsObserver) {
                 let queued = false;
@@ -1057,7 +1084,7 @@
                         const hasLast = header && Array.from(header.children).some(cell => /^last$/i.test(String(cell.textContent || '').trim()));
                         return hasLast && Array.from(table.querySelectorAll('tbody tr')).some(row => !row.querySelector('[data-dashbridge-summary-column="last"]'));
                     });
-                    if (hasMissingLast || refreshVisualState) applyLegendColumns({ root, columns: requested });
+                    if (hasMissingLast || refreshVisualState) applyLegendColumnsForEnvironment(environment, { root, columns: requested });
                 };
                 const scheduleRefresh = (visualState = false) => {
                     forceRefresh ||= visualState;
@@ -1117,12 +1144,11 @@
                     // DashBridge isolates one Grafana panel per iframe. Resolve the
                     // renderer from the iframe document so this path uses the same
                     // uPlot instance as the diagnostics/threshold pipeline.
-                    const chart = window.name === 'dashbridge-iframe'
-                        ? (findUPlotForThreshold(document) || findUPlotForThreshold(root))
-                        : findUPlotForThreshold(root);
-                    const series = chart?.data
-                        || (Array.isArray(window.__dashbridgeRawLegendSeries) ? window.__dashbridgeRawLegendSeries : getFlotLegendData(root));
+                    const chart = resolveLegendRenderer();
+                    const series = resolveLegendData(chart);
                     const computed = computeLastStats(chart, series);
+                    const debug = resolveDashBridgeDebug();
+                    const debugLastValues = resolveDashBridgeLastValues(debug);
                     const normalizeLabel = value => String(value || '').replace(/\s+/g, ' ').trim();
                     const colorKey = value => { const text = String(value || '').replace(/\s+/g, '').toLowerCase(); const hex = text.match(/^#([0-9a-f]{6})$/); return hex ? `rgb(${parseInt(hex[1].slice(0, 2), 16)},${parseInt(hex[1].slice(2, 4), 16)},${parseInt(hex[1].slice(4), 16)})` : text; };
                     const byColor = chart ? new Map((chart.series || []).slice(1).map((item, offset) => [colorKey(typeof item.stroke === 'function' ? item.stroke(chart, offset + 1) : item.stroke), computed[offset]])) : null;
@@ -1136,13 +1162,14 @@
                         });
                         return matches.length === 1 ? matches[0] : null;
                     };
-                    rows.forEach(row => {
+                    rows.forEach((row, index) => {
                         const valueCell = (row.children[1] || row.children[0] || headers[headers.length - 1]).cloneNode(false);
                         const labelElement = row.querySelector('button[title],[class*="LegendLabel"]');
                         const label = normalizeLabel(getFlotRowLabel(row)
                             || labelElement?.getAttribute('title') || labelElement?.textContent || row.textContent);
-                        const value = findComputed(label)?.stats?.last
-                            ?? byColor?.get(colorKey(row.querySelector('[data-testid="series-icon"]')?.style?.background))?.stats?.last;
+                        const debugValue = resolveDashBridgeLast(label, index, debugLastValues, debug?.series, chart);
+                        const value = Number.isFinite(debugValue) ? debugValue : (findComputed(label)?.stats?.last
+                            ?? byColor?.get(colorKey(row.querySelector('[data-testid="series-icon"]')?.style?.background))?.stats?.last);
                         valueCell.textContent = Number.isFinite(value) ? formatLast(value, row) : '-';
                         valueCell.dataset.dashbridgeSummaryColumn = 'last'; row.appendChild(valueCell);
                     });
@@ -1153,12 +1180,11 @@
                     const lastColumnIndex = lastHeader ? Array.from(headerRow.children).indexOf(lastHeader) : -1;
                     if (lastColumnIndex >= 0) {
                         const rows = Array.from(table.querySelectorAll("tbody tr"));
-                        const chart = window.name === 'dashbridge-iframe'
-                            ? (findUPlotForThreshold(document) || findUPlotForThreshold(root))
-                            : findUPlotForThreshold(root);
-                        const data = chart?.data
-                            || (Array.isArray(window.__dashbridgeRawLegendSeries) ? window.__dashbridgeRawLegendSeries : getFlotLegendData(root));
+                        const chart = resolveLegendRenderer();
+                        const data = resolveLegendData(chart);
                         const computed = computeLastStats(chart, data);
+                        const debug = resolveDashBridgeDebug();
+                        const debugLastValues = resolveDashBridgeLastValues(debug);
                         const normalizeLabel = value => String(value || '').replace(/\s+/g, ' ').trim();
                         const computedByLabel = new Map(computed.map(item => [normalizeLabel(item.label), item]));
                         const findComputed = label => {
@@ -1233,8 +1259,9 @@
                             // Sorted native rows no longer share the renderer's series order.
                             // Resolve from the full raw series by label/color; never fall back
                             // to the rendered row index after a Max/Last sort.
-                            const value = findComputed(label)?.stats?.last
-                                ?? seriesByColor?.get(normalizeColor(iconColor))?.stats?.last;
+                            const debugValue = resolveDashBridgeLast(label, rows.indexOf(row), debugLastValues, debug?.series, chart);
+                            const value = Number.isFinite(debugValue) ? debugValue : (findComputed(label)?.stats?.last
+                                ?? seriesByColor?.get(normalizeColor(iconColor))?.stats?.last);
                             const text = Number.isFinite(value) ? formatLast(value, row) : '-';
                             if (cell.textContent !== text) { cell.textContent = text; changed += 1; }
                             cell.dataset.dashBridgeLastRaw = Number.isFinite(value) ? String(value) : '';
@@ -1323,7 +1350,14 @@
             }
             return changed;
         };
-    
+        // Keep the two consumers explicit. Native Grafana must retain its
+        // renderer/data path; DashBridge is an isolated iframe with its own
+        // renderer lookup and raw-response fallback.
+        const applyNativeLegendColumns = args => applyLegendColumnsForEnvironment('native', args);
+        const applyDashBridgeLegendColumns = args => applyLegendColumnsForEnvironment('dashbridge', args);
+        const applyLegendColumns = args => window.name === 'dashbridge-iframe'
+            ? applyDashBridgeLegendColumns(args)
+            : applyNativeLegendColumns(args);
 
 
         return Object.freeze({
@@ -1340,6 +1374,8 @@
             resetSeriesVisibility,
             stopLegacyVisualObservers,
             applyLegendColumns,
+            applyNativeLegendColumns,
+            applyDashBridgeLegendColumns,
         });
     }
 
