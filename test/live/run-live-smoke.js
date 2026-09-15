@@ -1,7 +1,7 @@
 'use strict';
 const { parseArgs, runLiveScenario } = require('./run-live-scenario');
 
-const SMOKE_SCENARIOS = Object.freeze(['legend-complete-hide']);
+const SMOKE_SCENARIOS = Object.freeze(['legend-complete-hide', 'threshold-highlight']);
 
 function parseSmokeArgs(argv) {
     const args = parseArgs(argv.filter((value, index) => value !== '--scenario' && argv[index - 1] !== '--scenario'));
