@@ -79,6 +79,7 @@ legend_layout_ok = (
     and "const restoreLegendLayout" in visual_engine
     and "const resizeUPlotAfterLegendLayout" in visual_engine
     and "const sizeTarget = chartBranch || chartHost;" in visual_engine
+    and "if (!sizeTarget?.getBoundingClientRect) return false;" in visual_engine
     and "uplot.setSize({ width, height });" in visual_engine
 )
 passed = fixture_ok and fallbacks_ok and shared_contract_ok and legend_layout_ok and result.returncode == 0

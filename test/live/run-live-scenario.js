@@ -32,6 +32,9 @@ async function runLiveScenario(options) {
         const page = await context.newPage();
         try {
             await page.goto(options.url, { waitUntil: 'domcontentloaded', timeout: 15_000 });
+            if (typeof page.waitForSelector === 'function') {
+                await page.waitForSelector(options.panelSelector, { state: 'attached', timeout: 5_000 });
+            }
             const api = await context.request.get(new URL('/api/user', new URL(options.url).origin).href, { failOnStatusCode: false, timeout: 5_000 });
             if (api.status() !== 200 || /^\/login(?:\/|$)/.test(new URL(page.url()).pathname)) return { status: 'blocked', reason: 'grafana-authentication-required' };
             return await runLiveLegendScenario({ page, panelSelector: options.panelSelector, panelId: options.panelId, hidden: options.hidden });

@@ -29,9 +29,11 @@ async function runLiveLegendScenario({ page, panelSelector, panelId, hidden, pan
             return page.evaluate(({ operation, panelId: id, hidden: names }) => {
                 const root = window.DashBridgeGrafanaDom?.findPanel?.({ panelId: id }) || document;
                 const labels = Array.from(root.querySelectorAll?.('[class*="LegendLabel"], .graph-legend-series') || []);
+                const hiddenRows = Array.from(root.querySelectorAll?.('.dashbridge-uplot-fast-hidden') || []);
                 return operation === 'assertHidden'
-                    ? names.every(name => labels.some(node => node.textContent?.trim() === name && (node.closest('tr, [class*="LegendRow"]')?.classList.contains('dashbridge-uplot-fast-hidden') || node.closest('tr, [class*="LegendRow"]')?.style.display === 'none')))
-                    : labels.every(node => !node.closest('tr, [class*="LegendRow"]')?.classList.contains('dashbridge-uplot-fast-hidden'));
+                    ? names.every(name => hiddenRows.some(node => node.textContent?.trim() === name || node.querySelector?.('[class*="LegendLabel"]')?.textContent?.trim() === name)
+                        || labels.some(node => node.textContent?.trim() === name && (node.closest('tr, [class*="LegendRow"]')?.style.display === 'none')))
+                    : hiddenRows.length === 0 && labels.every(node => !node.closest('tr, [class*="LegendRow"]')?.classList.contains('dashbridge-uplot-fast-hidden'));
             }, { operation: step.operation, panelId, hidden: hiddenNames });
         },
         observe: async value => value,

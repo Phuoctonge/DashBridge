@@ -408,6 +408,7 @@
                 const uplot = findUPlotForThreshold(outerPanel);
                 const { chartHost, chartBranch } = legendLayout;
                 const sizeTarget = chartBranch || chartHost;
+                if (!sizeTarget?.getBoundingClientRect) return false;
                 const rect = sizeTarget.getBoundingClientRect();
                 const width = Math.max(1, Math.round(rect.width));
                 const height = Math.max(1, Math.round(rect.height));
