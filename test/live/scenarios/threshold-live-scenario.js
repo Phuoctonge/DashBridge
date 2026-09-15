@@ -21,6 +21,9 @@ async function runLiveThresholdScenario({ page, panelSelector = '[data-testid^="
         invoke: async step => {
             if (step.operation === 'apply') { resetRequired = true; return call.apply({ panelId, threshold, sourceNames }); }
             if (step.operation === 'reset') { const result = await call.reset({ panelId }); resetRequired = false; return result; }
+            if (step.operation === 'assertVisible' && typeof page.waitForFunction === 'function') {
+                await page.waitForFunction(() => document.querySelectorAll('[data-dashbridge-threshold-highlights]').length > 0, undefined, { timeout: 3_000 });
+            }
             return page.evaluate(operation => {
                 const visible = operation === 'assertVisible'
                     ? document.querySelectorAll('[data-dashbridge-threshold-highlights]').length > 0
