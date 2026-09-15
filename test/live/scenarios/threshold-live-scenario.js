@@ -10,8 +10,8 @@ async function runLiveThresholdScenario({ page, panelSelector = '[data-testid^="
     if (!before) return { status: 'blocked', error: 'panel-not-found' };
     let resetRequired = false;
     const call = invoker || {
-        apply: args => page.evaluate(({ id, value, names }) => window.DashBridgeGrafanaVisualEngine?.setSeriesThresholdHighlights({ root: window.DashBridgeGrafanaDom?.findPanel?.({ panelId: id }) || document, enabled: true, rules: [{ threshold: value, sourceNames: names }] }), { id: String(panelId), value: Number(threshold), names: sourceNames.slice(0, 100) }),
-        reset: args => page.evaluate(({ id }) => window.DashBridgeGrafanaVisualEngine?.setSeriesThresholdHighlights({ root: window.DashBridgeGrafanaDom?.findPanel?.({ panelId: id }) || document, enabled: false, rules: [] }), { id: String(args.panelId) }),
+        apply: args => page.evaluate(({ selector, value, names }) => { const roots = [...document.querySelectorAll(selector)]; if (roots.length !== 1) throw new Error(`panel selector resolves to ${roots.length} elements`); return window.DashBridgeGrafanaVisualEngine?.setSeriesThresholdHighlights({ root: roots[0], enabled: true, rules: [{ threshold: value, sourceNames: names }] }); }, { selector: panelSelector, value: Number(threshold), names: sourceNames.slice(0, 100) }),
+        reset: args => page.evaluate(selector => { const roots = [...document.querySelectorAll(selector)]; if (roots.length !== 1) throw new Error(`panel selector resolves to ${roots.length} elements`); return window.DashBridgeGrafanaVisualEngine?.setSeriesThresholdHighlights({ root: roots[0], enabled: false, rules: [] }); }, panelSelector),
     };
     return runScenario({
         scenario: { name: 'threshold-highlight', timeoutMs: 30_000, steps: [
