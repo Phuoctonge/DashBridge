@@ -197,6 +197,20 @@ DashBridge. Пользователь входит в обе системы од�
 npm run test:grafana:live -- --mode=fast 'https://grafana-one.example/d/...'
 ```
 
+Для точечной проверки нового opt-in live-контура используется один bounded
+сценарий настоящего unpacked-расширения:
+
+```powershell
+npm run test:live:check -- 'https://grafana-one.example/d/...'
+npm run test:live:scenario -- --url 'https://grafana-one.example/d/...' --panelSelector "section[data-testid*='Panel title']" --panelId 8 --hidden 'Series A'
+```
+
+`test:live:check` ограничен readiness-проверкой (до 15 секунд на Grafana), а
+один сценарий — 30 секундами. Сценарий проходит `apply`, наблюдение результата,
+`reset` и проверку восстановления; ошибка авторизации, DNS или неподдержанный
+renderer получают `blocked`, а не `passed`. Эти команды не запускаются из
+`test:all` и не входят в release ZIP.
+
 Точечный повтор выполняется тем же владельцем сценариев по стабильным ID:
 
 ```powershell
