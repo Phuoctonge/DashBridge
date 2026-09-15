@@ -1,3 +1,4 @@
+/* global document, location */
 'use strict';
 
 function validateIframeMessage(message, extensionOrigin) {

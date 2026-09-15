@@ -1,3 +1,4 @@
+/* global document */
 'use strict';
 const { detectRenderer, summarizePanelFacts } = require('./renderer-probe');
 

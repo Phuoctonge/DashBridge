@@ -1,3 +1,4 @@
+/* global window, document */
 'use strict';
 const { snapshotPanel: defaultSnapshotPanel } = require('../probes/panel-probe');
 const { createLegendLiveInvoker } = require('./legend-live-invoker');

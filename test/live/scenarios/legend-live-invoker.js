@@ -1,3 +1,4 @@
+/* global window, document */
 'use strict';
 
 function createLegendLiveInvoker(page) {
