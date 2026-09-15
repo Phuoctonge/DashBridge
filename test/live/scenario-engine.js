@@ -21,9 +21,9 @@ async function runScenario({ scenario, invoke, observe = async value => value, a
             phases.executed += 1;
             const observed = await withTimeout(Promise.resolve(observe(commandResult, step)), Math.max(1, deadline - (Date.now() - startedAt)), `${step.operation || 'step'} observe`);
             phases.observable += 1;
+            results.push({ operation: step.operation, observed });
             const passed = await withTimeout(Promise.resolve(assertStep(observed, step)), Math.max(1, deadline - (Date.now() - startedAt)), `${step.operation || 'step'} assert`);
             if (!passed) throw new Error(`${step.operation || 'step'} assertion failed`);
-            results.push({ operation: step.operation, observed });
         }
     } catch (caught) {
         status = /timeout/i.test(String(caught.message)) ? 'timeout' : 'failed';

@@ -26,5 +26,11 @@ const { runScenario } = require('./scenario-engine');
     });
     assert.equal(failed.status, 'failed');
     assert.equal(cleaned, true);
+    const assertionFailed = await runScenario({
+        scenario: { name: 'assertion-failure', timeoutMs: 1000, steps: [{ capability: 'demo', operation: 'snapshot', args: {} }] },
+        invoke: async () => ({ diagnostic: 'kept' }),
+        assertStep: async () => false,
+    });
+    assert.deepEqual(assertionFailed.results, [{ operation: 'snapshot', observed: { diagnostic: 'kept' } }]);
     console.log('PASS live scenario engine records phases and always cleans up');
 })().catch(error => { console.error(error); process.exitCode = 1; });
