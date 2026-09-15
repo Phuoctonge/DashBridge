@@ -4,7 +4,7 @@ const schema = require('./live-schema');
 
 assert.throws(() => schema.validateEnvironment({ name: 'bad', baseUrl: 'grafana.local', dashboardUrls: ['https://grafana.local/d/demo'] }), /HTTP\(S\)/);
 assert.throws(() => schema.validateCommand({ capability: 'x', args: { value: 'x'.repeat(9000) } }), /size/i);
-assert.throws(() => schema.validateScenario({ name: 'x', steps: [{ action: 'unknown' }] }), /step/i);
+assert.throws(() => schema.validateScenario({ name: 'x', capability: 'x', steps: [] }), /step/i);
 
 const environment = schema.validateEnvironment({
     name: 'grafanakns',
