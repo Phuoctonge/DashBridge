@@ -30,12 +30,12 @@ async function runLiveThresholdScenario({ page, panelSelector = '[data-testid^="
                 const visible = operation === 'assertVisible'
                     ? document.querySelectorAll('[data-dashbridge-threshold-highlights]').length > 0
                     : document.querySelectorAll('[data-dashbridge-threshold-highlights], [data-dashbridge-threshold-line]').length === 0;
-                return { visible, diagnostic: window.__dashbridgeThresholdHighlightDiagnostic || null };
+                return { visible, diagnostic: window.__dashbridgeThresholdHighlightDiagnostic || null, thresholdDebug: window.DashBridgeGrafanaVisualEngine?.getThresholdDebug?.() || null };
             }, step.operation);
         },
         assertStep: async (value, step) => {
             if (step.operation === 'apply' || step.operation === 'reset' || value === true || value?.visible === true) return true;
-            throw new Error(`threshold overlay missing: ${JSON.stringify(value?.diagnostic || null).slice(0, 512)}`);
+            throw new Error(`threshold overlay missing: ${JSON.stringify({ diagnostic: value?.diagnostic || null, thresholdDebug: value?.thresholdDebug || null }).slice(0, 512)}`);
         },
         cleanup: async () => { if (resetRequired) await call.reset({ panelId }); },
     });
