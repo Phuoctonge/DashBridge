@@ -10,5 +10,6 @@ const { runLiveThresholdScenario } = require('./threshold-live-scenario');
     assert.equal(result.status, 'passed');
     assert.equal(visible, false);
     assert.equal((await runLiveThresholdScenario({ page, panelId: '8', threshold: NaN })).error, 'threshold-must-be-finite');
+    assert.equal((await runLiveThresholdScenario({ page, panelId: '8', threshold: 80 })).error, 'threshold-source-names-required');
     console.log('PASS live threshold scenario applies, observes, resets, and rejects invalid values');
 })().catch(error => { console.error(error); process.exitCode = 1; });

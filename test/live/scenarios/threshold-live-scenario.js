@@ -4,6 +4,7 @@ const { runScenario } = require('../scenario-engine');
 async function runLiveThresholdScenario({ page, panelSelector = '[data-testid^="data-testid Panel header"]', panelId, threshold, sourceNames = [], panelProbe = null, invoker = null } = {}) {
     if (!page || typeof page.evaluate !== 'function') throw new TypeError('Playwright page is required');
     if (!Number.isFinite(Number(threshold))) return { status: 'blocked', error: 'threshold-must-be-finite' };
+    if (!Array.isArray(sourceNames) || sourceNames.length === 0) return { status: 'blocked', error: 'threshold-source-names-required' };
     const before = panelProbe ? await panelProbe.snapshotPanel(page, panelSelector) : { renderer: 'unknown' };
     if (!before) return { status: 'blocked', error: 'panel-not-found' };
     let resetRequired = false;
