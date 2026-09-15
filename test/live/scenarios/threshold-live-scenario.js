@@ -21,11 +21,17 @@ async function runLiveThresholdScenario({ page, panelSelector = '[data-testid^="
         invoke: async step => {
             if (step.operation === 'apply') { resetRequired = true; return call.apply({ panelId, threshold, sourceNames }); }
             if (step.operation === 'reset') { const result = await call.reset({ panelId }); resetRequired = false; return result; }
-            return page.evaluate(operation => operation === 'assertVisible'
-                ? document.querySelectorAll('[data-dashbridge-threshold-highlights]').length > 0
-                : document.querySelectorAll('[data-dashbridge-threshold-highlights], [data-dashbridge-threshold-line]').length === 0, step.operation);
+            return page.evaluate(operation => {
+                const visible = operation === 'assertVisible'
+                    ? document.querySelectorAll('[data-dashbridge-threshold-highlights]').length > 0
+                    : document.querySelectorAll('[data-dashbridge-threshold-highlights], [data-dashbridge-threshold-line]').length === 0;
+                return { visible, diagnostic: window.__dashbridgeThresholdHighlightDiagnostic || null };
+            }, step.operation);
         },
-        assertStep: async (value, step) => step.operation === 'apply' || step.operation === 'reset' || value === true,
+        assertStep: async (value, step) => {
+            if (step.operation === 'apply' || step.operation === 'reset' || value === true || value?.visible === true) return true;
+            throw new Error(`threshold overlay missing: ${JSON.stringify(value?.diagnostic || null).slice(0, 512)}`);
+        },
         cleanup: async () => { if (resetRequired) await call.reset({ panelId }); },
     });
 }
