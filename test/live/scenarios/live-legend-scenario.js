@@ -6,6 +6,7 @@ const { runScenario } = require('../scenario-engine');
 async function runLiveLegendScenario({ page, panelSelector, panelId, hidden, panelProbe = { snapshotPanel: defaultSnapshotPanel }, invoker = createLegendLiveInvoker(page) } = {}) {
     const before = await panelProbe.snapshotPanel(page, panelSelector);
     if (!before) return { status: 'blocked', error: 'panel-not-found' };
+    if (before.legendAdapterReady === false) return { status: 'blocked', error: 'legend-adapter-unsupported' };
     const hiddenNames = Array.isArray(hidden) ? hidden.slice(0, 100) : [];
     let resetRequired = false;
     return runScenario({
