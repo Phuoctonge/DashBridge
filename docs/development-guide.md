@@ -217,6 +217,15 @@ Smoke запускает только явно зарегистрированн�
 ```powershell
 npm run test:live:smoke -- --scenario legend-complete-hide --url 'https://grafana-one.example/d/...'
 ```
+
+Для нескольких авторизованных Grafana используется последовательная matrix:
+
+```powershell
+npm run test:live:matrix -- --urls 'https://grafana-one.example/d/...,https://grafana-two.example/d/...' --scenario legend-complete-hide
+```
+
+Один persistent profile не используется параллельно; каждый URL получает
+отдельный результат, а недоступный environment остаётся `blocked`.
 Опция `--evidence` сохраняет только bounded JSON (`live-scenario.json`),
 обезличенный общим redaction-слоем; сохранение evidence не является обязательным
 для обычного запуска.
