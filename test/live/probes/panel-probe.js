@@ -1,5 +1,5 @@
 'use strict';
-const { summarizePanelFacts } = require('./renderer-probe');
+const { detectRenderer, summarizePanelFacts } = require('./renderer-probe');
 
 async function snapshotPanel(page, selector) {
     if (!page || typeof page.evaluate !== 'function') throw new TypeError('Playwright page is required');
@@ -10,6 +10,6 @@ async function snapshotPanel(page, selector) {
             .map(node => node.textContent?.trim()).filter(Boolean).slice(0, 100);
         return { id: root.getAttribute('data-panelid') || root.getAttribute('data-panel-id') || '', title: root.querySelector('[class*="panel-title" i], h2, h3')?.textContent?.trim() || '', labels, width: root.getBoundingClientRect().width, height: root.getBoundingClientRect().height, uplotCount: root.querySelectorAll('[data-uplot], .uplot').length, flotCount: root.querySelectorAll('.flot-base, .flot-overlay').length };
     }, selector);
-    return facts ? summarizePanelFacts(facts) : null;
+    return facts ? summarizePanelFacts({ ...facts, renderer: detectRenderer(facts) }) : null;
 }
 module.exports = { snapshotPanel };
