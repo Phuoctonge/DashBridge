@@ -5,6 +5,7 @@ const { chromium } = require('@playwright/test');
 const { projectRoot, resolveProfileRoot, waitForExtensionWorker } = require('../../scripts/setup-grafana-e2e-profile');
 const { acquireProfileLock } = require('./profile-lock');
 const { runLiveLegendScenario } = require('./scenarios/live-legend-scenario');
+const { writeEvidence } = require('./evidence-writer');
 
 function parseArgs(argv) {
     const values = {};
@@ -17,7 +18,7 @@ function parseArgs(argv) {
     if (!url) throw new Error('Pass --url <Grafana dashboard URL>');
     const parsed = new URL(url);
     if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password) throw new Error('url must be HTTP(S) without credentials');
-    return { url: parsed.href, panelSelector: values.panelSelector || '[data-testid="data-testid Panel header"]', panelId: values.panelId || null, hidden: (values.hidden || '').split(',').map(item => item.trim()).filter(Boolean).slice(0, 100) };
+    return { url: parsed.href, panelSelector: values.panelSelector || '[data-testid="data-testid Panel header"]', panelId: values.panelId || null, hidden: (values.hidden || '').split(',').map(item => item.trim()).filter(Boolean).slice(0, 100), evidenceDir: values.evidence || null };
 }
 
 async function runLiveScenario(options) {
@@ -43,6 +44,6 @@ async function runLiveScenario(options) {
     finally { await context?.close().catch(() => undefined); lock.release(); }
 }
 
-if (require.main === module) runLiveScenario(parseArgs(process.argv.slice(2))).then(result => { console.log(JSON.stringify(result, null, 2)); process.exitCode = result.status === 'passed' ? 0 : 2; }).catch(error => { console.error(error.stack || error); process.exitCode = 1; });
+if (require.main === module) runLiveScenario(parseArgs(process.argv.slice(2))).then(result => { const args = parseArgs(process.argv.slice(2)); if (args.evidenceDir) writeEvidence(args.evidenceDir, result, { filename: 'live-scenario.json' }); console.log(JSON.stringify(result, null, 2)); process.exitCode = result.status === 'passed' ? 0 : 2; }).catch(error => { console.error(error.stack || error); process.exitCode = 1; });
 
 module.exports = { parseArgs, runLiveScenario };

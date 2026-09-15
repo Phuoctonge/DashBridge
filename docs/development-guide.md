@@ -203,6 +203,7 @@ npm run test:grafana:live -- --mode=fast 'https://grafana-one.example/d/...'
 ```powershell
 npm run test:live:check -- 'https://grafana-one.example/d/...'
 npm run test:live:scenario -- --url 'https://grafana-one.example/d/...' --panelSelector "section[data-testid*='Panel title']" --panelId 8 --hidden 'Series A'
+npm run test:live:scenario -- --url 'https://grafana-one.example/d/...' --evidence test-results/live-scenario
 ```
 
 `test:live:check` ограничен readiness-проверкой (до 15 секунд на Grafana), а
@@ -210,6 +211,9 @@ npm run test:live:scenario -- --url 'https://grafana-one.example/d/...' --panelS
 `reset` и проверку восстановления; ошибка авторизации, DNS или неподдержанный
 renderer получают `blocked`, а не `passed`. Эти команды не запускаются из
 `test:all` и не входят в release ZIP.
+Опция `--evidence` сохраняет только bounded JSON (`live-scenario.json`),
+обезличенный общим redaction-слоем; сохранение evidence не является обязательным
+для обычного запуска.
 
 Точечный повтор выполняется тем же владельцем сценариев по стабильным ID:
 
