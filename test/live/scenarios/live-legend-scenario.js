@@ -7,6 +7,7 @@ async function runLiveLegendScenario({ page, panelSelector, panelId, hidden, pan
     const before = await panelProbe.snapshotPanel(page, panelSelector);
     if (!before) return { status: 'blocked', error: 'panel-not-found' };
     const hiddenNames = Array.isArray(hidden) ? hidden.slice(0, 100) : [];
+    let resetRequired = false;
     return runScenario({
         scenario: { name: 'legend-complete-hide', timeoutMs: 30_000, steps: [
             { operation: 'apply', capability: 'legend.completeHide', args: { panelId, hidden: hiddenNames } },
@@ -15,8 +16,16 @@ async function runLiveLegendScenario({ page, panelSelector, panelId, hidden, pan
             { operation: 'assertRestored', capability: 'legend.completeHide', args: { panelId } },
         ] },
         invoke: async step => {
-            if (step.operation === 'apply') return invoker.apply({ panelId, labels: before.labels, hidden: hiddenNames });
-            if (step.operation === 'reset') return invoker.reset({ panelId });
+            if (step.operation === 'apply') {
+                // Apply may mutate the renderer before rejecting.
+                resetRequired = true;
+                return invoker.apply({ panelId, labels: before.labels, hidden: hiddenNames });
+            }
+            if (step.operation === 'reset') {
+                const result = await invoker.reset({ panelId });
+                resetRequired = false;
+                return result;
+            }
             return page.evaluate(({ operation, panelId: id, hidden: names }) => {
                 const root = window.DashBridgeGrafanaDom?.findPanel?.({ panelId: id }) || document;
                 const labels = Array.from(root.querySelectorAll?.('[class*="LegendLabel"], .graph-legend-series') || []);
@@ -27,6 +36,9 @@ async function runLiveLegendScenario({ page, panelSelector, panelId, hidden, pan
         },
         observe: async value => value,
         assertStep: async (value, step) => step.operation === 'apply' || step.operation === 'reset' || value === true,
+        cleanup: async () => {
+            if (resetRequired) await invoker.reset({ panelId });
+        },
     });
 }
 module.exports = { runLiveLegendScenario };
