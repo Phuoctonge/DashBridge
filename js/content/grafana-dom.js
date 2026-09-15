@@ -25,7 +25,7 @@
         const numeric = escape(numericId);
         const vizKey = escape(rawId.startsWith('panel-') ? rawId : `panel-${rawId}`);
         return document.querySelector(
-            `[data-panelid="${raw}"], [data-panelid="${numeric}"], [data-panel-id="${raw}"], [data-panel-id="${numeric}"], #panel-${numeric}, [data-viz-panel-key="${vizKey}"]`
+            `[data-panelid="${raw}"], [data-panelid="${numeric}"], [data-panel-id="${raw}"], [data-panel-id="${numeric}"], #panel-${numeric}, #${numeric}, [data-viz-panel-key="${vizKey}"]`
         );
     };
 

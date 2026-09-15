@@ -35,11 +35,12 @@ const newPanel = {{
   hasAttribute: name => name === 'data-viz-panel-key',
   parentElement: pageRoot
 }};
+const numericPanel = {{ id: '8' }};
 const context = {{
   window: {{}},
   CSS: {{ escape: value => String(value) }},
   document: {{
-    querySelector: selector => selector.includes('[data-viz-panel-key="panel-137"]') ? newPanel : null,
+    querySelector: selector => selector.includes('[data-viz-panel-key="panel-137"]') ? newPanel : (selector.includes('#8') ? numericPanel : null),
     querySelectorAll: () => []
   }}
 }};
@@ -47,9 +48,10 @@ vm.createContext(context);
 vm.runInContext(fs.readFileSync({json.dumps(str(DOM))}, 'utf8'), context);
 const found = context.window.DashBridgeGrafanaDom.findPanelById('137');
 const foundPrefixed = context.window.DashBridgeGrafanaDom.findPanelById('panel-137');
+const foundNumeric = context.window.DashBridgeGrafanaDom.findPanelById('8');
 const outer = context.window.DashBridgeGrafanaDom.outerPanel(newPanel);
 const key = context.window.DashBridgeGrafanaDom.panelKey(newPanel);
-process.exit(found === newPanel && foundPrefixed === newPanel && outer === newPanel && key === 'panel-137' ? 0 : 1);
+process.exit(found === newPanel && foundPrefixed === newPanel && foundNumeric === numericPanel && outer === newPanel && key === 'panel-137' ? 0 : 1);
 """
 
 with tempfile.NamedTemporaryFile("w", suffix=".js", encoding="utf-8", delete=False) as handle:
