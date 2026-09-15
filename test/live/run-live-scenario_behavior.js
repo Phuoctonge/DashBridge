@@ -7,4 +7,5 @@ assert.equal(parsed.panelId, '8');
 assert.deepEqual(parsed.hidden, ['A', 'B']);
 assert.equal(parsed.evidenceDir, null);
 assert.throws(() => parseArgs(['--url', 'https://user:pass@grafana.example/d/test']), /without credentials/);
+assert.throws(() => parseArgs(['--url', 'https://grafana.example/d/test', '--typo', 'value']), /Unknown live scenario option/);
 console.log('PASS live scenario CLI validates URL and bounded arguments');

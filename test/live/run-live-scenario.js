@@ -9,10 +9,13 @@ const { writeEvidence } = require('./evidence-writer');
 
 function parseArgs(argv) {
     const values = {};
+    const allowed = new Set(['url', 'panelSelector', 'panelId', 'hidden', 'evidence']);
     for (let index = 0; index < argv.length; index += 1) {
         const token = argv[index];
         if (!token.startsWith('--') || !argv[index + 1]) throw new Error('Expected bounded --name value arguments');
-        values[token.slice(2)] = argv[index + 1]; index += 1;
+        const name = token.slice(2);
+        if (!allowed.has(name)) throw new Error(`Unknown live scenario option: --${name}`);
+        values[name] = argv[index + 1]; index += 1;
     }
     const url = values.url;
     if (!url) throw new Error('Pass --url <Grafana dashboard URL>');
