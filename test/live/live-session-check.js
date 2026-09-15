@@ -19,11 +19,15 @@ async function runLiveCheck(urls, { headless = true } = {}) {
         for (const value of urls) {
             const target = new URL(value);
             const page = await context.newPage();
-            const response = await page.goto(value, { waitUntil: 'domcontentloaded', timeout: 15_000 });
-            await page.waitForTimeout(500);
-            const api = await context.request.get(new URL('/api/user', target.origin).href, { failOnStatusCode: false, timeout: 5_000 });
-            const finalUrl = new URL(page.url());
-            results.push({ host: target.host, navigationStatus: response?.status() || null, apiUserStatus: api.status(), finalPath: finalUrl.pathname, authenticated: api.status() === 200 && finalUrl.origin === target.origin && !/^\/login(?:\/|$)/.test(finalUrl.pathname) });
+            try {
+                const response = await page.goto(value, { waitUntil: 'domcontentloaded', timeout: 15_000 });
+                await page.waitForTimeout(500);
+                const api = await context.request.get(new URL('/api/user', target.origin).href, { failOnStatusCode: false, timeout: 5_000 });
+                const finalUrl = new URL(page.url());
+                results.push({ host: target.host, navigationStatus: response?.status() || null, apiUserStatus: api.status(), finalPath: finalUrl.pathname, authenticated: api.status() === 200 && finalUrl.origin === target.origin && !/^\/login(?:\/|$)/.test(finalUrl.pathname) });
+            } catch (error) {
+                results.push({ host: target.host, status: 'blocked', reason: String(error.message || error).slice(0, 240), authenticated: false });
+            }
             await page.close();
         }
         return { status: results.every(item => item.authenticated) ? 'passed' : 'blocked', extensionId, results };
