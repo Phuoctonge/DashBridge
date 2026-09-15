@@ -11,6 +11,7 @@ function summarizePanelFacts(value = {}) {
         title: String(value.title || '').slice(0, 256),
         renderer: ['uplot', 'flot', 'mixed', 'unknown'].includes(value.renderer) ? value.renderer : 'unknown',
         labels: (Array.isArray(value.labels) ? value.labels : []).slice(0, 100).map(label => String(label).slice(0, 256)),
+        legendAdapterReady: value.legendAdapterReady === true,
         width: Number.isFinite(Number(value.width)) ? Math.max(0, Math.min(10_000, Number(value.width))) : 0,
         height: Number.isFinite(Number(value.height)) ? Math.max(0, Math.min(10_000, Number(value.height))) : 0,
     });

@@ -7,5 +7,7 @@ assert.equal(detectRenderer({ uplotCount: 0, flotCount: 2 }), 'flot');
 assert.equal(detectRenderer({ uplotCount: 1, flotCount: 1 }), 'mixed');
 assert.equal(detectRenderer({ uplotCount: 0, flotCount: 0 }), 'unknown');
 const facts = summarizePanelFacts({ id: '12', title: 'CPU', renderer: 'uplot', labels: ['CPU user', 'CPU idle'], width: 1000, height: 500 });
-assert.deepEqual(facts, { id: '12', title: 'CPU', renderer: 'uplot', labels: ['CPU user', 'CPU idle'], width: 1000, height: 500 });
+assert.deepEqual(facts, { id: '12', title: 'CPU', renderer: 'uplot', labels: ['CPU user', 'CPU idle'], legendAdapterReady: false, width: 1000, height: 500 });
+assert.equal(summarizePanelFacts({ legendAdapterReady: true }).legendAdapterReady, true);
+assert.equal(summarizePanelFacts({ legendAdapterReady: 'true' }).legendAdapterReady, false);
 console.log('PASS live renderer probe detects bounded panel facts');

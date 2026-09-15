@@ -8,6 +8,6 @@ const { snapshotPanel } = require('./panel-probe');
         return { id: '12', title: 'CPU', labels: ['CPU user'], width: 800, height: 400, uplotCount: 1, flotCount: 0 };
     } };
     const result = await snapshotPanel(page, '[data-panelid="12"]');
-    assert.deepEqual(result, { id: '12', title: 'CPU', renderer: 'uplot', labels: ['CPU user'], width: 800, height: 400 });
+    assert.deepEqual(result, { id: '12', title: 'CPU', renderer: 'uplot', labels: ['CPU user'], legendAdapterReady: false, width: 800, height: 400 });
     console.log('PASS live panel probe returns bounded DOM facts');
 })().catch(error => { console.error(error); process.exitCode = 1; });
