@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
 const { attachPageObserver } = require('./observers/page-observer');
 const { attachNetworkObserver } = require('./observers/network-observer');
+const { attachWorkerObserver } = require('./observers/worker-observer');
 
 const page = new EventEmitter();
 const observer = attachPageObserver(page, { maxEntries: 2 });
@@ -25,3 +26,14 @@ assert.equal(JSON.stringify(network.snapshot()).includes('secret'), false);
 network.detach();
 assert.equal(page.listenerCount('requestfailed'), 0);
 console.log('PASS live network observer omits URLs and bodies');
+
+const context = new EventEmitter();
+const worker = new EventEmitter();
+context.serviceWorkers = () => [worker];
+const workerObserver = attachWorkerObserver(context, { maxEntries: 2 });
+worker.emit('console', { type: () => 'error', text: () => 'worker error' });
+assert.equal(workerObserver.snapshot().length, 1);
+workerObserver.detach();
+worker.emit('console', { type: () => 'error', text: () => 'ignored' });
+assert.equal(workerObserver.snapshot().length, 1);
+console.log('PASS live worker observer is bounded and detachable');
