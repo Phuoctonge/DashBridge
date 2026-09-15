@@ -211,6 +211,12 @@ npm run test:live:scenario -- --url 'https://grafana-one.example/d/...' --eviden
 `reset` и проверку восстановления; ошибка авторизации, DNS или неподдержанный
 renderer получают `blocked`, а не `passed`. Эти команды не запускаются из
 `test:all` и не входят в release ZIP.
+Smoke запускает только явно зарегистрированные capability-сценарии и поэтому
+не расширяет быстрый набор автоматически:
+
+```powershell
+npm run test:live:smoke -- --scenario legend-complete-hide --url 'https://grafana-one.example/d/...'
+```
 Опция `--evidence` сохраняет только bounded JSON (`live-scenario.json`),
 обезличенный общим redaction-слоем; сохранение evidence не является обязательным
 для обычного запуска.

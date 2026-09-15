@@ -9,6 +9,7 @@
     "check:grafana-session": "node scripts/check-grafana-e2e-session.js",
     "test:live:check": "node test/live/live-session-check.js",
     "test:live:scenario": "node test/live/run-live-scenario.js",
+    "test:live:smoke": "node test/live/run-live-smoke.js",
     "lint": "eslint .",
     "test:unit": "node test/run-all-tests.js",
     "test:browser": "node test/run-extension-browser-smoke.js",
