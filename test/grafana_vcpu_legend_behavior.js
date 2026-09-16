@@ -74,6 +74,14 @@ assert(moduleSource.includes('if (tableCell?.parentElement === row) tableCell.af
 assert(moduleSource.includes('const nativeValueCell = tableCell?.nextElementSibling;')
     && moduleSource.includes("nativeValueCell.className.trim()"),
     'vCPU cells must inherit Grafana typography classes from the native min column');
+assert(moduleSource.includes("const vcpuWidth = window.name === 'dashbridge-iframe' ? 32 : 48")
+    && moduleSource.includes("if (window.name !== 'dashbridge-iframe') continue;"),
+    'direct Grafana must keep its native table layout while DashBridge owns a compact vCPU grid');
+const directLayoutGuard = moduleSource.indexOf("if (window.name !== 'dashbridge-iframe') continue;");
+assert(directLayoutGuard >= 0
+    && directLayoutGuard < moduleSource.indexOf("table.classList.add('dashbridge-vcpu-table')", directLayoutGuard)
+    && directLayoutGuard < moduleSource.indexOf("row.style.setProperty('display', 'grid', 'important')", directLayoutGuard),
+    'the direct-Grafana guard must run before any iframe-only table or row mutation');
 assert(!moduleSource.includes('font-variant-numeric:tabular-nums'),
     'custom numeric typography must not override Grafana legend fonts');
 assert(moduleSource.includes(": '-';") && moduleSource.includes("text === '-' ? 'Количество vCPU не определено'"),
@@ -107,6 +115,7 @@ assert(controllerSchedule.includes('renderColumn(panelRoot, controller.state)')
 const visualEngine = fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-legend-visibility-adapters.js'), 'utf8')
     + fs.readFileSync(path.join(__dirname, '..', 'js', 'content', 'grafana-legend-visuals.js'), 'utf8');
 assert(visualEngine.includes('.dashbridge-legend-bottom tr > .dashbridge-vcpu-legend-cell')
+    && visualEngine.includes('flex:0 0 32px !important')
     && visualEngine.includes('flex:0 0 auto !important')
     && !visualEngine.includes('table:has(th) tr > :not(:first-child) { flex:0 0 48px !important; width:48px !important; }'),
     'bottom legends must let each metric column use its measured content width');

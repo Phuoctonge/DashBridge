@@ -173,13 +173,14 @@
                 let invalidated = false;
                 const onActivated = info => { if (info.windowId === windowId) invalidated = true; };
                 const onUpdated = (id, change) => {
-                    if (id === tabId && (change.url || change.status === 'loading')) invalidated = true;
+                    // History API changes the URL without replacing the requesting document.
+                    // A loading transition, unlike a URL-only update, denotes a document navigation.
+                    if (id === tabId && change.status === 'loading') invalidated = true;
                 };
                 const onRemoved = id => { if (id === tabId) invalidated = true; };
                 const assertTarget = async () => {
                     const [active] = await chromeRef.tabs.query({ active: true, windowId });
-                    if (invalidated || active?.id !== tabId || active.pendingUrl
-                        || active.url !== sender.url) throw new Error('capture-target-changed');
+                    if (invalidated || active?.id !== tabId) throw new Error('capture-target-changed');
                 };
                 chromeRef.tabs.onActivated.addListener(onActivated);
                 chromeRef.tabs.onUpdated.addListener(onUpdated);

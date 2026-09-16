@@ -3,55 +3,68 @@ const fs = require('fs');
 const vm = require('vm');
 
 let messageListener;
+const event = () => {
+    const listeners = new Set();
+    return {
+        addListener(listener) { listeners.add(listener); },
+        removeListener(listener) { listeners.delete(listener); },
+        emit(...args) { listeners.forEach(listener => listener(...args)); },
+    };
+};
 const chrome = {
     tabs: {
-        onRemoved: { addListener() {}, removeListener() {} },
-        onActivated: { addListener() {}, removeListener() {} },
-        onUpdated: { addListener() {}, removeListener() {} },
+        onRemoved: event(),
+        onActivated: event(),
+        onUpdated: event(),
         captureVisibleTab: async () => 'data:image/png;base64,AA==',
         query: async () => [{ id: 7, windowId: 3, url: 'https://grafana.test/d/uid/name' }],
     },
     scripting: {
-        getRegisteredContentScripts: async () => [], registerContentScripts: async () => {},
-        unregisterContentScripts: async () => {}, executeScript: async options => {
+        getRegisteredContentScripts: async () => [], registerContentScripts: async () => { },
+        unregisterContentScripts: async () => { }, executeScript: async options => {
             chrome.__lastScriptInjection = options; return [];
         },
     },
-    windows: { create: async () => ({}), update: async () => {}, remove: async () => {} },
+    windows: { create: async () => ({}), update: async () => { }, remove: async () => { } },
     downloads: { download: async () => 1 },
     storage: {
-        sync: { get: async () => ({ grafanaIframeDomains: ['grafana.test', 'strict.test:8443'] }), onChanged: { addListener() {} } },
-        session: { remove: async () => {} },
-        local: { get: async () => ({}), set: async () => {}, remove: async () => {} },
-        onChanged: { addListener() {} }
+        sync: { get: async () => ({ grafanaIframeDomains: ['grafana.test', 'strict.test:8443'] }), onChanged: { addListener() { } } },
+        session: { remove: async () => { } },
+        local: { get: async () => ({}), set: async () => { }, remove: async () => { } },
+        onChanged: { addListener() { } }
     },
     declarativeNetRequest: {
-        getDynamicRules: async () => [], updateDynamicRules: async () => {},
-        getSessionRules: async () => [], updateSessionRules: async () => {},
+        getDynamicRules: async () => [], updateDynamicRules: async () => { },
+        getSessionRules: async () => [], updateSessionRules: async () => { },
     },
     runtime: {
         id: 'extension-id', getURL: path => `chrome-extension://extension-id/${path || ''}`,
         getManifest: () => ({ version: '2.4.2' }),
-        onInstalled: { addListener() {} }, onStartup: { addListener() {} }, onMessage: { addListener(listener) { messageListener = listener; } }
+        onInstalled: { addListener() { } }, onStartup: { addListener() { } }, onMessage: { addListener(listener) { messageListener = listener; } }
     },
     action: {
-        setIcon: async () => {}, setBadgeText: async () => {},
-        setBadgeBackgroundColor: async () => {}, setTitle: async () => {},
+        setIcon: async () => { }, setBadgeText: async () => { },
+        setBadgeBackgroundColor: async () => { }, setTitle: async () => { },
     },
 };
-const context = { navigator: { locks: { request: async (_name, callback) => callback() } },
-    chrome, importScripts() {}, console, setTimeout, clearTimeout, URL, Date, Uint8Array,
+const context = {
+    navigator: { locks: { request: async (_name, callback) => callback() } },
+    chrome, importScripts() { }, console, setTimeout, clearTimeout, URL, Date, Uint8Array,
     crypto: { randomUUID: () => 'generated-id' },
     fetch: async () => ({ blob: async () => ({ size: 1 }) }),
     DashBridgeGrafanaRuntimeManifest: { files: [], matchesForHostname: () => [] },
-    DashBridgeDnrRules: { planSessionRules: () => ({
-        rules: [], desiredRuleCount: 0, omittedRuleCount: 0, truncated: false, maxRules: 4000,
-    }) },
-    DashBridgeLocalStateSchema: { normalizeProfiles: items => ({
-        items, skippedProfiles: 0, skippedPanels: 0,
-    }) },
+    DashBridgeDnrRules: {
+        planSessionRules: () => ({
+            rules: [], desiredRuleCount: 0, omittedRuleCount: 0, truncated: false, maxRules: 4000,
+        })
+    },
+    DashBridgeLocalStateSchema: {
+        normalizeProfiles: items => ({
+            items, skippedProfiles: 0, skippedPanels: 0,
+        })
+    },
     DashBridgeGrafanaPanelIdentity: { normalizePanelId: value => value, fromUrl: value => value },
-    JSZip: function JSZip() {},
+    JSZip: function JSZip() { },
     getGrafanaSettingsDefaults: () => ({ grafanaIframeDomains: [] }),
     normalizeHttpHost: value => String(value).toLowerCase(),
     parseHttpUrl: value => { try { return new URL(`https://${value}`); } catch { return null; } },
@@ -87,8 +100,8 @@ const grafanaSender = (url, frameId = 0) => ({
 
 (async () => {
     for (const sender of [grafanaSender('https://grafana.test/d/uid/name'),
-        { id: 'extension-id', url: chrome.runtime.getURL('pages/popup/popup.html') },
-        { id: 'foreign', url: chrome.runtime.getURL('pages/dashbridge/dashbridge.html') }]) {
+    { id: 'extension-id', url: chrome.runtime.getURL('pages/popup/popup.html') },
+    { id: 'foreign', url: chrome.runtime.getURL('pages/dashbridge/dashbridge.html') }]) {
         const response = await new Promise(resolve => messageListener({
             type: 'dashbridge-grafana-connection', url: 'https://new.test/d/a', add: true
         }, sender, resolve));
@@ -105,7 +118,7 @@ const grafanaSender = (url, frameId = 0) => ({
     assert.strictEqual(await isTrustedGrafanaContentSender(grafanaSender('https://grafana.test/d/uid/name', 1)), false,
         'privileged capture messages must come from the top-level content script');
     const ready = waitForGuiCaptureReady(42, 100);
-    messageListener({ type: 'dashbridge-gui-capture-ready' }, { tab: { id: 42 } }, () => {});
+    messageListener({ type: 'dashbridge-gui-capture-ready' }, { tab: { id: 42 } }, () => { });
     assert.strictEqual(await ready, true, 'matching tab render event must resolve the waiter');
     const captureResult = await new Promise(resolve => messageListener(
         { type: 'dashbridge-capture-visible-tab' },
@@ -118,11 +131,26 @@ const grafanaSender = (url, frameId = 0) => ({
     assert.strictEqual(JSON.stringify(chrome.__lastScriptInjection.files),
         JSON.stringify(['js/shared/grafana-capture-output.js']));
     const originalQuery = chrome.tabs.query;
+    const originalCapture = chrome.tabs.captureVisibleTab;
+    chrome.tabs.query = async () => [{
+        id: 7, windowId: 3, url: 'https://grafana.test/d/uid/name?from=now-6h'
+    }];
+    chrome.tabs.onUpdated.emit(7, { url: 'https://grafana.test/d/uid/name?from=now-6h' });
+    assert.strictEqual(await guiCaptureController.captureVisiblePanel(grafanaSender('https://grafana.test/d/uid/name')),
+        'data:image/png;base64,AA==',
+        'a same-document History API URL update must not reject the requesting document');
+    chrome.tabs.query = originalQuery;
+    chrome.tabs.captureVisibleTab = async () => {
+        chrome.tabs.onUpdated.emit(7, { status: 'loading' });
+        return 'data:image/png;base64,AA==';
+    };
+    await assert.rejects(guiCaptureController.captureVisiblePanel(grafanaSender('https://grafana.test/d/uid/name')),
+        /capture-target-changed/, 'a document navigation must discard the requested capture even before its URL changes');
+    chrome.tabs.captureVisibleTab = originalCapture;
     chrome.tabs.query = async () => [{ id: 8, windowId: 3, url: 'https://other.test/' }];
     await assert.rejects(guiCaptureController.captureVisiblePanel(grafanaSender('https://grafana.test/d/uid/name')),
         /capture-target-changed/);
     chrome.tabs.query = originalQuery;
-    const originalCapture = chrome.tabs.captureVisibleTab;
     chrome.tabs.captureVisibleTab = async () => {
         chrome.tabs.query = async () => [{ id: 8, windowId: 3, url: 'https://other.test/' }];
         return 'data:image/png;base64,AA==';

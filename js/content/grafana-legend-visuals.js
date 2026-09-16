@@ -83,10 +83,10 @@
                         white-space:nowrap !important;
                     }
                     .dashbridge-legend-bottom tr > .dashbridge-vcpu-legend-cell {
-                        width:48px !important;
-                        min-width:48px !important;
-                        max-width:48px !important;
-                        flex:0 0 48px !important;
+                        width:32px !important;
+                        min-width:32px !important;
+                        max-width:32px !important;
+                        flex:0 0 32px !important;
                         box-sizing:border-box !important;
                     }
                     .dashbridge-legend-bottom [class*="LegendLabel"] {

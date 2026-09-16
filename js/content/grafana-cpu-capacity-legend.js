@@ -97,7 +97,7 @@
                 .dashbridge-vcpu-legend-cell {
                     box-sizing:border-box !important;
                     width:max-content !important;
-                    min-width:48px !important;
+                    min-width:32px !important;
                     max-width:100% !important;
                     flex:0 0 auto !important;
                     padding-left:6px !important;
@@ -133,10 +133,11 @@
                 else row.appendChild(cell);
             }
             if (cell.textContent !== text) cell.textContent = text;
-            cell.style.setProperty('width', '48px', 'important');
-            cell.style.setProperty('min-width', '48px', 'important');
-            cell.style.setProperty('max-width', '48px', 'important');
-            cell.style.setProperty('flex', '0 0 48px', 'important');
+            const vcpuWidth = window.name === 'dashbridge-iframe' ? 32 : 48;
+            cell.style.setProperty('width', `${vcpuWidth}px`, 'important');
+            cell.style.setProperty('min-width', `${vcpuWidth}px`, 'important');
+            cell.style.setProperty('max-width', `${vcpuWidth}px`, 'important');
+            cell.style.setProperty('flex', `0 0 ${vcpuWidth}px`, 'important');
             cell.title = header
                 ? 'Количество виртуальных CPU'
                 : (text === '-' ? 'Количество vCPU не определено' : `${text} vCPU`);
@@ -268,13 +269,17 @@
                 }
             }
             for (const table of tables) {
+                // Direct Grafana owns the native table layout. Applying the
+                // iframe grid template there can collapse the name column
+                // when the panel is narrow.
+                if (window.name !== 'dashbridge-iframe') continue;
                 const rowsInTable = Array.from(table.querySelectorAll('tr'));
                 const columnCount = Math.max(0, ...rowsInTable.map(row => row.children.length));
                 if (columnCount < 2) continue;
                 table.classList.add('dashbridge-vcpu-table');
                 const columnWidths = Array.from({ length: columnCount }, (_, columnIndex) => Math.max(0,
                     ...rowsInTable.map(row => row.children[columnIndex]?.getBoundingClientRect?.().width || 0)));
-                const template = `minmax(0,1fr) 48px${columnCount > 2
+                const template = `minmax(0,1fr) 32px${columnCount > 2
                     ? ` ${columnWidths.slice(2).map(width => `${Math.ceil(width)}px`).join(' ')}` : ''}`;
                 rowsInTable.forEach(row => {
                     row.style.setProperty('display', 'grid', 'important');

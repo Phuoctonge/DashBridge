@@ -4,13 +4,16 @@ async function captureGrafanaVisibleTab(tabId, expectedUrl) {
     const initial = await chrome.tabs.get(tabId);
     let invalidated = false;
     const onActivated = info => { if (info.windowId === initial.windowId) invalidated = true; };
-    const onUpdated = (id, change) => { if (id === tabId && (change.url || change.status === 'loading')) invalidated = true; };
+    const onUpdated = (id, change) => {
+        if (id === tabId && change.url && change.url !== expectedUrl) invalidated = true;
+    };
     const onRemoved = id => { if (id === tabId) invalidated = true; };
     const check = async () => {
         const tab = await chrome.tabs.get(tabId);
         const active = await chrome.tabs.query({ active: true, windowId: tab.windowId });
         if (invalidated || tab.windowId !== initial.windowId || active[0]?.id !== tabId
-            || tab.pendingUrl || !expectedUrl || tab.url !== expectedUrl) {
+            || (tab.pendingUrl && tab.pendingUrl !== expectedUrl)
+            || !expectedUrl || tab.url !== expectedUrl) {
             throw new Error('capture-target-changed');
         }
         return tab;

@@ -940,10 +940,11 @@ Copy выполняется максимально близко к клику и
 document. Ошибка capture/crop/download/clipboard также проходит восстановление.
 
 Direct Grafana и DashBridge обращаются к общей очереди background capture.
-Broker проверяет активную вкладку и URL отправителя до и после ожидания и
-снимка; переключение вкладки, навигация или закрытие во время операции
-отменяют выдачу изображения с `capture-target-changed`. Слушатели снимаются
-в `finally`.
+Broker проверяет активную вкладку до и после ожидания и снимка; переключение
+вкладки, document navigation или закрытие во время операции отменяют выдачу
+изображения с `capture-target-changed`. URL-only изменения History API не
+считаются навигацией: Grafana и DashBridge могут менять query/hash, сохраняя
+тот же document. Слушатели снимаются в `finally`.
 Перед `captureVisibleTab` service worker после повторной проверки отправителя
 идемпотентно восстанавливает `grafana-capture-output.js` в isolated world именно
 запросившего document. Это закрывает рассинхронизацию поколений MAIN/isolated

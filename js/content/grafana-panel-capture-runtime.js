@@ -162,8 +162,13 @@
                     .find(isNeutralBackground) || null;
             };
             const nativeBackgrounds = getRows().map(readBackground);
-            const rootBackground = [root, root?.parentElement, document.body, document.documentElement]
-                .filter(Boolean)
+            const backgroundAncestors = [];
+            for (let element = root; element; element = element.parentElement) {
+                backgroundAncestors.push(element);
+                if (element === document.body) break;
+            }
+            backgroundAncestors.push(document.documentElement);
+            const rootBackground = backgroundAncestors
                 .map(element => getComputedStyle(element).backgroundColor)
                 .find(isNeutralBackground);
             const primaryBackground = nativeBackgrounds.find(Boolean) || rootBackground
@@ -206,19 +211,34 @@
                     }
                 });
                 // In compact bottom legends the name takes the remaining space;
-                // vCPU/min/max/current must be one stable four-column grid. Using
-                // max-content here made every numeric column start at a different
-                // x coordinate after Grafana rebuilt the legend during resize.
-                getLayoutRows().forEach(row => {
-                    const cells = Array.from(row.children);
-                    cells.slice(1).forEach(cell => {
+                // numeric columns must share stable widths, but a hard-coded
+                // 48px overflows themes that add left padding to value cells.
+                const layoutRows = getLayoutRows();
+                const columnWidths = [];
+                layoutRows.forEach(row => {
+                    Array.from(row.children).slice(1).forEach((cell, columnIndex) => {
                         setTemporaryStyle(cell, 'box-sizing', 'border-box');
-                        setTemporaryStyle(cell, 'width', '48px');
-                        setTemporaryStyle(cell, 'min-width', '48px');
-                        setTemporaryStyle(cell, 'max-width', '48px');
-                        setTemporaryStyle(cell, 'flex', '0 0 48px');
-                        setTemporaryStyle(cell, 'text-align', 'right');
+                        setTemporaryStyle(cell, 'width', 'auto');
+                        setTemporaryStyle(cell, 'min-width', '0');
+                        setTemporaryStyle(cell, 'max-width', 'none');
+                        setTemporaryStyle(cell, 'flex', '0 1 auto');
                         setTemporaryStyle(cell, 'white-space', 'nowrap');
+                        const naturalWidth = Math.ceil(Math.max(
+                            cell.scrollWidth || 0, cell.getBoundingClientRect().width || 0
+                        ));
+                        // Keep short vCPU/count columns compact; percentage
+                        // cells still grow to their measured content width.
+                        columnWidths[columnIndex] = Math.max(columnWidths[columnIndex] || 32, naturalWidth);
+                    });
+                });
+                layoutRows.forEach(row => {
+                    Array.from(row.children).slice(1).forEach((cell, columnIndex) => {
+                        const width = columnWidths[columnIndex] || 32;
+                        setTemporaryStyle(cell, 'width', `${width}px`);
+                        setTemporaryStyle(cell, 'min-width', `${width}px`);
+                        setTemporaryStyle(cell, 'max-width', `${width}px`);
+                        setTemporaryStyle(cell, 'flex', `0 0 ${width}px`);
+                        setTemporaryStyle(cell, 'text-align', 'right');
                     });
                 });
             };
@@ -343,7 +363,14 @@
                         && !/^rgba\([^)]*,\s*0(?:\.0+)?\s*\)$/i.test(value);
                     const bodyBackground = getComputedStyle(document.body).backgroundColor;
                     const rootBackground = getComputedStyle(document.documentElement).backgroundColor;
-                    const captureBackground = [bodyBackground, rootBackground].find(isOpaqueBackground)
+                    // Flot canvases are transparent. Prefer the nearest
+                    // dashboard/panel ancestor's computed background; the
+                    // page background may be Grafana's neutral grey.
+                    const panelBackgrounds = [];
+                    for (let node = captureNode; node && node !== document.body; node = node.parentElement) {
+                        panelBackgrounds.push(getComputedStyle(node).backgroundColor);
+                    }
+                    const captureBackground = [...panelBackgrounds, bodyBackground, rootBackground].find(isOpaqueBackground)
                         || (document.documentElement.classList.contains('theme-light') ? '#ffffff' : '#111217');
                     captureFrame = document.createElement('div');
                     captureFrame.className = 'dashbridge-panel-capture-frame';

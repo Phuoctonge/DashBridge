@@ -48,6 +48,10 @@ assert(tools.includes('syncAllPanelCaptureToggles(value)'), 'one toolbar click m
 assert(dashboardCapture.includes('storage.set({ grafanaCompactScreenshot: prepared })'), 'DashBridge capture owner must persist the shared toggle globally');
 assert(tools.includes('const fitPanelCaptureSize = options =>'), 'native prepared capture must survive a stale hot-injected dependency set');
 assert(tools.includes("captureFrame.className = 'dashbridge-panel-capture-frame'"), 'native prepared capture must escape Grafana grid containment');
+assert(tools.includes('const panelBackgrounds = []')
+    && tools.includes('for (let node = captureNode; node && node !== document.body; node = node.parentElement)')
+    && tools.includes('[...panelBackgrounds, bodyBackground, rootBackground].find(isOpaqueBackground)'),
+    'compact capture must prefer the original panel ancestor background over Grafana page grey');
 assert(tools.includes('const createCompactCaptureLegendBackgroundController = root =>')
     && tools.indexOf('captureLegendBackgroundController = createCompactCaptureLegendBackgroundController(captureNode);')
         < tools.indexOf('document.body.appendChild(captureFrame);'),
@@ -64,8 +68,13 @@ assert(tools.includes('const isNeutralBackground = value =>')
     && tools.includes('Math.max(...rgb) - Math.min(...rgb) <= 14')
     && tools.includes('.find(isNeutralBackground) || null'),
     'compact capture must not mistake coloured series swatches for legend row backgrounds');
-assert(tools.includes('getLayoutRows().forEach(row =>')
-    && tools.includes("setTemporaryStyle(cell, 'flex', '0 0 48px')")
+assert(tools.includes('const backgroundAncestors = []')
+    && tools.includes('for (let element = root; element; element = element.parentElement)')
+    && tools.includes('backgroundAncestors.push(document.documentElement)'),
+    'compact legend background lookup must follow the full original ancestor chain');
+assert(tools.includes('const layoutRows = getLayoutRows()')
+    && tools.includes('const columnWidths = []')
+    && tools.includes("setTemporaryStyle(cell, 'flex', `0 0 ${width}px`)")
     && tools.includes("setTemporaryStyle(cell, 'text-align', 'right')"),
     'compact bottom capture must align vCPU/min/max/current as four fixed numeric columns');
 assert(tools.includes('syncThresholdHighlightState(captureFrame, captureVisualState)')

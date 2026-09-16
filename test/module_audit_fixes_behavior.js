@@ -54,7 +54,11 @@ async function captureIdentity() {
     duringCapture = () => { active = 3; };
     await assert.rejects(context.captureGrafanaVisibleTab(1, tab.url), /capture-target-changed/);
     active = 1; duringCapture = () => tabs.onUpdated.emit(1, { status: 'loading' });
-    await assert.rejects(context.captureGrafanaVisibleTab(1, tab.url), /capture-target-changed/);
+    assert.equal(await context.captureGrafanaVisibleTab(1, tab.url), 'image',
+        'a same-URL reload must not invalidate the capture target');
+    duringCapture = () => tabs.onUpdated.emit(1, { url: 'https://grafana.test/d/other' });
+    await assert.rejects(context.captureGrafanaVisibleTab(1, tab.url), /capture-target-changed/,
+        'a real URL navigation must invalidate the capture');
     for (const name of ['onActivated', 'onUpdated', 'onRemoved']) assert.equal(tabs[name].callbacks.size, 0);
 }
 async function batchWrites() {
