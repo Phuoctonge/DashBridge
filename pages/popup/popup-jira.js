@@ -1,10 +1,14 @@
 /* global DashBridgeAnalytics */
-async function dashbridgeTransferJiraWorklogs(expectedOrigin, expectedBasePath = '') {
+async function dashbridgeTransferJiraWorklogs(expectedOrigin, expectedBasePath = '', transferMode) {
     const issueKeyPattern = /^[A-Z][A-Z0-9_]*-\d+$/;
     const normalizeIssueKey = value => {
         const key = String(value || '').trim().toUpperCase();
         return key.length <= 255 && issueKeyPattern.test(key) ? key : null;
     };
+    if (transferMode !== 'move' && transferMode !== 'copy') {
+        alert('Операция отменена: не выбран корректный режим переноса записей.');
+        return { status: 'invalid-mode' };
+    }
 
     if (location.origin.toLowerCase() !== expectedOrigin) {
         alert('Операция отменена: активная вкладка больше не соответствует настроенному Jira origin.');
@@ -84,7 +88,7 @@ async function dashbridgeTransferJiraWorklogs(expectedOrigin, expectedBasePath =
         ? `Найдено ${worklogsToTransfer.length} записей пользователя "${targetUser}".`
         : `Выбраны ВСЕ записи (${worklogsToTransfer.length} шт).`;
     if (!confirm(`${selection}\nЗадача назначения: ${newIssueKey}\n\nПродолжить?`)) return { status: 'cancelled' };
-    const isMove = confirm('Что делаем с исходными записями?\n\n[ОК] - ПЕРЕНЕСТИ\n[Отмена] - ПРОСТО СКОПИРОВАТЬ');
+    const isMove = transferMode === 'move';
 
     const totals = { copied: 0, deleted: 0, copyFailed: 0, deleteFailed: 0 };
     for (let index = 0; index < worklogsToTransfer.length; index++) {
@@ -132,6 +136,58 @@ async function dashbridgeTransferJiraWorklogs(expectedOrigin, expectedBasePath =
     return { status: fullySuccessful ? 'complete' : 'partial', isMove, total: worklogsToTransfer.length, ...totals };
 }
 
+function chooseJiraTransferMode() {
+    return new Promise(resolve => {
+        const previousFocus = document.activeElement;
+        const overlay = document.createElement('div');
+        overlay.id = 'jiraTransferModeDialog';
+        overlay.setAttribute('role', 'presentation');
+        Object.assign(overlay.style, {
+            position: 'fixed', inset: '0', zIndex: '200', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', padding: '1rem', background: 'var(--modal-overlay-bg)'
+        });
+        const dialog = document.createElement('section');
+        dialog.className = 'modal-content';
+        dialog.setAttribute('role', 'dialog');
+        dialog.setAttribute('aria-modal', 'true');
+        dialog.setAttribute('aria-labelledby', 'jiraTransferModeTitle');
+        dialog.setAttribute('aria-describedby', 'jiraTransferModeDescription');
+        dialog.style.maxWidth = '26rem';
+        dialog.innerHTML = `
+            <div class="modal-header"><h4 id="jiraTransferModeTitle">Как обработать исходные записи?</h4></div>
+            <p id="jiraTransferModeDescription" style="margin: 0; color: var(--text-muted); font-size: 0.8125rem; line-height: 1.45;">
+                Копирование оставит исходные записи без изменений. Перенос удалит каждую исходную запись только после успешного копирования.
+            </p>
+            <div class="modal-actions" style="flex-wrap: wrap;">
+                <button type="button" class="btn btn-primary" data-jira-transfer-mode="move">Перенести</button>
+                <button type="button" class="btn btn-outline" data-jira-transfer-mode="copy">Скопировать</button>
+                <button type="button" class="btn btn-cancel" data-jira-transfer-mode="cancel">Отмена</button>
+            </div>`;
+        overlay.append(dialog);
+        document.body.append(overlay);
+        let settled = false;
+        const finish = mode => {
+            if (settled) return;
+            settled = true;
+            document.removeEventListener('keydown', onKeyDown, true);
+            overlay.remove();
+            if (previousFocus && typeof previousFocus.focus === 'function') previousFocus.focus();
+            resolve(mode);
+        };
+        const onKeyDown = event => {
+            if (event.key === 'Escape') { event.preventDefault(); finish(null); }
+        };
+        document.addEventListener('keydown', onKeyDown, true);
+        dialog.addEventListener('click', event => {
+            const mode = event.target.closest('[data-jira-transfer-mode]')?.dataset.jiraTransferMode;
+            if (mode === 'move' || mode === 'copy') finish(mode);
+            if (mode === 'cancel') finish(null);
+        });
+        overlay.addEventListener('click', event => { if (event.target === overlay) finish(null); });
+        dialog.querySelector('[data-jira-transfer-mode="move"]')?.focus();
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('openJiraPage').onclick = () => chrome.tabs.create({ url: chrome.runtime.getURL('pages/worklog/worklog.html') });
     const transferBtn = document.getElementById('transferWorklogBtn');
@@ -149,8 +205,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 DashBridgeAnalytics?.outcome('jira.popup_transfer', 'invalid_input');
                 return;
             }
+            const transferMode = await chooseJiraTransferMode();
+            if (!transferMode) {
+                DashBridgeAnalytics?.outcome('jira.popup_transfer', 'cancelled');
+                return;
+            }
             const executions = await chrome.scripting.executeScript({
-                target: { tabId: tab.id }, func: dashbridgeTransferJiraWorklogs, args: [expectedOrigin, expectedBasePath]
+                target: { tabId: tab.id }, func: dashbridgeTransferJiraWorklogs,
+                args: [expectedOrigin, expectedBasePath, transferMode]
             });
             const result = executions?.[0]?.result;
             const outcome = result?.status === 'complete' ? 'success'

@@ -2,7 +2,7 @@
 // Keep it self-contained: chrome.scripting.executeScript transfers only this function body.
 async function _tdmExportScriptInternal(options) {
     const TDM_EXPORT_MAX_DURATION_MS = 10 * 60 * 1000;
-    const { startStr, endStr, format, savePhotos, excludePhotoUser, isExcludeAll, photoExportId } = options;
+    const { startStr, endStr, format, savePhotos, excludePhotoUser, photoExportId } = options;
     const startObj = startStr ? new Date(startStr) : new Date(0);
     const endObj = endStr ? new Date(endStr) : new Date(8640000000000000);
 
@@ -196,9 +196,9 @@ async function _tdmExportScriptInternal(options) {
 
                 if (!msgObj.isSystem && savePhotos) {
                     let shouldSavePhotos = true;
-                    if (excludePhotoUser || isExcludeAll) {
-                        if (isExcludeAll) shouldSavePhotos = false;
-                        else if (msgObj.sender && msgObj.sender.toLowerCase().includes(excludePhotoUser)) shouldSavePhotos = false;
+                    if (excludePhotoUser && msgObj.sender
+                        && msgObj.sender.toLowerCase().includes(excludePhotoUser)) {
+                        shouldSavePhotos = false;
                     }
 
                     if (shouldSavePhotos) {

@@ -4,6 +4,10 @@ const fs = require('fs');
 
 const controllerSource = fs.readFileSync('pages/popup/popup-tdm.js', 'utf8');
 const pageExportSource = fs.readFileSync('pages/popup/popup-tdm-page-export.js', 'utf8');
+assert(controllerSource.includes('Укажите имя пользователя для исключения фотографий.'),
+    'TDM must reject a blank photo exclusion name before side effects');
+assert(!controllerSource.includes('isExcludeAll: photosCheck.checked && excludeCheck.checked && excludeName === ""'),
+    'a blank exclusion name must never become an exclude-all export option');
 const source = `${controllerSource}\n${pageExportSource}`;
 const formatterSource = controllerSource.slice(0, controllerSource.indexOf('document.addEventListener'));
 const formatProgress = Function(formatterSource + '; return formatTdmExportProgress;')();

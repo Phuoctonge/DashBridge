@@ -103,6 +103,13 @@ async function tdmExport() {
     const endInput = document.getElementById("tdmExportEnd");
     const formatSelect = document.getElementById("tdmExportFormat");
 
+    if (photosCheck.checked && excludeCheck.checked && !excludeText.value.trim()) {
+        statusEl.style.display = "block";
+        statusEl.textContent = "Укажите имя пользователя для исключения фотографий.";
+        excludeText.focus();
+        return;
+    }
+
     statusEl.style.display = "block";
     statusEl.textContent = "Начинаю экспорт...";
 
@@ -128,7 +135,6 @@ async function tdmExport() {
         format: formatSelect.value,
         savePhotos: photosCheck.checked,
         excludePhotoUser: excludeName,
-        isExcludeAll: photosCheck.checked && excludeCheck.checked && excludeName === "",
         photoExportId: crypto.randomUUID()
     };
     const analyticsDimensions = { format: ['html', 'json', 'both'].includes(options.format) ? options.format : 'html' };

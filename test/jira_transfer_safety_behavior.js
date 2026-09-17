@@ -6,6 +6,12 @@ const path = require('path');
 const vm = require('vm');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'pages', 'popup', 'popup-jira.js'), 'utf8');
+assert(source.includes("const transferMode = await chooseJiraTransferMode();"),
+    'the popup must choose move/copy mode before injecting Jira transfer');
+assert(source.includes("args: [expectedOrigin, expectedBasePath, transferMode]"),
+    'the explicit Jira transfer mode must reach the injected operation');
+assert(!source.includes('[Отмена] - ПРОСТО СКОПИРОВАТЬ'),
+    'a confirmation cancel must never silently mean copy');
 
 function createContext(overrides = {}) {
     const alerts = [];
@@ -37,15 +43,22 @@ function createContext(overrides = {}) {
 
 (async () => {
     {
+        const fixture = createContext({ fetchResponses: [] });
+        const result = await fixture.context.dashbridgeTransferJiraWorklogs('https://jira.example.test', '', 'invalid');
+        assert.strictEqual(result.status, 'invalid-mode');
+        assert.strictEqual(fixture.fetchCalls.length, 0, 'an invalid transfer mode must stop before Jira requests');
+    }
+
+    {
         const fixture = createContext({ prompts: ['', 'SRC-1'], confirms: [], fetchResponses: [] });
-        const result = await fixture.context.dashbridgeTransferJiraWorklogs('https://jira.example.test');
+        const result = await fixture.context.dashbridgeTransferJiraWorklogs('https://jira.example.test', '', 'move');
         assert.strictEqual(result.status, 'same-issue');
         assert.strictEqual(fixture.fetchCalls.length, 0, 'same-issue transfer must not call Jira');
     }
 
     {
         const fixture = createContext({ origin: 'https://evil.example', fetchResponses: [] });
-        const result = await fixture.context.dashbridgeTransferJiraWorklogs('https://jira.example.test');
+        const result = await fixture.context.dashbridgeTransferJiraWorklogs('https://jira.example.test', '', 'move');
         assert.strictEqual(result.status, 'origin-mismatch');
         assert.strictEqual(fixture.fetchCalls.length, 0, 'origin mismatch must fail before Jira calls');
     }
@@ -55,7 +68,7 @@ function createContext(overrides = {}) {
             pathname: '/jira/browse/SRC-1', prompts: ['', 'DST-2'], confirms: [],
             fetchResponses: [{ ok: true, async json() { return { worklogs: [] }; } }],
         });
-        const result = await fixture.context.dashbridgeTransferJiraWorklogs('https://jira.example.test', '/jira');
+        const result = await fixture.context.dashbridgeTransferJiraWorklogs('https://jira.example.test', '/jira', 'move');
         assert.strictEqual(result.status, 'empty');
         assert.strictEqual(fixture.fetchCalls[0].url, '/jira/rest/api/2/issue/SRC-1/worklog');
     }
@@ -70,7 +83,7 @@ function createContext(overrides = {}) {
                 { ok: false, status: 403 },
             ],
         });
-        const result = await fixture.context.dashbridgeTransferJiraWorklogs('https://jira.example.test');
+        const result = await fixture.context.dashbridgeTransferJiraWorklogs('https://jira.example.test', '', 'move');
         assert.deepStrictEqual(
             { status: result.status, copied: result.copied, deleted: result.deleted, deleteFailed: result.deleteFailed },
             { status: 'partial', copied: 1, deleted: 0, deleteFailed: 1 }
@@ -87,7 +100,7 @@ function createContext(overrides = {}) {
             { ok: true, json: async () => ({ startAt: 1, total: 2, worklogs: [{ id: '2' }] }) },
             { ok: true }, { ok: true }
         ] });
-        const result = await fixture.context.dashbridgeTransferJiraWorklogs('https://jira.example.test');
+        const result = await fixture.context.dashbridgeTransferJiraWorklogs('https://jira.example.test', '', 'copy');
         assert.equal(result.copied, 2);
         assert(fixture.fetchCalls[1].url.includes('startAt=1'));
         assert.deepStrictEqual(fixture.fetchCalls.map(call => call.method), ['GET', 'GET', 'POST', 'POST']);
