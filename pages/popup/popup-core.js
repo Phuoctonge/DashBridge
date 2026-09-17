@@ -2,11 +2,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const tabs = document.querySelectorAll(".tab-btn");
     const contents = document.querySelectorAll(".tab-content");
     const reportGuiCaptureSize = () => {
-        if (!new URLSearchParams(location.search).has('guiCapture')) return;
+        const query = new URLSearchParams(location.search);
+        const captureId = query.get('guiCaptureId');
+        if (!query.has('guiCapture') || !captureId) return;
         setTimeout(() => {
             const root = document.documentElement;
             chrome.runtime.sendMessage({
                 type: 'dashbridge-popup-capture-size',
+                captureId,
                 width: Math.ceil(Math.max(document.body.scrollWidth, root.scrollWidth) + 16),
                 height: Math.ceil(Math.max(document.body.scrollHeight, root.scrollHeight) + 16)
             });

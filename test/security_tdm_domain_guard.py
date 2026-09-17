@@ -18,7 +18,11 @@ check(
 check("Active tab URL is parsed", "activeUrl = new URL(tabs[0].url)" in SOURCE)
 check("Configured TDM URL is parsed", "tdmUrl = new URL(" in SOURCE)
 check(
-    "TDM hostname must match exactly",
-    "activeUrl.hostname.toLowerCase() !== tdmUrl.hostname.toLowerCase()" in SOURCE,
+    "TDM origin must match exactly",
+    "activeUrl.origin !== tdmUrl.origin" in SOURCE,
+)
+check(
+    "TDM origin guard rejects scheme and port substitutions",
+    "activeUrl.hostname.toLowerCase() !== tdmUrl.hostname.toLowerCase()" not in SOURCE,
 )
 check.finish()

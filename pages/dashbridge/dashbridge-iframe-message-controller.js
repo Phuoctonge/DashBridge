@@ -136,8 +136,9 @@
                 sourceIframe.dataset.dashbridgeLoaded = 'true';
                 sourceIframe.dataset.dashbridgeRendered = 'true';
                 retryPanelAnalysis(sourceIframe);
-                if (new URLSearchParams(locationRef.search).has('guiCapture')) {
-                    chromeRef.runtime.sendMessage({ type: 'dashbridge-gui-capture-ready' })
+                const captureId = new URLSearchParams(locationRef.search).get('guiCaptureId');
+                if (new URLSearchParams(locationRef.search).has('guiCapture') && captureId) {
+                    chromeRef.runtime.sendMessage({ type: 'dashbridge-gui-capture-ready', captureId })
                         .catch(() => undefined);
                 }
                 return;

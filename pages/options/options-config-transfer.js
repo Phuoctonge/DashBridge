@@ -38,6 +38,13 @@
             else resolve();
         });
     });
+    const removeStorageValues = (area, keys) => new Promise((resolve, reject) => {
+        if (!keys.length) { resolve(); return; }
+        area.remove(keys, () => {
+            if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+            else resolve();
+        });
+    });
 
     function create({ parseGrafanaIframeDomains, normalizePanelTitle, getAnalysisThresholdPairError, showStatus }) {
         if (![parseGrafanaIframeDomains, normalizePanelTitle, getAnalysisThresholdPairError, showStatus]
@@ -47,6 +54,7 @@
         const exportButton = document.getElementById('exportBtn');
         const importButton = document.getElementById('importBtn');
         const importFile = document.getElementById('importFile');
+        const restoreBackupButton = document.getElementById('restoreImportBackupBtn');
         if (!exportButton || !importButton || !importFile) {
             throw new TypeError('DashBridgeOptionsConfigTransfer controls are incomplete');
         }
@@ -143,6 +151,37 @@
             return { sync, local, dropped, sourceSchemaVersion: Number(config.schemaVersion) || 1 };
         }
 
+        const refreshRestoreAvailability = async () => {
+            if (!restoreBackupButton) return;
+            const { dashbridge_import_backup: backup } = await chrome.storage.local.get('dashbridge_import_backup');
+            restoreBackupButton.hidden = !isPlainObject(backup) || !isPlainObject(backup.sync) || !isPlainObject(backup.local);
+        };
+
+        const restoreImportBackup = async () => {
+            try {
+                const { dashbridge_import_backup: backup } = await chrome.storage.local.get('dashbridge_import_backup');
+                if (!isPlainObject(backup) || !isPlainObject(backup.sync) || !isPlainObject(backup.local)) {
+                    throw new Error('Резервная копия перед импортом не найдена.');
+                }
+                const restored = validateImportedConfig({ sync: backup.sync, local: backup.local });
+                if (!window.confirm(`Восстановить настройки до импорта от ${backup.createdAt || 'неизвестного времени'}?`)) return;
+                const [currentSync, currentLocal] = await Promise.all([
+                    chrome.storage.sync.get(null), chrome.storage.local.get(null)
+                ]);
+                const syncRemove = [...SYNC_IMPORT_KEYS].filter(key => key in currentSync && !(key in restored.sync));
+                const localRemove = [...LOCAL_IMPORT_KEYS].filter(key => key in currentLocal && !(key in restored.local));
+                await setStorageValues(chrome.storage.sync, restored.sync);
+                await removeStorageValues(chrome.storage.sync, syncRemove);
+                await setStorageValues(chrome.storage.local, restored.local);
+                await removeStorageValues(chrome.storage.local, localRemove);
+                showStatus('Восстановлены настройки, сохранённые перед последним импортом.', 'green');
+                root.DashBridgeAnalytics?.outcome('options.config_import_restored', 'success');
+            } catch (error) {
+                showStatus(error?.message || 'Не удалось восстановить резервную копию.', 'red');
+                root.DashBridgeAnalytics?.outcome('options.config_import_restored', 'error');
+            }
+        };
+
         const handleExport = () => {
             chrome.storage.sync.get(null, syncData => {
                 chrome.storage.local.get(null, localData => {
@@ -203,6 +242,7 @@
                     });
                     await setStorageValues(chrome.storage.sync, imported.sync);
                     if (Object.keys(imported.local).length) await setStorageValues(chrome.storage.local, imported.local);
+                    await refreshRestoreAvailability();
                     showStatus('Настройки импортированы. Обновите открытые страницы Dashboard.', 'green');
                     root.DashBridgeAnalytics?.outcome('options.config_imported', 'success');
                 } catch (error) {
@@ -223,10 +263,13 @@
         exportButton.addEventListener('click', handleExport);
         importButton.addEventListener('click', handleImportClick);
         importFile.addEventListener('change', handleImportChange);
+        restoreBackupButton?.addEventListener('click', restoreImportBackup);
+        void refreshRestoreAvailability();
         const stop = () => {
             exportButton.removeEventListener('click', handleExport);
             importButton.removeEventListener('click', handleImportClick);
             importFile.removeEventListener('change', handleImportChange);
+            restoreBackupButton?.removeEventListener('click', restoreImportBackup);
         };
         return Object.freeze({ validateImportedConfig, stop });
     }

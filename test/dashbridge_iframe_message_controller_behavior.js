@@ -46,7 +46,7 @@ const controller = context.DashBridgeIframeMessageController.create({
     hideCrosshair: () => calls.push(['hideCrosshair']),
     windowRef: { addEventListener: (type, listener) => { if (type === 'message') messageListener = listener; } },
     documentRef: { querySelectorAll: () => [frame] },
-    locationRef: { search: '?guiCapture=1' },
+    locationRef: { search: '?guiCapture=1&guiCaptureId=capture-1' },
     chromeRef: { runtime: { sendMessage: message => { calls.push(['runtime', message]); return Promise.resolve(); } } },
 });
 
@@ -98,7 +98,8 @@ emit({ action: 'dashbridgePanelRendered' });
 assert.strictEqual(frame.dataset.dashbridgeRendered, 'true');
 assert.strictEqual(frame.dataset.dashbridgeLoaded, 'true', 'rendered fallback must reopen iframe transport after a missed ready message');
 assert.strictEqual(frame.dataset.dashbridgeOrigin, 'https://grafana.example');
-assert(calls.some(call => call[0] === 'runtime' && call[1].type === 'dashbridge-gui-capture-ready'));
+assert(calls.some(call => call[0] === 'runtime' && call[1].type === 'dashbridge-gui-capture-ready'
+    && call[1].captureId === 'capture-1'));
 emit({ action: 'panelLegendSeries', requestId: 'legend-1' });
 emit({ action: 'panelThresholdStatus', status: {} });
 emit({ action: 'broadcastCrosshair', percentX: 0, timestamp: 10 });

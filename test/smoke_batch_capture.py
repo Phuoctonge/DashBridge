@@ -41,7 +41,7 @@ if __name__ == "__main__":
             "js/shared/grafana-dashboard-api.js": ["apiUrl.searchParams.set('orgId', dashboard.orgId)"],
             "pages/batch/batch-panel-loader.js": [
                 "function createBatchPanelLoader", "findPanelById(panelId)",
-                "__dashbridgeDataInterceptorDiagnostic", "request-complete", "findUPlot",
+                "requiresDataEvidence", "isTransientFrameRemoval", "navigationGeneration",
             ],
             "pages/batch/batch-series-selection.js": ["resolveExact", "resolvePatterns", "resolveAll"],
             "pages/batch/batch-capture-utils.js": ["base64ToUint8Array(base64)"],

@@ -125,10 +125,14 @@
                             tabId, fullUrl, panelId, null, null,
                             panelRules.forPanel(mainPanelRules, panelId), lifecycle.signal(runId),
                         );
+                        if (!operation.isActive(runId)) break;
                         if (rect && rect.w > 5 && rect.h > 5) {
-                            if (await operation.capturePanelToZip(
+                            const captured = await operation.capturePanelToZip(
                                 captureWindow, tabId, panelId, archivePath, archive, captureOptions,
-                            )) {
+                                () => operation.isActive(runId),
+                            );
+                            if (!operation.isActive(runId)) break;
+                            if (captured) {
                                 successfulJobs++;
                             } else {
                                 failedJobs++;
@@ -163,8 +167,10 @@
                         await operation.addArchiveReport(archive, {
                             kind: 'panels', dashboard: info, totalJobs,
                             successfulJobs, failedJobs, errors: captureErrors,
-                        });
+                        }, () => operation.isActive(runId));
+                        if (!operation.isActive(runId)) return;
                         await archive.finalize();
+                        if (!operation.isActive(runId)) return;
                         if (failedJobs) {
                             analyticsOutcome = 'partial';
                             logMessage(`Сбор завершён частично: сохранено ${successfulJobs}, ошибок ${failedJobs}.`);

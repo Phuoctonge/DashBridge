@@ -224,13 +224,13 @@ async function _tdmExportScriptInternal(options) {
                     }
                 }
                 extractedMessages.set(child.id, msgObj);
-                try { chrome.runtime.sendMessage({ action: "tdmExportProgress", current: extractedMessages.size, text: "Сбор сообщений:" }); } catch (e) { }
+                try { chrome.runtime.sendMessage({ action: "tdmExportProgress", exportId: photoExportId, current: extractedMessages.size, text: "Сбор сообщений:" }); } catch (e) { }
             }
         }
     };
 
     // Скроллим вверх плавно, собирая сообщения
-    try { chrome.runtime.sendMessage({ action: "tdmExportProgress", current: 0, total: 100, text: "Подготовка..." }); } catch (e) { }
+    try { chrome.runtime.sendMessage({ action: "tdmExportProgress", exportId: photoExportId, current: 0, total: 100, text: "Подготовка..." }); } catch (e) { }
 
     let lastHeight = chatContainer.scrollHeight;
     let noChangeCount = 0;
@@ -292,7 +292,7 @@ async function _tdmExportScriptInternal(options) {
         let totalImages = 0;
         messages.forEach(m => m.images.forEach(img => { if (img.startsWith('data:') || img.startsWith('blob:') || img.startsWith('http')) totalImages++; }));
 
-        try { chrome.runtime.sendMessage({ action: "tdmExportProgress", current: 0, total: totalImages, text: "Подготовка фото:" }); } catch (e) { }
+        try { chrome.runtime.sendMessage({ action: "tdmExportProgress", exportId: photoExportId, current: 0, total: totalImages, text: "Подготовка фото:" }); } catch (e) { }
         for (const m of messages) {
             for (let i = 0; i < m.images.length; i++) {
                 const src = m.images[i];
@@ -314,7 +314,7 @@ async function _tdmExportScriptInternal(options) {
                         m.images[i] = filename; // Replace the base64 string with the filename in JSON
                     }
 
-                    try { chrome.runtime.sendMessage({ action: "tdmExportProgress", current: downloadImgCount, total: totalImages, text: "Упаковка фото:" }); } catch (e) { }
+                    try { chrome.runtime.sendMessage({ action: "tdmExportProgress", exportId: photoExportId, current: downloadImgCount, total: totalImages, text: "Упаковка фото:" }); } catch (e) { }
                     downloadImgCount++;
                     await delay(100);
                 }

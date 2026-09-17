@@ -107,6 +107,11 @@ const importBackupWrite = optionsSource.indexOf('dashbridge_import_backup:', imp
 const importSyncWrite = optionsSource.indexOf('await setStorageValues(chrome.storage.sync, imported.sync);', importBackupWrite);
 assert(importValidationCall >= 0 && importBackupWrite > importValidationCall && importSyncWrite > importBackupWrite,
     'confirmed import must validate before creating its backup and writing sync settings');
+assert(optionsHtml.includes('id="restoreImportBackupBtn"')
+    && optionsSource.includes('restoreImportBackup')
+    && optionsSource.includes('removeStorageValues(chrome.storage.sync, syncRemove)')
+    && optionsSource.includes('removeStorageValues(chrome.storage.local, localRemove)'),
+    'Options must expose a last-import restore action that also removes keys absent from the backup');
 for (const id of ['settingCpuWarn', 'settingCpuCrit', 'settingMemWarn', 'settingMemCrit']) {
     assert(new RegExp(`id="${id}"[^>]*min="0"[^>]*max="100"`).test(optionsHtml),
         `${id} must expose its valid percentage range`);

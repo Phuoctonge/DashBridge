@@ -129,7 +129,7 @@ async function tdmExport() {
         savePhotos: photosCheck.checked,
         excludePhotoUser: excludeName,
         isExcludeAll: photosCheck.checked && excludeCheck.checked && excludeName === "",
-        photoExportId: new Date().toISOString().replace(/[-:T]/g, '').slice(0, 12)
+        photoExportId: crypto.randomUUID()
     };
     const analyticsDimensions = { format: ['html', 'json', 'both'].includes(options.format) ? options.format : 'html' };
     DashBridgeAnalytics?.track('tdm.export_started', 'used', analyticsDimensions);
@@ -142,8 +142,13 @@ async function tdmExport() {
         })
         : null;
     let activeTdmTabId = null;
+    let activeTdmOrigin = null;
     let photoQueue = Promise.resolve();
+    const isCurrentExportSender = sender => sender?.tab?.id === activeTdmTabId
+        && sender.frameId === 0 && typeof sender.url === 'string'
+        && (() => { try { return new URL(sender.url).origin === activeTdmOrigin; } catch { return false; } })();
     const progressListener = (msg, sender, sendResponse) => {
+        if (msg?.exportId !== options.photoExportId || !isCurrentExportSender(sender)) return undefined;
         if (msg.action === "tdmExportProgress") {
             statusEl.textContent = formatTdmExportProgress(msg);
         }
@@ -189,12 +194,13 @@ async function tdmExport() {
                     return;
                 }
 
-                if (activeUrl.hostname.toLowerCase() !== tdmUrl.hostname.toLowerCase()) {
+                if (activeUrl.origin !== tdmUrl.origin) {
                     statusEl.textContent = `Откройте страницу TDM Chat (${settings.tdmDomain})`;
                     chrome.runtime.onMessage.removeListener(progressListener);
                     finishAnalytics('unsupported_page');
                     return;
                 }
+                activeTdmOrigin = tdmUrl.origin;
                 chrome.scripting.executeScript({
                     target: { tabId: tabs[0].id },
                     func: _tdmExportScriptInternal,

@@ -117,9 +117,14 @@ const grafanaSender = (url, frameId = 0) => ({
         'an explicitly configured port must remain exact');
     assert.strictEqual(await isTrustedGrafanaContentSender(grafanaSender('https://grafana.test/d/uid/name', 1)), false,
         'privileged capture messages must come from the top-level content script');
-    const ready = waitForGuiCaptureReady(42, 100);
-    messageListener({ type: 'dashbridge-gui-capture-ready' }, { tab: { id: 42 } }, () => { });
-    assert.strictEqual(await ready, true, 'matching tab render event must resolve the waiter');
+    const ready = waitForGuiCaptureReady(42, 'capture-42', 100);
+    guiCaptureController.markReady(42, 'capture-42');
+    assert.strictEqual(await ready, true, 'matching tab and capture event must resolve the waiter');
+    const rejectedReady = waitForGuiCaptureReady(42, 'capture-43', 100);
+    assert.strictEqual(guiCaptureController.markReady(42, 'wrong-capture'), false,
+        'a stale capture identifier must not resolve another run');
+    guiCaptureController.markReady(42, 'capture-43');
+    assert.strictEqual(await rejectedReady, true);
     const captureResult = await new Promise(resolve => messageListener(
         { type: 'dashbridge-capture-visible-tab' },
         { ...grafanaSender('https://grafana.test/d/uid/name'), documentId: 'document-7' }, resolve
@@ -172,7 +177,7 @@ const grafanaSender = (url, frameId = 0) => ({
     ));
     assert.strictEqual(rejectedIndicator.ok, false,
         'another extension page must not gain the popup update-indicator authority');
-    console.log('PASS background GUI capture waiter resolves for the emitting tab');
+    console.log('PASS background GUI capture readiness is correlated to the active capture session');
 })().catch(error => { console.error(error); process.exitCode = 1; });
 
 const contentSource = fs.readFileSync('js/content/content.js', 'utf8');

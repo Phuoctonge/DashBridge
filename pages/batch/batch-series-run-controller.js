@@ -142,6 +142,7 @@
                                 onTabId: value => { seriesDiscoveryTabId = value; },
                                 discoveryWindowId: batchPageTab?.windowId || null,
                             });
+                            if (!operation.isActive(runId)) break;
                             seriesDiscoveryTabId = discoveryResult.tabId;
                             const selection = seriesSelection.resolvePatterns(
                                 discoveryResult.names, includePattern, ignorePattern,
@@ -187,11 +188,13 @@
                                     panelRules.forPanel(seriesPanelRules, panelId),
                                     lifecycle.signal(runId),
                                 );
+                                if (!operation.isActive(runId)) break;
                                 if (rect && rect.w > 5) {
                                     const captured = await operation.capturePanelToZip(
                                         captureWindow, tabId, panelId, archivePath,
-                                        archive, captureOptions,
+                                        archive, captureOptions, () => operation.isActive(runId),
                                     );
+                                    if (!operation.isActive(runId)) break;
                                     recordSeriesJob(
                                         captured, archivePath,
                                         'Не удалось захватить изображение панели',
@@ -230,11 +233,13 @@
                                         panelRules.forPanel(seriesPanelRules, panelId),
                                         lifecycle.signal(runId),
                                     );
+                                    if (!operation.isActive(runId)) break;
                                     previousSeriesName = seriesName;
                                     if (rect && rect.w > 5) {
                                         const filterResult = await setLegendVisibility({
                                             tabId, panelId, selectedKeys: [series.key],
                                         });
+                                        if (!operation.isActive(runId)) break;
                                         if (!filterResult.ok) {
                                             recordSeriesJob(
                                                 false, archivePath,
@@ -254,8 +259,9 @@
                                         }
                                         const captured = await operation.capturePanelToZip(
                                             captureWindow, tabId, panelId, archivePath,
-                                            archive, captureOptions,
+                                            archive, captureOptions, () => operation.isActive(runId),
                                         );
+                                        if (!operation.isActive(runId)) break;
                                         recordSeriesJob(
                                             captured, archivePath,
                                             'Не удалось захватить изображение Series',
@@ -316,8 +322,10 @@
                             successfulJobs,
                             failedJobs,
                             errors: captureErrors,
-                        });
+                        }, () => operation.isActive(runId));
+                        if (!operation.isActive(runId)) return;
                         await archive.finalize();
+                        if (!operation.isActive(runId)) return;
                         if (failedJobs) {
                             analyticsOutcome = 'partial';
                             logMessage(

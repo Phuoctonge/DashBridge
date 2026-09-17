@@ -123,6 +123,20 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 
 const guiCaptureController = DashBridgeBackgroundGuiCapture.create({ zipConstructor: JSZip });
 
+function isActiveGuiCaptureSender(sender, message, page) {
+    const active = guiCaptureController.getActiveCapture();
+    if (!active || sender?.id !== chrome.runtime.id || sender.tab?.id !== active.tabId
+        || sender.tab?.windowId !== active.windowId || typeof sender.url !== 'string'
+        || typeof message?.captureId !== 'string' || message.captureId !== active.id) return false;
+    try {
+        const url = new URL(sender.url);
+        const expected = new URL(chrome.runtime.getURL(page));
+        return url.origin === expected.origin && url.pathname === expected.pathname
+            && url.searchParams.has('guiCapture')
+            && url.searchParams.get('guiCaptureId') === active.id;
+    } catch (_) { return false; }
+}
+
 // This listener is a trust boundary: a new message type must validate its sender,
 // payload shape/size, and target scope in its own branch before using Chrome APIs.
 // Do not replace the branch-specific checks with a single "extension sender" test:
@@ -261,14 +275,17 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             .catch(error => sendResponse({ ok: false, error: error.message || String(error) }));
         return true;
     }
-    if (message && message.type === 'dashbridge-gui-capture-ready' && _sender.tab) {
-        guiCaptureController.markReady(_sender.tab.id);
+    if (message?.type === 'dashbridge-gui-capture-ready') {
+        if (isActiveGuiCaptureSender(_sender, message, 'pages/dashbridge/dashbridge.html')) {
+            guiCaptureController.markReady(_sender.tab.id, message.captureId);
+        }
         return undefined;
     }
-    if (message && message.type === 'dashbridge-popup-capture-size' && _sender.tab && _sender.tab.windowId) {
+    if (message?.type === 'dashbridge-popup-capture-size') {
+        if (!isActiveGuiCaptureSender(_sender, message, 'pages/popup/popup.html')) return undefined;
         const width = Math.min(480, Math.max(366, Number(message.width) || 366));
         const height = Math.min(1500, Math.max(420, Number(message.height) || 420));
-        chrome.windows.update(_sender.tab.windowId, { state: 'normal', width, height });
+        chrome.windows.update(_sender.tab.windowId, { state: 'normal', width, height }).catch(() => undefined);
         return undefined;
     }
     if (message && message.type === 'dashbridge-capture-gui') {

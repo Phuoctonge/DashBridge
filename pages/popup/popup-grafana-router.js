@@ -108,11 +108,14 @@ document.addEventListener("DOMContentLoaded", () => {
             if (targetSub) {
                 activateSubTab(targetSub, false);
             }
-            if (new URLSearchParams(location.search).has('guiCapture')) {
+            const query = new URLSearchParams(location.search);
+            const captureId = query.get('guiCaptureId');
+            if (query.has('guiCapture') && captureId) {
                 setTimeout(() => {
                     const root = document.documentElement;
                     chrome.runtime.sendMessage({
                         type: 'dashbridge-popup-capture-size',
+                        captureId,
                         width: Math.ceil(Math.max(document.body.scrollWidth, root.scrollWidth) + 16),
                         height: Math.ceil(Math.max(document.body.scrollHeight, root.scrollHeight) + 16)
                     });

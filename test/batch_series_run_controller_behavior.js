@@ -188,6 +188,21 @@ function createHarness({ mode = 'group', matches = [{ name: 'cpu', key: 'cpu\u00
     await settingsFailure.controller.run();
     assert(settingsFailure.calls.some(call => Array.isArray(call) && call[0] === 'finish'));
 
+    const cancelledAfterLoad = createHarness();
+    let seriesRunActive = true;
+    cancelledAfterLoad.operation.isActive = runId => seriesRunActive && runId === 17;
+    cancelledAfterLoad.operation.loadPanel = async (...args) => {
+        cancelledAfterLoad.calls.push(['load', ...args]);
+        seriesRunActive = false;
+        return { w: 100, h: 50 };
+    };
+    await cancelledAfterLoad.controller.run();
+    assert(cancelledAfterLoad.calls.some(call => Array.isArray(call) && call[0] === 'load'));
+    assert(!cancelledAfterLoad.calls.some(call => Array.isArray(call) && call[0] === 'capture'));
+    assert(!cancelledAfterLoad.calls.some(call => Array.isArray(call) && call[0] === 'report'));
+    assert(!cancelledAfterLoad.calls.includes('finalize'));
+    assert(!cancelledAfterLoad.progress.some(item => item.done === 1));
+
     let failureHarness;
     failureHarness = createHarness({
         discoveryImpl: async options => {

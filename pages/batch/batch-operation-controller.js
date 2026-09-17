@@ -32,7 +32,8 @@
             if (!lifecycle.finish(runId)) return false;
             progress.finish(); await releaseWindow(); setProcessing(false); return true;
         };
-        const capturePanelToZip = async (win, tabId, panelId, filename, archive, captureOptions = {}) => {
+        const capturePanelToZip = async (win, tabId, panelId, filename, archive, captureOptions = {}, isActive = () => true) => {
+            if (!isActive()) return null;
             const captured = await captureGrafanaPanelImage({
                 tabId, windowId: win.id, panelId, settleMs: 300,
                 onDiagnostic: detail => logMessage(
@@ -41,9 +42,14 @@
                 ),
                 ...captureOptions,
             });
+            if (!isActive()) return null;
             if (!captured) { logMessage(`Unable to capture panel: ${filename}`, true); return false; }
             const bytes = BatchCaptureUtils.base64ToUint8Array(captured.dataUrl.split(',')[1]);
-            await archive.add(filename, bytes, bytes.byteLength); logMessage(`Saved: ${filename} (${bytes.length} bytes)`); return true;
+            if (!isActive()) return null;
+            await archive.add(filename, bytes, bytes.byteLength);
+            if (!isActive()) return null;
+            logMessage(`Saved: ${filename} (${bytes.length} bytes)`);
+            return true;
         };
         const getCaptureOptions = async toggleId => {
             if (document.getElementById(toggleId)?.checked !== true) return { prepared: false };
@@ -51,13 +57,17 @@
             const settings = normalizeGrafanaSettings(stored);
             return { prepared: true, outputWidth: settings.grafanaCompactExportWidth, outputHeight: settings.grafanaCompactExportHeight };
         };
-        const addArchiveReport = async (archive, report) => {
+        const addArchiveReport = async (archive, report, isActive = () => true) => {
+            if (!isActive()) return false;
             const manifestBytes = new TextEncoder().encode(`${JSON.stringify({ generatedAt: new Date().toISOString(), ...report }, null, 2)}\n`);
             await archive.add('manifest.json', manifestBytes, manifestBytes.byteLength);
+            if (!isActive()) return false;
             if (report.errors?.length) {
                 const errorBytes = new TextEncoder().encode(`${report.errors.map(item => `${item.file}: ${item.reason}`).join('\n')}\n`);
                 await archive.add('errors.txt', errorBytes, errorBytes.byteLength);
+                if (!isActive()) return false;
             }
+            return true;
         };
         cancelButton.addEventListener('click', cancel);
         window.addEventListener('pagehide', () => { lifecycle.cancel(); void progress.release(); });

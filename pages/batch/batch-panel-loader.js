@@ -1,6 +1,6 @@
 // Batch navigation and renderer readiness in the temporary Grafana tab.
 function createBatchPanelLoader({ log }) {
-    const waitForPanelInMainWorld = (panelId, panelTools) => new Promise(resolve => {
+    const waitForPanelInMainWorld = (panelId, panelTools, timeoutMs = 25_000) => new Promise(resolve => {
         const findPanel = () => {
             const exact = window.DashBridgeGrafanaDom?.findPanelById(panelId);
             if (exact) return exact;
@@ -49,6 +49,7 @@ function createBatchPanelLoader({ log }) {
             if (loading || !panel) {
                 stableFrames = 0;
                 previousRect = null;
+                schedule();
                 return;
             }
             if (observedPanel !== panel) {
@@ -65,28 +66,49 @@ function createBatchPanelLoader({ log }) {
                     stableFrames = 0; schedule(); return;
                 }
             }
-            if (rect.width <= 5 || rect.height <= 10) return;
-            // Header/menu SVG icons may precede the chart and can be hidden.
-            const renderer = panel.querySelector('.flot-base, .uplot canvas, .graph-panel__chart canvas, canvas')
-                || Array.from(panel.querySelectorAll('svg')).find(svg => svg.getBoundingClientRect().height > 1) || panel;
-            if (renderer.getBoundingClientRect().height <= 1) return;
-            const interceptor = window.__dashbridgeDataInterceptorDiagnostic;
-            const requestSettled = interceptor?.activeRequests === 0
-                && interceptor.events?.some(event => event.stage === 'request-complete');
-            const chart = window.DashBridgeGrafanaVisualEngine?.findUPlot?.(panel);
-            const chartHasPoints = Array.isArray(chart?.data)
-                && chart.data.some(values => Array.isArray(values) && values.length > 0);
-            const flotHasPoints = typeof window.jQuery === 'function'
-                && (window.jQuery(renderer).data('plot')?.getData?.() || [])
-                    .some(series => Array.isArray(series?.data) && series.data.length > 0);
-            const svgHasGeometry = [...panel.querySelectorAll('svg path, svg polyline, svg rect')].some(element => {
-                try { return element.getBBox().width > 0 && element.getBBox().height > 0; }
-                catch { return false; }
-            });
-            if (!requestSettled || !(chartHasPoints || flotHasPoints || svgHasGeometry)) {
+            if (rect.width <= 5 || rect.height <= 10) {
                 stableFrames = 0;
                 schedule();
                 return;
+            }
+            // Header/menu SVG icons may precede the visualization and can be hidden.
+            // A rendered panel itself is enough for the ordinary capture path: Grafana
+            // may render valid no-data, table, stat, canvas and plugin panels without
+            // uPlot/Flot points or any observed data request.
+            const renderer = panel.querySelector('.flot-base, .uplot canvas, .graph-panel__chart canvas, canvas')
+                || Array.from(panel.querySelectorAll('svg')).find(svg => svg.getBoundingClientRect().height > 1) || panel;
+            if (renderer.getBoundingClientRect().height <= 1) {
+                stableFrames = 0;
+                schedule();
+                return;
+            }
+            const requiresDataEvidence = panelTools?.invertIdle === true
+                || panelTools?.convertMemToUsed === true
+                || panelTools?.forceMemByteUnit === true
+                || panelTools?.trimDomainEnabled === true
+                || panelTools?.seriesQueryFilterEnabled === true
+                || panelTools?.cpuCapacityFilterEnabled === true
+                || (panelTools?.legendMode === 'fast_complete_hide'
+                    && (panelTools.legendFilter?.length > 0 || panelTools.legendVisibleSeries?.length > 0));
+            if (requiresDataEvidence) {
+                const interceptor = window.__dashbridgeDataInterceptorDiagnostic;
+                const requestSettled = interceptor?.activeRequests === 0
+                    && interceptor.events?.some(event => event.stage === 'request-complete');
+                const chart = window.DashBridgeGrafanaVisualEngine?.findUPlot?.(panel);
+                const chartHasPoints = Array.isArray(chart?.data)
+                    && chart.data.some(values => Array.isArray(values) && values.length > 0);
+                const flotHasPoints = typeof window.jQuery === 'function'
+                    && (window.jQuery(renderer).data('plot')?.getData?.() || [])
+                        .some(series => Array.isArray(series?.data) && series.data.length > 0);
+                const svgHasGeometry = [...panel.querySelectorAll('svg path, svg polyline, svg rect')].some(element => {
+                    try { return element.getBBox().width > 0 && element.getBBox().height > 0; }
+                    catch { return false; }
+                });
+                if (!requestSettled || !(chartHasPoints || flotHasPoints || svgHasGeometry)) {
+                    stableFrames = 0;
+                    schedule();
+                    return;
+                }
             }
             const currentRect = [rect.x, rect.y, rect.width, rect.height].map(value => Math.round(value * 10) / 10);
             if (previousRect && currentRect.every((value, index) => value === previousRect[index])) stableFrames++;
@@ -157,32 +179,60 @@ function createBatchPanelLoader({ log }) {
             attributeFilter: ['class', 'style', 'width', 'height']
         });
         resizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(schedule) : null;
-        timeout = setTimeout(() => finish(null), 30_000);
+        timeout = setTimeout(() => finish(null), timeoutMs);
         schedule();
     });
+
+    const isTransientFrameRemoval = error => /\bframe with id \d+ was removed\b/i.test(String(error?.message || error));
+    const wait = delayMs => new Promise(resolve => setTimeout(resolve, delayMs));
+    const withoutCacheBust = value => {
+        const normalized = new URL(value);
+        normalized.searchParams.delete('_t');
+        return normalized.toString();
+    };
 
     return async (tabId, url, panelId, _seriesFilter, previousSeriesFilter = null, panelTools = null, signal = null) => {
         log(previousSeriesFilter ? 'Быстрое переключение на серию…' : `Загрузка панели ${panelId}…`);
         if (signal?.aborted) return false;
 
-        // The runtime must start at document_start for every Batch panel: its
-        // request journal is the causal readiness signal, not an optional tool.
+        // The early runtime is needed only when a panel's active tools actually
+        // transform response data. Ordinary panels are read from their rendered DOM.
         const targetUrl = new URL(url);
-        try {
-            const registration = await ensureEarlyGrafanaRuntimeForUrl(targetUrl.toString());
-            if (!registration.ok) {
-                log(`Не удалось подготовить runtime панели ${panelId}: ${registration.reason || 'неизвестная ошибка'}`, true);
+        const requiresDataRuntime = panelTools?.invertIdle === true
+            || panelTools?.convertMemToUsed === true
+            || panelTools?.forceMemByteUnit === true
+            || panelTools?.trimDomainEnabled === true
+            || panelTools?.seriesQueryFilterEnabled === true
+            || panelTools?.cpuCapacityFilterEnabled === true
+            || (panelTools?.legendMode === 'fast_complete_hide'
+                && (panelTools.legendFilter?.length > 0 || panelTools.legendVisibleSeries?.length > 0));
+        if (requiresDataRuntime) {
+            try {
+                const registration = await ensureEarlyGrafanaRuntimeForUrl(targetUrl.toString());
+                if (!registration.ok) {
+                    log(`Не удалось подготовить runtime панели ${panelId}: ${registration.reason || 'неизвестная ошибка'}`, true);
+                    return null;
+                }
+            } catch (error) {
+                log(`Не удалось подготовить runtime панели ${panelId}: ${error.message}`, true);
                 return null;
             }
-        } catch (error) {
-            log(`Не удалось подготовить runtime панели ${panelId}: ${error.message}`, true);
-            return null;
+            if (signal?.aborted) return false;
         }
 
         return new Promise(resolve => {
             let settled = false;
             let readinessTimeout = null;
             let preparing = false;
+            let navigationGeneration = 0;
+            let expectedUrl = null;
+            const getTab = () => new Promise(resolveTab => {
+                chrome.tabs.get(tabId, tab => resolveTab(chrome.runtime.lastError ? null : tab || null));
+            });
+            const matchesExpectedUrl = tab => !!tab && !!expectedUrl
+                && !tab.pendingUrl && tab.url === expectedUrl;
+            const isCurrentAttempt = (generation, tab) => !settled && !signal?.aborted
+                && generation === navigationGeneration && matchesExpectedUrl(tab);
             const finish = value => {
                 if (settled) return;
                 settled = true;
@@ -192,38 +242,49 @@ function createBatchPanelLoader({ log }) {
                 resolve(value);
             };
             const abort = () => finish(false);
-            const prepareCompleteTab = async currentTab => {
-                if (settled || preparing || currentTab?.status !== 'complete') return;
+            const prepareCompleteTab = async (currentTab, generation) => {
+                if (settled || preparing || currentTab?.status !== 'complete'
+                    || !isCurrentAttempt(generation, currentTab)) return;
                 preparing = true;
                 try {
-                    if (panelTools) {
-                        const refresh = panelTools.invertIdle === true || panelTools.convertMemToUsed === true || panelTools.seriesQueryFilterEnabled === true;
-                        const applied = await applySharedGrafanaPanelTools(panelTools, { tabId, refresh });
-                        if (!applied?.ok) {
-                            log(`Не удалось применить настройки панели ${panelId}: ${applied?.reason || 'неизвестная ошибка'}`, true);
-                            finish(null);
-                            return;
+                    for (let attempt = 0; attempt < 2; attempt++) {
+                        if (!isCurrentAttempt(generation, await getTab())) return finish(false);
+                        if (panelTools) {
+                            const refresh = panelTools.invertIdle === true || panelTools.convertMemToUsed === true
+                                || panelTools.seriesQueryFilterEnabled === true || panelTools.cpuCapacityFilterEnabled === true;
+                            const applied = await applySharedGrafanaPanelTools(panelTools, { tabId, refresh });
+                            if (!isCurrentAttempt(generation, await getTab())) return finish(false);
+                            if (!applied?.ok) {
+                                log(`Не удалось применить настройки панели ${panelId}: ${applied?.reason || 'неизвестная ошибка'}`, true);
+                                return finish(null);
+                            }
+                        }
+                        try {
+                            await chrome.scripting.executeScript({ target: { tabId }, world: 'MAIN', files: ['js/content/grafana-dom.js'] });
+                            if (!isCurrentAttempt(generation, await getTab())) return finish(false);
+                            const results = await chrome.scripting.executeScript({
+                                target: { tabId }, world: 'MAIN', func: waitForPanelInMainWorld,
+                                args: [panelId, panelTools, 25_000]
+                            });
+                            if (!isCurrentAttempt(generation, await getTab())) return finish(false);
+                            return finish(results?.[0]?.result || null);
+                        } catch (error) {
+                            if (!isTransientFrameRemoval(error) || attempt === 1) throw error;
+                            // A Grafana navigation can replace frame 0 just after its
+                            // complete event. Retry once, bounded, within this load only.
+                            await wait(150);
                         }
                     }
-                    if (signal?.aborted) return finish(false);
-                    await chrome.scripting.executeScript({ target: { tabId }, world: 'MAIN', files: ['js/content/grafana-dom.js'] });
-                    const results = await chrome.scripting.executeScript({
-                        target: { tabId },
-                        world: 'MAIN',
-                        func: waitForPanelInMainWorld,
-                        args: [panelId, panelTools]
-                    });
-                    finish(results?.[0]?.result || null);
                 } catch (error) {
                     if (!signal?.aborted) log(`Не удалось подготовить панель ${panelId}: ${error.message}`, true);
-                    finish(null);
+                    finish(signal?.aborted ? false : null);
+                } finally {
+                    preparing = false;
                 }
             };
             const onUpdated = (updatedTabId, changeInfo, currentTab) => {
-                if (updatedTabId !== tabId || settled) return;
-                if (changeInfo.status === 'complete' || currentTab?.status === 'complete') {
-                    void prepareCompleteTab(currentTab);
-                }
+                if (updatedTabId !== tabId || settled || changeInfo.status !== 'complete') return;
+                void prepareCompleteTab(currentTab, navigationGeneration);
             };
             chrome.tabs.onUpdated.addListener(onUpdated);
             readinessTimeout = setTimeout(() => finish(false), 30_000);
@@ -231,21 +292,23 @@ function createBatchPanelLoader({ log }) {
 
             chrome.tabs.get(tabId, async tab => {
                 if (chrome.runtime.lastError || !tab || signal?.aborted) return finish(false);
-                const current = new URL(tab.url || 'http://localhost');
-                const target = targetUrl;
-                current.searchParams.delete('_t');
-                target.searchParams.delete('_t');
-                if (current.toString() !== target.toString()) {
-                    target.searchParams.set('_t', Date.now());
+                const currentBaseUrl = withoutCacheBust(tab.url || 'http://localhost');
+                const targetBaseUrl = withoutCacheBust(targetUrl.toString());
+                navigationGeneration++;
+                if (currentBaseUrl !== targetBaseUrl) {
+                    targetUrl.searchParams.set('_t', Date.now());
+                    expectedUrl = targetUrl.toString();
                     try {
-                        const updatedTab = await chrome.tabs.update(tabId, { url: target.toString() });
-                        void prepareCompleteTab(updatedTab);
-                    } catch {
+                        const updatedTab = await chrome.tabs.update(tabId, { url: expectedUrl });
+                        if (updatedTab?.status === 'complete') void prepareCompleteTab(updatedTab, navigationGeneration);
+                    } catch (error) {
+                        if (!signal?.aborted) log(`Не удалось открыть панель ${panelId}: ${error.message}`, true);
                         finish(false);
                     }
                     return;
                 }
-                void prepareCompleteTab(tab);
+                expectedUrl = tab.url;
+                void prepareCompleteTab(tab, navigationGeneration);
             });
         });
     };

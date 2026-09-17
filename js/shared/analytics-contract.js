@@ -96,7 +96,7 @@
     add(['tdm.photos_changed', 'tdm.exclusion_changed', 'tdm.remember_dates_changed', 'tdm.export_started', 'tdm.export_finished'],
         ['changed', 'configured', 'used', 'outcome'], ['outcome', 'format', 'state', 'countBucket']);
     add(['confluence.fix_configured', 'confluence.fix_activated'], ['configured', 'effective'], ['state']);
-    add(['options.saved', 'options.config_exported', 'options.config_imported'], ['used', 'outcome'], ['outcome']);
+    add(['options.saved', 'options.config_exported', 'options.config_imported', 'options.config_import_restored'], ['used', 'outcome'], ['outcome']);
     add(['options.module_availability'], ['configured'], ['module', 'state']);
     add(['internal.debug_report', 'internal.gui_capture', 'internal.grafana_test_runner', 'internal.message_test_runner', 'internal.debug_easter_egg'],
         ['used', 'outcome'], ['outcome']);

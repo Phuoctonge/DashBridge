@@ -99,6 +99,34 @@ controller.run().then(() => {
     operation.getCaptureOptions = async () => { throw new Error('storage unavailable'); };
     await controller.run();
     assert.strictEqual(calls.filter(call => Array.isArray(call) && call[0] === 'finish').length, finishes + 1);
+
+    // Cancellation while the renderer is still loading must not produce a
+    // capture, failure accounting, archive finalization, or completion UI.
+    calls.length = 0;
+    progress.length = 0;
+    notifications.length = 0;
+    operation.processing = false;
+    let active = true;
+    operation.begin = async () => 7;
+    operation.isActive = runId => active && runId === 7;
+    operation.getCaptureOptions = async () => ({ prepared: false });
+    operation.loadPanel = async (...args) => {
+        calls.push(['load', ...args]);
+        active = false;
+        return { w: 100, h: 50 };
+    };
+    operation.capturePanelToZip = async (...args) => {
+        calls.push(['capture', ...args]);
+        return true;
+    };
+    await controller.run();
+    assert(calls.some(call => Array.isArray(call) && call[0] === 'load'));
+    assert(!calls.some(call => Array.isArray(call) && call[0] === 'capture'));
+    assert(!calls.some(call => Array.isArray(call) && call[0] === 'report'));
+    assert(!calls.includes('finalize'));
+    assert(!calls.some(call => Array.isArray(call) && call[0] === 'log' && /❌|заверш/.test(call[1])));
+    assert(!progress.some(item => item.done === 1));
+
     assert.throws(
         () => context.BatchMainRunController.create({ documentRef }),
         /dependencies are incomplete/,

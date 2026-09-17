@@ -52,7 +52,9 @@ check('Batch compact capture choices use accessible switches',
 check('Main action uses the shared primary button variant', 'id="startBtn" class="btn btn-primary"' in HTML)
 check('Cancel action uses the shared danger button variant', 'id="cancelBtn" class="btn btn-danger"' in HTML)
 check('Batch action buttons are compact instead of globally full-width', '#mainActionArea .btn' in CSS and 'width: 100%;' not in CSS.split('.btn {', 1)[1].split('}', 1)[0])
-check('Panel navigation is awaited before readiness polling', 'await chrome.tabs.update(tabId, { url: target.toString() })' in (ROOT / 'pages/batch/batch-panel-loader.js').read_text(encoding='utf-8'))
+check('Panel navigation is awaited before readiness polling',
+      'const updatedTab = await chrome.tabs.update(tabId, { url: expectedUrl });' in PANEL_LOADER
+      and 'if (updatedTab?.status === \'complete\') void prepareCompleteTab(updatedTab, navigationGeneration);' in PANEL_LOADER)
 check('Batch state writes are debounced', 'saveTimer' in (ROOT / 'pages/batch/batch-state.js').read_text(encoding='utf-8') and 'setTimeout' in (ROOT / 'pages/batch/batch-state.js').read_text(encoding='utf-8'))
 check('Batch exposes progress counters', 'batchProgress' in HTML and 'updateBatchProgress' in JS)
 check('Rule loading ignores stale URL responses', 'loadVersion' in JS and 'version !== loadVersion' in JS)

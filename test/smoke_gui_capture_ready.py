@@ -21,6 +21,11 @@ check('iframe readiness supports chart and table surfaces',
 check('iframe readiness avoids document-wide mutation observers',
       'new MutationObserver' not in IFRAME
       and 'readinessTimer = setTimeout(inspectReadiness, delay)' in IFRAME)
-check('background owns tab-scoped render waiters', 'const waitForReady =' in BACKGROUND)
-check('DashBridge GUI capture creates and awaits render readiness', '? waitForReady(tabId)' in BACKGROUND and 'await dashbridgeReady;' in BACKGROUND)
+check('background owns capture-session render waiters', 'const waitForReady =' in BACKGROUND)
+check('DashBridge GUI capture creates a per-capture identifier', 'const captureId =' in BACKGROUND)
+check('DashBridge GUI capture awaits correlated render readiness',
+      '? waitForReady(tabId, captureId)' in BACKGROUND and 'await dashbridgeReady;' in BACKGROUND)
+check('GUI capture messages carry the session identifier',
+      "message.captureId !== active.id" in BACKGROUND
+      and "get('guiCaptureId') === active.id" in BACKGROUND)
 check.finish()

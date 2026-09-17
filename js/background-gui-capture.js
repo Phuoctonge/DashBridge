@@ -31,28 +31,32 @@
             throw new TypeError('Background GUI capture dependencies are incomplete');
         }
         const readyWaiters = new Map();
+        let activeCapture = null;
         let captureInProgress = false;
         let lastPanelVisibleCaptureAt = 0;
         const wait = ms => new Promise(resolve => setTimer(resolve, ms));
 
-        const waitForReady = (tabId, timeoutMs = 15_000) => new Promise(resolve => {
-            const previous = readyWaiters.get(tabId);
+        const waitForReady = (tabId, captureId, timeoutMs = 15_000) => new Promise(resolve => {
+            const key = `${tabId}:${captureId}`;
+            const previous = readyWaiters.get(key);
             if (previous) previous(false);
             const finish = ready => {
                 clearTimer(timeout);
-                if (readyWaiters.get(tabId) === finish) readyWaiters.delete(tabId);
+                if (readyWaiters.get(key) === finish) readyWaiters.delete(key);
                 resolve(ready);
             };
             const timeout = setTimer(() => finish(false), timeoutMs);
-            readyWaiters.set(tabId, finish);
+            readyWaiters.set(key, finish);
         });
 
-        const markReady = tabId => {
-            const finish = readyWaiters.get(tabId);
+        const markReady = (tabId, captureId) => {
+            const finish = readyWaiters.get(`${tabId}:${captureId}`);
             if (!finish) return false;
             finish(true);
             return true;
         };
+
+        const getActiveCapture = () => activeCapture ? { ...activeCapture } : null;
 
         const blobToDataUrl = async blob => {
             const bytes = new Uint8Array(await blob.arrayBuffer());
@@ -102,16 +106,22 @@
             });
             const tabId = captureWindow.tabs?.[0]?.id;
             if (!captureWindow.id || !tabId) throw new Error('Не удалось открыть окно для снимков');
+            const captureId = typeof root.crypto?.randomUUID === 'function'
+                ? root.crypto.randomUUID() : `${now()}-${Math.random().toString(36).slice(2)}`;
+            activeCapture = { id: captureId, tabId, windowId: captureWindow.id };
             try {
                 const zip = new zipConstructor();
                 let capturedSourceBytes = 0;
                 for (let index = 0; index < pages.length; index += 1) {
                     const page = pages[index];
-                    const dashbridgeReady = page.name === '11_dashbridge.png' ? waitForReady(tabId) : null;
+                    const dashbridgeReady = page.name === '11_dashbridge.png' ? waitForReady(tabId, captureId) : null;
                     if (page.url) {
                         await chromeRef.windows.update(captureWindow.id, { state: 'maximized' });
+                        const capturePageUrl = new URL(page.url);
+                        capturePageUrl.searchParams.set('guiCapture', String(index));
+                        capturePageUrl.searchParams.set('guiCaptureId', captureId);
                         const loaded = waitForTab(tabId);
-                        await chromeRef.tabs.update(tabId, { url: page.url });
+                        await chromeRef.tabs.update(tabId, { url: capturePageUrl.toString() });
                         await loaded;
                     } else {
                         await chromeRef.windows.update(captureWindow.id, { state: 'normal' });
@@ -119,6 +129,7 @@
                         const [mainTab, subTab] = page.popup;
                         const captureUrl = new URL(popupUrl);
                         captureUrl.searchParams.set('guiCapture', String(index));
+                        captureUrl.searchParams.set('guiCaptureId', captureId);
                         captureUrl.searchParams.set('guiTab', mainTab);
                         if (subTab) captureUrl.searchParams.set('guiSub', subTab);
                         const loaded = waitForTab(tabId);
@@ -156,6 +167,8 @@
             } catch (error) {
                 await chromeRef.windows.remove(captureWindow.id).catch(() => undefined);
                 throw error;
+            } finally {
+                if (activeCapture?.id === captureId) activeCapture = null;
             }
         };
 
@@ -205,7 +218,7 @@
             return result;
         };
 
-        return Object.freeze({ collect, captureVisiblePanel, waitForReady, markReady });
+        return Object.freeze({ collect, captureVisiblePanel, waitForReady, markReady, getActiveCapture });
     }
 
     root.DashBridgeBackgroundGuiCapture = Object.freeze({ create, reserveBytes, assertArchiveSize });
