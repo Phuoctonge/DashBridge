@@ -1,0 +1,10 @@
+:root { color-scheme: light dark; }
+body { margin: 0; min-width: 42rem; background: var(--page-bg); color: var(--text-color); font: 1rem/1.45 system-ui, sans-serif; }
+.report-page { max-width: 72rem; margin: 0 auto; padding: 2rem; }
+.page-header { display: flex; justify-content: space-between; gap: 1rem; align-items: start; margin-bottom: 1.5rem; }
+h1, h2, p { margin-top: 0; } h1 { margin-bottom: .35rem; } h2 { font-size: 1.1rem; }
+.card { padding: 1.25rem; margin-bottom: 1rem; border: 1px solid var(--border-color); border-radius: .75rem; background: var(--card-bg); }
+label { display: block; font-weight: 600; margin-bottom: .5rem; } input[type=file] { max-width: 100%; }
+button { min-height: 2.4rem; padding: .45rem .8rem; border: 1px solid var(--border-color); border-radius: .45rem; background: var(--button-bg, var(--card-bg)); color: inherit; cursor: pointer; }
+button:disabled { opacity: .55; cursor: not-allowed; } .summary-grid { display: flex; gap: 2rem; flex-wrap: wrap; }
+.summary-grid span { color: var(--muted-text); } .summary-grid b { color: var(--text-color); margin-left: .35rem; }

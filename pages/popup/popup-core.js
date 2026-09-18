@@ -118,6 +118,13 @@ document.addEventListener("DOMContentLoaded", () => {
         openSettingsFallbackBtn.onclick = openOptions;
     }
 
+    const reportImageReplacementButton = document.getElementById('openReportImageReplacementBtn');
+    if (reportImageReplacementButton) {
+        reportImageReplacementButton.addEventListener('click', () => {
+            chrome.tabs.create({ url: chrome.runtime.getURL('pages/confluence-report/confluence-report.html') });
+        });
+    }
+
     const recorderButton = document.getElementById("openTrafficRecorderBtn");
     if (recorderButton) {
         recorderButton.onclick = () => chrome.tabs.create({ url: chrome.runtime.getURL("pages/recorder/recorder.html") });

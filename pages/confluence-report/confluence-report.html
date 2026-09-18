@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Замена изображений в отчёте</title>
+    <script src="../shared/theme.js"></script>
+    <link rel="stylesheet" href="../shared/theme.css">
+    <link rel="stylesheet" href="confluence-report.css">
+</head>
+<body>
+<main class="report-page">
+    <header class="page-header"><div><h1>Замена изображений в отчёте</h1><p id="pageStatus">Выберите ZIP-архив Batch.</p></div><button id="rescanButton" type="button" disabled>Сканировать заново</button></header>
+    <section class="card"><label for="archiveInput">Архив Batch</label><input id="archiveInput" type="file" accept=".zip,application/zip"><p id="archiveStatus" role="status">Архив ещё не выбран.</p></section>
+    <section class="card" id="summaryCard" hidden><h2>Предварительный итог</h2><div class="summary-grid"><span>Источников <b id="sourceCount">0</b></span><span>Тестов <b id="testCount">0</b></span><span>Изображений <b id="imageCount">0</b></span></div><p id="mappingHint">Live-сканирование Confluence будет подключено после browser discovery для Confluence 7.19.18.</p></section>
+</main>
+<script src="../../vendor/jszip.min.js"></script>
+<script src="../../js/shared/confluence-report-schema.js"></script>
+<script src="confluence-report-zip.js"></script>
+<script src="confluence-report-scanner.js"></script>
+<script src="confluence-report-matcher.js"></script>
+<script src="confluence-report.js"></script>
+</body>
+</html>

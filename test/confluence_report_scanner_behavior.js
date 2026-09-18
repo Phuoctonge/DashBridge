@@ -1,0 +1,12 @@
+'use strict';
+const assert = require('assert'); const fs = require('fs'); const path = require('path'); const vm = require('vm');
+const context = { globalThis: null }; context.globalThis = context; vm.createContext(context);
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'pages', 'confluence-report', 'confluence-report-scanner.js'), 'utf8'), context);
+const scanner = context.DashBridgeConfluenceReportScanner;
+const html = '<h3>Тест 1. Сценарий</h3><h5>Метрики серверов системы</h5><p>На рисунке далее CPU.</p><ac:image><ri:attachment ri:filename="cpu-1.png" /></ac:image><p>На рисунке далее диск.</p><ac:image><ri:attachment ri:filename="disk-1.png" /></ac:image><h3>Тест 2. Другой</h3><h5>Метрики серверов системы</h5><p>На рисунке далее CPU.</p><ac:image><ri:attachment ri:filename="cpu-2.png" /></ac:image>';
+const snapshot = scanner.fromStorageHtml(html, { pageIdentity: { pageId: '42' } });
+assert.strictEqual(snapshot.tests.length, 2); assert.strictEqual(snapshot.tests[0].groups[0].images.length, 2);
+assert.strictEqual(snapshot.tests[0].groups[0].images[0].imageReference.filename, 'cpu-1.png');
+assert.strictEqual(snapshot.tests[0].groups[0].images[0].caption, 'На рисунке далее CPU.');
+assert.strictEqual(snapshot.tests[0].groups[0].images[0].occurrence, 0); assert.strictEqual(snapshot.tests[1].groups[0].images[0].occurrence, 0);
+console.log('PASS report snapshot scanner');
