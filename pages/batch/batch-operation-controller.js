@@ -3,6 +3,7 @@
     function create({ mainActionArea, startButton, startSeriesButton, cancelButton, showToast, logMessage,
         lifecycle, progressFactory, captureWindowRunner, loadPanel }) {
         let processing = false;
+        const captureRecords = [];
         const progress = progressFactory.create({ onCancel: cancel });
         const updateActionVisibility = () => {
             const mainTab = document.querySelector('.tab-btn.active')?.dataset.tab === 'tab-main';
@@ -24,6 +25,7 @@
             await releaseWindow(); setProcessing(false); return true;
         }
         const begin = async ({ title, phase }) => {
+            captureRecords.length = 0;
             const runId = lifecycle.begin(); setProcessing(true);
             await progress.openPictureInPicture({ title, phase, width: 390, height: 300 }); return runId;
         };
@@ -47,6 +49,7 @@
             const bytes = BatchCaptureUtils.base64ToUint8Array(captured.dataUrl.split(',')[1]);
             if (!isActive()) return null;
             await archive.add(filename, bytes, bytes.byteLength);
+            captureRecords.push({ file: filename });
             if (!isActive()) return null;
             logMessage(`Saved: ${filename} (${bytes.length} bytes)`);
             return true;
@@ -59,7 +62,7 @@
         };
         const addArchiveReport = async (archive, report, isActive = () => true) => {
             if (!isActive()) return false;
-            const manifestBytes = new TextEncoder().encode(`${JSON.stringify({ generatedAt: new Date().toISOString(), ...report }, null, 2)}\n`);
+            const manifestBytes = new TextEncoder().encode(`${JSON.stringify({ schemaVersion: 2, generatedAt: new Date().toISOString(), captures: captureRecords.slice(), ...report }, null, 2)}\n`);
             await archive.add('manifest.json', manifestBytes, manifestBytes.byteLength);
             if (!isActive()) return false;
             if (report.errors?.length) {
