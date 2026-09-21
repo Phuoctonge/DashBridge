@@ -170,7 +170,7 @@
                         <label for="iframeSettingsHeight">Высота, px</label>
                         <input class="form-input" type="number" id="iframeSettingsHeight" min="180" max="3000" step="10" value="${Math.max(180, parseInt(panel.height, 10) || 350)}">
                     </div>
-                    <div class="modal-actions"><button type="button" class="btn btn-outline iframe-settings-cancel">Отмена</button><button type="button" class="btn btn-primary iframe-settings-save">Сохранить</button></div>
+                    <div class="modal-actions"><button type="button" class="btn btn-primary iframe-settings-save">Сохранить</button><button type="button" class="btn btn-outline iframe-settings-cancel">Отмена</button></div>
                 </div>`;
             documentRef.body.appendChild(overlay);
             overlay.style.display = 'flex';

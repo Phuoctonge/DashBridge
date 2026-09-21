@@ -123,7 +123,7 @@
                         </div>
                     </details>
                     <div class="report-panel-editor-error" role="alert" hidden></div>
-                    <div class="modal-actions report-panel-editor-actions"><button type="button" class="btn btn-outline report-panel-editor-cancel">Отмена</button><button type="button" class="btn btn-primary report-panel-editor-save">Сохранить фразы</button></div>
+                    <div class="modal-actions report-panel-editor-actions"><button type="button" class="btn btn-primary report-panel-editor-save">Сохранить фразы</button><button type="button" class="btn btn-outline report-panel-editor-cancel">Отмена</button></div>
                 </section>`;
             document.body.appendChild(overlay);
             overlay.style.display = 'flex';
@@ -356,7 +356,7 @@
                     <div class="report-panel-list">${orderedPanels.map(panel => reportPanelCardMarkup(panel)).join('')}</div>
                     ${reportVariableReferenceMarkup()}
                     <p class="report-save-error" role="alert" hidden></p>
-                    <div class="modal-actions report-settings-actions"><button type="button" class="btn btn-outline report-cancel">Отмена</button><button type="button" class="btn btn-primary report-save">Сохранить</button></div>
+                    <div class="modal-actions report-settings-actions"><button type="button" class="btn btn-primary report-save">Сохранить</button><button type="button" class="btn btn-outline report-cancel">Отмена</button></div>
                 </section>`;
             document.body.appendChild(overlay);
             overlay.style.display = 'flex';

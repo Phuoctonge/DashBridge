@@ -1,7 +1,6 @@
 'use strict';
 
 const fs = require('node:fs');
-const os = require('node:os');
 const path = require('node:path');
 const { chromium } = require('@playwright/test');
 
@@ -29,14 +28,30 @@ function validateGrafanaUrls(values) {
 }
 
 function resolveProfileRoot(override = process.env.DASHBRIDGE_E2E_PROFILE) {
-    const localDataRoot = process.env.LOCALAPPDATA
-        || path.join(os.homedir(), 'AppData', 'Local');
-    const profileRoot = path.resolve(override || path.join(localDataRoot, 'DashBridge', 'E2E', 'browser-profile'));
+    const localProfileRoot = path.join(projectRoot, '.dashbridge-local', 'e2e', 'browser-profile');
+    const profileRoot = path.resolve(override || localProfileRoot);
     const relativeToProject = path.relative(projectRoot, profileRoot);
-    if (!relativeToProject.startsWith('..') && !path.isAbsolute(relativeToProject)) {
-        throw new Error('The persistent E2E browser profile must stay outside the repository.');
+    const isInsideRepository = !relativeToProject.startsWith('..') && !path.isAbsolute(relativeToProject);
+    const isCanonicalLocalProfile = profileRoot === path.resolve(localProfileRoot);
+    if (isInsideRepository && !isCanonicalLocalProfile) {
+        throw new Error('The persistent E2E browser profile must stay in the canonical local runtime directory or outside the repository.');
     }
     return profileRoot;
+}
+
+function resolveChromeExecutable(override = process.env.DASHBRIDGE_CHROME_PATH) {
+    if (override) return path.resolve(override);
+    const localBrowserRoot = path.join(projectRoot, '.dashbridge-local', 'playwright');
+    if (fs.existsSync(localBrowserRoot)) {
+        const revisions = fs.readdirSync(localBrowserRoot, { withFileTypes: true })
+            .filter(entry => entry.isDirectory() && /^chromium-\d+$/.test(entry.name))
+            .sort((left, right) => Number(right.name.slice(9)) - Number(left.name.slice(9)));
+        for (const revision of revisions) {
+            const executable = path.join(localBrowserRoot, revision.name, 'chrome-win64', 'chrome.exe');
+            if (fs.existsSync(executable)) return executable;
+        }
+    }
+    return chromium.executablePath();
 }
 
 async function waitForExtensionWorker(context) {
@@ -94,7 +109,7 @@ async function reconcileRegisteredGrafanaRuntime({ settleMs = 4_000, pollMs = 20
 async function main() {
     const grafanaUrls = validateGrafanaUrls(process.argv.slice(2));
     const profileRoot = resolveProfileRoot();
-    const chromeExecutable = process.env.DASHBRIDGE_CHROME_PATH || chromium.executablePath();
+    const chromeExecutable = resolveChromeExecutable();
     if (!fs.existsSync(chromeExecutable)) {
         throw new Error(`Playwright Chromium is missing: ${chromeExecutable}. Run npm run browser:install.`);
     }
@@ -154,6 +169,7 @@ if (require.main === module) {
 module.exports = {
     projectRoot,
     reconcileRegisteredGrafanaRuntime,
+    resolveChromeExecutable,
     resolveProfileRoot,
     validateGrafanaUrls,
     waitForExtensionWorker,

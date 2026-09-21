@@ -30,5 +30,11 @@ const assert = require('node:assert/strict');
     assert.deepEqual(source.report.attachments.forcedIds, ['b', 'deleted']);
     panels[0].title = 'Changed copy';
     assert.equal(source.panels[0].title, 'A');
+
+    profiles = [{ ...source, id: 'system', systemKey: 'dashbridge', isSystemDefault: true }];
+    active = 'system'; panels = profiles[0].panels;
+    await controller.cloneProfile('普通ная копия');
+    assert.equal(profiles[1].systemKey, undefined);
+    assert.equal(profiles[1].isSystemDefault, undefined);
     console.log('PASS profile cloning remaps attachment IDs, drops deleted references and isolates the original');
 })().catch(error => { console.error(error); process.exitCode = 1; });

@@ -1,0 +1,13 @@
+'use strict';
+const assert = require('assert'); const fs = require('fs'); const path = require('path'); const vm = require('vm');
+const context = { globalThis: null }; context.globalThis = context; vm.createContext(context);
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'pages', 'confluence-report', 'confluence-report-operations.js'), 'utf8'), context);
+const operations = context.DashBridgeConfluenceReportOperations;
+const snapshot = { tests: [{ testKey: 'test-01', title: 'Тест 1', groups: [{ title: 'Система', images: [{ occurrence: 0, captionLead: 'использование CPU' }, { occurrence: 1, captionLead: 'память' }] }] }, { testKey: 'test-02', title: 'Тест 2', groups: [{ title: 'Система', images: [{ occurrence: 0, captionLead: 'использование CPU' }] }] }] };
+const source = { panelId: '2', title: 'CPU Usage', ranges: [{ rangeIndex: 1 }, { rangeIndex: 2 }] };
+const op = operations.create({ action: 'replace', sourceKey: '2\0CPU Usage', targetMetric: 'использование CPU', scope: 'all' });
+const expanded = operations.expand([op], snapshot, [source]);
+assert.strictEqual(expanded.length, 2); assert(expanded.every(item => item.action === 'replace'));
+const selective = operations.expand([operations.create({ ...op, scope: 'selected', testKeys: ['test-02'] })], snapshot, [source]);
+assert.strictEqual(selective.length, 1); assert.strictEqual(selective[0].testKey, 'test-02');
+console.log('PASS Confluence report operations');

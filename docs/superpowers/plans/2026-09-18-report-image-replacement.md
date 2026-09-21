@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Добавить отдельную extension page «Замена изображений в отчёте», которая импортирует Batch ZIP, сопоставляет PNG с блоками живого Confluence-отчёта, позволяет выбрать частичную замену или явное добавление и сохраняет результат с post-save verification.
+**Goal:** Добавить отдельную extension page «Замена изображений в отчёте» с вертикальным потоком `Confluence → Цели → Источник → Сопоставление → Preview → Применение`, которая сопоставляет выбранные PNG с блоками живого отчёта и сохраняет результат с post-save verification.
 
-**Architecture:** Batch остаётся владельцем capture и ZIP. Новая extension page владеет archive parsing, report snapshot, matching, immutable change plan, preview и operation lifecycle. Isolated Confluence bridge выполняет узкие read/prepare/save/verify команды на текущей разрешённой вкладке; service worker получает новый broker только если discovery подтвердит необходимость.
+**Architecture:** Batch остаётся владельцем capture и ZIP. Новая extension page сначала открывает указанную пользователем страницу Confluence в отдельном видимом окне, затем владеет scan, target selection, archive parsing, matching, immutable change plan, preview и operation lifecycle. Изолированный Confluence bridge выполняет узкие read/prepare/save/verify команды; service worker получает новый broker только если discovery подтвердит необходимость.
 
 **Tech Stack:** Chrome MV3 classic scripts, vanilla DOM, JSZip, Chrome runtime messaging, existing theme/modal/progress helpers, Node behavior tests and Playwright browser smoke.
 
@@ -18,6 +18,8 @@
 - Внешний текст выводится через DOM properties/`textContent`; `innerHTML` для недоверенных данных запрещён.
 - ZIP, manifest, изображения, messages и imports имеют schema, path-traversal guard и bounded caps.
 - Apply требует user action, immutable plan, page identity/baseline check и post-save verification.
+- ZIP/PNG source добавляется только после успешного scan и выбора хотя бы одной target-записи.
+- Новый scan или изменение target selection инвалидирует archive mapping и требует повторного preview.
 - Старые attachments не удаляются в первой версии.
 - Перед кодом читать архитектурные документы из `AGENTS.md`; после кода обновлять владельцев/permissions при изменении контракта.
 - Не изменять `vendor/jszip.min.js` и не затирать существующие пользовательские изменения.
@@ -64,7 +66,7 @@ CaptureRecord = { file, testKey, testTitle, metricGroup, metric, panelId, panelT
 - [ ] Run schema, Batch main/Series tests, module boundaries and dependency contracts.
 - [ ] Commit `feat: add report capture manifest metadata`.
 
-### Task 3: Bounded ZIP import and operation state
+### Task 3: Target-first operation state and bounded ZIP import
 
 **Files:**
 - Create: `pages/confluence-report/confluence-report-zip.js`.
@@ -80,7 +82,7 @@ ArchiveSnapshot = { fingerprint, manifest, sources: Map<path, {path, blob, bytes
 
 - [ ] Test path traversal, absolute paths, unsupported types, duplicate paths, caps, hash mismatch, abort and cleanup.
 - [ ] Implement injected JSZip parser with validation before retaining image bytes and bounded object URL lifetime.
-- [ ] Implement run IDs and states `idle`, `archive-loaded`, `scanning`, `ready`, `planning`, `preview`, `applying`, `verifying`, `completed`, `cancelled`, `partial`, `failed`.
+- [ ] Implement run IDs and states `idle`, `scanning`, `targets-ready`, `archive-loaded`, `planning`, `preview`, `applying`, `verifying`, `completed`, `cancelled`, `partial`, `failed`; reject archive import before `targets-ready` and invalidate archive/mapping when scan or selection changes.
 - [ ] Run targeted test and commit `feat: add bounded report archive import`.
 
 ### Task 4: Standalone page and accessible UI

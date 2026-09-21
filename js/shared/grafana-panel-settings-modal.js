@@ -52,7 +52,7 @@
             .dashbridge-panel-settings h3 { font-size:1.3846em; }
             .dashbridge-panel-settings > .panel-tools-scroll,.panel-tools-scroll { padding-right:1.2308em; }
             .panel-tools-footer { gap:.6154em; margin-top:1.3846em; padding-top:1.0769em; }
-            .panel-tools-footer button { min-height:2.8571em; padding:.5714em .8571em; border-radius:.4286em; font-size:1.0769em; }
+            .panel-tools-footer button { min-height:2.8571em; flex:0 0 auto; padding:.5714em .8571em; border-radius:.4286em; font-size:1.0769em; }
             .dashbridge-panel-settings .btn,.panel-tools-modal .btn { gap:.5714em; padding:.5714em 1.1429em; border-radius:.4286em; font-size:1.0769em; }
             .dashbridge-panel-settings .switch,.panel-tools-modal .switch { width:2.9231em; height:1.6923em; }
             .dashbridge-panel-settings .slider::before,.panel-tools-modal .slider::before { width:1.0769em; height:1.0769em; left:.3077em; bottom:.3077em; }
@@ -106,6 +106,7 @@
                 .panel-tools-footer { flex-wrap:wrap; }
                 .panel-tools-footer button { min-width:8em; }
             }
+            .panel-tools-footer button { flex:0 0 auto; }
         `;
         document.documentElement.appendChild(style);
     };
@@ -597,7 +598,7 @@
     const open = ({ state = {}, onSave, content = '', onReady = null, advanced = null }) => {
         ensureStyles(); document.querySelector('.dashbridge-panel-settings-overlay')?.remove();
         const overlay = createOverlay();
-        overlay.innerHTML = `<div class="dashbridge-panel-settings" role="dialog" aria-modal="true" aria-labelledby="dashbridge-panel-settings-title"><div class="panel-tools-modal-header"><h3 id="dashbridge-panel-settings-title">Настройки графика</h3><button type="button" class="btn btn-outline panel-tools-reset-all">Сбросить всё</button></div><div class="panel-tools-scroll"><p class="panel-tools-hint">Применяются только к этому графику.</p>${visualFields(state)}${content}</div><div class="panel-tools-footer"><button type="button" class="cancel">Отмена</button><button type="button" class="save">Сохранить</button></div></div>`;
+        overlay.innerHTML = `<div class="dashbridge-panel-settings" role="dialog" aria-modal="true" aria-labelledby="dashbridge-panel-settings-title"><div class="panel-tools-modal-header"><h3 id="dashbridge-panel-settings-title">Настройки графика</h3><button type="button" class="btn btn-outline panel-tools-reset-all">Сбросить всё</button></div><div class="panel-tools-scroll"><p class="panel-tools-hint">Применяются только к этому графику.</p>${visualFields(state)}${content}</div><div class="panel-tools-footer"><button type="button" class="save">Сохранить</button><button type="button" class="cancel">Отмена</button></div></div>`;
         const columnSettings = overlay.querySelector('.panel-tools-column-options')?.closest('.panel-tools-transform');
         const thresholdSettings = overlay.querySelector('.panel-alert-threshold');
         if (columnSettings && thresholdSettings) thresholdSettings.after(columnSettings);

@@ -580,16 +580,14 @@
             display: inline;
         }
 
-        .btn-save {
-            background: var(--primary);
-            color: white;
-            flex: 2;
+.btn-save {
+    background: var(--primary);
+    color: white;
         }
 
-        .btn-cancel {
-            background: #f1f5f9;
-            color: var(--text-muted);
-            flex: 1;
+.btn-cancel {
+    background: #f1f5f9;
+    color: var(--text-muted);
         }
 
         /* TDM Export Status */

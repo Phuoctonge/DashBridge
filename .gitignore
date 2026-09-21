@@ -18,6 +18,11 @@ node_modules/
 test-results/
 .worktrees/
 
+# Persistent Playwright profiles contain cookies, local storage and auth state.
+# Keep the canonical local profile inside the project for sandbox reliability,
+# but never include it in Git, release archives or extension package checks.
+.dashbridge-local/
+
 # Local analytics preview data and deployment credentials never enter Git.
 deploy/dashbridge-analytics/.dev-data/
 deploy/dashbridge-analytics/.dev-data-*/

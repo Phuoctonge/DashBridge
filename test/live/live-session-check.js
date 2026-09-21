@@ -3,11 +3,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { chromium } = require('@playwright/test');
 const { acquireProfileLock } = require('./profile-lock');
-const { projectRoot, resolveProfileRoot, validateGrafanaUrls, waitForExtensionWorker } = require('../../scripts/setup-grafana-e2e-profile');
+const { projectRoot, resolveChromeExecutable, resolveProfileRoot, validateGrafanaUrls, waitForExtensionWorker } = require('../../scripts/setup-grafana-e2e-profile');
 
 async function runLiveCheck(urls, { headless = true } = {}) {
     const profileRoot = resolveProfileRoot();
-    const executablePath = process.env.DASHBRIDGE_CHROME_PATH || chromium.executablePath();
+    const executablePath = resolveChromeExecutable();
     if (!fs.existsSync(profileRoot)) return { status: 'blocked', reason: 'profile-not-found' };
     if (!fs.existsSync(executablePath)) return { status: 'blocked', reason: 'chromium-not-found' };
     const lock = acquireProfileLock(profileRoot);

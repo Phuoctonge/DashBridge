@@ -7,6 +7,7 @@ const { chromium } = require('@playwright/test');
 const {
     projectRoot,
     reconcileRegisteredGrafanaRuntime,
+    resolveChromeExecutable,
     resolveProfileRoot,
     validateGrafanaUrls,
     waitForExtensionWorker
@@ -248,7 +249,7 @@ async function readFailureDiagnostics(page) {
 async function main() {
     const { mode, testIds, urls } = parseArguments(process.argv.slice(2));
     const profileRoot = resolveProfileRoot();
-    const chromeExecutable = process.env.DASHBRIDGE_CHROME_PATH || chromium.executablePath();
+    const chromeExecutable = resolveChromeExecutable();
     if (!fs.existsSync(profileRoot)) throw new Error(`Grafana E2E profile does not exist: ${profileRoot}`);
     if (!fs.existsSync(chromeExecutable)) throw new Error(`Playwright Chromium is missing: ${chromeExecutable}`);
 

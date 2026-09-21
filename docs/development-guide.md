@@ -83,6 +83,7 @@ Browser smoke не требует пользователя и ловит оши�
 | DashBridge panel/profile | schema, import/export, pause, theme, time, drag/drop, source+origin | `dashbridge.js`, report transport, renderer, profile store |
 | Time/refresh | relative/absolute range, Grafana 10/12 clipboard, Off vs saved dashboard refresh, iframe reload | `dashbridge-time-state.js`, `grafana-time-picker-clipboard.js`, `grafana-panel-bootstrap.js`, `grafana-refresh-policy.js` |
 | Batch | отдельное окно, cancel/error cleanup, лимиты PNG/ZIP, Blob URL lifecycle | `batch.js`, loader/capture/lifecycle helpers |
+| Confluence Report | авторизованная live-страница, REST storage/attachment scan, точное сопоставление test/group/metric/occurrence; mutation только отдельным подтверждаемым этапом | `pages/confluence-report/`, `confluence-report-live-*.js`, `confluence-report-scanner.js` |
 | Recorder/DashFlow | CDP lifecycle, network/HAR projection, atomic import, ZIP working-set и entry caps, SHA-256 bodies, secrets warning | `recorder.js`, `recorder-dashflow-export.js`, `recorder-dashflow-io.js`, `dashflow-schema.js` |
 | Test Runner | порядок runtime scripts, OPFS spool, planned/completed/NOT RUN, PiP cancel и elapsed time, cleanup окна Grafana | `pages/test-runner/test-runner-*.js`, `pages/shared/operation-progress-window.js`, `pages/test-runner/test-runner.html` |
 | Capture | save и copy, prepared on/off, DPR/crop, success/error restore | shared capture helpers, content bridge, background |
@@ -182,9 +183,11 @@ npm run auth:grafana -- 'https://grafana-one.example/d/...' 'https://grafana-two
 Команда открывает обе Grafana в официальном Playwright Chromium с загруженным
 DashBridge. Пользователь входит в обе системы один раз и закрывает окно;
 последующие E2E используют сохранённые browser cookies. Профиль по умолчанию
-находится в `%LOCALAPPDATA%\DashBridge\E2E\browser-profile`, то есть вне
-репозитория. URL не должны содержать username, password или token; секреты не
-передаются скрипту и не сохраняются в Git.
+находится в `.dashbridge-local/e2e/browser-profile` внутри рабочей папки
+DashBridge. Каталог добавлен в `.gitignore`, не входит в release paths и
+содержит cookies/local storage авторизованных сессий; он не должен попадать в
+Git, ZIP расширения или архивы релиза. URL не должны содержать username,
+password или token; секреты не передаются скрипту и не сохраняются в исходниках.
 Можно начать с одного URL и позже повторить команду со вторым: обе авторизации
 останутся в том же постоянном профиле.
 Сохранённую авторизацию без показа credentials проверяет

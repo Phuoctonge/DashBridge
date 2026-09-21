@@ -118,7 +118,7 @@ capability или при `--evidence=all`. В `finally` выполняются r
 ## Release command
 
 ```powershell
-$env:DASHBRIDGE_E2E_PROFILE = 'C:\Users\Vanya\AppData\Local\DashBridge\E2E\browser-profile'
+$env:DASHBRIDGE_E2E_PROFILE = '.dashbridge-local\e2e\browser-profile'
 & 'C:\Program Files\nodejs\node.exe' scripts/run-release-gate.js `
   --grafana-one 'https://grafana-one.example/d/uid/...' `
   --grafana-two 'https://grafana-two.example/d/uid/...' `

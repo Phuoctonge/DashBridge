@@ -382,6 +382,16 @@
             border: 1px solid var(--border);
         }
 
+        /* Keep the form readable on large desktop monitors without making it
+           span the entire viewport. The normal 40.625rem cap remains the
+           compact default; only very wide workspaces receive extra breathing
+           room. */
+        @media (min-width: 120rem) {
+            .container {
+                max-width: 56rem;
+            }
+        }
+
         h1 {
             margin: 0;
             font-size: var(--font-size-page-title);

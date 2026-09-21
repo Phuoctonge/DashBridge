@@ -9,16 +9,71 @@
     <link rel="stylesheet" href="confluence-report.css">
 </head>
 <body>
-<main class="report-page">
-    <header class="page-header"><div><h1>Замена изображений в отчёте</h1><p id="pageStatus">Выберите ZIP-архив Batch.</p></div><button id="rescanButton" type="button" disabled>Сканировать заново</button></header>
-    <section class="card"><label for="archiveInput">Архив Batch</label><input id="archiveInput" type="file" accept=".zip,application/zip"><p id="archiveStatus" role="status">Архив ещё не выбран.</p></section>
-    <section class="card" id="summaryCard" hidden><h2>Предварительный итог</h2><div class="summary-grid"><span>Источников <b id="sourceCount">0</b></span><span>Тестов <b id="testCount">0</b></span><span>Изображений <b id="imageCount">0</b></span></div><p id="mappingHint">Live-сканирование Confluence будет подключено после browser discovery для Confluence 7.19.18.</p></section>
+<main class="report-page" id="content" tabindex="-1">
+    <header class="page-header">
+        <div><div class="eyebrow">DashBridge · Confluence</div><h1>Замена изображений в отчёте</h1><p id="pageStatus" class="page-subtitle" role="status">Сначала укажите страницу Confluence и выберите цели замены.</p></div>
+        <button id="rescanButton" class="btn btn-quiet" type="button" disabled>Сканировать заново</button>
+    </header>
+    <section class="step-card" aria-labelledby="pageHeading">
+        <span class="step-number" aria-hidden="true">1</span><div class="step-heading"><div><h2 id="pageHeading">Укажите страницу Confluence</h2><p>Расширение откроет её в отдельном видимом окне и прочитает текущую сессию.</p></div></div>
+        <div class="url-row"><div class="field"><label for="pageUrlInput">URL отчёта</label><input id="pageUrlInput" name="pageUrl" type="url" autocomplete="url" required aria-describedby="pageUrlHint" placeholder="https://wiki.example/pages/viewpage.action?pageId=123"><p id="pageUrlHint" class="field-hint">Логин, пароль и токены в URL не допускаются.</p></div><button id="scanLiveButton" class="btn btn-primary" type="button">Сканировать страницу</button></div>
+        <p id="liveStatus" class="status-line" role="status" aria-live="polite">Укажите URL отчёта — отдельное окно откроется автоматически.</p>
+    </section>
+    <section class="step-card mapping-board-card" id="mappingBoardCard" aria-labelledby="mappingBoardHeading" hidden>
+        <span class="step-number" aria-hidden="true">↔</span>
+        <div class="step-heading"><div><h2 id="mappingBoardHeading">Сопоставление</h2><p>Перетащите панель ZIP на общий критерий или на конкретный график теста.</p></div><div><button id="clearConnectionsButton" class="btn btn-quiet" type="button">Очистить связи</button><button id="applyConfluenceButton" class="btn btn-primary" type="button" disabled>Применить изменения в Confluence</button></div></div>
+        <div id="mappingBoard" class="mapping-board"><svg id="mappingLinks" class="mapping-links" aria-hidden="true"><defs><marker id="mapping-arrow-group" markerWidth="5" markerHeight="5" refX="4.5" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5 Z" fill="#15803d"></path></marker><marker id="mapping-arrow-specific" markerWidth="5" markerHeight="5" refX="4.5" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5 Z" fill="#2563eb"></path></marker></defs></svg><div class="mapping-column"><h3>ZIP Batch</h3><div id="mappingSources" class="mapping-nodes"></div></div><div class="mapping-column"><h3>Отчёт Confluence</h3><div id="mappingTargets" class="mapping-nodes"></div></div></div>
+        <p id="mappingBoardStatus" class="status-line" role="status" aria-live="polite">Загрузите URL и ZIP, чтобы начать сопоставление.</p>
+    </section>
+    <section class="step-card" id="summaryCard" aria-labelledby="summaryHeading" hidden>
+        <span class="step-number" aria-hidden="true">2</span><div class="step-heading"><div><h2 id="summaryHeading">Сопоставьте отчёт и ZIP</h2><p>После анализа обоих источников система предложит операции замены и добавления.</p></div></div>
+        <div class="summary-grid"><div class="summary-tile"><span>Тесты</span><b id="testCount">0</b></div><div class="summary-tile"><span>Изображения</span><b id="imageCount">0</b></div><div class="summary-tile"><span>Выбрано целей</span><b id="targetCount">0</b></div></div>
+        <div class="preview-controls"><div class="field"><span class="field-label">Структура отчёта</span><div id="targetTree" class="target-tree" role="tree" aria-label="Цели замены"></div><select id="metricSelect" name="metric" hidden aria-hidden="true"></select></div></div>
+        <p id="mappingHint" class="status-line" role="status" aria-live="polite">Выберите изображения или целую группу.</p>
+    </section>
+    <section class="step-card" id="archiveCard" aria-labelledby="archiveHeading" hidden>
+        <span class="step-number" aria-hidden="true">2</span><div class="step-heading"><div><h2 id="archiveHeading">Загрузите ZIP Batch</h2><p>После загрузки появятся панели, которые можно соединить с отчётом.</p></div></div>
+        <div class="field"><label for="archiveInput">ZIP-архив Batch</label><input id="archiveInput" name="archive" type="file" accept=".zip" disabled><p id="archiveStatus" class="status-line" role="status" aria-live="polite">Сначала просканируйте страницу Confluence.</p></div>
+        <div id="archiveAnalysis" class="archive-analysis" hidden>
+            <div class="analysis-heading legacy-archive-heading"><h3>Структура ZIP</h3><span id="archiveSummary" class="analysis-count"></span></div>
+            <div class="table-scroll legacy-archive-table"><table class="mapping-table-data"><caption>Временные диапазоны и панели архива</caption><thead><tr><th scope="col">Диапазон</th><th scope="col">Панели</th><th scope="col">Файлов</th></tr></thead><tbody id="archiveRangeRows"></tbody></table></div>
+            <div class="analysis-heading legacy-archive-heading"><h3>Панели для сопоставления</h3><span>Выберите, какие позиции отчёта они заменяют</span></div>
+            <div class="table-scroll legacy-archive-table"><table class="mapping-table-data"><caption>Тесты отчёта и диапазоны ZIP</caption><thead><tr><th scope="col">Тест отчёта</th><th scope="col">Диапазон ZIP</th></tr></thead><tbody id="archiveTestRows"></tbody></table></div>
+            <div class="table-scroll legacy-archive-table"><table class="mapping-table-data"><caption>Панели ZIP и позиции отчёта</caption><thead><tr><th scope="col">Панель ZIP</th><th scope="col">Позиция отчёта</th><th scope="col">Диапазонов</th></tr></thead><tbody id="archivePanelRows"></tbody></table></div>
+            <div class="operation-builder" aria-labelledby="operationBuilderHeading">
+                <div class="analysis-heading"><h3 id="operationBuilderHeading">Операции</h3><span>Один ZIP можно использовать для нескольких правил</span></div>
+                <div class="operation-form">
+                    <div class="field"><label for="operationAction">Действие</label><select id="operationAction"><option value="replace">Заменить существующие</option><option value="add">Добавить новые</option></select></div>
+                    <div class="field"><label for="operationSource">Источник из ZIP</label><select id="operationSource"></select></div>
+                    <div class="field"><label for="operationTarget">Цель отчёта</label><select id="operationTarget"></select></div>
+                    <div class="field"><label for="operationScope">Охват</label><select id="operationScope"><option value="all">Все тесты</option><option value="selected">Выбранные тесты</option></select></div>
+                    <div class="field operation-caption-field" hidden><label for="operationCaption">Подпись нового графика</label><input id="operationCaption" type="text" placeholder="Например: средняя загрузка CPU"></div>
+                    <div class="field operation-anchor-field" hidden><label for="operationAnchor">Добавить в отчёт</label><select id="operationAnchor"><option value="end">В конец выбранной группы</option><option value="after">После выбранной позиции</option></select></div>
+                    <button id="addOperationButton" class="btn btn-primary" type="button">Добавить операцию</button>
+                </div>
+                <div id="operationTestPicker" class="operation-test-picker" hidden></div>
+                <div id="operationList" class="operation-list" aria-live="polite"></div>
+            </div>
+        </div>
+    </section>
+    <section class="step-card" id="previewCard" aria-labelledby="previewHeading" hidden>
+        <span class="step-number" aria-hidden="true">4</span><div class="step-heading"><div><h2 id="previewHeading">Проверьте сопоставление</h2><p>Проверьте старые и новые изображения перед применением.</p></div></div>
+        <p id="previewStatus" class="status-line preview-status" role="status" aria-live="polite">Добавьте источник, чтобы увидеть сопоставление.</p><div id="previewList" class="image-list mapping-table" role="table" aria-label="Сопоставление целей и файлов ZIP"></div>
+    </section>
 </main>
 <script src="../../vendor/jszip.min.js"></script>
 <script src="../../js/shared/confluence-report-schema.js"></script>
+<script src="../../js/shared/confluence-report-live-schema.js"></script>
+<script src="../../js/shared/confluence-report-live-client.js"></script>
 <script src="confluence-report-zip.js"></script>
+<script src="confluence-report-archive.js"></script>
+<script src="confluence-report-operations.js"></script>
+<script src="confluence-report-mapping-board.js"></script>
 <script src="confluence-report-scanner.js"></script>
 <script src="confluence-report-matcher.js"></script>
+<script src="confluence-report-preview.js"></script>
+<script src="confluence-report-storage.js"></script>
+<script src="confluence-report-apply.js"></script>
 <script src="confluence-report.js"></script>
 </body>
 </html>

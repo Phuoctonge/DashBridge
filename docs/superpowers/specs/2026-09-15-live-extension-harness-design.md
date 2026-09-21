@@ -64,7 +64,7 @@ Initial capabilities should cover the highest-risk Grafana paths: legend complet
 
 ## Environment matrix
 
-`test/live/environments.json` stores non-secret environment metadata: host, dashboard URLs, expected route, renderer expectations, and profile label. Secrets and auth state remain in the external persistent profile at `%LOCALAPPDATA%\DashBridge\E2E\browser-profile`.
+`test/live/environments.json` stores non-secret environment metadata: host, dashboard URLs, expected route, renderer expectations, and profile label. Secrets and auth state remain in the ignored local persistent profile at `.dashbridge-local/e2e/browser-profile`.
 
 The runner supports one environment, multiple environments sequentially, and independent parallel contexts. A shared persistent profile is never used concurrently. Each scenario declares whether it requires the modern renderer, legacy renderer, iframe, or both.
 

@@ -43,6 +43,8 @@ async function inspectIframeSettings(executablePath) {
         });
         assert.equal(clickable, true, 'iframe settings Save must be above fullscreen card');
         await page.locator('.iframe-settings-save').focus(); await page.keyboard.press('Tab');
+        assert.equal(await page.locator('.iframe-settings-cancel').evaluate(node => node === document.activeElement), true, 'Tab follows primary action with cancel');
+        await page.keyboard.press('Tab');
         assert.equal(await page.locator('#iframeSettingsUrl').evaluate(node => node === document.activeElement), true, 'Tab wraps in modal');
         await page.keyboard.press('Escape');
         assert.equal(await page.locator('.iframe-settings-modal').count(), 0);

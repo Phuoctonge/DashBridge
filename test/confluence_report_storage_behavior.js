@@ -1,0 +1,10 @@
+'use strict';
+const assert = require('assert'); const fs = require('fs'); const path = require('path'); const vm = require('vm');
+const context = { globalThis: null }; context.globalThis = context; vm.createContext(context);
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'pages', 'confluence-report', 'confluence-report-storage.js'), 'utf8'), context);
+const storage = context.DashBridgeConfluenceReportStorage;
+const html = '<h4>Метрики</h4><p>Старая подпись</p><ac:image><ri:attachment ri:filename="old.png" /></ac:image><p>После</p>';
+const result = storage.transform(html, { replacements: [{ oldFilename: 'old.png', newFilename: 'new.png' }] });
+assert(result.html.includes('ri:filename="new.png"')); assert(result.html.includes('style="width: 100%;"')); assert(result.html.includes('Старая подпись')); assert.strictEqual(result.applied.length, 1);
+assert.throws(() => storage.transform(html, { replacements: [{ oldFilename: 'missing.png', newFilename: 'new.png' }] }), /Attachment not found/);
+console.log('PASS Confluence report storage transformation');

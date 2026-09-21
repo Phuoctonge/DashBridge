@@ -106,6 +106,10 @@ const DashBridgeProfileStore = {
             // The system layout is managed by the extension, but the time range
             // and refresh interval are deliberately user-owned preferences.
             return { ...structuredClone(dashBridgeSystemProfileBaseline),
+                // Report settings are also user-owned. In particular, replacing
+                // the whole system profile here silently discarded custom SLA
+                // phrases immediately after the editor reported a successful save.
+                report: structuredClone(profile.report || dashBridgeSystemProfileBaseline.report),
                 timeState: structuredClone(profile.timeState || dashBridgeSystemProfileBaseline.timeState) };
         });
         return dashBridgeProfileWriter.write({ profiles: nextProfiles, activeProfileId });

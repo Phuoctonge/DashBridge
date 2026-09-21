@@ -203,6 +203,7 @@
 .report-variable-row code { display: inline-block; max-width: 100%; overflow-wrap: anywhere; color: var(--primary); font-size: .78rem; }
 .report-variable-row dd { color: var(--text-muted); font-size: .78rem; line-height: 1.45; }
 .report-settings-actions { position: sticky; bottom: -1.5rem; z-index: 2; margin: 0 -1.5rem -1.5rem; padding: 16px 1.5rem; border-top: 1px solid var(--border-color); background: var(--card-bg); }
+.report-settings-actions .btn { flex: 0 0 auto; min-width: 8.75rem; }
 
 @media (max-width: 37.5rem) {
     .report-settings-overlay, .report-preview-overlay, .report-audit-overlay { padding: 0.5rem; }
@@ -221,6 +222,7 @@
     .report-panel-editor-actions .btn,
     .report-panel-editor-modal > .modal-actions .btn { min-width: 0; flex: 1 1 8rem; }
     .report-settings-actions { bottom: -16px; margin: 0 -16px -16px; padding: 13px 16px; }
+    .report-settings-actions .btn { min-width: 0; flex: 1 1 8rem; }
     .report-variable-groups { padding: 14px; }
     .report-template-grid { grid-template-columns: 1fr; }
     .report-audit-header { align-items: flex-start; flex-direction: column; }

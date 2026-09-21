@@ -165,7 +165,7 @@
 }
 
 .modal-actions .btn {
-    flex: 1;
+    flex: 0 0 auto;
     justify-content: center;
 }
 

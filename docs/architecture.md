@@ -25,6 +25,7 @@ manifest.json
 ├── AGENTS.md                   # Обязательная точка входа для AI-анализа
 ├── pages/                      # Feature-папки полноразмерных extension pages
 │   ├── batch/                  # Пакетный PNG/ZIP: UI и lifecycle-модули
+│   ├── confluence-report/      # Read-only сканирование и будущая замена вложений отчёта
 │   ├── dashbridge/             # Единый дашборд: renderer, profiles, time
 │   ├── options/                # HTML, CSS и контроллер настроек
 │   ├── popup/                  # Основной Popup: HTML, CSS и page-модули
@@ -51,7 +52,7 @@ manifest.json
 | Service worker | `js/background.js`, `js/background-grafana-infrastructure.js`, `js/background-profile-storage.js`, `js/background-gui-capture.js`, `js/background-update-indicator.js` | Единый message dispatcher; изолированные владельцы MAIN-регистрации/tab-scoped DNR, сериализованных profile/storage commits, GUI capture lifecycle и постоянного action-индикатора обновления. |
 | Isolated content world | `content.js`, `grafana-iframe.js` | Мост Chrome API, Confluence, iframe time/crosshair/title и вывод снимка. |
 | Grafana MAIN world | Файлы runtime manifest | fetch/XHR, данные, visual state, меню, легенда, threshold, vCPU и подготовка снимка. |
-| Extension pages | Popup, Options, DashBridge, Batch, Worklog | UI, команды и долговечное состояние. |
+| Extension pages | Popup, Options, DashBridge, Batch, Worklog, Confluence Report | UI, команды и долговечное состояние. Confluence Report читает live-страницу через executeScript в её origin; mutation/upload пока не входит в контракт. |
 | Внешние сайты | Grafana, Jira, TDM, Confluence | Недоверенные URL, DOM, API и текст. |
 
 MAIN и isolated world не смешиваются. Связь идёт через
@@ -231,6 +232,9 @@ listener снимаются на pagehide и восстанавливаются 
 | Tab capture/crop | `grafana-panel-capture.js` | Batch/legacy Popup flow. |
 | URL/dashboard API | `grafana-url.js`, `grafana-dashboard-api.js` | Batch. |
 | Batch presets | `grafana-batch-panel-rules.js` | Batch. |
+| Confluence report live schema/client | `confluence-report-live-schema.js`, `confluence-report-live-client.js` | Extension page «Замена изображений в отчёте»; нормализация REST storage/attachments и bounded read-only scan. |
+| Confluence report storage scanner | `confluence-report-scanner.js` | Extension page; строит test/group/image snapshot из storage-разметки без записи во внешний сайт. |
+| Confluence replacement preview | `confluence-report-preview.js` | Extension page; извлекает метрики из attachment names, строит детерминированный план «было → станет» и запрещает молчаливое применение неоднозначных строк. |
 | Profiles storage | `dashbridge-profile-store.js` | `dashbridge-profile-controller.js`. |
 | Profiles UI/lifecycle | `dashbridge-profile-controller.js` | `dashbridge.js`; tab-local selection, cross-tab sync, panel-state checkpoint. |
 | DashBridge iframe transport | `dashbridge-iframe-message-controller.js` | Двусторонняя trust boundary: guarded post/navigation reset, проверка source + exact origin, dispatch report/analysis/capture/tools/crosshair и iframe ready/rendered lifecycle. |
@@ -1253,7 +1257,7 @@ package-файлы, `node_modules` и результаты тестов не в�
 Тестовый Chromium устанавливается отдельно командой
 `npm run browser:install` и не использует пользовательский Chrome-профиль.
 Живые Grafana E2E используют один отдельный постоянный профиль в
-`%LOCALAPPDATA%\DashBridge\E2E\browser-profile`; обе авторизации выполняются
+`.dashbridge-local/e2e/browser-profile`; обе авторизации выполняются
 вручную один раз внутри браузера, без передачи credentials тестовому коду.
 `scripts/run-live-grafana-e2e.js` является внешним Playwright-оркестратором, а
 не вторым владельцем сценариев: он открывает существующий extension Test Runner,

@@ -38,14 +38,14 @@
 
         const actions = appendElement(content, 'div', 'modal-actions');
         let cancelButton = null;
+        const okButton = appendElement(actions, 'button', 'btn btn-primary modal-ok');
+        okButton.type = 'button';
+        okButton.textContent = 'OK';
         if (confirm || prompt) {
             cancelButton = appendElement(actions, 'button', 'btn btn-outline modal-cancel');
             cancelButton.type = 'button';
             cancelButton.textContent = 'Отмена';
         }
-        const okButton = appendElement(actions, 'button', 'btn btn-primary modal-ok');
-        okButton.type = 'button';
-        okButton.textContent = 'OK';
 
         overlay.style.display = 'flex';
         return { overlay, input, okButton, cancelButton, actions };

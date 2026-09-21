@@ -2,7 +2,7 @@
 
 const fs = require('node:fs');
 const { chromium } = require('@playwright/test');
-const { projectRoot, resolveProfileRoot, waitForExtensionWorker } = require('../../scripts/setup-grafana-e2e-profile');
+const { projectRoot, resolveChromeExecutable, resolveProfileRoot, waitForExtensionWorker } = require('../../scripts/setup-grafana-e2e-profile');
 const { acquireProfileLock } = require('./profile-lock');
 const { runLiveLegendScenario } = require('./scenarios/live-legend-scenario');
 const { runLiveThresholdScenario } = require('./scenarios/threshold-live-scenario');
@@ -27,7 +27,7 @@ function parseArgs(argv) {
 
 async function runLiveScenario(options) {
     const profileRoot = resolveProfileRoot();
-    const executablePath = process.env.DASHBRIDGE_CHROME_PATH || chromium.executablePath();
+    const executablePath = resolveChromeExecutable();
     if (!fs.existsSync(profileRoot) || !fs.existsSync(executablePath)) return { status: 'blocked', reason: 'profile-or-chromium-not-found' };
     const lock = acquireProfileLock(profileRoot);
     let context;

@@ -6,6 +6,7 @@ const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
 const { chromium } = require('@playwright/test');
+const { resolveChromeExecutable } = require('../scripts/setup-grafana-e2e-profile');
 const inspectReportCollage = require('./support/browser-report-collage');
 const inspectGrafanaConnection = require('./support/browser-grafana-connection');
 const inspectFrameStartup = require('./support/browser-frame-startup');
@@ -17,8 +18,7 @@ const inspectIframeSettings = require('./dashbridge_iframe_settings_browser.cjs'
 const projectRoot = path.resolve(__dirname, '..');
 const resultsRoot = path.join(projectRoot, 'test-results');
 const reportPath = path.join(resultsRoot, 'extension-smoke.json');
-const chromeExecutable = process.env.DASHBRIDGE_CHROME_PATH
-    || chromium.executablePath();
+const chromeExecutable = resolveChromeExecutable();
 const settleMs = Number.parseInt(process.env.DASHBRIDGE_SMOKE_SETTLE_MS || '1000', 10);
 const extensionEntries = Object.freeze(['manifest.json', 'icons', 'js', 'pages', 'vendor']);
 
@@ -163,6 +163,10 @@ async function inspectPage(context, extensionId, relativePath) {
                 await page.locator('.modal-input').fill('Playwright profile copy');
                 await page.locator('.modal-input').press('Enter');
                 await page.waitForFunction(() => document.getElementById('profilePickerLabel').textContent === 'Playwright profile copy');
+                await page.waitForFunction(async () => {
+                    const stored = await chrome.storage.local.get('dashbridge_profiles');
+                    return stored.dashbridge_profiles?.some(profile => profile.name === 'Playwright profile copy');
+                });
                 await page.reload();
                 await page.waitForFunction(() => document.getElementById('profilePickerLabel').textContent === 'Playwright profile copy');
             }

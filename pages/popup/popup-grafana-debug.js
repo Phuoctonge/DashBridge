@@ -270,8 +270,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="modal-header"><h4 id="dashbridgeResetTitle">Полная очистка DashBridge</h4></div>
                     <p style="margin:0;color:var(--text-muted);line-height:1.45;">Будут удалены все настройки, профили, ссылки и Jira worklogs. Это действие нельзя отменить.</p>
                     <div class="modal-actions" style="justify-content:flex-end;">
-                        <button type="button" class="btn btn-cancel" data-action="cancel" style="border:1px solid var(--border,#cbd5e1);">Отмена</button>
                         <button type="button" class="btn" data-action="confirm" style="background:var(--danger,#dc2626);border:1px solid #991b1b;color:var(--text-on-primary,#fff);">Полная очистка</button>
+                        <button type="button" class="btn btn-cancel" data-action="cancel" style="border:1px solid var(--border,#cbd5e1);">Отмена</button>
                     </div>
                 </div>`;
             const close = value => { overlay.remove(); resolve(value); };

@@ -120,8 +120,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const reportImageReplacementButton = document.getElementById('openReportImageReplacementBtn');
     if (reportImageReplacementButton) {
-        reportImageReplacementButton.addEventListener('click', () => {
-            chrome.tabs.create({ url: chrome.runtime.getURL('pages/confluence-report/confluence-report.html') });
+        reportImageReplacementButton.addEventListener('click', async () => {
+            await chrome.tabs.create({ url: chrome.runtime.getURL('pages/confluence-report/confluence-report.html') });
         });
     }
 

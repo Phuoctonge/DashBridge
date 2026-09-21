@@ -77,6 +77,8 @@
             border-radius: var(--radius-lg);
             box-shadow: var(--shadow);
             overflow: auto;
+            overscroll-behavior-x: contain;
+            scrollbar-gutter: stable;
             border: 1px solid #fff;
         }
 

@@ -195,6 +195,9 @@
             const ids = new Map();
             copy.id = crypto.randomUUID();
             copy.name = name.trim().slice(0, 120);
+            // System-only markers identify the canonical seed profile and cannot be cloned.
+            delete copy.systemKey;
+            delete copy.isSystemDefault;
             copy.panels.forEach(panel => {
                 const id = crypto.randomUUID();
                 ids.set(panel.id, id);

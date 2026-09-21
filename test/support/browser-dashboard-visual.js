@@ -68,7 +68,10 @@ module.exports = async function inspectDashboardVisual(context, extensionId) {
         await page.locator('.report-save').click();
         await page.locator('.report-settings-overlay').waitFor({ state: 'detached' });
         await page.reload();
-        const saved = await page.evaluate(async () => (await chrome.storage.local.get('dashbridge_profiles')).dashbridge_profiles[0]);
+        const saved = await page.evaluate(async () => {
+            const profiles = (await chrome.storage.local.get('dashbridge_profiles')).dashbridge_profiles;
+            return profiles.find(profile => profile.id === 'visual-audit') || profiles[0];
+        });
         assert.equal(saved.panels[0].report.templates.breached, 'CPU превышен: {{aggregateValue}}');
         assert.equal(saved.panels[0].report.sla.unit, '%');
         assert.equal(saved.panels[0].report.includeMode, 'issue_only');
@@ -90,7 +93,7 @@ module.exports = async function inspectDashboardVisual(context, extensionId) {
         await page.locator('.attachment-layout').selectOption('column');
         await page.locator('.attachment-none').click();
         await page.waitForFunction(async () => {
-            const saved = (await chrome.storage.local.get('dashbridge_profiles')).dashbridge_profiles[0].report.attachments;
+            const saved = (await chrome.storage.local.get('dashbridge_profiles')).dashbridge_profiles.find(profile => profile.id === 'visual-audit').report.attachments;
             return saved?.slaOnly === false && saved.heading === false && saved.layout === 'column' && saved.selectedIds?.length === 0;
         });
         assert(await page.locator('.report-preview-modal').isVisible(), 'saving preferences must not close the preview');
@@ -103,7 +106,7 @@ module.exports = async function inspectDashboardVisual(context, extensionId) {
         await page.locator('#reportMenuBtn').click(); await page.locator('#configureReportBtn').click();
         await page.locator('.report-save').click();
         await page.locator('.report-settings-overlay').waitFor({ state: 'detached' });
-        const retained = await page.evaluate(async () => (await chrome.storage.local.get('dashbridge_profiles')).dashbridge_profiles[0].report.attachments);
+        const retained = await page.evaluate(async () => (await chrome.storage.local.get('dashbridge_profiles')).dashbridge_profiles.find(profile => profile.id === 'visual-audit').report.attachments);
         assert.equal(retained.slaOnly, false, 'saving the text template must preserve screenshot preferences');
         await page.route('https://visual.test/**', route => route.fulfill({ contentType: 'text/html', body: '<html><body>Test panel</body></html>' }));
         await page.evaluate(async () => {
@@ -116,7 +119,7 @@ module.exports = async function inspectDashboardVisual(context, extensionId) {
         await page.locator('.attachment-panel-row').nth(2).locator('.attachment-drag')
             .dragTo(page.locator('.attachment-panel-row').first());
         await page.waitForFunction(async () => {
-            const saved = (await chrome.storage.local.get('dashbridge_profiles')).dashbridge_profiles[0].report.attachments;
+            const saved = (await chrome.storage.local.get('dashbridge_profiles')).dashbridge_profiles.find(profile => profile.id === 'visual-audit').report.attachments;
             return saved.selectedIds?.length === 2 && saved.panelOrder[0] === 'visual-2';
         });
         await page.locator('.report-close').click(); await page.reload(); await openPreview();
@@ -138,7 +141,7 @@ module.exports = async function inspectDashboardVisual(context, extensionId) {
         result.checks.push('screenshot SLA/heading/layout/empty selection persist through broker, close/reload and text settings save');
         result.checks.push('manual panel selection and drag order survive reload and profile switching; another profile keeps its own defaults');
         await page.evaluate(async () => {
-            const profile = (await chrome.storage.local.get('dashbridge_profiles')).dashbridge_profiles[0];
+            const profile = (await chrome.storage.local.get('dashbridge_profiles')).dashbridge_profiles.find(item => item.id === 'visual-audit');
             const state = { release: null, value: 91 };
             window.messageVisualFixture = state;
             const owner = window.DashBridgeReportController.create({

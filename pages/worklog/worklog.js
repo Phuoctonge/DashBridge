@@ -56,7 +56,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return new Promise(resolve => {
             const overlay = document.createElement('div');
             overlay.className = 'modal-overlay';
-            overlay.innerHTML = '<div class="modal-content" style="max-width:420px"><p class="worklog-confirm-message" style="margin:0"></p><div class="modal-actions"><button type="button" class="btn btn-outline worklog-confirm-cancel">Отмена</button><button type="button" class="btn btn-danger worklog-confirm-ok">Очистить</button></div></div>';
+            overlay.innerHTML = '<div class="modal-content" style="max-width:420px"><p class="worklog-confirm-message" style="margin:0"></p><div class="modal-actions"><button type="button" class="btn btn-danger worklog-confirm-ok">Очистить</button><button type="button" class="btn btn-outline worklog-confirm-cancel">Отмена</button></div></div>';
             overlay.querySelector('.worklog-confirm-message').textContent = message;
             document.body.appendChild(overlay);
             const finish = value => { overlay.remove(); resolve(value); };

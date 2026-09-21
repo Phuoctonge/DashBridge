@@ -1,9 +1,11 @@
 'use strict';
 
 const assert = require('node:assert');
+const fs = require('node:fs');
 const path = require('node:path');
 const {
     reconcileRegisteredGrafanaRuntime,
+    resolveChromeExecutable,
     resolveProfileRoot,
     validateGrafanaUrls,
 } = require('../scripts/setup-grafana-e2e-profile');
@@ -38,7 +40,22 @@ assert.throws(() => validateGrafanaUrls([
     'https://grafana-one.example',
     'https://grafana-one.example'
 ]), /must be different/);
+const previousProfileOverride = process.env.DASHBRIDGE_E2E_PROFILE;
+delete process.env.DASHBRIDGE_E2E_PROFILE;
+const localProfile = resolveProfileRoot();
+assert.match(localProfile, /[\\/]\.dashbridge-local[\\/]e2e[\\/]browser-profile$/,
+    'default live profile must be in the ignored local runtime directory');
+assert.strictEqual(resolveProfileRoot(localProfile), localProfile,
+    'the canonical local profile may be explicitly selected');
 assert.throws(() => resolveProfileRoot(path.resolve(__dirname, '..', 'test-results', 'profile')), /outside the repository/);
+const localChrome = path.resolve(__dirname, '..', '.dashbridge-local', 'playwright', 'chromium-1243', 'chrome-win64', 'chrome.exe');
+assert.ok(fs.existsSync(localChrome), 'local Playwright Chromium must be copied before live launch');
+assert.strictEqual(resolveChromeExecutable(), localChrome,
+    'live launch must prefer the ignored local Playwright Chromium');
+assert.strictEqual(resolveChromeExecutable('C:\\custom\\chrome.exe'), path.resolve('C:\\custom\\chrome.exe'),
+    'explicit Chrome override must remain supported');
+if (previousProfileOverride === undefined) delete process.env.DASHBRIDGE_E2E_PROFILE;
+else process.env.DASHBRIDGE_E2E_PROFILE = previousProfileOverride;
 
 (async () => {
     const previousManifest = globalThis.DashBridgeGrafanaRuntimeManifest;
