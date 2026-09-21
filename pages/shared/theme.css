@@ -104,6 +104,25 @@
     --card: var(--card-bg);
 }
 
+/* Shared desktop page shell. Feature styles keep ownership of colors and
+   controls; this contract only normalizes header rhythm and wrapping. */
+.page-shell-header {
+    min-height: 4.5rem;
+    padding-block: .75rem;
+    box-sizing: border-box;
+}
+
+.page-shell-header > * { min-width: 0; }
+
+:where(button, a:any-link, input, select, textarea, summary):focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+@media (max-width: 48rem) {
+    .page-shell-header { min-height: 4rem; }
+}
+
 html {
     font-size: 16px;
     text-size-adjust: 100%;
