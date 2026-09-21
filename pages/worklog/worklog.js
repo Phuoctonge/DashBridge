@@ -323,6 +323,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function renderTable() {
+        if (worklogs.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="7"><div class="worklog-empty-state" role="status"><strong>Нет записей Worklog</strong><span>Добавьте первую запись, чтобы начать учёт времени.</span><button type="button" class="btn btn-primary" id="emptyAddRow">Добавить запись</button></div></td></tr>';
+            document.getElementById('emptyAddRow')?.addEventListener('click', () => addRowBtn.click());
+            updateStats();
+            return;
+        }
         const positions = new Map();
         document.querySelectorAll('.task-row').forEach(row => { const id = row.getAttribute('data-id'); if (id) positions.set(id, row.getBoundingClientRect()); });
         worklogs.sort((a, b) => { const da = parseDate(a.dateStarted); const db = parseDate(b.dateStarted); return sortOrder === 'desc' ? db - da : da - db; });
