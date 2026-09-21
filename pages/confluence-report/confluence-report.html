@@ -7,13 +7,22 @@
     <script src="../shared/theme.js"></script>
     <link rel="stylesheet" href="../shared/theme.css">
 <link rel="stylesheet" href="confluence-report.css">
+<link rel="stylesheet" href="../shared/page-shell.css">
 </head>
 <body>
+<header class="report-header page-shell-header">
+    <div class="report-brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 4h16v16H4z"/><path d="M8 8h8M8 12h8M8 16h5"/>
+        </svg>
+    </div>
+    <div class="report-header-text">
+        <h1>Замена изображений в отчёте</h1>
+        <p id="pageStatus" class="page-subtitle" role="status">Сначала укажите страницу Confluence и выберите цели замены.</p>
+    </div>
+    <button id="rescanButton" class="btn btn-quiet" type="button" disabled>Сканировать заново</button>
+</header>
 <main class="report-page" id="content" tabindex="-1">
-        <header class="page-header">
-        <div><div class="eyebrow">DashBridge · Confluence</div><h1>Замена изображений в отчёте</h1><p id="pageStatus" class="page-subtitle" role="status">Сначала укажите страницу Confluence и выберите цели замены.</p></div>
-        <button id="rescanButton" class="btn btn-quiet" type="button" disabled>Сканировать заново</button>
-    </header>
     <section class="step-card" aria-labelledby="pageHeading">
         <span class="step-number" aria-hidden="true">1</span><div class="step-heading"><div><h2 id="pageHeading">Укажите страницу Confluence</h2><p>Расширение откроет её в отдельном видимом окне и прочитает текущую сессию.</p></div></div>
         <div class="url-row"><div class="field"><label for="pageUrlInput">URL отчёта</label><input id="pageUrlInput" name="pageUrl" type="url" autocomplete="url" required aria-describedby="pageUrlHint" placeholder="https://wiki.example/pages/viewpage.action?pageId=123"><p id="pageUrlHint" class="field-hint">Логин, пароль и токены в URL не допускаются.</p></div><button id="scanLiveButton" class="btn btn-primary" type="button">Сканировать страницу</button></div>
