@@ -24,6 +24,8 @@
     --page-gutter: clamp(0.75rem, 2vw, 2rem);
     --workspace-max: none;
     --readable-max: 46rem;
+    --shell-title-size: 1.375rem;
+    --shell-subtitle-size: 0.8125rem;
     /* Цвета */
     --primary: #2563eb;
     --primary-hover: #1d4ed8;
@@ -104,23 +106,9 @@
     --card: var(--card-bg);
 }
 
-/* Shared desktop page shell. Feature styles keep ownership of colors and
-   controls; this contract only normalizes header rhythm and wrapping. */
-.page-shell-header {
-    min-height: 4.5rem;
-    padding-block: .75rem;
-    box-sizing: border-box;
-}
-
-.page-shell-header > * { min-width: 0; }
-
 :where(button, a:any-link, input, select, textarea, summary):focus-visible {
     outline: 2px solid var(--primary);
     outline-offset: 2px;
-}
-
-@media (max-width: 48rem) {
-    .page-shell-header { min-height: 4rem; }
 }
 
 html {

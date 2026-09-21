@@ -1,0 +1,26 @@
+/* Shared visual contract for full-page extension headers. */
+.page-shell-header {
+    display: flex;
+    align-items: center;
+    gap: .875rem;
+    min-height: 4.5rem;
+    padding: .75rem var(--page-gutter);
+    box-sizing: border-box;
+    color: var(--text-main);
+    background: var(--header-bg);
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+}
+
+.page-shell-header > * { min-width: 0; }
+.page-shell-header h1 { margin: 0; color: var(--primary); font-size: var(--shell-title-size); line-height: 1.25; text-wrap: balance; }
+.page-shell-header p { margin: .25rem 0 0; color: var(--text-muted); font-size: var(--shell-subtitle-size); line-height: 1.4; }
+.page-shell-header .logo { font-size: var(--shell-title-size); }
+.page-shell-header .app-title { font-size: var(--shell-title-size); }
+
+.page-shell-header--workflow { align-items: center; }
+.page-shell-header--workflow h1 { color: var(--text-main); }
+
+@media (max-width: 48rem) {
+    .page-shell-header { min-height: 4rem; }
+}
