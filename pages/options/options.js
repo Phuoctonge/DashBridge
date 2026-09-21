@@ -1,5 +1,25 @@
 document.addEventListener('DOMContentLoaded', () => {
     let connectionBaseline = null;
+    let dirtyReady = false;
+    let isDirty = false;
+    const dirtyStatus = document.getElementById('optionsDirtyStatus');
+    const saveIsland = document.querySelector('.save-island');
+    const setDirty = dirty => {
+        isDirty = dirty;
+        saveIsland.dataset.dirty = String(dirty);
+        dirtyStatus.textContent = dirty ? 'Есть несохранённые изменения' : 'Все изменения сохранены';
+    };
+    const markDirty = event => {
+        if (!dirtyReady || !event.target.matches('input, select, textarea')) return;
+        setDirty(true);
+    };
+    document.addEventListener('input', markDirty);
+    document.addEventListener('change', markDirty);
+    globalThis.addEventListener('beforeunload', event => {
+        if (!isDirty) return;
+        event.preventDefault();
+        event.returnValue = '';
+    });
     const memCalcModeEl = document.getElementById('settingGrafanaMemCalcMode');
     const refreshAnalyticsHealth = async () => {
         const output = document.getElementById('analyticsDeliveryHealth');
@@ -221,6 +241,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Инициализируем состояние подвкладок Grafana при загрузке
         updateSubtabsState();
+        dirtyReady = true;
+        setDirty(false);
     });
 
     function autoResize(el) {
@@ -396,6 +418,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             globalThis.DashBridgeAnalytics?.outcome('options.saved', 'success');
+            setDirty(false);
             const btn = document.getElementById('saveBtn');
             const text = document.getElementById('saveBtnText');
             if (text) {

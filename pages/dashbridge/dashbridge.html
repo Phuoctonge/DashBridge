@@ -109,8 +109,8 @@
                         <div class="form-group">
                             <label>Время начала</label>
                             <div class="gtp-input-wrapper">
-                                <input type="text" id="absTimeFrom" value="now-1h">
-                                <button class="gtp-icon-btn calendar-btn" data-picker="pickerFrom"><svg class="ic"
+                                <input type="text" id="absTimeFrom" aria-label="Начало временного диапазона" value="now-1h">
+                                <button class="gtp-icon-btn calendar-btn" data-picker="pickerFrom" aria-label="Открыть календарь начала диапазона"><svg class="ic"
                                         viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                                         stroke-linecap="round" stroke-linejoin="round">
                                         <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
@@ -125,8 +125,8 @@
                         <div class="form-group">
                             <label>Время окончания</label>
                             <div class="gtp-input-wrapper">
-                                <input type="text" id="absTimeTo" value="now">
-                                <button class="gtp-icon-btn calendar-btn" data-picker="pickerTo"><svg class="ic"
+                                <input type="text" id="absTimeTo" aria-label="Конец временного диапазона" value="now">
+                                <button class="gtp-icon-btn calendar-btn" data-picker="pickerTo" aria-label="Открыть календарь конца диапазона"><svg class="ic"
                                         viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                                         stroke-linecap="round" stroke-linejoin="round">
                                         <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
@@ -168,7 +168,7 @@
 
                     <div class="gtp-right">
                         <div class="gtp-search">
-                            <input type="text" placeholder="Поиск быстрых диапазонов" id="quickRangeSearch">
+                            <input type="text" placeholder="Поиск быстрых диапазонов" aria-label="Поиск быстрых диапазонов" id="quickRangeSearch">
                         </div>
                         <div class="quick-ranges-list" id="quickRangesList">
                             <button class="quick-range-btn" data-time="now-5m">Последние 5 минут</button>
@@ -316,7 +316,7 @@
                             <span>Толщина линии</span>
                             <span id="crosshairThicknessValue">1px</span>
                         </div>
-                        <input type="range" id="crosshairThicknessSlider" min="1" max="10" value="1" step="1"
+                        <input type="range" id="crosshairThicknessSlider" aria-label="Толщина умного курсора" min="1" max="10" value="1" step="1"
                             title="Регулировка толщины" style="width: 100%; margin: 0; cursor: pointer;">
                     </div>
                 </div>
@@ -343,11 +343,11 @@
 
             <div class="form-group">
                 <label>Ссылка для встраивания (меню «Поделиться» → «Встроить» в Grafana)</label>
-                <input type="text" id="newPanelUrl" placeholder="https://grafana.../d-solo/...">
+                <input type="text" id="newPanelUrl" aria-label="Ссылка для встраивания панели" placeholder="https://grafana.../d-solo/...">
             </div>
             <div class="form-group">
                 <label>Ширина на экране</label>
-                <select id="newPanelWidth">
+                <select id="newPanelWidth" aria-label="Ширина панели">
                     <option value="100%">100% (На всю ширину)</option>
                     <option value="50%" selected>50% (Половина экрана)</option>
                     <option value="33%">33% (Треть экрана)</option>
