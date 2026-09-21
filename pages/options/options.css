@@ -382,13 +382,34 @@
             border: 1px solid var(--border);
         }
 
+        /* Desktop settings use the available width for parallel, scannable
+           groups; the single-column flow remains the compact fallback. */
+        @media (min-width: 70rem) {
+            .container {
+                max-width: 92rem;
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 1.25rem;
+                align-items: start;
+            }
+            .container > .interface-section,
+            .container > .section-card,
+            .container > .maintenance-section {
+                min-width: 0;
+                margin: 0;
+            }
+            .container > .maintenance-section {
+                grid-column: 1 / -1;
+            }
+        }
+
         /* Keep the form readable on large desktop monitors without making it
            span the entire viewport. The normal 40.625rem cap remains the
            compact default; only very wide workspaces receive extra breathing
            room. */
         @media (min-width: 120rem) {
             .container {
-                max-width: 56rem;
+                max-width: 104rem;
             }
         }
 
@@ -415,6 +436,14 @@
             width: 100%;
             max-width: 40.625rem;
             text-align: left;
+        }
+
+        @media (min-width: 70rem) {
+            .header-content { max-width: 92rem; }
+        }
+
+        @media (min-width: 120rem) {
+            .header-content { max-width: 104rem; }
         }
 
         h3 {

@@ -183,6 +183,7 @@
 
         const appendPanelCard = (panelId, panelTitle, panelUrl, signatures) => {
             const container = documentRef.getElementById('seriesPanelsContainer');
+            documentRef.getElementById('seriesPanelsEmpty')?.remove();
             const card = documentRef.createElement('div');
             card.className = 'batch-series-card';
             card.dataset.querySignatures = JSON.stringify(signatures || []);
@@ -209,7 +210,7 @@
             if (!panelIds.length) return showToast('Выберите хотя бы одну панель', 'error');
             const loader = documentRef.getElementById('seriesLoaderStatus');
             loader.hidden = false;
-            documentRef.getElementById('seriesPanelsContainer').innerHTML = '';
+            documentRef.getElementById('seriesPanelsContainer').innerHTML = '<div id="seriesPanelsEmpty" class="batch-empty-state" role="status"><strong>Панели для Series ещё не подготовлены</strong><span>Введите URL дашборда, выберите панели и нажмите «Подготовить выбранные панели».</span></div>';
             try {
                 let loadedCards = 0;
                 const { payload } = await fetchDashboardDefinition(dashboardUrl);
