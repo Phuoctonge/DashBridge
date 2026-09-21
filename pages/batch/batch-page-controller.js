@@ -59,6 +59,12 @@
         const batchProgressBar = documentRef.getElementById('batchProgressBar');
         let operationProgressController = null;
         let previousSeriesDashboardUrl = documentRef.getElementById('seriesDashUrl').value.trim();
+        const autoResizeTextarea = field => {
+            field.style.height = 'auto';
+            field.style.height = `${field.scrollHeight + 2}px`;
+        };
+        const rangeTextareas = ['timestamps', 'seriesTimestamps']
+            .map(id => documentRef.getElementById(id));
 
         const setOperationProgressController = controller => {
             operationProgressController = controller || null;
@@ -86,6 +92,7 @@
                 return result;
             }
             field.value = result.ranges.map(({ from, to }) => `${from}, ${to}`).join('\n');
+            autoResizeTextarea(field);
             pageState.save();
             if (notify) showToast(`Преобразовано диапазонов: ${result.ranges.length}.`, 'success');
             return result;
@@ -142,7 +149,11 @@
             });
 
             pageState.bind();
-            pageState.restore().then(loadBatchPanelRules);
+            rangeTextareas.forEach(field => field.addEventListener('input', () => autoResizeTextarea(field)));
+            pageState.restore().then(() => {
+                rangeTextareas.forEach(autoResizeTextarea);
+                return loadBatchPanelRules();
+            });
             documentRef.getElementById('copyMainSettingsToSeriesBtn').addEventListener('click', () => {
                 const mainUrl = documentRef.getElementById('dashUrl').value.trim();
                 const mainSlices = documentRef.getElementById('timestamps').value.trim();
@@ -152,6 +163,7 @@
                 }
                 documentRef.getElementById('seriesDashUrl').value = mainUrl;
                 documentRef.getElementById('seriesTimestamps').value = mainSlices;
+                autoResizeTextarea(documentRef.getElementById('seriesTimestamps'));
                 resetSeriesDashboardSelection(panelPicker);
                 documentRef.getElementById('seriesDashUrl').dispatchEvent(new Event('change'));
                 pageState.save();
