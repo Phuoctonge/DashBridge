@@ -118,7 +118,7 @@
                                         <line x1="8" y1="2" x2="8" y2="6" />
                                         <line x1="3" y1="10" x2="21" y2="10" />
                                     </svg></button>
-                                <input type="date" id="pickerFrom" class="hidden-date-picker" data-target="absTimeFrom"
+                                <input type="date" id="pickerFrom" aria-label="Дата начала диапазона" class="hidden-date-picker" data-target="absTimeFrom"
                                     style="position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none;">
                             </div>
                         </div>
@@ -134,7 +134,7 @@
                                         <line x1="8" y1="2" x2="8" y2="6" />
                                         <line x1="3" y1="10" x2="21" y2="10" />
                                     </svg></button>
-                                <input type="date" id="pickerTo" class="hidden-date-picker" data-target="absTimeTo"
+                                <input type="date" id="pickerTo" aria-label="Дата окончания диапазона" class="hidden-date-picker" data-target="absTimeTo"
                                     style="position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none;">
                             </div>
                         </div>
@@ -243,7 +243,7 @@
                     <button id="importPanelsBtn" type="button">Импорт (JSON)</button>
                 </div>
             </div>
-            <input type="file" id="importPanelsInput" accept=".json" style="display:none">
+            <input type="file" id="importPanelsInput" aria-label="Файл панелей JSON" accept=".json" style="display:none">
             <div class="header-menu add-panel-menu">
                 <button id="addPanelBtn" class="btn btn-primary" type="button"
                     style="display: inline-flex; align-items: center;">

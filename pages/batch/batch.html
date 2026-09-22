@@ -43,7 +43,7 @@
                 <div class="form-group">
                     <label>URL Дашборда Grafana</label>
                     <div class="batch-url-row">
-                        <input type="text" id="dashUrl" placeholder="https://grafana.example.com/d/..." value=""
+                        <input type="text" id="dashUrl" aria-label="URL дашборда Grafana" placeholder="https://grafana.example.com/d/..." value=""
                             class="batch-url-input">
                         <div class="batch-url-actions">
                             <button id="getPanelsBtn" class="btn batch-secondary-btn"
@@ -60,7 +60,7 @@
                 <div class="grid">
                     <div class="form-group">
                         <label>Режим панелей</label>
-                        <select id="panelsMode">
+                        <select id="panelsMode" aria-label="Режим выбора панелей">
                             <option value="all">Все панели дашборда</option>
                             <option value="whitelist">Белый список (только эти ID через запятую)</option>
                             <option value="blacklist">Черный список (все кроме этих ID)</option>
@@ -68,13 +68,13 @@
                     </div>
                     <div class="form-group" id="userPanelsGroup" style="display: none;">
                         <label>ID панелей (через запятую)</label>
-                        <input type="text" id="userPanels" placeholder="2, 5, 12">
+                        <input type="text" id="userPanels" aria-label="ID выбранных панелей" placeholder="2, 5, 12">
                     </div>
                 </div>
 
                 <div class="form-group">
                     <label>Временные диапазоны (From, To через запятую). Каждая пара - с новой строки</label>
-                    <textarea id="timestamps" rows="3" placeholder="17.08.2026 09:00, 17.08.2026 18:00&#10;now-1h, now"></textarea>
+                    <textarea id="timestamps" aria-label="Временные диапазоны основного сбора" rows="3" placeholder="17.08.2026 09:00, 17.08.2026 18:00&#10;now-1h, now"></textarea>
                     <p class="batch-field-hint">Поддерживаются ISO, ДД.ММ.ГГГГ, ДД/ММ/ГГГГ, ГГГГ-ММ-ДД и Unix timestamp; <code>now-…</code> сохраняется. Преобразование выполняется при запуске.</p>
                 </div>
 
@@ -127,7 +127,7 @@
                 <div class="form-group">
                     <label>URL дашборда Grafana для Series</label>
                     <div class="batch-url-row">
-                        <input type="text" id="seriesDashUrl" placeholder="https://grafana.example.com/d/..."
+                        <input type="text" id="seriesDashUrl" aria-label="URL дашборда Grafana для Series" placeholder="https://grafana.example.com/d/..."
                             class="batch-url-input">
                         <div class="batch-url-actions">
                             <button id="getSeriesPanelsBtn" class="btn batch-secondary-btn">ID
@@ -172,14 +172,14 @@
 
                 <div class="form-group batch-spaced-group">
                     <label>Временные периоды для выбранных панелей (каждая пара с новой строки)</label>
-                    <textarea id="seriesTimestamps" class="batch-panel-url" placeholder="now-1h, now"
+                    <textarea id="seriesTimestamps" aria-label="Временные диапазоны Series" class="batch-panel-url" placeholder="now-1h, now"
                         style="height: 50px;"></textarea>
                 </div>
 
                 <div class="series-capture-settings">
                     <div class="form-group">
                         <label>Режим сбора изолированных метрик</label>
-                        <select id="seriesCaptureMode">
+                        <select id="seriesCaptureMode" aria-label="Режим сбора Series">
                             <option value="group">Групповой (все подходящие Series остаются на одном графике)</option>
                             <option value="standalone">По отдельности (каждая подходящая Series - в отдельном файле)
                             </option>

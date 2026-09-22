@@ -1,0 +1,12 @@
+'use strict';
+const fs = require('node:fs');
+const assert = require('node:assert/strict');
+const recorder = fs.readFileSync('pages/recorder/recorder.html', 'utf8');
+const popup = fs.readFileSync('pages/popup/popup.html', 'utf8');
+const worklog = fs.readFileSync('pages/worklog/worklog.html', 'utf8');
+assert.match(recorder, /<h1>Запись трафика<\/h1>/);
+assert.match(popup, /<span>Запись<\/span>/);
+assert.match(worklog, /<th class="col-key">Задача Jira<\/th>/);
+assert.match(worklog, /<th class="col-time">Время \(ч\)<\/th>/);
+assert.match(worklog, /<th class="col-actions">Действия<\/th>/);
+console.log('Final UI language behavior passed');

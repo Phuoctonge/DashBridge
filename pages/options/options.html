@@ -159,7 +159,7 @@
             <div class="options-subsection">
                 <h5 class="options-subsection-title">Подключение</h5>
                 <p class="section-description">Укажите домены корпоративных Grafana для встраивания в <strong>Единый дашборд Grafana</strong> и использования инструментов DashBridge на панелях.</p>
-                <textarea id="settingGrafanaIframeDomains" class="form-input form-input-mono"
+                <textarea id="settingGrafanaIframeDomains" aria-label="Домены Grafana для встраивания" class="form-input form-input-mono"
                     placeholder="grafanakns.mos.ru&#10;mon-dc.mos.ru"></textarea>
                 <div class="form-hint-italic">
                     * По одному домену на строку (без http/https). Добавляйте только доверенные Grafana: для них разрешаются
@@ -167,7 +167,7 @@
                 </div>
                 <div class="form-group form-group-last">
                     <label class="form-label">Параметры для переноса между дашбордами:</label>
-                    <input type="text" id="settingGrafanaKeepParams" class="form-input" placeholder="from, to, var-project">
+                    <input type="text" id="settingGrafanaKeepParams" aria-label="Параметры URL Grafana" class="form-input" placeholder="from, to, var-project">
                     <div class="form-hint">Через запятую. Например: from,
                         to, var-project, var-station</div>
                 </div>
@@ -183,7 +183,7 @@
                         </div>
                         <div class="form-group form-group-last">
                             <label class="form-label">Ключевое слово Idle для поиска и конвертации:</label>
-                            <input type="text" id="settingGrafanaKeyword" class="form-input" placeholder="idle">
+                        <input type="text" id="settingGrafanaKeyword" aria-label="Ключевое слово CPU панели" class="form-input" placeholder="idle">
                         </div>
                     </div>
                     <div class="metric-settings-group metric-settings-group-ram">
@@ -228,7 +228,7 @@
                     <h6 class="metric-settings-title">Имена серверов</h6>
                     <div class="form-group form-group-last">
                         <label class="form-label">Суффикс домена и порта для удаления:</label>
-                        <input type="text" id="settingGrafanaDomain" class="form-input" placeholder=".passport.local:9182">
+                        <input type="text" id="settingGrafanaDomain" aria-label="Суффикс домена сервера" class="form-input" placeholder=".passport.local:9182">
                         <div class="domain-trim-toggle">
                             <label for="settingGrafanaTrimDomainEnabled">Удалять этот суффикс в названиях серий всех панелей Grafana</label>
                             <label class="switch"><input type="checkbox" id="settingGrafanaTrimDomainEnabled"><span
@@ -259,31 +259,31 @@
             <div class="row">
                 <div class="form-group">
                     <label class="form-label">CPU Порог 🟨 (%):</label>
-                    <input type="number" id="settingCpuWarn" class="form-input" value="50" min="0" max="100" step="1">
+                    <input type="number" id="settingCpuWarn" aria-label="Порог предупреждения CPU" class="form-input" value="50" min="0" max="100" step="1">
                 </div>
                 <div class="form-group">
                     <label class="form-label">CPU Порог 🟥 (%):</label>
-                    <input type="number" id="settingCpuCrit" class="form-input" value="80" min="0" max="100" step="1">
+                    <input type="number" id="settingCpuCrit" aria-label="Критический порог CPU" class="form-input" value="80" min="0" max="100" step="1">
                 </div>
             </div>
             <div class="row">
                 <div class="form-group">
                     <label class="form-label">RAM Порог 🟨 (%):</label>
-                    <input type="number" id="settingMemWarn" class="form-input" value="80" min="0" max="100" step="1">
+                    <input type="number" id="settingMemWarn" aria-label="Порог предупреждения RAM" class="form-input" value="80" min="0" max="100" step="1">
                 </div>
                 <div class="form-group">
                     <label class="form-label">RAM Порог 🟥 (%):</label>
-                    <input type="number" id="settingMemCrit" class="form-input" value="90" min="0" max="100" step="1">
+                    <input type="number" id="settingMemCrit" aria-label="Критический порог RAM" class="form-input" value="90" min="0" max="100" step="1">
                 </div>
             </div>
             <div class="form-group">
                 <label class="form-label">Шаблон для "Весь список":</label>
-                <input type="text" id="settingCpuTemplateFull" class="form-input" placeholder="{server} до {cpu}%">
+                <input type="text" id="settingCpuTemplateFull" aria-label="Шаблон CPU для одной строки" class="form-input" placeholder="{server} до {cpu}%">
                 <div class="form-hint">Доступно: {server}, {cpu}</div>
             </div>
             <div class="form-group form-group-last">
                 <label class="form-label">Шаблон для "TOP-3":</label>
-                <textarea id="settingCpuTemplateTop3" class="form-input form-input-textarea"
+                <textarea id="settingCpuTemplateTop3" aria-label="Шаблон CPU для трёх строк" class="form-input form-input-textarea"
                     placeholder="до {cpu1}% для {server1}, до {cpu2}% для {server2}, для остальных до {cpu3}%"></textarea>
                 <div class="form-hint">Доступно: {server1..3},
                     {cpu1..3}</div>
@@ -291,12 +291,12 @@
             <hr class="divider">
             <div class="form-group">
                 <label class="form-label">Шаблон RAM "Весь список":</label>
-                <input type="text" id="settingMemTemplateFull" class="form-input" placeholder="{server} до {mem}%">
+                <input type="text" id="settingMemTemplateFull" aria-label="Шаблон RAM для одной строки" class="form-input" placeholder="{server} до {mem}%">
                 <div class="form-hint">Доступно: {server}, {mem}</div>
             </div>
             <div class="form-group form-group-last">
                 <label class="form-label">Шаблон RAM "TOP-3":</label>
-                <textarea id="settingMemTemplateTop3" class="form-input form-input-textarea"
+                <textarea id="settingMemTemplateTop3" aria-label="Шаблон RAM для трёх строк" class="form-input form-input-textarea"
                     placeholder="до {mem1}% для {server1}, до {mem2}% для {server2}, для остальных до {mem3}%"></textarea>
                 <div class="form-hint">Доступно: {server1..3},
                     {mem1..3}</div>
@@ -314,11 +314,11 @@
             </h4>
             <div class="form-group">
                 <label class="form-label">Базовый URL Jira:</label>
-                <input type="text" id="settingJiraUrl" class="form-input" placeholder="https://jira.lanit.ru">
+                <input type="text" id="settingJiraUrl" aria-label="Базовый URL Jira" class="form-input" placeholder="https://jira.lanit.ru">
             </div>
             <div class="form-group form-group-mt-mb-16">
                 <label class="form-label">Часовой пояс для списания времени:</label>
-                <select id="settingJiraTz" class="form-input">
+                <select id="settingJiraTz" aria-label="Часовой пояс Jira" class="form-input">
                     <option value="local">Локальный часовой пояс браузера</option>
                     <option value="Europe/Moscow">Europe/Moscow (Москва, UTC+3)</option>
                     <option value="Europe/Kaliningrad">Europe/Kaliningrad (Калининград, UTC+2)</option>
@@ -357,14 +357,14 @@
                 Укажите адреса корпоративных Wiki-систем, на которых нужно автоматически исправлять проблемы со
                 скроллом.
             </p>
-            <textarea id="settingWikiDomains" class="form-input form-input-mono"
+            <textarea id="settingWikiDomains" aria-label="Домены Confluence и Wiki" class="form-input form-input-mono"
                 placeholder="itpm-wiki.mos.ru&#10;wiki.mos-team.ru&#10;wiki.lanit.ru"></textarea>
             <div class="form-hint-italic">
                 * По одному домену на строку (без http/https)
             </div>
             <div class="form-group form-group-last">
                 <label class="form-label">Идентификаторы iframe редактора (через запятую):</label>
-                <input type="text" id="settingWikiIframeIds" class="form-input"
+                <input type="text" id="settingWikiIframeIds" aria-label="ID iframe редактора Wiki" class="form-input"
                     placeholder="wysiwygTextarea_ifr, mce_0_ifr">
             </div>
         </div>
@@ -378,7 +378,7 @@
             </h4>
             <div class="form-group">
                 <label class="form-label">Домен для проверки активности TDM:</label>
-                <input type="text" id="settingTdmDomain" class="form-input" placeholder="web.tdm.mos.ru">
+                <input type="text" id="settingTdmDomain" aria-label="Домен TDM" class="form-input" placeholder="web.tdm.mos.ru">
             </div>
             <hr class="divider">
             <h5 class="options-subsection-title">Экспорт сообщений</h5>
@@ -445,7 +445,7 @@
                     </svg> Импорт (JSON)</button>
                 <button id="restoreImportBackupBtn" class="btn btn-secondary-flex" type="button" hidden>Восстановить до импорта</button>
             </div>
-            <input type="file" id="importFile" class="hidden" accept=".json">
+            <input type="file" id="importFile" aria-label="Файл резервной копии JSON" class="hidden" accept=".json">
             <div id="maintenanceStatus" class="maintenance-status"></div>
             <details class="analytics-delivery"><summary>Доставка аналитики</summary>
                 <div id="analyticsDeliveryHealth" role="status">Загрузка…</div>
