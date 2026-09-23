@@ -36,4 +36,7 @@ const pairedAnchorHtml = '<h3>Тест 1</h3><h5>Метрики серверов
 const pairedAnchorResult = storage.transform(pairedAnchorHtml, { additions: [{ newFilename: 'load.png', caption: 'Load Average', insertion: { groupTitle: 'Метрики серверов системы', testTitle: 'Тест 1', beforeFilename: 'average.png' } }] });
 assert(pairedAnchorResult.html.indexOf('load.png') < pairedAnchorResult.html.indexOf('среднюю загруженность'));
 assert(pairedAnchorResult.html.indexOf('среднюю загруженность') < pairedAnchorResult.html.indexOf('average.png'));
+assert(storage.verifyPlan(pairedAnchorResult.html, { additions: [{ newFilename: 'load.png', caption: 'Load Average', insertion: { groupTitle: 'Метрики серверов системы', testTitle: 'Тест 1', beforeFilename: 'average.png' } }] }));
+assert.strictEqual(storage.verifyPlan(pairedAnchorResult.html, { additions: [{ newFilename: 'load.png', caption: 'Load Average', insertion: { groupTitle: 'Другая группа', testTitle: 'Тест 1', beforeFilename: 'average.png' } }] }), false);
+assert.strictEqual(storage.verifyPlan('<h3>Тест 1</h3><h5>Метрики серверов системы</h5><p>CPU Usage</p><ac:image><ri:attachment ri:filename="old.png" /></ac:image><p>CPU Usage</p><ac:image><ri:attachment ri:filename="new.png" /></ac:image>', { additions: [{ newFilename: 'new.png', caption: 'CPU Usage', insertion: { groupTitle: 'Метрики серверов системы', testTitle: 'Тест 1' } }] }), true);
 console.log('PASS Confluence report storage transformation');

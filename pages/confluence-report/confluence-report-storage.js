@@ -31,6 +31,26 @@
         for (const match of String(html).slice(0, imageIndex).matchAll(/<p\b[^>]*>[\s\S]*?<\/p>/gi)) candidate = match.index;
         return candidate;
     }
+    function verifyPlan(storageHtml, plan = {}) {
+        const html = String(storageHtml || '');
+        for (const item of Array.isArray(plan.additions) ? plan.additions : []) {
+            const insertion = item.insertion || {};
+            if (!insertion.groupTitle) continue;
+            const region = groupRegion(html, insertion);
+            if (!region) return false;
+            const scoped = html.slice(region.start, region.end);
+            const image = imageBlockAt(scoped, text(item.newFilename));
+            if (!image) return false;
+            const caption = `<p>${escapeXml(item.caption)}</p>`;
+            const captionIndex = scoped.lastIndexOf(caption, image.index);
+            if (captionIndex < 0 || captionIndex > image.index || /<ac:image\b/i.test(scoped.slice(captionIndex + caption.length, image.index))) return false;
+            if (insertion.beforeFilename) {
+                const anchor = imageBlockAt(scoped, insertion.beforeFilename);
+                if (!anchor || image.index >= anchor.index) return false;
+            }
+        }
+        return true;
+    }
     function transform(storageHtml, plan = {}) {
         let html = String(storageHtml || ''); const applied = []; const replacements = Array.isArray(plan.replacements) ? plan.replacements : [];
         for (const item of replacements) { const oldFilename = text(item.oldFilename); const newFilename = text(item.newFilename); if (!oldFilename || !newFilename) throw new Error('Replacement requires oldFilename and newFilename'); let occurrence = 0; let changed = false; html = html.replace(/<ac:image\b[\s\S]*?<\/ac:image>|<ac:image\b[^>]*\/>/gi, block => { if (imageFilename(block) !== oldFilename) return block; if (item.occurrence != null && occurrence++ !== Number(item.occurrence)) return block; changed = true; return replaceImage(block, oldFilename, newFilename); }); if (!changed) throw new Error(`Attachment not found: ${oldFilename}`); applied.push({ ...item, oldFilename, newFilename }); }
@@ -60,5 +80,5 @@
         }
         return Object.freeze({ html, changed: html !== storageHtml, applied: Object.freeze(applied) });
     }
-    root.DashBridgeConfluenceReportStorage = Object.freeze({ transform });
+    root.DashBridgeConfluenceReportStorage = Object.freeze({ transform, verifyPlan });
 })(globalThis);
