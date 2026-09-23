@@ -3,8 +3,7 @@
     const visualLabels = [['removeFill', 'Убрать заливку графика'], ['thickenLines', 'Утолщить линии графика'],
         ['invertLegend', 'Переместить легенду: справа ↔ снизу']];
     const transformLabels = [['invertIdle', 'Инвертировать CPU-график: Idle → Load'],
-        ['convertMemToUsed', 'Конвертировать RAM-график в % Used'],
-        ['forceMemByteUnit', 'Показывать RAM в байтах']];
+        ['convertMemToUsed', 'Конвертировать RAM-график в % Used']];
     const filterLabels = [['seriesQueryFilterEnabled', 'Фильтр отображаемых серий'],
         ['cpuCapacityFilterEnabled', 'Фильтр Load Average по vCPU'], ['thresholdEnabled', 'Порог на графике']];
     const allLabels = [...visualLabels, ...transformLabels, ...filterLabels];
@@ -54,15 +53,10 @@
             const syncWidth = () => { widthInput.disabled = thick?.checked !== true; };
             thick?.addEventListener('change', syncWidth); syncWidth();
             const convertMem = options.querySelector('[data-rule-field="convertMemToUsed"]');
-            const forceBytes = options.querySelector('[data-rule-field="forceMemByteUnit"]');
             const syncMemoryModes = (source) => {
-                if (source?.checked && source === convertMem && forceBytes) forceBytes.checked = false;
-                if (source?.checked && source === forceBytes && convertMem) convertMem.checked = false;
-                if (forceBytes) forceBytes.disabled = convertMem?.checked === true;
-                if (convertMem) convertMem.disabled = forceBytes?.checked === true;
+                if (convertMem) convertMem.disabled = false;
             };
             convertMem?.addEventListener('change', () => syncMemoryModes(convertMem));
-            forceBytes?.addEventListener('change', () => syncMemoryModes(forceBytes));
             syncMemoryModes();
             const addFilterDetails = (prefix, label, modeOptions = null) => {
                 const setting = options.querySelector(`[data-setting="${prefix}Enabled"]`);
@@ -130,7 +124,7 @@
                 const active = allLabels.filter(([key]) => options.querySelector(`[data-rule-field="${key}"]`)?.checked);
                 const names = { removeFill: 'без заливки', thickenLines: `линии ${widthInput.value}`,
                     invertLegend: 'легенда', invertIdle: 'CPU → Load', convertMemToUsed: 'RAM → %',
-                    forceMemByteUnit: 'RAM в байтах', seriesQueryFilterEnabled: 'фильтр серий',
+                    seriesQueryFilterEnabled: 'фильтр серий',
                     cpuCapacityFilterEnabled: 'Load по vCPU', thresholdEnabled: 'порог' };
                 summary.textContent = active.length ? `Настройки · ${active.map(([key]) => names[key]).join(' · ')}` : 'Настройки · ничего не включено';
             };
