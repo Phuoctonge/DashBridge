@@ -28,12 +28,6 @@
         <div class="url-row"><div class="field"><label for="pageUrlInput">URL отчёта</label><input id="pageUrlInput" name="pageUrl" type="url" autocomplete="url" required aria-describedby="pageUrlHint" placeholder="https://wiki.example/pages/viewpage.action?pageId=123"><p id="pageUrlHint" class="field-hint">Логин, пароль и токены в URL не допускаются.</p></div><button id="scanLiveButton" class="btn btn-primary" type="button">Сканировать страницу</button></div>
         <p id="liveStatus" class="status-line" role="status" aria-live="polite">Укажите URL отчёта — отдельное окно откроется автоматически.</p>
     </section>
-    <section class="step-card mapping-board-card" id="mappingBoardCard" aria-labelledby="mappingBoardHeading" hidden>
-        <span class="step-number" aria-hidden="true">↔</span>
-        <div class="step-heading"><div><h2 id="mappingBoardHeading">Сопоставление</h2><p>Перетащите синюю карточку из «ZIP Batch» на график, группу или пункт добавления справа. Точная зона вставки подсветится.</p></div><div><button id="clearConnectionsButton" class="btn btn-quiet" type="button">Очистить связи</button><button id="applyConfluenceButton" class="btn btn-primary" type="button" disabled>Применить изменения в Confluence</button></div></div>
-        <div id="mappingBoard" class="mapping-board"><svg id="mappingLinks" class="mapping-links" aria-hidden="true"><defs><marker id="mapping-arrow-group" markerWidth="5" markerHeight="5" refX="4.5" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5 Z" fill="#15803d"></path></marker><marker id="mapping-arrow-specific" markerWidth="5" markerHeight="5" refX="4.5" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5 Z" fill="#2563eb"></path></marker></defs></svg><div class="mapping-column"><h3>ZIP Batch</h3><div id="mappingSources" class="mapping-nodes"></div></div><div class="mapping-column"><h3>Отчёт Confluence</h3><div id="mappingTargets" class="mapping-nodes"></div></div></div>
-        <p id="mappingBoardStatus" class="status-line" role="status" aria-live="polite">Загрузите URL и ZIP, чтобы начать сопоставление.</p>
-    </section>
     <section class="step-card" id="summaryCard" aria-labelledby="summaryHeading" hidden>
         <span class="step-number" aria-hidden="true">2</span><div class="step-heading"><div><h2 id="summaryHeading">Сопоставьте отчёт и ZIP</h2><p>После анализа обоих источников система предложит операции замены и добавления.</p></div></div>
         <div class="summary-grid"><div class="summary-tile"><span>Тесты</span><b id="testCount">0</b></div><div class="summary-tile"><span>Изображения</span><b id="imageCount">0</b></div><div class="summary-tile"><span>Выбрано целей</span><b id="targetCount">0</b></div></div>
@@ -64,6 +58,12 @@
                 <div id="operationList" class="operation-list" aria-live="polite"></div>
             </div>
         </div>
+    </section>
+    <section class="step-card mapping-board-card" id="mappingBoardCard" aria-labelledby="mappingBoardHeading" hidden>
+        <span class="step-number" aria-hidden="true">↔</span>
+        <div class="step-heading"><div><h2 id="mappingBoardHeading">Сопоставление</h2><p>Перетащите синюю карточку из «ZIP Batch» на график, группу или пункт добавления справа. Точная зона вставки подсветится.</p></div><div><button id="clearConnectionsButton" class="btn btn-quiet" type="button">Очистить связи</button><button id="applyConfluenceButton" class="btn btn-primary" type="button" disabled>Применить изменения в Confluence</button></div></div>
+        <div id="mappingBoard" class="mapping-board"><svg id="mappingLinks" class="mapping-links" aria-hidden="true"><defs><marker id="mapping-arrow-group" markerWidth="5" markerHeight="5" refX="4.5" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5 Z" fill="#15803d"></path></marker><marker id="mapping-arrow-specific" markerWidth="5" markerHeight="5" refX="4.5" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5 Z" fill="#2563eb"></path></marker></defs></svg><div class="mapping-column"><h3>ZIP Batch</h3><div id="mappingSources" class="mapping-nodes"></div></div><div class="mapping-column"><h3>Отчёт Confluence</h3><div id="mappingTargets" class="mapping-nodes"></div></div></div>
+        <p id="mappingBoardStatus" class="status-line" role="status" aria-live="polite">Загрузите URL и ZIP, чтобы начать сопоставление.</p>
     </section>
     <section class="step-card" id="previewCard" aria-labelledby="previewHeading" hidden>
         <span class="step-number" aria-hidden="true">4</span><div class="step-heading"><div><h2 id="previewHeading">Проверьте сопоставление</h2><p>Проверьте старые и новые изображения перед применением.</p></div></div>
