@@ -53,4 +53,7 @@ assert.match(reportSource, /filter\(item => item\.criteriaWide && item\.groupTit
 assert.match(reportSource, /for \(const wide of wides\.slice\(\)\.reverse\(\)\)/);
 assert.match(reportSource, /window\.scrollX/);
 assert.match(reportSource, /requestAnimationFrame/);
+assert.match(reportSource, /placeholder = 'Название раздела'/);
+assert.match(reportSource, /section\.title = title\.value\.trim\(\)/);
+assert.match(reportSource, /input\.focus\(\)/);
 console.log('PASS Confluence report mapping board');
