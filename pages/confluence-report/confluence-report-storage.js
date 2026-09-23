@@ -16,7 +16,7 @@
             const block = `<p>${escapeXml(caption)}</p><ac:image style="width: 100%;"><ri:attachment ri:filename="${escapeXml(filename)}" /></ac:image>`;
             const insertion = item.insertion || {};
             if (insertion.groupTitle) {
-                const heading = new RegExp(`(<h4\\b[^>]*>\\s*${escapeRegExp(insertion.groupTitle)}\\s*</h4>)`, 'i');
+                const heading = new RegExp(`(<h[1-6]\\b[^>]*>\\s*${escapeRegExp(insertion.groupTitle)}\\s*</h[1-6]>)`, 'i');
                 if (heading.test(html)) {
                     if (insertion.beforeFilename) {
                         const before = new RegExp(`(<ac:image\\b[\\s\\S]*?ri:filename\\s*=\\s*["']${escapeRegExp(insertion.beforeFilename)}["'][\\s\\S]*?<\\/ac:image>|<ac:image\\b[^>]*ri:filename\\s*=\\s*["']${escapeRegExp(insertion.beforeFilename)}["'][^>]*\\/>)`, 'i');
