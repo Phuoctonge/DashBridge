@@ -41,6 +41,7 @@ assert.match(reportSource, /draggedSourceKey\.startsWith\('aggregate\\0'\)/);
 assert.match(reportSource, /criteriaWideId/);
 assert.match(reportSource, /Общая панель для всех тестов/);
 assert.match(reportSource, /if \(draggedAddedItem\) moveAddedItem\(\{ kind: 'group', groupTitle \}\)/);
+assert.match(reportSource, /added-wide\\0/);
 assert.match(reportSource, /candidate\.testKey === '\*'/);
 assert.match(reportSource, /mapping-criteria-group/);
 assert.match(reportSource, /groupTitle/);
