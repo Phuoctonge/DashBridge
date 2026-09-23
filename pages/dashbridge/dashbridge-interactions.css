@@ -281,7 +281,6 @@
         padding-inline: 0.625rem;
     }
 
-    .dashboard-capture-all span,
     #crosshairMenuBtn > span:first-of-type {
         display: none;
     }

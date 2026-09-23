@@ -35,7 +35,7 @@ class FakeElement {
 }
 
 const ids = [
-    'capturePreparedToggleBtn', 'captureAllPanelsBtn', 'crosshairMenuBtn',
+    'capturePreparedToggleBtn', 'crosshairMenuBtn',
     'crosshairDropdown', 'crosshairToggleCheckbox', 'crosshairThicknessSlider',
     'crosshairThicknessValue', 'profileDropdown', 'dataDropdown',
     'addPanelDropdown', 'reportDropdown', 'dataMenuBtn', 'addPanelMenuBtn',
@@ -71,7 +71,6 @@ const controller = context.DashBridgePageUiController.create({
     getFrames: () => frames,
     getCapturePrepared: () => prepared,
     setCapturePrepared: value => { prepared = value; calls.push(['prepared', value]); },
-    captureAllPanels: button => calls.push(['captureAll', button.id]),
     renderProfileSwitcher: () => calls.push('renderProfiles'),
     showPrompt: async (label, value) => label.startsWith('Название') ? ' New ' : `${value} 2`,
     createProfile: name => calls.push(['create', name]),
@@ -113,9 +112,7 @@ assert.strictEqual(elements.crosshairThicknessValue.textContent, '4px');
 assert.deepStrictEqual(storageWrites[1], ['dashbridge_crosshairThickness', 4]);
 
 elements.capturePreparedToggleBtn.emit('click');
-elements.captureAllPanelsBtn.emit('click');
 assert.strictEqual(prepared, true);
-assert(calls.some(call => Array.isArray(call) && call[0] === 'captureAll'));
 
 elements.configureReportBtn.emit('click');
 elements.generateReportBtn.emit('click');

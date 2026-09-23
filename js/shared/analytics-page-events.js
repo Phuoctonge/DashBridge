@@ -23,7 +23,6 @@
         newProfileBtn: 'dashbridge.profile_created', renameProfileBtn: 'dashbridge.profile_renamed',
         deleteProfileBtn: 'dashbridge.profile_deleted', forceRefreshBtn: 'dashbridge.force_refresh',
         copyTimeBtn: 'dashbridge.time_range_copied', pasteTimeBtn: 'dashbridge.time_range_pasted',
-        captureAllPanelsBtn: 'dashbridge.capture_all_zip',
         generateReportBtn: 'dashbridge.report_generated',
         testReportBtn: 'internal.message_test_runner', exportPanelsBtn: 'dashbridge.profile_exported',
         importPanelsBtn: 'dashbridge.profile_imported', savePanelBtn: 'dashbridge.panel_added',

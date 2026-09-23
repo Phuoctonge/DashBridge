@@ -282,13 +282,6 @@ header .grafana-dropdown {
     gap: 0.35rem;
 }
 
-.dashboard-capture-all {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    white-space: nowrap;
-}
-
 .dashboard-capture-toggle {
     width: var(--control-height-md);
     min-width: var(--control-height-md);
@@ -308,16 +301,6 @@ header .grafana-dropdown {
     color: var(--primary);
     border-color: var(--primary);
     background: transparent;
-}
-
-.dashboard-capture-all .ic {
-    width: 17px;
-    height: 17px;
-}
-
-.dashboard-capture-all:disabled {
-    cursor: progress;
-    opacity: 0.72;
 }
 
 /* Both cursor states occupy one stable slot in the header. */
@@ -576,6 +559,6 @@ iframe {
     border: none;
     display: block;
 }
-header :is(#profilePickerBtn, #timePickerBtn, #forceRefreshBtn, #refreshPickerBtn, #dashboardVariablesToggle, #reportMenuBtn, #dataMenuBtn, #addPanelBtn, #addPanelMenuBtn, #capturePreparedToggleBtn, #captureAllPanelsBtn, #crosshairMenuBtn) { min-height: 3rem; justify-content: center; }
+header :is(#profilePickerBtn, #timePickerBtn, #forceRefreshBtn, #refreshPickerBtn, #dashboardVariablesToggle, #reportMenuBtn, #dataMenuBtn, #addPanelBtn, #addPanelMenuBtn, #capturePreparedToggleBtn, #crosshairMenuBtn) { min-height: 3rem; justify-content: center; }
 .header-button-label { display: inline-block; text-align: center; line-height: 1.15; }
 #dashboardVariablesToggle[hidden] { display: none; }

@@ -435,7 +435,6 @@ const dashBridgeCapture = DashBridgeCapture.create({
     postToDashboardFrame,
     showAlert,
 });
-const captureAllDashboardPanels = dashBridgeCapture.captureAll;
 const runDashboardToolbarCapture = dashBridgeCapture.captureFromToolbar;
 const captureDashbridgePanel = dashBridgeCapture.capturePanel;
 
@@ -499,7 +498,6 @@ dashBridgePageUiController = DashBridgePageUiController.create({
     getFrames: () => document.querySelectorAll('iframe[name="dashbridge-iframe"]'),
     getCapturePrepared: () => defaultCapturePrepared,
     setCapturePrepared: dashBridgeCapture.setPrepared,
-    captureAllPanels: captureAllDashboardPanels,
     renderProfileSwitcher,
     showPrompt,
     createProfile,

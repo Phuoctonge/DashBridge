@@ -24,9 +24,8 @@ checks = {
         "panel.paused ? this.createPausedPanelBody(panel) : this.createLivePanelBody" in renderer,
     'active iframe enters bounded startup queue during render':
         re.search(r"if \(!panel\.paused\)\s*\{\s*scheduleFrameLoad\(iframe, iframe\.dataset\.src\)", cards) is not None,
-    'header contains current-profile ZIP button':
-        'id="captureAllPanelsBtn"' in html and 'captureAllDashboardPanels' in src
-        and 'captureAll' in capture,
+    'header omits the removed current-profile ZIP button':
+        'id="captureAllPanelsBtn"' not in html and 'captureAllDashboardPanels' not in src,
     'header compact toggle shares global panel state':
         'id="capturePreparedToggleBtn"' in html and 'btn-capture-toggle' in html
         and "setCapturePrepared(!getCapturePrepared())" in page_ui,

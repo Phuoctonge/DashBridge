@@ -3,7 +3,7 @@
 
     function create({ getCrosshairMode, setCrosshairMode, getCrosshairThickness,
         setCrosshairThickness, hideCrosshair, postToDashboardFrame, getFrames,
-        getCapturePrepared, setCapturePrepared, captureAllPanels,
+        getCapturePrepared, setCapturePrepared,
         renderProfileSwitcher, showPrompt, createProfile, cloneProfile, renameActiveProfile,
         deleteProfile, getActiveProfile, getActiveProfileId, openReportSettings,
         openReportPreview, openReportTest, setupPanelAddition,
@@ -13,7 +13,7 @@
         const required = [
             getCrosshairMode, setCrosshairMode, getCrosshairThickness,
             setCrosshairThickness, hideCrosshair, postToDashboardFrame, getFrames,
-            getCapturePrepared, setCapturePrepared, captureAllPanels,
+            getCapturePrepared, setCapturePrepared,
             renderProfileSwitcher, showPrompt, createProfile, cloneProfile, renameActiveProfile,
             deleteProfile, getActiveProfile, getActiveProfileId, openReportSettings,
             openReportPreview, openReportTest, setupPanelAddition,
@@ -35,10 +35,6 @@
             documentRef.getElementById('capturePreparedToggleBtn')?.addEventListener('click', () => {
                 setCapturePrepared(!getCapturePrepared());
             });
-            documentRef.getElementById('captureAllPanelsBtn')?.addEventListener('click', event => {
-                void captureAllPanels(event.currentTarget);
-            });
-
             const crosshairMenuButton = documentRef.getElementById('crosshairMenuBtn');
             const crosshairDropdown = documentRef.getElementById('crosshairDropdown');
             const crosshairToggle = documentRef.getElementById('crosshairToggleCheckbox');
