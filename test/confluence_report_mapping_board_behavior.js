@@ -56,4 +56,7 @@ assert.match(reportSource, /requestAnimationFrame/);
 assert.match(reportSource, /placeholder = 'Название раздела'/);
 assert.match(reportSource, /section\.title = title\.value\.trim\(\)/);
 assert.match(reportSource, /input\.focus\(\)/);
+assert.match(reportSource, /function sourceForKey\(sourceKey, rangeKey = null\)/);
+assert.match(reportSource, /function findSourceForTarget\(sourceKey, test\)/);
+assert.match(reportSource, /const targetFilename = findSourceForTarget\(link\.sourceKey, targetTest\)/);
 console.log('PASS Confluence report mapping board');
