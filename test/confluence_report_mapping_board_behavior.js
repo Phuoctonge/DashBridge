@@ -37,6 +37,8 @@ assert.match(reportSource, /Приписка перед графиком/);
 assert.match(reportSource, /Добавить новый раздел во все тесты/);
 assert.match(reportSource, /Добавить график во все тесты/);
 assert.match(reportSource, /function createInlineCriteriaGraph/);
+assert.match(reportSource, /draggedSourceKey\.startsWith\('aggregate\\0'\)/);
+assert.match(reportSource, /criteriaWideId/);
 assert.match(reportSource, /candidate\.testKey === '\*'/);
 assert.match(reportSource, /mapping-criteria-group/);
 assert.match(reportSource, /groupTitle/);
