@@ -46,4 +46,6 @@ assert.match(reportSource, /candidate\.testKey === '\*'/);
 assert.match(reportSource, /mapping-criteria-group/);
 assert.match(reportSource, /groupTitle/);
 assert.match(reportSource, /candidate\.testKey === '\*'/);
+assert.match(reportSource, /delete entry\.insertionBeforeMetric/);
+assert.match(reportSource, /function restoreCriteriaWideOrder/);
 console.log('PASS Confluence report mapping board');
