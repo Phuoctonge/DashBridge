@@ -15,4 +15,14 @@ const headingLevelResult = storage.transform(headingLevelHtml, { additions: [
 assert(headingLevelResult.html.indexOf('cpu.png') < headingLevelResult.html.indexOf('anchor.png'));
 assert(headingLevelResult.html.indexOf('load.png') < headingLevelResult.html.indexOf('anchor.png'));
 assert.throws(() => storage.transform('<h5>Другая группа</h5>', { additions: [{ newFilename: 'x.png', caption: 'CPU', insertion: { groupTitle: 'Метрики серверов системы' } }] }), /Target group not found/);
+const duplicateGroupsHtml = '<h3>Тест 1</h3><h5>Данные с нагрузочных станций</h5><ac:image><ri:attachment ri:filename="load-1.png" /></ac:image><h5>Метрики серверов системы</h5><ac:image><ri:attachment ri:filename="cpu-1.png" /></ac:image><h3>Тест 2</h3><h5>Данные с нагрузочных станций</h5><ac:image><ri:attachment ri:filename="load-2.png" /></ac:image><h5>Метрики серверов системы</h5><ac:image><ri:attachment ri:filename="cpu-2.png" /></ac:image>';
+const scoped = storage.transform(duplicateGroupsHtml, { additions: [
+    { newFilename: 'new-1.png', caption: 'CPU Usage', insertion: { groupTitle: 'Метрики серверов системы', testTitle: 'Тест 1', beforeFilename: 'cpu-1.png' } },
+    { newFilename: 'new-2.png', caption: 'CPU Usage', insertion: { groupTitle: 'Метрики серверов системы', testTitle: 'Тест 2', beforeFilename: 'cpu-2.png' } },
+] });
+assert(scoped.html.indexOf('new-1.png') < scoped.html.indexOf('cpu-1.png'));
+assert(scoped.html.indexOf('new-1.png') > scoped.html.indexOf('load-1.png'));
+assert(scoped.html.indexOf('new-2.png') < scoped.html.indexOf('cpu-2.png'));
+assert(scoped.html.indexOf('new-2.png') > scoped.html.indexOf('load-2.png'));
+assert(scoped.html.indexOf('new-1.png') < scoped.html.indexOf('load-2.png'));
 console.log('PASS Confluence report storage transformation');

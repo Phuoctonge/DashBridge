@@ -6,6 +6,20 @@
     function imageFilename(block) { return String(block || '').match(/ri:filename\s*=\s*["']([^"']+)["']/i)?.[1] || null; }
     function setFullWidth(block) { if (/\sstyle\s*=\s*["'][^"']*["']/i.test(block)) return block.replace(/(\sstyle\s*=\s*["'])[^"']*/i, '$1width: 100%;'); return block.replace(/<ac:image\b/i, '<ac:image style="width: 100%;"'); }
     function replaceImage(block, oldFilename, newFilename) { const pattern = new RegExp(`(ri:filename\\s*=\\s*["'])${escapeRegExp(oldFilename)}(["'])`, 'i'); if (!pattern.test(block)) return block; return setFullWidth(block.replace(pattern, `$1${newFilename}$2`)); }
+    function groupRegion(html, insertion) {
+        const headingPattern = /<h([1-6])\b[^>]*>[\s\S]*?<\/h\1>/gi;
+        const headings = [...String(html).matchAll(headingPattern)].map(match => ({ index: match.index, end: match.index + match[0].length, level: Number(match[1]), title: text(match[0].replace(/^<h[1-6]\b[^>]*>|<\/h[1-6]>$/gi, '')) }));
+        const testTitle = text(insertion.testTitle);
+        let currentTest = '';
+        for (const heading of headings) {
+            if (heading.level === 3) currentTest = heading.title;
+            if (heading.level < 4 || heading.title.toLocaleLowerCase('ru-RU') !== text(insertion.groupTitle).toLocaleLowerCase('ru-RU')) continue;
+            if (testTitle && currentTest !== testTitle) continue;
+            const next = headings.find(candidate => candidate.index > heading.index && candidate.level <= heading.level);
+            return { start: heading.end, end: next ? next.index : String(html).length };
+        }
+        return null;
+    }
     function transform(storageHtml, plan = {}) {
         let html = String(storageHtml || ''); const applied = []; const replacements = Array.isArray(plan.replacements) ? plan.replacements : [];
         for (const item of replacements) { const oldFilename = text(item.oldFilename); const newFilename = text(item.newFilename); if (!oldFilename || !newFilename) throw new Error('Replacement requires oldFilename and newFilename'); let occurrence = 0; let changed = false; html = html.replace(/<ac:image\b[\s\S]*?<\/ac:image>|<ac:image\b[^>]*\/>/gi, block => { if (imageFilename(block) !== oldFilename) return block; if (item.occurrence != null && occurrence++ !== Number(item.occurrence)) return block; changed = true; return replaceImage(block, oldFilename, newFilename); }); if (!changed) throw new Error(`Attachment not found: ${oldFilename}`); applied.push({ ...item, oldFilename, newFilename }); }
@@ -16,13 +30,14 @@
             const block = `<p>${escapeXml(caption)}</p><ac:image style="width: 100%;"><ri:attachment ri:filename="${escapeXml(filename)}" /></ac:image>`;
             const insertion = item.insertion || {};
             if (insertion.groupTitle) {
-                const heading = new RegExp(`(<h[1-6]\\b[^>]*>\\s*${escapeRegExp(insertion.groupTitle)}\\s*</h[1-6]>)`, 'i');
-                if (heading.test(html)) {
+                const region = groupRegion(html, insertion);
+                if (region) {
+                    const scoped = html.slice(region.start, region.end);
                     if (insertion.beforeFilename) {
                         const before = new RegExp(`(<ac:image\\b[\\s\\S]*?ri:filename\\s*=\\s*["']${escapeRegExp(insertion.beforeFilename)}["'][\\s\\S]*?<\\/ac:image>|<ac:image\\b[^>]*ri:filename\\s*=\\s*["']${escapeRegExp(insertion.beforeFilename)}["'][^>]*\\/>)`, 'i');
-                        if (before.test(html)) { html = html.replace(before, `${block}$1`); continue; }
+                        if (before.test(scoped)) { const offset = region.start + scoped.search(before); html = html.slice(0, offset) + scoped.replace(before, `${block}$1`) + html.slice(region.end); continue; }
                     }
-                    html = html.replace(heading, `$1${insertion.kind === 'group' ? `<h4>${escapeXml(insertion.sectionTitle || 'Новая группа')}</h4>` : ''}${block}`); continue;
+                    html = html.slice(0, region.start) + (insertion.kind === 'group' ? `<h4>${escapeXml(insertion.sectionTitle || 'Новая группа')}</h4>` : '') + block + html.slice(region.start); continue;
                 }
                 throw new Error(`Target group not found: ${insertion.groupTitle}`);
             }
