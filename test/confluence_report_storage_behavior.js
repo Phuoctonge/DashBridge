@@ -28,4 +28,8 @@ assert(scoped.html.indexOf('new-1.png') < scoped.html.indexOf('load-2.png'));
 const encodedTitleHtml = '<h3>Тест 1. Поиск максимальной производительности по сценарию &quot;Бронь бесплатной экскурсии&quot;</h3><h5>Метрики серверов системы</h5><ac:image><ri:attachment ri:filename="cpu-encoded.png" /></ac:image>';
 const encodedTitleResult = storage.transform(encodedTitleHtml, { additions: [{ newFilename: 'encoded.png', caption: 'CPU Usage', insertion: { groupTitle: 'Метрики серверов системы', testTitle: 'Тест 1. Поиск максимальной производительности по сценарию "Бронь бесплатной экскурсии"', beforeFilename: 'cpu-encoded.png' } }] });
 assert(encodedTitleResult.html.indexOf('encoded.png') < encodedTitleResult.html.indexOf('cpu-encoded.png'));
+const nonFirstAnchorHtml = '<h3>Тест 1</h3><h5>Метрики серверов системы</h5><ac:image><ri:attachment ri:filename="first.png" /></ac:image><ac:image><ri:attachment ri:filename="anchor-second.png" /></ac:image>';
+const nonFirstAnchorResult = storage.transform(nonFirstAnchorHtml, { additions: [{ newFilename: 'between.png', caption: 'CPU Usage', insertion: { groupTitle: 'Метрики серверов системы', testTitle: 'Тест 1', beforeFilename: 'anchor-second.png' } }] });
+assert(nonFirstAnchorResult.html.indexOf('first.png') < nonFirstAnchorResult.html.indexOf('between.png'));
+assert(nonFirstAnchorResult.html.indexOf('between.png') < nonFirstAnchorResult.html.indexOf('anchor-second.png'));
 console.log('PASS Confluence report storage transformation');
