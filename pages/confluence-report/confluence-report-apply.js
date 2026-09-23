@@ -10,8 +10,7 @@
             for (const item of replacements) await ensureUpload(item.newFilename);
             for (const item of additions) await ensureUpload(item.newFilename);
             let storageHtml = page.storageHtml;
-            const transformed = storage.transform(storageHtml, { replacements: replacements.map(item => ({ ...item, newFilename: item.newFilename })) }); storageHtml = transformed.html;
-            for (const addition of additions) { const caption = String(addition.caption || '').trim(); const filename = String(addition.newFilename || '').trim(); if (!caption || !filename) throw new Error('Addition requires caption and filename'); storageHtml += `<p>${escapeXml(caption)}</p><ac:image style="width: 100%;"><ri:attachment ri:filename="${escapeXml(filename)}" /></ac:image>`; }
+            const transformed = storage.transform(storageHtml, { replacements: replacements.map(item => ({ ...item, newFilename: item.newFilename })), additions }); storageHtml = transformed.html;
             onProgress({ stage: 'save', count: attachmentResults.length });
             const updated = await updatePage({ page, storageHtml, signal });
             const expectedVersion = Number(updated?.version?.number ?? updated?.version);
