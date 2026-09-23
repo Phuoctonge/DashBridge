@@ -125,7 +125,14 @@
     }
 
     async function requestTab(tabId, request, signal) {
-        const [execution] = await chrome.scripting.executeScript({ target: { tabId }, func: async input => { const headers = { Accept: 'application/json', ...(input.headers || {}) }; const init = { method: input.method || 'GET', credentials: 'same-origin', headers }; if (input.json !== undefined) { headers['Content-Type'] = 'application/json'; init.body = JSON.stringify(input.json); } if (input.bytes) { const form = new FormData(); form.append('file', new Blob([input.bytes], { type: input.contentType || 'application/octet-stream' }), input.filename); init.body = form; delete headers['Content-Type']; } const response = await fetch(input.url, init); let data = null; try { data = await response.json(); } catch { /* empty response */ } return { ok: response.ok, status: response.status, data }; }, args: [{ ...request, signal: undefined }] });
+        // chrome.scripting arguments use structured-clone serialization, but
+        // ArrayBuffer is rejected by some Chromium builds. Send attachment
+        // bytes as a bounded plain array and rebuild the buffer in MAIN.
+        const serializableRequest = { ...request };
+        if (request?.bytes instanceof ArrayBuffer) {
+            serializableRequest.bytes = [...new Uint8Array(request.bytes)];
+        }
+        const [execution] = await chrome.scripting.executeScript({ target: { tabId }, func: async input => { const headers = { Accept: 'application/json', ...(input.headers || {}) }; const init = { method: input.method || 'GET', credentials: 'same-origin', headers }; if (input.json !== undefined) { headers['Content-Type'] = 'application/json'; init.body = JSON.stringify(input.json); } if (Array.isArray(input.bytes)) { const form = new FormData(); form.append('file', new Blob([new Uint8Array(input.bytes)], { type: input.contentType || 'application/octet-stream' }), input.filename); init.body = form; delete headers['Content-Type']; } const response = await fetch(input.url, init); let data = null; try { data = await response.json(); } catch { /* empty response */ } return { ok: response.ok, status: response.status, data }; }, args: [serializableRequest] });
         if (signal?.aborted) throw new DOMException('Aborted', 'AbortError'); const result = execution?.result; if (!result?.ok) throw new Error(`Confluence request failed (${result?.status || 'unknown'})`); return result.data;
     }
 

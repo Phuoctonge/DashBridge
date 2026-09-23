@@ -220,6 +220,11 @@ function createBatchPanelLoader({ log }) {
                 load15: panelTools.cpuCapacityFilterLoad15 === true
             }));
         }
+        if (panelTools?.forceMemByteUnit === true) {
+            const hashParams = new URLSearchParams(targetUrl.hash.slice(1));
+            hashParams.set('dashbridgePanelTransforms', JSON.stringify({ forceMemByteUnit: true }));
+            targetUrl.hash = hashParams.toString();
+        }
         const requiresDataRuntime = panelTools?.invertIdle === true
             || panelTools?.convertMemToUsed === true
             || panelTools?.forceMemByteUnit === true
