@@ -1,6 +1,13 @@
 // Batch page controller.
 
 document.addEventListener("DOMContentLoaded", () => {
+    const reportImageReplacementButton = document.getElementById('openReportImageReplacementBtn');
+    if (reportImageReplacementButton) {
+        reportImageReplacementButton.addEventListener('click', async () => {
+            await chrome.tabs.create({ url: chrome.runtime.getURL('pages/confluence-report/confluence-report.html') });
+        });
+    }
+
     const batchPageController = BatchPageController.create({
         pageState: BatchPageState,
         normalizeTimeRanges: normalizeGrafanaTimeRanges,

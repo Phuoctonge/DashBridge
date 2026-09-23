@@ -182,6 +182,47 @@ textarea:focus-visible {
     margin-bottom: 1rem;
 }
 
+.batch-report-tools-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 1.25rem;
+    padding: 1rem 1.125rem;
+    border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border));
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--primary) 6%, var(--card-bg));
+}
+
+.batch-report-tools-copy {
+    display: flex;
+    align-items: flex-start;
+    gap: .75rem;
+    min-width: 0;
+}
+
+.batch-report-tools-icon {
+    display: inline-flex;
+    flex: 0 0 2rem;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: .625rem;
+    background: var(--tab-active-bg);
+    color: var(--primary);
+}
+
+.batch-report-tools-icon .ic { width: 1.125rem; height: 1.125rem; }
+.batch-report-tools-card h2 { margin: 0; color: var(--text-main); font-size: .9375rem; }
+.batch-report-tools-card p { margin: .25rem 0 0; color: var(--text-muted); font-size: .8125rem; line-height: 1.45; }
+.batch-report-tools-btn { flex: 0 0 auto; margin-top: 0; white-space: nowrap; }
+
+@media (max-width: 44rem) {
+    .batch-report-tools-card { align-items: stretch; flex-direction: column; }
+    .batch-report-tools-btn { width: 100%; }
+}
+
 label {
     display: block;
     margin-bottom: 0.5rem;
