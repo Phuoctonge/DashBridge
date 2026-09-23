@@ -192,6 +192,11 @@ function createBatchPanelLoader({ log }) {
         normalized.searchParams.delete('_t');
         return normalized.toString();
     };
+    const withoutRuntimeBootstrap = value => {
+        const normalized = new URL(withoutCacheBust(value));
+        normalized.searchParams.delete('dashbridgeCpuCapacityFilter');
+        return normalized.toString();
+    };
 
     return async (tabId, url, panelId, _seriesFilter, previousSeriesFilter = null, panelTools = null, signal = null) => {
         log(previousSeriesFilter ? 'Быстрое переключение на серию…' : `Загрузка панели ${panelId}…`);
@@ -247,7 +252,7 @@ function createBatchPanelLoader({ log }) {
                 chrome.tabs.get(tabId, tab => resolveTab(chrome.runtime.lastError ? null : tab || null));
             });
             const matchesExpectedUrl = tab => !!tab && !!expectedUrl
-                && !tab.pendingUrl && tab.url === expectedUrl;
+                && !tab.pendingUrl && withoutRuntimeBootstrap(tab.url) === withoutRuntimeBootstrap(expectedUrl);
             const isCurrentAttempt = (generation, tab) => !settled && !signal?.aborted
                 && generation === navigationGeneration && matchesExpectedUrl(tab);
             const finish = value => {
@@ -280,8 +285,16 @@ function createBatchPanelLoader({ log }) {
                             const applied = await applySharedGrafanaPanelTools(effectivePanelTools, { tabId, refresh });
                             if (!isCurrentAttempt(generation, await getTab())) return finish(false);
                             if (!applied?.ok) {
+                                // A View/solo route may have no dashboard
+                                // Refresh control. The page still has a valid
+                                // first render; let readiness decide whether it
+                                // can be captured instead of discarding it here.
+                                if (applied.reason === 'refresh-unavailable') {
+                                    log(`Обновление панели ${panelId} недоступно, использую текущий рендер`, true);
+                                } else {
                                 log(`Не удалось применить настройки панели ${panelId}: ${applied?.reason || 'неизвестная ошибка'}`, true);
                                 return finish(null);
+                                }
                             }
                         }
                         try {
