@@ -120,6 +120,9 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .mapping-board.mapping-drag-active .target-node { border-color: var(--primary); border-style: dashed; }
 .mapping-board.mapping-reorder-active .mapping-added-section,
 .mapping-board.mapping-reorder-active .mapping-section-dropzone { border-color: var(--primary); border-style: dashed; }
+.mapping-reorder-dropzone { min-height: .35rem; margin: .1rem .25rem .1rem 1rem; border: 1px dashed transparent; border-radius: .3rem; transition: min-height .12s ease, border-color .12s ease, background .12s ease; }
+.mapping-board.mapping-reorder-active .mapping-reorder-dropzone { min-height: .85rem; border-color: rgba(var(--primary-rgb), .35); }
+.mapping-reorder-dropzone.mapping-drop-active { border-color: var(--primary); background: rgba(var(--primary-rgb), .1); }
 .mapping-links { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; clip-path: inset(0 round var(--radius-md)); }
 .mapping-links path { fill: none; stroke-linecap: round; stroke-width: 1.6; }
 .mapping-links .group-link { stroke-width: 1.6; }
