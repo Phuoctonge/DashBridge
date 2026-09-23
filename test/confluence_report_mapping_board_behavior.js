@@ -49,4 +49,6 @@ assert.match(reportSource, /candidate\.testKey === '\*'/);
 assert.match(reportSource, /delete entry\.insertionBeforeMetric/);
 assert.match(reportSource, /function restoreCriteriaWideOrder/);
 assert.match(reportSource, /summary\.replace\(\/\\s\+\\\(\\d\+\\\)\$\//);
+assert.match(reportSource, /filter\(item => item\.criteriaWide && item\.groupTitle === groupTitle\)/);
+assert.match(reportSource, /for \(const wide of wides\.slice\(\)\.reverse\(\)\)/);
 console.log('PASS Confluence report mapping board');
