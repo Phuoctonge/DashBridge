@@ -262,6 +262,13 @@
         tools.cpuCapacityFilterLoad5 = bootstrapCpuCapacityFilter.load5;
         tools.cpuCapacityFilterLoad15 = bootstrapCpuCapacityFilter.load15;
     }
+    // The bootstrap is only an early-runtime contract; never let the private
+    // setting travel as a query parameter to Grafana/datasource requests.
+    const cpuBootstrapUrl = new URL(location.href);
+    if (cpuBootstrapUrl.searchParams.has('dashbridgeCpuCapacityFilter')) {
+        cpuBootstrapUrl.searchParams.delete('dashbridgeCpuCapacityFilter');
+        history.replaceState(history.state, '', cpuBootstrapUrl.toString());
+    }
     const enforceSingleResponseSeriesFilter = state => {
         // The generic threshold and dynamic vCPU threshold are alternative
         // selectors. The UI already enforces this; keep the invariant for URL
@@ -1613,15 +1620,6 @@
         if (event.origin !== extensionOrigin) return;
         if (isDashboardIframe ? event.source !== window.parent : event.source !== window) return;
         if (!isDashboardIframe && !window.__dashbridgePanelToolsAllowTop) return;
-        if (event.data?.action === 'refreshPanelData' && typeof event.data.requestId === 'string') {
-            let result = 'refresh-unavailable';
-            try { result = refreshSelectedPanelData(getTargetPanel()); }
-            catch { result = 'refresh-failed'; }
-            window.postMessage({ action: 'panelRefreshResult', requestId: event.data.requestId,
-                ok: !['flot-runner-unavailable', 'uplot-runner-unavailable', 'refresh-failed'].includes(result),
-                reason: result }, location.origin);
-            return;
-        }
         if (event.data?.action === 'getPanelLegendSeries') {
             const series = getLegendSeries();
             window.parent.postMessage({ action: 'panelLegendSeries', requestId: event.data.requestId, series }, extensionOrigin);

@@ -200,6 +200,21 @@ function createBatchPanelLoader({ log }) {
         // The early runtime is needed only when a panel's active tools actually
         // transform response data. Ordinary panels are read from their rendered DOM.
         const targetUrl = new URL(url);
+        // View/solo routes often do not expose Grafana's dashboard Refresh
+        // button. Bootstrap the CPU transform before the first datasource
+        // request so Batch remains independent from that UI affordance.
+        if (panelTools?.cpuCapacityFilterEnabled === true) {
+            targetUrl.searchParams.set('dashbridgeCpuCapacityFilter', JSON.stringify({
+                enabled: true,
+                coefficient: Number(panelTools.cpuCapacityFilterCoefficient) > 0
+                    ? Number(panelTools.cpuCapacityFilterCoefficient) : 0.8,
+                mode: panelTools.cpuCapacityFilterMode === 'last' ? 'last' : 'max',
+                highlightEnabled: panelTools.cpuCapacityFilterHighlightEnabled !== false,
+                load1: panelTools.cpuCapacityFilterLoad1 !== false,
+                load5: panelTools.cpuCapacityFilterLoad5 === true,
+                load15: panelTools.cpuCapacityFilterLoad15 === true
+            }));
+        }
         const requiresDataRuntime = panelTools?.invertIdle === true
             || panelTools?.convertMemToUsed === true
             || panelTools?.forceMemByteUnit === true
@@ -251,10 +266,18 @@ function createBatchPanelLoader({ log }) {
                 try {
                     for (let attempt = 0; attempt < 2; attempt++) {
                         if (!isCurrentAttempt(generation, await getTab())) return finish(false);
+                        const effectivePanelTools = panelTools ? {
+                            ...panelTools,
+                            targetPanelId: String(panelId).replace(/^panel-/, ''),
+                            targetPanelType: 'active'
+                        } : null;
                         if (panelTools) {
                             const refresh = panelTools.invertIdle === true || panelTools.convertMemToUsed === true
-                                || panelTools.seriesQueryFilterEnabled === true || panelTools.cpuCapacityFilterEnabled === true;
-                            const applied = await applySharedGrafanaPanelTools(panelTools, { tabId, refresh });
+                                || panelTools.seriesQueryFilterEnabled === true;
+                            // A Batch URL is a single-panel route. Tell MAIN the
+                            // exact panel explicitly so its scoped response guard
+                            // cannot fall back to an arbitrary visible canvas.
+                            const applied = await applySharedGrafanaPanelTools(effectivePanelTools, { tabId, refresh });
                             if (!isCurrentAttempt(generation, await getTab())) return finish(false);
                             if (!applied?.ok) {
                                 log(`Не удалось применить настройки панели ${panelId}: ${applied?.reason || 'неизвестная ошибка'}`, true);
@@ -266,7 +289,7 @@ function createBatchPanelLoader({ log }) {
                             if (!isCurrentAttempt(generation, await getTab())) return finish(false);
                             const results = await chrome.scripting.executeScript({
                                 target: { tabId }, world: 'MAIN', func: waitForPanelInMainWorld,
-                                args: [panelId, panelTools, 25_000]
+                                args: [panelId, effectivePanelTools, 25_000]
                             });
                             if (!isCurrentAttempt(generation, await getTab())) return finish(false);
                             return finish(results?.[0]?.result || null);

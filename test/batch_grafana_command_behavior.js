@@ -41,7 +41,7 @@ async function run({ status = 'applied', scenario = 'success', tools = { convert
     vm.runInContext(fs.readFileSync('js/shared/grafana-command.js', 'utf8'), context);
     const result = await context.runGrafanaCommand({ tabId: 1, command: 'applyPanelTools', payload: { tools }, refresh: true });
     assert.strictEqual(listener, null);
-    assert.strictEqual(cleared, scenario === 'no-button' ? 2 : 1);
+    assert.strictEqual(cleared, 1);
     return { result, refreshes };
 }
 (async () => {

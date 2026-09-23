@@ -52,7 +52,7 @@ const context = {
         },
     },
     ensureEarlyGrafanaRuntimeForUrl: async () => ({ ok: true }),
-    applySharedGrafanaPanelTools: async () => ({ ok: true }),
+    applySharedGrafanaPanelTools: async tools => ({ ok: true, tools }),
     setTimeout(callback, delay) {
         if (delay === 30_000) return setTimeout(callback, 500);
         if (delay === 25_000) return setTimeout(callback, 50);
@@ -176,6 +176,8 @@ vm.runInContext(fs.readFileSync('pages/batch/batch-panel-loader.js', 'utf8'), co
     );
     assert.deepEqual({ ...filteredEmptyResult }, { x: 10, y: 20, w: 800, h: 400, dpr: undefined },
         'a completed CPU filter with no matching series must still produce a valid empty-state capture');
+    assert.match(currentTabUrl, /dashbridgeCpuCapacityFilter=/,
+        'Batch must bootstrap CPU filtering before the first datasource request');
     console.log('PASS Batch loader handles ordinary, transformed and transient-frame panels');
 })().catch(error => {
     console.error(error);
