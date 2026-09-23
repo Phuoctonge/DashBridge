@@ -28,19 +28,10 @@
             idInput.inputMode = 'numeric'; idInput.className = 'batch-panel-rule-id-input'; idInput.value = panelId; idInput.placeholder = '12';
             idLabel.append(idInput); idBox.append(idLabel);
             const options = document.createElement('div'); options.className = 'batch-panel-rule-options';
-            const addGroup = (title, entries, className) => {
-                const group = document.createElement('section');
-                group.className = `batch-panel-rule-group ${className}`;
-                const heading = document.createElement('h4'); heading.textContent = title; group.append(heading);
-                entries.forEach(([key, label]) => {
-                    const setting = document.createElement('div'); setting.className = 'batch-panel-rule-setting';
-                    setting.dataset.setting = key; setting.append(option(key, label, rule[key])); group.append(setting);
-                });
-                options.append(group);
-            };
-            addGroup('Визуализация', visualLabels, 'batch-panel-rule-visual');
-            addGroup('Преобразование данных', transformLabels, 'batch-panel-rule-transform');
-            addGroup('Фильтры и порог', filterLabels, 'batch-panel-rule-filter');
+            [...visualLabels, ...transformLabels, ...filterLabels].forEach(([key, label]) => {
+                const setting = document.createElement('div'); setting.className = 'batch-panel-rule-setting';
+                setting.dataset.setting = key; setting.append(option(key, label, rule[key])); options.append(setting);
+            });
             const width = document.createElement('label'); width.className = 'batch-panel-rule-width'; width.append(document.createTextNode('Толщина '));
             const widthInput = document.createElement('input'); widthInput.type = 'range'; widthInput.min = '0.5'; widthInput.max = '5';
             widthInput.step = '0.5'; widthInput.dataset.ruleField = 'thickenLinesValue'; widthInput.value = Number(rule.thickenLinesValue) || 1.5;

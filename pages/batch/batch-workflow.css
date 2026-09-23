@@ -421,32 +421,10 @@ h3 .ic {
     display: grid;
     grid-column: 1 / -1;
     grid-row: 2;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0 1rem;
     min-width: 0;
 }
-
-.batch-panel-rule-group {
-    min-width: 0;
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0 1rem;
-    align-content: start;
-    padding: 0;
-    border: 0;
-    background: transparent;
-}
-.batch-panel-rule-group h4 {
-    grid-column: 1 / -1;
-    margin: 0.25rem 0 0.15rem;
-    color: var(--text-muted);
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-}
-.batch-panel-rule-group .batch-panel-rule-setting { grid-column: auto; }
-.batch-panel-rule-group + .batch-panel-rule-group h4 { margin-top: 0.7rem; }
 
 .batch-panel-rule-setting {
     min-width: 0;
@@ -523,7 +501,17 @@ h3 .ic {
 .batch-panel-rule-width-value { min-width: 2.5rem; text-align: right; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .batch-panel-rule-width:has(input:disabled) { opacity: 0.55; cursor: default; }
 
-.batch-panel-rule-group.batch-panel-rule-filter { grid-column: 1 / -1; }
+.batch-panel-rule-setting[data-setting="seriesQueryFilterEnabled"],
+.batch-panel-rule-setting[data-setting="thresholdEnabled"],
+.batch-panel-rule-setting[data-setting="cpuCapacityFilterEnabled"] {
+    grid-row: 1 / span 5;
+    border-left: 1px solid var(--border);
+    padding-left: 1.5rem;
+    align-self: stretch;
+}
+.batch-panel-rule-setting[data-setting="seriesQueryFilterEnabled"] { grid-column: 2; }
+.batch-panel-rule-setting[data-setting="cpuCapacityFilterEnabled"] { grid-column: 3; }
+.batch-panel-rule-setting[data-setting="thresholdEnabled"] { grid-column: 4; }
 .batch-rule-disclosure { grid-column: 1 / -1; min-width: 0; }
 .batch-rule-disclosure > summary { display: none; }
 .batch-rule-disclosure > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
@@ -556,9 +544,16 @@ h3 .ic {
     .batch-panel-rule-remove { grid-column: 2; grid-row: 1; }
     .batch-panel-rule-options { grid-column: 1 / -1; grid-row: 2; }
     .batch-panel-rule-options { grid-template-columns: minmax(0, 1fr); }
-    .batch-panel-rule-group,
-    .batch-panel-rule-group.batch-panel-rule-filter { grid-column: auto; grid-template-columns: minmax(0, 1fr); }
-    .batch-panel-rule-group h4 { grid-column: auto; }
+    .batch-panel-rule-setting[data-setting="seriesQueryFilterEnabled"],
+    .batch-panel-rule-setting[data-setting="thresholdEnabled"],
+    .batch-panel-rule-setting[data-setting="cpuCapacityFilterEnabled"] {
+        grid-column: 1;
+        grid-row: auto;
+        border-left: 0;
+        border-top: 1px solid var(--border);
+        margin-top: 0.75rem;
+        padding: 0.75rem 0 0;
+    }
 }
 
 .batch-panel-rule-remove {
