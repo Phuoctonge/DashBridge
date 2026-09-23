@@ -25,4 +25,7 @@ assert(scoped.html.indexOf('new-1.png') > scoped.html.indexOf('load-1.png'));
 assert(scoped.html.indexOf('new-2.png') < scoped.html.indexOf('cpu-2.png'));
 assert(scoped.html.indexOf('new-2.png') > scoped.html.indexOf('load-2.png'));
 assert(scoped.html.indexOf('new-1.png') < scoped.html.indexOf('load-2.png'));
+const encodedTitleHtml = '<h3>Тест 1. Поиск максимальной производительности по сценарию &quot;Бронь бесплатной экскурсии&quot;</h3><h5>Метрики серверов системы</h5><ac:image><ri:attachment ri:filename="cpu-encoded.png" /></ac:image>';
+const encodedTitleResult = storage.transform(encodedTitleHtml, { additions: [{ newFilename: 'encoded.png', caption: 'CPU Usage', insertion: { groupTitle: 'Метрики серверов системы', testTitle: 'Тест 1. Поиск максимальной производительности по сценарию "Бронь бесплатной экскурсии"', beforeFilename: 'cpu-encoded.png' } }] });
+assert(encodedTitleResult.html.indexOf('encoded.png') < encodedTitleResult.html.indexOf('cpu-encoded.png'));
 console.log('PASS Confluence report storage transformation');

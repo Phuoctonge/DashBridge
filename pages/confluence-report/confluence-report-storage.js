@@ -2,13 +2,14 @@
     'use strict';
     const text = value => String(value ?? '').trim();
     const escapeXml = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[char]);
+    const decodeXml = value => String(value ?? '').replace(/&quot;/gi, '"').replace(/&apos;/gi, "'").replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&amp;/gi, '&');
     const escapeRegExp = value => text(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     function imageFilename(block) { return String(block || '').match(/ri:filename\s*=\s*["']([^"']+)["']/i)?.[1] || null; }
     function setFullWidth(block) { if (/\sstyle\s*=\s*["'][^"']*["']/i.test(block)) return block.replace(/(\sstyle\s*=\s*["'])[^"']*/i, '$1width: 100%;'); return block.replace(/<ac:image\b/i, '<ac:image style="width: 100%;"'); }
     function replaceImage(block, oldFilename, newFilename) { const pattern = new RegExp(`(ri:filename\\s*=\\s*["'])${escapeRegExp(oldFilename)}(["'])`, 'i'); if (!pattern.test(block)) return block; return setFullWidth(block.replace(pattern, `$1${newFilename}$2`)); }
     function groupRegion(html, insertion) {
         const headingPattern = /<h([1-6])\b[^>]*>[\s\S]*?<\/h\1>/gi;
-        const headings = [...String(html).matchAll(headingPattern)].map(match => ({ index: match.index, end: match.index + match[0].length, level: Number(match[1]), title: text(match[0].replace(/^<h[1-6]\b[^>]*>|<\/h[1-6]>$/gi, '')) }));
+        const headings = [...String(html).matchAll(headingPattern)].map(match => ({ index: match.index, end: match.index + match[0].length, level: Number(match[1]), title: decodeXml(text(match[0].replace(/^<h[1-6]\b[^>]*>|<\/h[1-6]>$/gi, ''))) }));
         const testTitle = text(insertion.testTitle);
         let currentTest = '';
         for (const heading of headings) {
