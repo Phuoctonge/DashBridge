@@ -17,7 +17,13 @@
             const insertion = item.insertion || {};
             if (insertion.groupTitle) {
                 const heading = new RegExp(`(<h4\\b[^>]*>\\s*${escapeRegExp(insertion.groupTitle)}\\s*</h4>)`, 'i');
-                if (heading.test(html)) { html = html.replace(heading, `$1${insertion.kind === 'group' ? `<h4>${escapeXml(insertion.sectionTitle || 'Новая группа')}</h4>` : ''}${block}`); continue; }
+                if (heading.test(html)) {
+                    if (insertion.beforeFilename) {
+                        const before = new RegExp(`(<ac:image\\b[\\s\\S]*?ri:filename\\s*=\\s*["']${escapeRegExp(insertion.beforeFilename)}["'][\\s\\S]*?<\\/ac:image>|<ac:image\\b[^>]*ri:filename\\s*=\\s*["']${escapeRegExp(insertion.beforeFilename)}["'][^>]*\\/>)`, 'i');
+                        if (before.test(html)) { html = html.replace(before, `${block}$1`); continue; }
+                    }
+                    html = html.replace(heading, `$1${insertion.kind === 'group' ? `<h4>${escapeXml(insertion.sectionTitle || 'Новая группа')}</h4>` : ''}${block}`); continue;
+                }
             }
             html += `<h4>${escapeXml(insertion.sectionTitle || 'Новый раздел')}</h4>${block}`;
         }
