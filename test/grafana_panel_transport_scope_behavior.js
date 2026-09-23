@@ -33,7 +33,8 @@ function createHarness({ iframe = true, capacity = false, visual = false } = {})
     context.dispatchEvent = () => {};
     for (const file of ['js/shared/grafana-legend-selection.js', 'js/content/grafana-panel-definition.js',
         'js/content/grafana-network.js', 'js/content/grafana-cpu-capacity-filter.js',
-        'js/content/grafana-panel-data-transforms.js', 'js/content/grafana-panel-data-runtime.js']) {
+        'js/content/grafana-panel-data-transforms.js', 'js/content/grafana-panel-data-transforms-runtime.js',
+        'js/content/grafana-panel-data-runtime.js']) {
         vm.runInContext(fs.readFileSync(file, 'utf8'), context, { filename: file });
     }
     context.DashBridgeGrafanaVisualEngine = context.DashBridgeGrafanaPanelDefinition;
