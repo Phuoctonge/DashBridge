@@ -24,6 +24,7 @@
                     }
                     html = html.replace(heading, `$1${insertion.kind === 'group' ? `<h4>${escapeXml(insertion.sectionTitle || 'Новая группа')}</h4>` : ''}${block}`); continue;
                 }
+                throw new Error(`Target group not found: ${insertion.groupTitle}`);
             }
             html += `<h4>${escapeXml(insertion.sectionTitle || 'Новый раздел')}</h4>${block}`;
         }

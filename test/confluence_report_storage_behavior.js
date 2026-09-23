@@ -14,4 +14,5 @@ const headingLevelResult = storage.transform(headingLevelHtml, { additions: [
 ] });
 assert(headingLevelResult.html.indexOf('cpu.png') < headingLevelResult.html.indexOf('anchor.png'));
 assert(headingLevelResult.html.indexOf('load.png') < headingLevelResult.html.indexOf('anchor.png'));
+assert.throws(() => storage.transform('<h5>Другая группа</h5>', { additions: [{ newFilename: 'x.png', caption: 'CPU', insertion: { groupTitle: 'Метрики серверов системы' } }] }), /Target group not found/);
 console.log('PASS Confluence report storage transformation');
