@@ -103,7 +103,11 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .mapping-column h3 { margin: 0 0 .65rem; color: var(--text-main); font-size: .86rem; }
 .mapping-nodes { display: grid; gap: .45rem; max-height: 30rem; overflow: auto; padding: .2rem; }
 .mapping-node { position: relative; padding: .38rem .55rem; border: 1px solid var(--border); border-radius: .45rem; background: var(--bg-elevated); color: var(--text-main); font-size: .75rem; line-height: 1.25; box-shadow: none; }
-.source-node { cursor: grab; border-inline-start: .25rem solid var(--primary); }
+.source-node { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .55rem; align-items: center; cursor: grab; border-inline-start: .25rem solid var(--primary); }
+.mapping-source-label { min-width: 0; overflow-wrap: anywhere; }
+.mapping-drag-handle { display: inline-flex; align-items: center; justify-content: center; min-height: 1.65rem; padding: .2rem .45rem; border: 1px solid var(--primary); border-radius: .35rem; background: rgba(var(--primary-rgb), .08); color: var(--primary); font-size: .66rem; font-weight: 800; white-space: nowrap; cursor: grab; user-select: none; }
+.source-node:hover .mapping-drag-handle { background: var(--primary); color: var(--text-on-primary); }
+.source-node:active .mapping-drag-handle { cursor: grabbing; }
 .source-node::after, .target-node::before { content: ""; position: absolute; top: 50%; width: .42rem; height: .42rem; transform: translateY(-50%); border: 2px solid var(--bg-elevated); border-radius: 50%; background: var(--connection-color, var(--border)); z-index: 5; }
 .source-node::after { right: -.3rem; }
 .target-node::before { left: -.3rem; background: var(--connection-color, var(--border)); }
