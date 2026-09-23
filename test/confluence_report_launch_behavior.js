@@ -9,6 +9,7 @@ assert(core.includes('openReportImageReplacementBtn'), 'Popup controller must ow
 assert(html.includes('id="openReportImageReplacementCard"'), 'Popup must provide a separate report replacement card');
 assert(html.includes('id="openReportImageReplacementBtn"'), 'Report replacement card must provide its launcher');
 assert(html.indexOf('id="openReportImageReplacementCard"') < html.indexOf('id="openReportImageReplacementBtn"'), 'Report replacement button must be inside its card');
+assert(/<button id="openReportImageReplacementBtn"[^>]*>[\s\S]*?<svg class="ic"/.test(html), 'Report replacement launcher must include an icon');
 assert(core.includes('pages/confluence-report/confluence-report.html'), 'Popup launcher must open the existing report page');
 assert(html.includes('id="openReportImageReplacementBtn"'), 'Mass collection card must provide the report image replacement launcher');
 assert(!batchHtml.includes('id="openReportImageReplacementBtn"'), 'Full Batch page must not duplicate the Popup launcher');
