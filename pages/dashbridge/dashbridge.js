@@ -121,7 +121,6 @@ const {
 } = window.DashBridgeReportUi.create({
     getTransformSettings: () => grafanaTransformSettings,
     getPanels: () => panels,
-    getActiveProfile,
     savePanels,
     normalizePanelMetadataText,
     escapeHtml,
@@ -206,7 +205,6 @@ dashBridgePanelToolsController = DashBridgePanelToolsController.create({
 });
 const dashBridgePanelTransferController = DashBridgePanelTransferController.create({
     transfer: window.DashBridgePanelTransfer,
-    showAlert,
     showImportChoice: window.DashBridgeModal.showImportChoice,
     getPanels: () => panels,
     setPanels: value => { panels = value; },

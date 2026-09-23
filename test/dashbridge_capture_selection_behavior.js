@@ -16,7 +16,6 @@ const panels = ['a', 'b'].map(id => ({ id, title: id }));
 let onCapture = async () => ({ ok: true, dataUrl: 'png' });
 let downloads = 0;
 let copies = 0;
-let archiveDownloads = 0;
 let controlDisabled = false;
 const control = { get disabled() { return controlDisabled; }, set disabled(value) { controlDisabled = value; } };
 const scope = {
@@ -25,9 +24,6 @@ const scope = {
     document: { body: {}, querySelectorAll: selector => selector.includes('header') ? [control] : [] },
     chrome: { storage: { sync: { set() {} } }, tabs: { getCurrent: async () => ({ windowId: 1 }) },
         runtime: { sendMessage: () => onCapture() }, downloads: { download: async () => { downloads++; } } },
-    DashBridgeArchiveBudget: { create: () => ({ reserve() {} }) },
-    JSZip: class { constructor() { this.files = {}; } file(name, blob) { this.files[name] = blob; } },
-    downloadZipArchive: async () => { archiveDownloads++; },
     console,
     MutationObserver: class { observe() {} disconnect() {} },
     window: { scrollX: 0, scrollY: 0, innerWidth: 1280, innerHeight: 900, devicePixelRatio: 1, scrollTo() {},
@@ -41,9 +37,9 @@ const scope = {
 vm.createContext(scope);
 vm.runInContext(fs.readFileSync('pages/dashbridge/dashbridge-capture.js', 'utf8'), scope);
 const capture = scope.DashBridgeCapture.create({ getPanels: () => panels,
-    getActiveProfile: () => ({ name: 'test' }), getDefaultCapturePrepared: () => true,
+    getDefaultCapturePrepared: () => true,
     setDefaultCapturePrepared() {}, getCompactCaptureDimensions: () => ({ width: 1000, height: 520 }),
-    forceLoadPanel: () => frame, postToDashboardFrame() {}, showAlert() {},
+    forceLoadPanel: () => frame, postToDashboardFrame() {},
     documentRef: scope.document
 });
 const restored = () => {
@@ -85,9 +81,6 @@ const restored = () => {
     while (!release) await new Promise(resolve => setTimeout(resolve, 2));
     await assert.rejects(capture.captureSelection(panels), /захват/);
     assert.equal((await capture.capturePanel(frame, panels[0], { requestId: 'foreign', outputAction: 'copy' })).error, 'capture-in-progress');
-    const button = { innerHTML: 'ZIP', title: 'ZIP', querySelector: () => ({}), classList: { add() {}, remove() {} } };
-    await capture.captureAll(button);
-    assert.equal(archiveDownloads, 0, 'ZIP cannot overlap selection');
     onCapture = async () => ({ ok: true, dataUrl: 'png' });
     release({ ok: true, dataUrl: 'png' }); await pending; restored();
     const abort = new AbortController();
@@ -102,7 +95,6 @@ const restored = () => {
     assert.equal(copies, 1); restored();
     assert.equal((await capture.capturePanel(frame, panels[0], { requestId: 'save', outputAction: 'save', prepared: true })).ok, true);
     assert.equal(downloads, 1); restored();
-    await capture.captureAll(button);
-    assert.equal(archiveDownloads, 1); assert.equal(controlDisabled, false); restored();
-    console.log('PASS selection order, mutual exclusion, cancellation, failure restore and existing copy/save/ZIP');
+    assert.equal(controlDisabled, false); restored();
+    console.log('PASS selection order, mutual exclusion, cancellation, failure restore and existing copy/save');
 })().catch(error => { console.error(error); process.exitCode = 1; });

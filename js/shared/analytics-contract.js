@@ -64,7 +64,7 @@
     ], ['used', 'changed', 'configured', 'outcome'], ['state', 'outcome', 'mode', 'theme', 'countBucket']);
     add(['dashbridge.panel_added', 'dashbridge.panels_added_manual', 'dashbridge.panels_discovered', 'dashbridge.panels_added_from_discovery'],
         ['used', 'outcome'], ['method', 'outcome', 'countBucket']);
-    add(['dashbridge.capture_prepared_changed', 'dashbridge.capture_panel_download', 'dashbridge.capture_panel_copy', 'dashbridge.capture_all_zip'],
+    add(['dashbridge.capture_prepared_changed', 'dashbridge.capture_panel_download', 'dashbridge.capture_panel_copy'],
         ['changed', 'used', 'outcome'], ['state', 'outcome', 'prepared', 'countBucket', 'format']);
     add([
         'dashbridge.analysis_cpu_opened', 'dashbridge.analysis_ram_opened', 'dashbridge.analysis_mode_period',

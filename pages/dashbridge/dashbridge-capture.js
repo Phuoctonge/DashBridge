@@ -1,17 +1,15 @@
 'use strict';
 
-// Owns DashBridge card capture, archive sequencing and the restoration boundary.
+// Owns DashBridge card capture and the restoration boundary.
 // The page controller supplies live profile/panel state without sharing capture flags.
 globalThis.DashBridgeCapture = (() => {
     function create({
         getPanels,
-        getActiveProfile,
         getDefaultCapturePrepared,
         setDefaultCapturePrepared,
         getCompactCaptureDimensions,
         forceLoadPanel,
         postToDashboardFrame,
-        showAlert,
         storage = chrome.storage.sync,
         documentRef = document,
     }) {
@@ -23,20 +21,10 @@ globalThis.DashBridgeCapture = (() => {
             throw new TypeError('DashBridge capture dependencies are incomplete');
         }
         let panelCaptureInProgress = false;
-        let archiveCaptureInProgress = false;
         let selectionOwner = null;
         let lastPanelCaptureAt = 0;
         const waitForLayout = () => new Promise(resolve =>
             requestAnimationFrame(() => requestAnimationFrame(resolve)));
-
-        const safeArchiveName = (value, fallback = 'panel') => {
-            const cleaned = String(value || fallback)
-                .replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_')
-                .replace(/\s+/g, ' ')
-                .trim()
-                .slice(0, 100);
-            return cleaned || fallback;
-        };
 
         const syncToggles = enabled => {
             const dimensions = getCompactCaptureDimensions();
@@ -70,22 +58,6 @@ globalThis.DashBridgeCapture = (() => {
             if (persist) void storage.set({ grafanaCompactScreenshot: prepared });
             if (persist) globalThis.DashBridgeAnalytics?.changed('dashbridge.capture_prepared_changed', prepared);
             return prepared;
-        };
-
-        const waitForPanelRendered = (iframe, timeoutMs = 20_000) => {
-            if (iframe?.dataset.dashbridgeRendered === 'true') return Promise.resolve();
-            return new Promise((resolve, reject) => {
-                const finish = error => {
-                    clearTimeout(timeout);
-                    observer.disconnect();
-                    error ? reject(error) : resolve();
-                };
-                const observer = new MutationObserver(() => {
-                    if (iframe.dataset.dashbridgeRendered === 'true') finish();
-                });
-                const timeout = setTimeout(() => finish(new Error('panel-render-timeout')), timeoutMs);
-                observer.observe(iframe, { attributes: true, attributeFilter: ['data-dashbridge-rendered'] });
-            });
         };
 
         const capturePanel = async (sourceIframe, panel, request, owner = null) => {
@@ -223,7 +195,7 @@ globalThis.DashBridgeCapture = (() => {
         // The lease stays in this controller; iframe messages cannot acquire it.
         const captureSelection = async (selected, { signal, assertCurrent = () => {}, onProgress = () => {},
             onCaptureVisibility = () => {}, allowUnrendered = false, waitForData = null } = {}) => {
-            if (panelCaptureInProgress || archiveCaptureInProgress || selectionOwner) throw new Error('Уже выполняется захват снимков.');
+            if (panelCaptureInProgress || selectionOwner) throw new Error('Уже выполняется захват снимков.');
             if (!Array.isArray(selected) || selected.length < 1 || selected.length > 8
                 || new Set(selected.map(panel => panel.id)).size !== selected.length) throw new Error('Выберите от 1 до 8 разных панелей.');
             const owner = {};
@@ -304,92 +276,6 @@ globalThis.DashBridgeCapture = (() => {
             } finally { selectionOwner = null; }
         };
 
-        const captureAll = async button => {
-            if (!button || archiveCaptureInProgress || panelCaptureInProgress || selectionOwner) return;
-            const panels = getPanels();
-            const activePanels = panels.filter(panel => !panel.paused);
-            const pausedCount = panels.length - activePanels.length;
-            if (!activePanels.length) {
-                globalThis.DashBridgeAnalytics?.outcome('dashbridge.capture_all_zip', 'no_data');
-                await showAlert(pausedCount
-                    ? 'Все графики текущего профиля поставлены на паузу.'
-                    : 'В текущем профиле нет графиков.');
-                return;
-            }
-
-            archiveCaptureInProgress = true;
-            const originalHtml = button.innerHTML;
-            const originalTitle = button.title;
-            const originalScroll = { x: window.scrollX, y: window.scrollY };
-            const errors = [];
-            const zip = new JSZip();
-            const budget = DashBridgeArchiveBudget.create(64 * 1024 * 1024);
-            const lockedControls = new Map(
-                [...document.querySelectorAll('header button, header input, header select, .panel-actions button')]
-                    .map(control => [control, control.disabled])
-            );
-            lockedControls.forEach((_wasDisabled, control) => { control.disabled = true; });
-            let analyticsOutcome = 'error';
-
-            try {
-                for (let index = 0; index < activePanels.length; index += 1) {
-                    const panel = activePanels[index];
-                    button.querySelector('span').textContent = `Снимки ${index + 1}/${activePanels.length}`;
-                    const iframe = forceLoadPanel(panel.id);
-                    try {
-                        if (!iframe) throw new Error('panel-iframe-not-found');
-                        await waitForPanelRendered(iframe);
-                        const dimensions = getCompactCaptureDimensions();
-                        const result = await capturePanel(iframe, panel, {
-                            requestId: `dashboard_archive_${Date.now()}_${index}`,
-                            outputAction: 'archive',
-                            prepared: getDefaultCapturePrepared(),
-                            outputWidth: dimensions.width,
-                            outputHeight: dimensions.height,
-                            title: panel.title
-                        });
-                        if (!result?.ok || !result.image?.blob) throw new Error(result?.error || 'capture-failed');
-                        budget.reserve(result.image.blob.size, panel.title || panel.id);
-                        const name = `${String(index + 1).padStart(2, '0')}_${safeArchiveName(panel.title, `panel_${panel.id}`)}.png`;
-                        zip.file(name, result.image.blob);
-                    } catch (error) {
-                        errors.push(`${index + 1}. ${panel.title || panel.id}: ${error?.message || String(error)}`);
-                    }
-                }
-
-                if (pausedCount) errors.push(`Пропущено панелей на паузе: ${pausedCount}.`);
-                if (errors.length) zip.file('errors.txt', `DashBridge - отчёт создания снимков\n\n${errors.join('\n')}\n`);
-                if (Object.keys(zip.files).every(name => name === 'errors.txt')) {
-                    throw new Error('Не удалось создать ни одного снимка. Проверьте загрузку панелей Grafana.');
-                }
-
-                button.querySelector('span').textContent = 'Упаковка ZIP…';
-                const profileName = safeArchiveName(getActiveProfile()?.name, 'profile');
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                await downloadZipArchive(zip, `dashbridge_${profileName}_${timestamp}.zip`);
-                button.classList.add('active');
-                setTimeout(() => button.classList.remove('active'), 1600);
-                if (errors.length) {
-                    analyticsOutcome = 'partial';
-                    await showAlert(`ZIP создан. Успешно: ${activePanels.length - (errors.length - (pausedCount ? 1 : 0))} из ${activePanels.length}. Подробности добавлены в errors.txt.`);
-                } else analyticsOutcome = 'success';
-            } catch (error) {
-                console.error('DashBridge archive capture failed:', error);
-                await showAlert('Не удалось сохранить снимки: ' + (error?.message || String(error)));
-            } finally {
-                globalThis.DashBridgeAnalytics?.outcome('dashbridge.capture_all_zip', analyticsOutcome, {
-                    prepared: getDefaultCapturePrepared(),
-                    countBucket: globalThis.DashBridgeAnalytics.bucket(activePanels.length), format: 'zip'
-                });
-                window.scrollTo(originalScroll.x, originalScroll.y);
-                button.innerHTML = originalHtml;
-                button.title = originalTitle;
-                lockedControls.forEach((wasDisabled, control) => { control.disabled = wasDisabled; });
-                syncToggles(getDefaultCapturePrepared());
-                archiveCaptureInProgress = false;
-            }
-        };
-
         const captureFromToolbar = async (panel, iframe, outputAction, button) => {
             if (!iframe || !button) return;
             const originalTitle = button.title;
@@ -429,7 +315,6 @@ globalThis.DashBridgeCapture = (() => {
         };
 
         return Object.freeze({
-            captureAll,
             captureFromToolbar,
             capturePanel,
             captureSelection,

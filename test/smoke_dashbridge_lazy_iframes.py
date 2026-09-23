@@ -29,20 +29,6 @@ checks = {
     'header compact toggle shares global panel state':
         'id="capturePreparedToggleBtn"' in html and 'btn-capture-toggle' in html
         and "setCapturePrepared(!getCapturePrepared())" in page_ui,
-    'DashBridge page loads ZIP dependencies before controller':
-        html.index('vendor/jszip.min.js') < html.index('js/shared/archive-download.js')
-        < html.index('dashbridge-capture.js') < html.index('dashbridge.js'),
-    'archive capture is sequential':
-        re.search(r"for \(let index = 0; index < activePanels\.length; index \+= 1\)[\s\S]+?await capturePanel", capture) is not None,
-    'paused panels are excluded from archive':
-        'panels.filter(panel => !panel.paused)' in capture,
-    'archive waits for a rendered Grafana panel':
-        'waitForPanelRendered(iframe)' in capture and "dataset.dashbridgeRendered = 'true'" in messages,
-    'archive uses the same prepared capture dimensions':
-        "outputAction: 'archive'" in capture
-        and 'const dimensions = getCompactCaptureDimensions()' in capture
-        and 'outputWidth: dimensions.width' in capture
-        and 'outputHeight: dimensions.height' in capture,
     'archive is memory bounded':
         'DashBridgeArchiveBudget.create(64 * 1024 * 1024)' in capture,
     'capture always restores its card':

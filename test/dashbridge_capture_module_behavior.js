@@ -11,10 +11,9 @@ assert(html.indexOf('dashbridge-capture.js') < html.indexOf('dashbridge.js'),
     'capture owner must load before the page controller');
 assert(capture.includes('globalThis.DashBridgeCapture')
     && capture.includes('const capturePanel = async')
-    && capture.includes('const captureAll = async')
     && capture.includes('const captureFromToolbar = async')
     && capture.includes('const setPrepared = (enabled'),
-    'the extracted module must own single, archive, toolbar and prepared-setting lifecycles');
+    'the extracted module must own single, toolbar and prepared-setting lifecycles');
 assert(controller.includes('DashBridgeCapture.create({')
     && controller.includes('getPanels: () => panels')
     && controller.includes('getDefaultCapturePrepared: () => defaultCapturePrepared')
