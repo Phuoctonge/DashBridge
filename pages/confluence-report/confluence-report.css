@@ -111,6 +111,9 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .group-node { border-inline-start: .25rem solid var(--success); font-weight: 700; }
 .specific-node { margin-inline-start: 1rem; color: var(--text-muted); }
 .mapping-node:hover { border-color: var(--primary); }
+.mapping-board.mapping-drag-active .mapping-add-graph,
+.mapping-board.mapping-drag-active .mapping-add-section,
+.mapping-board.mapping-drag-active .target-node { border-color: var(--primary); border-style: dashed; }
 .mapping-links { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; clip-path: inset(0 round var(--radius-md)); }
 .mapping-links path { fill: none; stroke-linecap: round; stroke-width: 1.6; }
 .mapping-links .group-link { stroke-width: 1.6; }
