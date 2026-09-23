@@ -6,7 +6,9 @@ const batchHtml = fs.readFileSync(path.join(__dirname, '..', 'pages', 'batch', '
 const batchSource = fs.readFileSync(path.join(__dirname, '..', 'pages', 'batch', 'batch.js'), 'utf8');
 const reportHtml = fs.readFileSync(path.join(__dirname, '..', 'pages', 'confluence-report', 'confluence-report.html'), 'utf8');
 assert(core.includes('openReportImageReplacementBtn'), 'Popup controller must own the mass-collection launcher');
-assert(html.includes('id="openReportImageReplacementBtn"'), 'Mass collection card must provide the report image replacement launcher');
+assert(html.includes('id="openReportImageReplacementCard"'), 'Popup must provide a separate report replacement card');
+assert(html.includes('id="openReportImageReplacementBtn"'), 'Report replacement card must provide its launcher');
+assert(html.indexOf('id="openReportImageReplacementCard"') < html.indexOf('id="openReportImageReplacementBtn"'), 'Report replacement button must be inside its card');
 assert(core.includes('pages/confluence-report/confluence-report.html'), 'Popup launcher must open the existing report page');
 assert(html.includes('id="openReportImageReplacementBtn"'), 'Mass collection card must provide the report image replacement launcher');
 assert(!batchHtml.includes('id="openReportImageReplacementBtn"'), 'Full Batch page must not duplicate the Popup launcher');
