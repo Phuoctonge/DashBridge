@@ -1,9 +1,13 @@
 (function initBatchPanelRulesUi(root) {
     'use strict';
-    const labels = [['removeFill', 'Убрать заливку графика'], ['thickenLines', 'Утолщить линии графика'],
-        ['invertLegend', 'Переместить легенду: справа ↔ снизу'], ['invertIdle', 'Инвертировать CPU-график: Idle → Load'],
+    const visualLabels = [['removeFill', 'Убрать заливку графика'], ['thickenLines', 'Утолщить линии графика'],
+        ['invertLegend', 'Переместить легенду: справа ↔ снизу']];
+    const transformLabels = [['invertIdle', 'Инвертировать CPU-график: Idle → Load'],
         ['convertMemToUsed', 'Конвертировать RAM-график в % Used'],
-        ['seriesQueryFilterEnabled', 'Фильтр отображаемых серий'], ['thresholdEnabled', 'Порог на графике']];
+        ['forceMemByteUnit', 'Показывать RAM в байтах']];
+    const filterLabels = [['seriesQueryFilterEnabled', 'Фильтр отображаемых серий'],
+        ['cpuCapacityFilterEnabled', 'Фильтр Load Average по vCPU'], ['thresholdEnabled', 'Порог на графике']];
+    const allLabels = [...visualLabels, ...transformLabels, ...filterLabels];
     function create({ dashboardUrl, container, status, store, parseUrl }) {
         let loadVersion = 0; let saveTimer = null;
         const setStatus = value => { status.textContent = value; };
@@ -25,10 +29,19 @@
             idInput.inputMode = 'numeric'; idInput.className = 'batch-panel-rule-id-input'; idInput.value = panelId; idInput.placeholder = '12';
             idLabel.append(idInput); idBox.append(idLabel);
             const options = document.createElement('div'); options.className = 'batch-panel-rule-options';
-            labels.forEach(([key, label]) => {
-                const setting = document.createElement('div'); setting.className = 'batch-panel-rule-setting';
-                setting.dataset.setting = key; setting.append(option(key, label, rule[key])); options.append(setting);
-            });
+            const addGroup = (title, entries, className) => {
+                const group = document.createElement('section');
+                group.className = `batch-panel-rule-group ${className}`;
+                const heading = document.createElement('h4'); heading.textContent = title; group.append(heading);
+                entries.forEach(([key, label]) => {
+                    const setting = document.createElement('div'); setting.className = 'batch-panel-rule-setting';
+                    setting.dataset.setting = key; setting.append(option(key, label, rule[key])); group.append(setting);
+                });
+                options.append(group);
+            };
+            addGroup('Визуализация', visualLabels, 'batch-panel-rule-visual');
+            addGroup('Преобразование данных', transformLabels, 'batch-panel-rule-transform');
+            addGroup('Фильтры и порог', filterLabels, 'batch-panel-rule-filter');
             const width = document.createElement('label'); width.className = 'batch-panel-rule-width'; width.append(document.createTextNode('Толщина '));
             const widthInput = document.createElement('input'); widthInput.type = 'range'; widthInput.min = '0.5'; widthInput.max = '5';
             widthInput.step = '0.5'; widthInput.dataset.ruleField = 'thickenLinesValue'; widthInput.value = Number(rule.thickenLinesValue) || 1.5;
@@ -40,17 +53,28 @@
             const thick = options.querySelector('[data-rule-field="thickenLines"]');
             const syncWidth = () => { widthInput.disabled = thick?.checked !== true; };
             thick?.addEventListener('change', syncWidth); syncWidth();
-            for (const prefix of ['seriesQueryFilter', 'threshold']) {
+            const convertMem = options.querySelector('[data-rule-field="convertMemToUsed"]');
+            const forceBytes = options.querySelector('[data-rule-field="forceMemByteUnit"]');
+            const syncMemoryModes = (source) => {
+                if (source?.checked && source === convertMem && forceBytes) forceBytes.checked = false;
+                if (source?.checked && source === forceBytes && convertMem) convertMem.checked = false;
+                if (forceBytes) forceBytes.disabled = convertMem?.checked === true;
+                if (convertMem) convertMem.disabled = forceBytes?.checked === true;
+            };
+            convertMem?.addEventListener('change', () => syncMemoryModes(convertMem));
+            forceBytes?.addEventListener('change', () => syncMemoryModes(forceBytes));
+            syncMemoryModes();
+            const addFilterDetails = (prefix, label, modeOptions = null) => {
                 const setting = options.querySelector(`[data-setting="${prefix}Enabled"]`);
                 const details = document.createElement('div'); details.className = 'batch-panel-rule-details';
-                const valueLabel = document.createElement('label'); valueLabel.textContent = prefix === 'threshold' ? 'Значение порога' : 'Показывать серии выше';
+                const valueLabel = document.createElement('label'); valueLabel.textContent = label;
                 const value = document.createElement('input'); value.type = 'number'; value.step = 'any';
                 value.dataset.ruleField = `${prefix}Value`; value.value = rule[`${prefix}Value`] ?? 0;
                 valueLabel.append(value); details.append(valueLabel);
-                if (prefix === 'seriesQueryFilter') {
+                if (modeOptions) {
                     const modeLabel = document.createElement('label'); modeLabel.textContent = 'Сравнивать';
                     const mode = document.createElement('select'); mode.dataset.ruleField = 'seriesQueryFilterMode';
-                    for (const [key, text] of [['max', 'Максимум за период'], ['last', 'Последнее значение']]) {
+                    for (const [key, text] of modeOptions) {
                         const item = document.createElement('option'); item.value = key; item.textContent = text; mode.append(item);
                     }
                     mode.value = rule.seriesQueryFilterMode === 'last' ? 'last' : 'max'; modeLabel.append(mode); details.append(modeLabel);
@@ -65,7 +89,36 @@
                     details.querySelectorAll('input, select').forEach(input => { input.disabled = !toggle.checked; });
                 };
                 toggle.addEventListener('change', sync); sync();
-            }
+            };
+            addFilterDetails('seriesQueryFilter', 'Показывать серии выше', [['max', 'Максимум за период'], ['last', 'Последнее значение']]);
+            addFilterDetails('threshold', 'Значение порога');
+            const capacity = options.querySelector('[data-setting="cpuCapacityFilterEnabled"]');
+            const capacityDetails = document.createElement('div'); capacityDetails.className = 'batch-panel-rule-details';
+            capacityDetails.innerHTML = '<label>Порог: количество vCPU × <input type="number" min="0.01" max="10" step="0.05" data-rule-field="cpuCapacityFilterCoefficient"></label>'
+                + '<label>Сравнивать <select data-rule-field="cpuCapacityFilterMode"><option value="max">Максимум за период</option><option value="last">Последнее значение</option></select></label>';
+            capacityDetails.append(option('cpuCapacityFilterLoad1', 'Load 1m', rule.cpuCapacityFilterLoad1 !== false));
+            capacityDetails.append(option('cpuCapacityFilterLoad5', 'Load 5m', rule.cpuCapacityFilterLoad5 === true));
+            capacityDetails.append(option('cpuCapacityFilterLoad15', 'Load 15m', rule.cpuCapacityFilterLoad15 === true));
+            capacityDetails.append(option('cpuCapacityFilterHighlightEnabled', 'Подсвечивать превышения', rule.cpuCapacityFilterHighlightEnabled !== false));
+            capacity.append(capacityDetails);
+            capacityDetails.querySelector('[data-rule-field="cpuCapacityFilterCoefficient"]').value = rule.cpuCapacityFilterCoefficient ?? 0.8;
+            capacityDetails.querySelector('[data-rule-field="cpuCapacityFilterMode"]').value = rule.cpuCapacityFilterMode === 'last' ? 'last' : 'max';
+            const capacityToggle = capacity.querySelector('[data-rule-field="cpuCapacityFilterEnabled"]');
+            const syncCapacity = () => { capacityDetails.hidden = !capacityToggle.checked; capacityDetails.querySelectorAll('input,select').forEach(input => { input.disabled = !capacityToggle.checked; }); };
+            capacityToggle.addEventListener('change', syncCapacity); syncCapacity();
+            const seriesToggle = options.querySelector('[data-rule-field="seriesQueryFilterEnabled"]');
+            seriesToggle?.addEventListener('change', () => {
+                if (seriesToggle.checked && capacityToggle.checked) {
+                    capacityToggle.checked = false;
+                    syncCapacity();
+                }
+            });
+            capacityToggle.addEventListener('change', () => {
+                if (capacityToggle.checked && seriesToggle?.checked) {
+                    seriesToggle.checked = false;
+                    seriesToggle.dispatchEvent(new Event('change'));
+                }
+            });
             const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'btn batch-panel-rule-remove'; remove.textContent = 'Удалить';
             remove.addEventListener('click', () => {
                 row.remove(); scheduleSave();
@@ -74,10 +127,11 @@
             const disclosure = document.createElement('details'); disclosure.className = 'batch-rule-disclosure'; disclosure.open = true;
             const summary = document.createElement('summary');
             const updateSummary = () => {
-                const active = labels.filter(([key]) => options.querySelector(`[data-rule-field="${key}"]`)?.checked);
+                const active = allLabels.filter(([key]) => options.querySelector(`[data-rule-field="${key}"]`)?.checked);
                 const names = { removeFill: 'без заливки', thickenLines: `линии ${widthInput.value}`,
                     invertLegend: 'легенда', invertIdle: 'CPU → Load', convertMemToUsed: 'RAM → %',
-                    seriesQueryFilterEnabled: 'фильтр серий', thresholdEnabled: 'порог' };
+                    forceMemByteUnit: 'RAM в байтах', seriesQueryFilterEnabled: 'фильтр серий',
+                    cpuCapacityFilterEnabled: 'Load по vCPU', thresholdEnabled: 'порог' };
                 summary.textContent = active.length ? `Настройки · ${active.map(([key]) => names[key]).join(' · ')}` : 'Настройки · ничего не включено';
             };
             options.addEventListener('input', updateSummary); options.addEventListener('change', updateSummary); updateSummary();
@@ -102,6 +156,11 @@
                 if (rule.seriesQueryFilterEnabled) {
                     rule.seriesQueryFilterMode = row.querySelector('[data-rule-field="seriesQueryFilterMode"]').value;
                     rule.seriesQueryFilterHighlightEnabled = row.querySelector('[data-rule-field="seriesQueryFilterHighlightEnabled"]').checked;
+                }
+                if (rule.cpuCapacityFilterEnabled) {
+                    rule.cpuCapacityFilterCoefficient = Number(row.querySelector('[data-rule-field="cpuCapacityFilterCoefficient"]')?.value);
+                    rule.cpuCapacityFilterMode = row.querySelector('[data-rule-field="cpuCapacityFilterMode"]')?.value;
+                    rule.cpuCapacityFilterHighlightEnabled = row.querySelector('[data-rule-field="cpuCapacityFilterHighlightEnabled"]')?.checked;
                 }
             }); return rules;
         };

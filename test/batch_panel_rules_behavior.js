@@ -53,6 +53,10 @@ async function main() {
         6: { convertMemToUsed: true, seriesQueryFilterEnabled: true, seriesQueryFilterValue: 40,
             seriesQueryFilterMode: 'last', seriesQueryFilterHighlightEnabled: false,
             thresholdEnabled: true, thresholdValue: 75 },
+        7: { cpuCapacityFilterEnabled: true, cpuCapacityFilterCoefficient: 0.8,
+            cpuCapacityFilterMode: 'last', cpuCapacityFilterHighlightEnabled: false,
+            cpuCapacityFilterLoad1: true, cpuCapacityFilterLoad5: true,
+            forceMemByteUnit: true },
         8: { seriesQueryFilterValue: 100, thresholdValue: 50 }
     });
     const advanced = await context.BatchPanelRules.load(url);
@@ -63,7 +67,21 @@ async function main() {
     assert.strictEqual(advanced[6].seriesQueryFilterHighlightEnabled, false);
     assert.strictEqual(advanced[6].thresholdRawValue, 75);
     assert.strictEqual(advanced[6].thresholdNotifyEnabled, false);
+    assert.strictEqual(advanced[7].cpuCapacityFilterEnabled, true);
+    assert.strictEqual(advanced[7].cpuCapacityFilterCoefficient, 0.8);
+    assert.strictEqual(advanced[7].cpuCapacityFilterMode, 'last');
+    assert.strictEqual(advanced[7].cpuCapacityFilterHighlightEnabled, false);
+    assert.strictEqual(advanced[7].cpuCapacityFilterLoad5, true);
+    assert.strictEqual(advanced[7].cpuCapacityFilterLoad15, undefined);
+    assert.strictEqual(advanced[7].forceMemByteUnit, true);
     assert.strictEqual(context.BatchPanelRules.forPanel(advanced, 6).thresholdEnabled, true);
+    await context.BatchPanelRules.save(url, {
+        9: { convertMemToUsed: true, forceMemByteUnit: true,
+            seriesQueryFilterEnabled: true, cpuCapacityFilterEnabled: true }
+    });
+    const exclusive = await context.BatchPanelRules.load(url);
+    assert.strictEqual(exclusive[9].forceMemByteUnit, undefined);
+    assert.strictEqual(exclusive[9].cpuCapacityFilterEnabled, undefined);
     console.log('[OK] Batch panel rules behavior');
 }
 

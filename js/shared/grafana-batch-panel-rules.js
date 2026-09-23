@@ -3,7 +3,10 @@
 // while sync has strict per-item and total quotas.
 window.BatchPanelRules = (() => {
     const STORAGE_KEY = 'batchPanelToolRules';
-    const BOOLEAN_FIELDS = ['removeFill', 'thickenLines', 'invertLegend', 'invertIdle', 'convertMemToUsed', 'forceMemByteUnit', 'seriesQueryFilterEnabled', 'thresholdEnabled'];
+    const BOOLEAN_FIELDS = ['removeFill', 'thickenLines', 'invertLegend', 'invertIdle', 'convertMemToUsed', 'forceMemByteUnit',
+        'seriesQueryFilterEnabled', 'seriesQueryFilterHighlightEnabled', 'cpuCapacityFilterEnabled',
+        'cpuCapacityFilterHighlightEnabled', 'cpuCapacityFilterLoad1', 'cpuCapacityFilterLoad5',
+        'cpuCapacityFilterLoad15', 'thresholdEnabled'];
 
     const dashboardKey = url => {
         const dashboard = parseGrafanaDashboardUrl(url);
@@ -19,6 +22,8 @@ window.BatchPanelRules = (() => {
         BOOLEAN_FIELDS.forEach(field => {
             if (rule[field] === true) normalized[field] = true;
         });
+        if (normalized.convertMemToUsed) delete normalized.forceMemByteUnit;
+        if (normalized.seriesQueryFilterEnabled) delete normalized.cpuCapacityFilterEnabled;
         if (normalized.thickenLines) {
             const width = Number(rule.thickenLinesValue);
             normalized.thickenLinesValue = Number.isFinite(width)
@@ -35,6 +40,16 @@ window.BatchPanelRules = (() => {
             normalized.seriesFilterSettingsVersion = 2;
             normalized.seriesQueryFilterMode = rule.seriesQueryFilterMode === 'last' ? 'last' : 'max';
             normalized.seriesQueryFilterHighlightEnabled = rule.seriesQueryFilterHighlightEnabled !== false;
+        }
+        if (normalized.cpuCapacityFilterEnabled) {
+            const coefficient = Number(rule.cpuCapacityFilterCoefficient);
+            normalized.cpuCapacityFilterCoefficient = Number.isFinite(coefficient)
+                ? Math.min(10, Math.max(0.01, coefficient)) : 0.8;
+            normalized.cpuCapacityFilterMode = rule.cpuCapacityFilterMode === 'last' ? 'last' : 'max';
+            normalized.cpuCapacityFilterHighlightEnabled = rule.cpuCapacityFilterHighlightEnabled !== false;
+            normalized.cpuCapacityFilterLoad1 = rule.cpuCapacityFilterLoad1 !== false;
+            if (rule.cpuCapacityFilterLoad5 === true) normalized.cpuCapacityFilterLoad5 = true;
+            if (rule.cpuCapacityFilterLoad15 === true) normalized.cpuCapacityFilterLoad15 = true;
         }
         if (normalized.thresholdEnabled) normalized.thresholdNotifyEnabled = false;
         return normalized;
