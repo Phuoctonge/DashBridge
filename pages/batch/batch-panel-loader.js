@@ -104,7 +104,9 @@ function createBatchPanelLoader({ log }) {
                     try { return element.getBBox().width > 0 && element.getBBox().height > 0; }
                     catch { return false; }
                 });
-                if (!requestSettled || !(chartHasPoints || flotHasPoints || svgHasGeometry)) {
+                const filteredEmpty = window.__dashbridgePanelToolsVisualMetadata?.responseFilterEmptyIsNormal === true
+                    && window.__dashbridgePanelToolsVisualMetadata?.responseDataStatus?.kind === 'filtered_empty';
+                if (!requestSettled || !(chartHasPoints || flotHasPoints || svgHasGeometry || filteredEmpty)) {
                     stableFrames = 0;
                     schedule();
                     return;

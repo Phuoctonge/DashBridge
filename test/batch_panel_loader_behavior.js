@@ -70,6 +70,8 @@ const context = {
         disconnect() {}
     },
     getComputedStyle: () => ({ display: 'none', visibility: 'hidden', opacity: '0' }),
+    __dashbridgeDataInterceptorDiagnostic: { activeRequests: 0, events: [{ stage: 'request-complete' }] },
+    __dashbridgePanelToolsVisualMetadata: { responseDataStatus: { kind: 'filtered_empty' }, responseFilterEmptyIsNormal: true },
 };
 context.window = context;
 context.DashBridgeGrafanaDom = {
@@ -166,6 +168,14 @@ vm.runInContext(fs.readFileSync('pages/batch/batch-panel-loader.js', 'utf8'), co
     assert.notDeepEqual(strictResult, { x: 10, y: 20, w: 800, h: 400, dpr: undefined },
         'data-transform panels must still wait for observed data and visual evidence');
     assert.equal(listeners.size, 0, 'every retry/timeout path must clean up its tab listener');
+    const filteredEmptyResult = await loadPanel(
+        7,
+        'https://grafana.example/d/dashboard?viewPanel=7',
+        '7', null, null, { cpuCapacityFilterEnabled: true },
+        { aborted: false, addEventListener() {}, removeEventListener() {} },
+    );
+    assert.deepEqual({ ...filteredEmptyResult }, { x: 10, y: 20, w: 800, h: 400, dpr: undefined },
+        'a completed CPU filter with no matching series must still produce a valid empty-state capture');
     console.log('PASS Batch loader handles ordinary, transformed and transient-frame panels');
 })().catch(error => {
     console.error(error);
