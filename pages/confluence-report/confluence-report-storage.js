@@ -15,9 +15,9 @@
             if (!filename || !caption) throw new Error('Addition requires filename and caption');
             const block = `<p>${escapeXml(caption)}</p><ac:image style="width: 100%;"><ri:attachment ri:filename="${escapeXml(filename)}" /></ac:image>`;
             const insertion = item.insertion || {};
-            if (insertion.kind === 'group' && insertion.groupTitle) {
+            if (insertion.groupTitle) {
                 const heading = new RegExp(`(<h4\\b[^>]*>\\s*${escapeRegExp(insertion.groupTitle)}\\s*</h4>)`, 'i');
-                if (heading.test(html)) { html = html.replace(heading, `$1<h4>${escapeXml(insertion.sectionTitle || 'Новая группа')}</h4>${block}`); continue; }
+                if (heading.test(html)) { html = html.replace(heading, `$1${insertion.kind === 'group' ? `<h4>${escapeXml(insertion.sectionTitle || 'Новая группа')}</h4>` : ''}${block}`); continue; }
             }
             html += `<h4>${escapeXml(insertion.sectionTitle || 'Новый раздел')}</h4>${block}`;
         }

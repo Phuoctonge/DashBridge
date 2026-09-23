@@ -105,8 +105,8 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .mapping-node { position: relative; padding: .38rem .55rem; border: 1px solid var(--border); border-radius: .45rem; background: var(--bg-elevated); color: var(--text-main); font-size: .75rem; line-height: 1.25; box-shadow: none; }
 .source-node { cursor: grab; border-inline-start: .25rem solid var(--primary); }
 .mapping-source-label { min-width: 0; overflow-wrap: anywhere; }
-.mapping-target-grip { position: absolute; inset-inline-end: .42rem; top: 50%; display: inline-flex; width: .85rem; height: 1.1rem; align-items: center; justify-content: center; transform: translateY(-50%); color: var(--text-muted); font-size: .9rem; line-height: 1; letter-spacing: -.2em; opacity: .7; pointer-events: none; }
-.target-node { padding-inline-end: 1.6rem; }
+.mapping-target-grip { position: absolute; inset-inline-end: .42rem; top: 50%; display: inline-flex; width: .85rem; height: 1.1rem; align-items: center; justify-content: center; transform: translateY(-50%); color: var(--text-muted); font-size: .9rem; line-height: 1; letter-spacing: -.2em; opacity: .7; cursor: grab; user-select: none; }
+.mapping-target-grip:active { cursor: grabbing; }
 .target-node:hover .mapping-target-grip { color: var(--primary); opacity: 1; }
 .source-node::after, .target-node::before { content: ""; position: absolute; top: 50%; width: .42rem; height: .42rem; transform: translateY(-50%); border: 2px solid var(--bg-elevated); border-radius: 50%; background: var(--connection-color, var(--border)); z-index: 5; }
 .source-node::after { right: -.3rem; }
@@ -118,6 +118,8 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .mapping-board.mapping-drag-active .mapping-add-graph,
 .mapping-board.mapping-drag-active .mapping-add-section,
 .mapping-board.mapping-drag-active .target-node { border-color: var(--primary); border-style: dashed; }
+.mapping-board.mapping-reorder-active .mapping-added-section,
+.mapping-board.mapping-reorder-active .mapping-section-dropzone { border-color: var(--primary); border-style: dashed; }
 .mapping-links { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; clip-path: inset(0 round var(--radius-md)); }
 .mapping-links path { fill: none; stroke-linecap: round; stroke-width: 1.6; }
 .mapping-links .group-link { stroke-width: 1.6; }
@@ -141,7 +143,9 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .mapping-added-section > summary { cursor: pointer; color: var(--text-main); font-size: .75rem; font-weight: 700; }
 .mapping-added-section input, .mapping-added-graph input { width: 100%; box-sizing: border-box; min-height: 1.8rem; padding: .3rem .45rem; border: 1px solid var(--border); border-radius: .35rem; background: var(--bg-elevated); color: var(--text-main); font: inherit; font-size: .72rem; }
 .mapping-section-dropzone { display: grid; gap: .35rem; margin-top: .45rem; padding: .45rem; border: 1px dashed var(--border); color: var(--text-muted); font-size: .7rem; }
-.mapping-added-graph { display: grid; gap: .3rem; margin-top: .3rem; padding: .4rem .5rem; }
+.mapping-added-graph { display: grid; grid-template-columns: minmax(0, 1fr) 1rem; gap: .3rem .45rem; margin-top: .3rem; padding: .4rem .5rem; padding-inline-end: .5rem; }
+.mapping-added-graph .mapping-added-graph-label, .mapping-added-graph input { grid-column: 1; }
+.mapping-added-graph .mapping-target-grip { position: static; grid-column: 2; grid-row: 1 / span 2; align-self: center; transform: none; }
 .mapping-added-graph-label { color: var(--text-muted); font-size: .68rem; font-weight: 700; }
 .mapping-aggregates { margin-top: 1rem; padding-top: .8rem; border-top: 2px solid var(--border-light); }
 .mapping-aggregates > summary { cursor: pointer; padding: .35rem .45rem; color: var(--text-main); font-size: .8rem; font-weight: 800; }
