@@ -26,6 +26,11 @@
         for (const match of String(html).matchAll(pattern)) if (imageFilename(match[0]) === filename) return match;
         return null;
     }
+    function captionStartBefore(html, imageIndex) {
+        let candidate = null;
+        for (const match of String(html).slice(0, imageIndex).matchAll(/<p\b[^>]*>[\s\S]*?<\/p>/gi)) candidate = match.index;
+        return candidate;
+    }
     function transform(storageHtml, plan = {}) {
         let html = String(storageHtml || ''); const applied = []; const replacements = Array.isArray(plan.replacements) ? plan.replacements : [];
         for (const item of replacements) { const oldFilename = text(item.oldFilename); const newFilename = text(item.newFilename); if (!oldFilename || !newFilename) throw new Error('Replacement requires oldFilename and newFilename'); let occurrence = 0; let changed = false; html = html.replace(/<ac:image\b[\s\S]*?<\/ac:image>|<ac:image\b[^>]*\/>/gi, block => { if (imageFilename(block) !== oldFilename) return block; if (item.occurrence != null && occurrence++ !== Number(item.occurrence)) return block; changed = true; return replaceImage(block, oldFilename, newFilename); }); if (!changed) throw new Error(`Attachment not found: ${oldFilename}`); applied.push({ ...item, oldFilename, newFilename }); }
@@ -41,7 +46,11 @@
                     const scoped = html.slice(region.start, region.end);
                     if (insertion.beforeFilename) {
                         const before = imageBlockAt(scoped, insertion.beforeFilename);
-                        if (before) { const offset = region.start + before.index; html = html.slice(0, offset) + block + html.slice(offset); continue; }
+                        if (before) {
+                            const captionStart = captionStartBefore(scoped, before.index);
+                            const offset = region.start + (captionStart == null ? before.index : captionStart);
+                            html = html.slice(0, offset) + block + html.slice(offset); continue;
+                        }
                     }
                     html = html.slice(0, region.start) + (insertion.kind === 'group' ? `<h4>${escapeXml(insertion.sectionTitle || 'Новая группа')}</h4>` : '') + block + html.slice(region.start); continue;
                 }

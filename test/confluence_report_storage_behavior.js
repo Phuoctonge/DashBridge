@@ -32,4 +32,8 @@ const nonFirstAnchorHtml = '<h3>Тест 1</h3><h5>Метрики серверо
 const nonFirstAnchorResult = storage.transform(nonFirstAnchorHtml, { additions: [{ newFilename: 'between.png', caption: 'CPU Usage', insertion: { groupTitle: 'Метрики серверов системы', testTitle: 'Тест 1', beforeFilename: 'anchor-second.png' } }] });
 assert(nonFirstAnchorResult.html.indexOf('first.png') < nonFirstAnchorResult.html.indexOf('between.png'));
 assert(nonFirstAnchorResult.html.indexOf('between.png') < nonFirstAnchorResult.html.indexOf('anchor-second.png'));
+const pairedAnchorHtml = '<h3>Тест 1</h3><h5>Метрики серверов системы</h5><p>среднюю загруженность</p><ac:image><ri:attachment ri:filename="average.png" /></ac:image><p>использование памяти</p><ac:image><ri:attachment ri:filename="memory.png" /></ac:image>';
+const pairedAnchorResult = storage.transform(pairedAnchorHtml, { additions: [{ newFilename: 'load.png', caption: 'Load Average', insertion: { groupTitle: 'Метрики серверов системы', testTitle: 'Тест 1', beforeFilename: 'average.png' } }] });
+assert(pairedAnchorResult.html.indexOf('load.png') < pairedAnchorResult.html.indexOf('среднюю загруженность'));
+assert(pairedAnchorResult.html.indexOf('среднюю загруженность') < pairedAnchorResult.html.indexOf('average.png'));
 console.log('PASS Confluence report storage transformation');
