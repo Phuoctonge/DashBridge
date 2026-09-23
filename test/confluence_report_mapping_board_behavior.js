@@ -56,6 +56,8 @@ assert.match(reportSource, /requestAnimationFrame/);
 assert.match(reportSource, /placeholder = 'Название раздела'/);
 assert.match(reportSource, /section\.title = title\.value\.trim\(\)/);
 assert.match(reportSource, /input\.focus\(\)/);
+assert.match(reportSource, /title\.addEventListener\('input'/);
+assert.match(reportSource, /title\.addEventListener\('click', event => event\.stopPropagation\(\)/);
 assert.match(reportSource, /function sourceForKey\(sourceKey, rangeKey = null\)/);
 assert.match(reportSource, /function findSourceForTarget\(sourceKey, test\)/);
 assert.match(reportSource, /const targetFilename = findSourceForTarget\(link\.sourceKey, targetTest\)/);
