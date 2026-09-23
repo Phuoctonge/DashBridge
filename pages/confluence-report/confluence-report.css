@@ -101,10 +101,10 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .operation-row span { color: var(--text-main); font-size: .8rem; font-weight: 700; }
 .operation-row small { color: var(--text-muted); font-size: .74rem; }
 .mapping-board-card { overflow: hidden; }
-.mapping-board { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4rem; min-height: 28rem; padding: .75rem; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-raised); overflow: hidden; }
+.mapping-board { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4rem; min-height: 28rem; padding: .75rem; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-raised); overflow: hidden; overscroll-behavior: contain; }
 .mapping-column { position: relative; z-index: 2; min-width: 0; }
 .mapping-column h3 { margin: 0 0 .65rem; color: var(--text-main); font-size: .86rem; }
-.mapping-nodes { display: grid; gap: .45rem; max-height: 30rem; overflow: auto; padding: .2rem; }
+.mapping-nodes { display: grid; gap: .45rem; max-height: 30rem; overflow: auto; padding: .2rem; overscroll-behavior: contain; }
 .mapping-node { position: relative; padding: .38rem .55rem; border: 1px solid var(--border); border-radius: .45rem; background: var(--bg-elevated); color: var(--text-main); font-size: .75rem; line-height: 1.25; box-shadow: none; }
 .source-node { cursor: grab; border-inline-start: .25rem solid var(--primary); }
 .mapping-source-label { min-width: 0; overflow-wrap: anywhere; }

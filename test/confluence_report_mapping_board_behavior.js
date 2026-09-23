@@ -51,4 +51,6 @@ assert.match(reportSource, /function restoreCriteriaWideOrder/);
 assert.match(reportSource, /summary\.replace\(\/\\s\+\\\(\\d\+\\\)\$\//);
 assert.match(reportSource, /filter\(item => item\.criteriaWide && item\.groupTitle === groupTitle\)/);
 assert.match(reportSource, /for \(const wide of wides\.slice\(\)\.reverse\(\)\)/);
+assert.match(reportSource, /window\.scrollX/);
+assert.match(reportSource, /requestAnimationFrame/);
 console.log('PASS Confluence report mapping board');
