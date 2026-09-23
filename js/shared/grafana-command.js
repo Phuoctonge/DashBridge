@@ -30,8 +30,26 @@ async function runGrafanaCommand({ tabId = null, command, payload = {}, refresh 
             target: { tabId: targetTabId }, world: 'MAIN', args: [payload.tools || {}],
             func: requestedTools => new Promise(resolve => {
                 const button = document.querySelector('button[aria-label="Refresh dashboard"], .refresh-picker button, [data-testid="data-toolbar-refresh"], button[title="Refresh dashboard"]');
-                if (!button) return resolve({ ok: false, reason: 'refresh-unavailable' });
-                const requiresTransform = requestedTools.invertIdle === true || requestedTools.convertMemToUsed === true || requestedTools.seriesQueryFilterEnabled === true;
+                if (!button) {
+                    const requestId = `dashbridge-refresh-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+                    const onPanelRefresh = event => {
+                        if (event.source !== window || event.origin !== location.origin
+                            || event.data?.action !== 'panelRefreshResult'
+                            || event.data.requestId !== requestId) return;
+                        clearTimeout(panelRefreshTimeout);
+                        window.removeEventListener('message', onPanelRefresh);
+                        resolve(event.data.ok ? { ok: true } : { ok: false, reason: event.data.reason || 'refresh-unavailable' });
+                    };
+                    const panelRefreshTimeout = setTimeout(() => {
+                        window.removeEventListener('message', onPanelRefresh);
+                        resolve({ ok: false, reason: 'refresh-unavailable' });
+                    }, 3000);
+                    window.addEventListener('message', onPanelRefresh);
+                    window.postMessage({ action: 'refreshPanelData', requestId }, location.origin);
+                    return;
+                }
+                const requiresTransform = requestedTools.invertIdle === true || requestedTools.convertMemToUsed === true
+                    || requestedTools.seriesQueryFilterEnabled === true || requestedTools.cpuCapacityFilterEnabled === true;
                 const diagnostic = window.__dashbridgeDataInterceptorDiagnostic;
                 if (requiresTransform && !diagnostic) return resolve({ ok: false, reason: 'transform-runtime-unavailable' });
                 // Only a request started after this refresh can confirm the new
@@ -47,7 +65,8 @@ async function runGrafanaCommand({ tabId = null, command, payload = {}, refresh 
                     const transformed = events.filter(event => event.stage === 'transform' && started.has(event.requestId)
                         && (!requestedTools.invertIdle || event.invertIdle === true)
                         && (!requestedTools.convertMemToUsed || event.convertMemToUsed === true)
-                        && (!requestedTools.seriesQueryFilterEnabled || event.sourceFilterEnabled === true));
+                        && (!requestedTools.seriesQueryFilterEnabled || event.sourceFilterEnabled === true)
+                        && (!requestedTools.cpuCapacityFilterEnabled || event.cpuCapacityFilterEnabled === true));
                     const completed = events.filter(event => event.stage === 'request-complete' && started.has(event.requestId));
                     if (transformed.some(event => event.memoryTransform?.applied === false)) {
                         return resolve({ ok: false, reason: 'memory-transform-not-applied' });

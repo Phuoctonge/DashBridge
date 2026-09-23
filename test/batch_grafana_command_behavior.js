@@ -25,7 +25,9 @@ async function run({ status = 'applied', scenario = 'success', tools = { convert
         diagnostic.events = [
             { id: 6, stage: 'request-start', requestId: 'new' },
             { id: 7, stage: 'transform', requestId: scenario === 'unrelated' ? 'old' : 'new', invertIdle: true,
-                convertMemToUsed: true, sourceFilterEnabled: scenario !== 'filter-missing', memoryTransform: { applied: scenario !== 'memory-failed' } },
+                convertMemToUsed: true, sourceFilterEnabled: scenario !== 'filter-missing',
+                cpuCapacityFilterEnabled: tools.cpuCapacityFilterEnabled === true,
+                memoryTransform: { applied: scenario !== 'memory-failed' } },
             { id: 8, stage: 'request-complete', requestId: 'new', outcome: scenario === 'http-error' ? 'http-error' : 'transformed' },
         ];
     } } };
@@ -39,7 +41,7 @@ async function run({ status = 'applied', scenario = 'success', tools = { convert
     vm.runInContext(fs.readFileSync('js/shared/grafana-command.js', 'utf8'), context);
     const result = await context.runGrafanaCommand({ tabId: 1, command: 'applyPanelTools', payload: { tools }, refresh: true });
     assert.strictEqual(listener, null);
-    assert.strictEqual(cleared, 1);
+    assert.strictEqual(cleared, scenario === 'no-button' ? 2 : 1);
     return { result, refreshes };
 }
 (async () => {
@@ -52,6 +54,7 @@ async function run({ status = 'applied', scenario = 'success', tools = { convert
     }
     assert.strictEqual((await run({ tools: { removeFill: true } })).result.ok, true);
     assert.strictEqual((await run({ tools: { seriesQueryFilterEnabled: true } })).result.ok, true);
+    assert.strictEqual((await run({ tools: { cpuCapacityFilterEnabled: true } })).result.ok, true);
     assert.strictEqual((await run({ tools: { seriesQueryFilterEnabled: true }, scenario: 'filter-missing' })).result.reason, 'transform-timeout');
     console.log('batch Grafana command behavior tests passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

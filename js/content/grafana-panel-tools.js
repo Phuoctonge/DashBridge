@@ -1613,6 +1613,15 @@
         if (event.origin !== extensionOrigin) return;
         if (isDashboardIframe ? event.source !== window.parent : event.source !== window) return;
         if (!isDashboardIframe && !window.__dashbridgePanelToolsAllowTop) return;
+        if (event.data?.action === 'refreshPanelData' && typeof event.data.requestId === 'string') {
+            let result = 'refresh-unavailable';
+            try { result = refreshSelectedPanelData(getTargetPanel()); }
+            catch { result = 'refresh-failed'; }
+            window.postMessage({ action: 'panelRefreshResult', requestId: event.data.requestId,
+                ok: !['flot-runner-unavailable', 'uplot-runner-unavailable', 'refresh-failed'].includes(result),
+                reason: result }, location.origin);
+            return;
+        }
         if (event.data?.action === 'getPanelLegendSeries') {
             const series = getLegendSeries();
             window.parent.postMessage({ action: 'panelLegendSeries', requestId: event.data.requestId, series }, extensionOrigin);
