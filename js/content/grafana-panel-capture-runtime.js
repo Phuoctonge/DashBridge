@@ -85,7 +85,12 @@
             height: Math.max(100, Number(document.documentElement.dataset.dashbridgeCaptureHeight) || 520)
         });
         const readPanelCaptureState = panel => {
-            const state = panelVisualState?.get(panel) || panel.__dashbridgeVisualState || (isDashboardIframe ? tools : {});
+            // Batch applies transform settings through the MAIN command bridge
+            // and keeps them in the document-level tools state. Direct Grafana
+            // capture does not always populate panelVisualState, so falling
+            // back to an empty object would disable response-filter highlights
+            // while the panel is being moved into the temporary capture frame.
+            const state = panelVisualState?.get(panel) || panel.__dashbridgeVisualState || tools || {};
             return { ...state, capturePrepared: defaultPanelCapturePrepared() };
         };
         const syncPanelCaptureToggle = (button, enabled) => {
