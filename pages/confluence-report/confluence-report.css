@@ -124,6 +124,11 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .mapping-add-graph, .mapping-add-section { margin: .3rem .25rem .3rem .65rem; padding: .2rem .45rem; border: 1px dashed var(--border); border-radius: .35rem; color: var(--text-muted); font-size: .68rem; cursor: copy; }
 .mapping-add-section { margin-top: .8rem; border-top: 1px dashed var(--border); border-inline: 0; border-radius: 0; font-weight: 700; }
 .mapping-add-graph:hover, .mapping-add-section:hover { border-color: var(--primary); color: var(--primary); }
+.mapping-add-graph.mapping-drop-active, .mapping-add-section.mapping-drop-active,
+.mapping-section-dropzone.mapping-drop-active { border-color: var(--primary); background: rgba(var(--primary-rgb), .09); color: var(--primary); outline: 2px solid rgba(var(--primary-rgb), .18); outline-offset: 1px; }
+.mapping-add-group { font-size: .66rem; }
+.mapping-added-section[draggable="true"] { cursor: grab; }
+.mapping-added-section[draggable="true"]:active { cursor: grabbing; }
 .mapping-add-graph { order: 20; }
 .mapping-added-section { margin: .45rem .25rem .45rem .65rem; padding: .4rem; border: 1px solid var(--border); border-radius: .45rem; background: var(--surface-raised); }
 .mapping-added-section > summary { cursor: pointer; color: var(--text-main); font-size: .75rem; font-weight: 700; }
