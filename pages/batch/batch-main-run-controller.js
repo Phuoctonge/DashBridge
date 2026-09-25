@@ -123,7 +123,7 @@
                         });
                         const rect = await operation.loadPanel(
                             tabId, fullUrl, panelId, null, null,
-                            panelRules.forPanel(mainPanelRules, panelId), lifecycle.signal(runId),
+                            panelRules.forPanel(mainPanelRules, panelId), lifecycle.signal(runId), panels[panelId],
                         );
                         if (!operation.isActive(runId)) break;
                         if (rect && rect.w > 5 && rect.h > 5) {

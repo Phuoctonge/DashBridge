@@ -198,8 +198,11 @@ function createBatchPanelLoader({ log }) {
         return normalized.toString();
     };
 
-    return async (tabId, url, panelId, _seriesFilter, previousSeriesFilter = null, panelTools = null, signal = null) => {
+    return async (tabId, url, panelId, _seriesFilter, previousSeriesFilter = null, panelTools = null, signal = null, panelTitle = '') => {
+        const context = () => `panelId=${String(panelId)}${panelTitle ? ` title="${String(panelTitle)}"` : ''} url=${url}`;
+        const trace = (stage, detail = '') => log(`[Batch ${stage}] ${context()}${detail ? ` ${detail}` : ''}`);
         log(previousSeriesFilter ? 'Быстрое переключение на серию…' : `Загрузка панели ${panelId}…`);
+        trace(previousSeriesFilter ? 'series-switch' : 'load-start');
         if (signal?.aborted) return false;
 
         // The early runtime is needed only when a panel's active tools actually
@@ -237,10 +240,12 @@ function createBatchPanelLoader({ log }) {
             try {
                 const registration = await ensureEarlyGrafanaRuntimeForUrl(targetUrl.toString());
                 if (!registration.ok) {
+                    trace('runtime-error', `reason=${registration.reason || 'unknown'}`);
                     log(`Не удалось подготовить runtime панели ${panelId}: ${registration.reason || 'неизвестная ошибка'}`, true);
                     return null;
                 }
             } catch (error) {
+                trace('runtime-error', `reason=${error.message}`);
                 log(`Не удалось подготовить runtime панели ${panelId}: ${error.message}`, true);
                 return null;
             }
@@ -295,8 +300,10 @@ function createBatchPanelLoader({ log }) {
                                 // first render; let readiness decide whether it
                                 // can be captured instead of discarding it here.
                                 if (applied.reason === 'refresh-unavailable') {
-                                    log(`Обновление панели ${panelId} недоступно, использую текущий рендер`, true);
+                                trace('panel-tools-refresh-unavailable');
+                                log(`Обновление панели ${panelId} недоступно, использую текущий рендер`, true);
                                 } else {
+                                trace('panel-tools-error', `reason=${applied?.reason || 'unknown'}`);
                                 log(`Не удалось применить настройки панели ${panelId}: ${applied?.reason || 'неизвестная ошибка'}`, true);
                                 return finish(null);
                                 }
@@ -310,7 +317,10 @@ function createBatchPanelLoader({ log }) {
                                 args: [panelId, effectivePanelTools, 25_000]
                             });
                             if (!isCurrentAttempt(generation, await getTab())) return finish(false);
-                            return finish(results?.[0]?.result || null);
+                            const result = results?.[0]?.result || null;
+                            if (!result) trace('readiness-failed', 'reason=timeout-or-panel-not-found');
+                            else trace('ready', `rect=${result.w}x${result.h}`);
+                            return finish(result);
                         } catch (error) {
                             if (!isTransientFrameRemoval(error) || attempt === 1) throw error;
                             // A Grafana navigation can replace frame 0 just after its
@@ -319,7 +329,10 @@ function createBatchPanelLoader({ log }) {
                         }
                     }
                 } catch (error) {
-                    if (!signal?.aborted) log(`Не удалось подготовить панель ${panelId}: ${error.message}`, true);
+                    if (!signal?.aborted) {
+                        trace('prepare-error', `reason=${error.message}`);
+                        log(`Не удалось подготовить панель ${panelId}: ${error.message}`, true);
+                    }
                     finish(signal?.aborted ? false : null);
                 } finally {
                     preparing = false;
@@ -330,7 +343,10 @@ function createBatchPanelLoader({ log }) {
                 void prepareCompleteTab(currentTab, navigationGeneration);
             };
             chrome.tabs.onUpdated.addListener(onUpdated);
-            readinessTimeout = setTimeout(() => finish(false), 30_000);
+            readinessTimeout = setTimeout(() => {
+                trace('timeout', 'reason=readiness-deadline');
+                finish(false);
+            }, 30_000);
             signal?.addEventListener('abort', abort, { once: true });
 
             chrome.tabs.get(tabId, async tab => {

@@ -119,6 +119,7 @@
                     const urlStr = card.querySelector('.series-panel-url').value;
                     const parsed = new URL(urlStr);
                     const panelId = new URLSearchParams(parsed.search).get('viewPanel') || 'Unknown';
+                    const panelTitle = String(card.dataset.panelTitle || '');
                     const signatures = JSON.parse(card.dataset.querySignatures || '[]');
 
                     for (let rangeIndex = 0; rangeIndex < timestamps.length; rangeIndex++) {
@@ -186,7 +187,7 @@
                                 const rect = await operation.loadPanel(
                                     tabId, filteredUrl, panelId, null, null,
                                     panelRules.forPanel(seriesPanelRules, panelId),
-                                    lifecycle.signal(runId),
+                                    lifecycle.signal(runId), panelTitle,
                                 );
                                 if (!operation.isActive(runId)) break;
                                 if (rect && rect.w > 5) {
@@ -231,7 +232,7 @@
                                     const rect = await operation.loadPanel(
                                         tabId, fullUrl, panelId, null, previousSeriesName,
                                         panelRules.forPanel(seriesPanelRules, panelId),
-                                        lifecycle.signal(runId),
+                                        lifecycle.signal(runId), panelTitle,
                                     );
                                     if (!operation.isActive(runId)) break;
                                     previousSeriesName = seriesName;

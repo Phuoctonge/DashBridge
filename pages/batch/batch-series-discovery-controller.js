@@ -186,6 +186,7 @@
             documentRef.getElementById('seriesPanelsEmpty')?.remove();
             const card = documentRef.createElement('div');
             card.className = 'batch-series-card';
+            card.dataset.panelTitle = panelTitle;
             card.dataset.querySignatures = JSON.stringify(signatures || []);
             card.innerHTML = `<h3 style="margin-top:0; font-size:14px; color:var(--primary);">Панель ID: ${escapeHtml(panelId)} - ${escapeHtml(panelTitle)}</h3>
                 <input type="hidden" class="series-panel-url" value="${escapeHtml(panelUrl)}">
