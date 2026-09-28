@@ -91,6 +91,43 @@
         uplot.setSize({ width, height });
         uplot.redraw(true, true);
     };
+    const relaxInlineSizeConstraints = root => {
+        const uplot = findUPlot(root);
+        const legendRow = root?.querySelector('table tbody tr, .u-legend tr, tr[class*="LegendRow"]');
+        const legend = legendRow?.closest('table, [role="table"], .u-legend') || legendRow;
+        if (!uplot || !legend) return null;
+        const chart = root.querySelector('.uplot');
+        let common = chart;
+        while (common && legend && !common.contains(legend)) common = common.parentElement;
+        if (!common || common === root) return null;
+        const properties = ['width', 'height', 'min-width', 'min-height', 'max-width', 'max-height'];
+        const snapshots = [];
+        const touched = new Set();
+        const touch = (element, full = true) => {
+            if (!element || touched.has(element)) return;
+            touched.add(element);
+            snapshots.push({ element, values: properties.map(property => [
+                property, element.style.getPropertyValue(property), element.style.getPropertyPriority(property)
+            ]) });
+            properties.forEach(property => {
+                if (!full && property !== 'min-width') return;
+                element.style.setProperty(property, property.startsWith('min-') ? '0' : '100%', 'important');
+            });
+        };
+        for (let element = common; element; element = element.parentElement) {
+            touch(element);
+            if (element === root) break;
+        }
+        Array.from(common.children).forEach(element => touch(element, false));
+        return {
+            restore() {
+                snapshots.forEach(({ element, values }) => values.forEach(([property, value, priority]) => {
+                    if (value) element.style.setProperty(property, value, priority);
+                    else element.style.removeProperty(property);
+                }));
+            }
+        };
+    };
     const restoreUPlot = panels => {
         panels.forEach(panel => {
             const uplot = findUPlot(panel);
@@ -127,6 +164,6 @@
     };
     window.DashBridgeGrafanaCompactLayout = {
         findUPlot, restoreInlineSnapshot, restoreSnapshotCollection,
-        redrawFlot, rememberUPlotSize, resizeUPlot, restoreUPlot, restoreFlot
+        redrawFlot, rememberUPlotSize, resizeUPlot, relaxInlineSizeConstraints, restoreUPlot, restoreFlot
     };
 })();

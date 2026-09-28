@@ -325,6 +325,7 @@
             let captureFrame = null;
             let captureAnchor = null;
             let captureLegendBackgroundController = null;
+            let captureInnerSizeController = null;
             const restore = async () => {
                 if (captureFrame) {
                     if (captureAnchor?.parentNode) captureAnchor.replaceWith(captureNode);
@@ -339,6 +340,8 @@
                 }
                 captureLegendBackgroundController?.restore();
                 captureLegendBackgroundController = null;
+                captureInnerSizeController?.restore();
+                captureInnerSizeController = null;
                 snapshot.forEach((state, prop) => state.value
                     ? outer.style.setProperty(prop, state.value, state.priority || '')
                     : outer.style.removeProperty(prop));
@@ -447,8 +450,13 @@
                     window.dispatchEvent(new Event('resize'));
                     await new Promise(resolve => setTimeout(resolve, 250));
                     layout?.redrawFlot(layoutTarget, true);
-                    layout?.resizeUPlot(layoutTarget, layoutTarget);
                     window.DashBridgeGrafanaVisualEngine?.reflowChart?.({ root: layoutTarget });
+                    // Grafana's ResizeObserver may rewrite measured inline sizes
+                    // while the panel is moved under the capture frame. Release
+                    // those stale constraints after that pass, immediately before
+                    // sizing the native renderer.
+                    captureInnerSizeController = layout?.relaxInlineSizeConstraints(layoutTarget);
+                    layout?.resizeUPlot(layoutTarget, layoutTarget);
                     captureLegendBackgroundController.apply();
                     if (legacyGraphPanel) {
                         // Prepared legacy capture moves .graph-panel outside its

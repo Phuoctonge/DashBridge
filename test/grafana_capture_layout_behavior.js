@@ -31,6 +31,7 @@ assert(narrow.left >= 12 && narrow.top >= 12, 'prepared panel must stay inside t
 const tools = fs.readFileSync('js/content/grafana-panel-tools.js', 'utf8')
     + fs.readFileSync('js/content/grafana-panel-capture-runtime.js', 'utf8')
     + fs.readFileSync('js/content/grafana-panel-menu-runtime.js', 'utf8');
+const compactLayout = fs.readFileSync('js/content/grafana-compact-layout.js', 'utf8');
 const dashboard = fs.readFileSync('pages/dashbridge/dashbridge.js', 'utf8')
     + fs.readFileSync('pages/dashbridge/dashbridge-panel-card-controller.js', 'utf8')
     + fs.readFileSync('pages/dashbridge/dashbridge-page-ui-controller.js', 'utf8')
@@ -86,6 +87,10 @@ assert(tools.includes("outer.querySelector('.graph-panel')")
     && tools.includes('legacySnapshot?.forEach')
     && tools.includes('layout?.resizeUPlot(layoutTarget, layoutTarget)'),
     'native compact capture must resize and restore Grafana 10 legacy graph content instead of only its grid item');
+assert(compactLayout.includes('relaxInlineSizeConstraints')
+    && tools.includes('captureInnerSizeController = layout?.relaxInlineSizeConstraints(layoutTarget)')
+    && tools.includes('captureInnerSizeController?.restore()'),
+    'modern Grafana compact capture must release stale inner flex sizes and restore them afterwards');
 assert(tools.includes("legacyGraphPanel.style.setProperty('height', `${legacyHeight}px`, 'important')")
     && tools.includes('captureFrame.appendChild(captureNode)')
     && tools.includes('layout?.redrawFlot(layoutTarget, true)'),
