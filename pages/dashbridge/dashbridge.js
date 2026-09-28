@@ -205,6 +205,7 @@ dashBridgePanelToolsController = DashBridgePanelToolsController.create({
 });
 const dashBridgePanelTransferController = DashBridgePanelTransferController.create({
     transfer: window.DashBridgePanelTransfer,
+    showAlert,
     showImportChoice: window.DashBridgeModal.showImportChoice,
     getPanels: () => panels,
     setPanels: value => { panels = value; },

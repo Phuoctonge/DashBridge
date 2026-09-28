@@ -134,6 +134,8 @@ const transferController = fs.readFileSync(
 );
 assert(controller.includes('transfer: window.DashBridgePanelTransfer'),
     'DashBridge must inject the pure transfer API into the lifecycle controller');
+assert(controller.match(/const dashBridgePanelTransferController = DashBridgePanelTransferController\.create\(\{[\s\S]*?showAlert,[\s\S]*?showImportChoice:/),
+    'DashBridge transfer controller must receive both alert and import-choice modal dependencies');
 assert(transferController.includes('transfer.createPanelExportPayload')
     && transferController.includes('transfer.parsePanelImportText'),
     'lifecycle controller must use the injected transfer API');
