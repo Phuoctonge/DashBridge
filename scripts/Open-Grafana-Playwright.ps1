@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$Url,
+    [string]$Url = 'chrome://new-tab-page',
     [int]$Port = 9222
 )
 
@@ -14,8 +14,9 @@ $chromeCandidates = @(
 )
 $chrome = $chromeCandidates | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -First 1
 if (-not $chrome) { throw 'Google Chrome не найден.' }
-if (-not $Url) { $Url = Read-Host 'Введите Grafana URL' }
-if (-not ($Url -match '^https?://')) { throw 'URL должен начинаться с http:// или https://.' }
+if (-not ($Url -match '^(?:https?|chrome)://')) {
+    throw 'URL должен начинаться с http://, https:// или chrome://.'
+}
 
 New-Item -ItemType Directory -Force -Path $profileRoot | Out-Null
 $endpoint = "http://127.0.0.1:$Port/json/version"

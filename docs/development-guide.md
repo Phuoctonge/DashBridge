@@ -194,14 +194,18 @@ password или token; секреты не передаются скрипту �
 `npm run check:grafana-session -- '<dashboard-url>'`: команда требует успешный
 `/api/user`, отсутствие login redirect и загруженный service worker DashBridge.
 
-Для видимого Chrome в пользовательском desktop-сеансе используйте
+Для видимого Chrome в пользовательском desktop-сеансе используйте ярлык
+`Запустить Grafana Playwright.cmd` в корне проекта. Он по умолчанию открывает
+`chrome://new-tab-page`; после этого любую Grafana можно открыть вручную.
+Тот же launcher доступен как
 `scripts/Open-Grafana-Playwright.cmd '<dashboard-url>'`. Launcher открывает
 отдельный `.dashbridge-local/visible-profile`, загружает unpacked-расширение и
 поднимает CDP на `127.0.0.1:9222`; ссылка не зашивается в проект и может быть
-передана при каждом запуске либо введена в консоли. После входа проверка
-`node scripts/check-visible-grafana-cdp.js --port 9222` подключается к уже
-видимому окну через Playwright `connectOverCDP`. Профиль основного Chrome не
-используется.
+передана при каждом запуске. После входа проверка
+`node scripts/check-visible-grafana-cdp.js --port 9222` перебирает HTTP(S)-вкладки
+подключённого окна и проверяет `/api/user`, поэтому конкретный домен в проекте
+не требуется. Playwright подключается ко всему Chrome через CDP и может работать
+с любой вкладкой этого профиля. Профиль основного Chrome не используется.
 
 Живой Fast-прогон запускается без ручного управления окнами:
 
