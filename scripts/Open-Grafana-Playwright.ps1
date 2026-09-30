@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [string]$Url = 'chrome://new-tab-page',
     [int]$Port = 9222
