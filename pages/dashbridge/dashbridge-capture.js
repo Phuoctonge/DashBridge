@@ -116,7 +116,6 @@ globalThis.DashBridgeCapture = (() => {
                 postToDashboardFrame(sourceIframe, { action: 'dashbridgeCaptureLayoutChanged' });
                 await request.waitForData?.();
                 request.assertCurrent?.();
-                await new Promise(resolve => setTimeout(resolve, prepared ? 260 : 80));
                 await waitForLayout();
                 const rect = sourceIframe.getBoundingClientRect();
                 if (rect.width <= 1 || rect.height <= 1) throw new Error('capture-panel-empty');

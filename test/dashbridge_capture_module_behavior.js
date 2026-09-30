@@ -26,5 +26,7 @@ assert(capture.includes('captureSnapshot?.forEach')
     && capture.includes('window.scrollTo(scroll.x, scroll.y)')
     && capture.includes('panelCaptureInProgress = false'),
     'capture cleanup must remain inside the extracted lifecycle owner');
+assert(!capture.includes('setTimeout(resolve, prepared ? 260 : 80)'),
+    'DashBridge capture must settle from data/layout checkpoints instead of a machine-dependent delay');
 
 console.log('PASS DashBridge capture module owns sequencing and restoration boundaries');

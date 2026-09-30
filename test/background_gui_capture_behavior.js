@@ -84,9 +84,11 @@ const waitForGuiCaptureReady = guiCaptureController.waitForReady;
 const reserveGuiCaptureBytes = context.DashBridgeBackgroundGuiCapture.reserveBytes;
 const assertGuiCaptureArchiveSize = context.DashBridgeBackgroundGuiCapture.assertArchiveSize;
 const guiCaptureSource = fs.readFileSync('js/background-gui-capture.js', 'utf8');
-assert(guiCaptureSource.includes('const PANEL_CAPTURE_SETTLE_MS = 120;')
-    && guiCaptureSource.includes('await wait(PANEL_CAPTURE_SETTLE_MS);'),
-    'visible panel capture must allow a bounded compositor settle window before captureVisibleTab');
+const contentSource = fs.readFileSync('js/content/content.js', 'utf8');
+assert(!guiCaptureSource.includes('PANEL_CAPTURE_SETTLE_MS')
+    && contentSource.includes('const waitForCapturePaint = () =>')
+    && contentSource.includes('await waitForCapturePaint();'),
+    'visible panel capture must use an adaptive paint checkpoint instead of a fixed delay');
 const isTrustedExtensionPage = vm.runInContext('isTrustedExtensionPage', context);
 const isTrustedGrafanaContentSender = vm.runInContext(
     'sender => grafanaInfrastructure.isTrustedContentSender(sender)', context
@@ -184,7 +186,6 @@ const grafanaSender = (url, frameId = 0) => ({
     console.log('PASS background GUI capture readiness is correlated to the active capture session');
 })().catch(error => { console.error(error); process.exitCode = 1; });
 
-const contentSource = fs.readFileSync('js/content/content.js', 'utf8');
 assert(contentSource.includes('let grafanaMenuScopeAllowed = false')
     && contentSource.includes('grafanaMenuScopeAllowed = allowed')
     && contentSource.includes("!grafanaMenuScopeAllowed ? 'scope'")

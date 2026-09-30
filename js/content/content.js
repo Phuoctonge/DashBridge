@@ -123,6 +123,10 @@
     });
 
     let panelCaptureInProgress = false;
+    const waitForCapturePaint = () => {
+        if (document.visibilityState === 'hidden' || typeof requestAnimationFrame !== 'function') return Promise.resolve();
+        return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    };
     document.addEventListener('dashbridgePanelCaptureRequest', async event => {
         const detail = event.detail || {};
         if (typeof detail.requestId !== 'string') return;
@@ -141,6 +145,7 @@
         let stage = 'capture-visible-tab';
         let result = { ok: false, stage, error: 'capture-failed' };
         try {
+            await waitForCapturePaint();
             const captured = await chrome.runtime.sendMessage({ type: 'dashbridge-capture-visible-tab' });
             if (!captured?.ok || !captured.dataUrl) throw new Error(captured?.error || 'capture-visible-tab-failed');
             stage = 'crop';
