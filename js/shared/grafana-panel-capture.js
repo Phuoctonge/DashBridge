@@ -72,14 +72,66 @@ async function captureGrafanaPanelImage({
 }) {
     let rect = null;
     let preparedSessionId = null;
+    const startedAt = Date.now();
     const targetSize = prepared ? {
         width: Math.min(4096, Math.max(100, Math.round(Number(outputWidth) || 1000))),
         height: Math.min(4096, Math.max(100, Math.round(Number(outputHeight) || 520)))
     } : null;
-    const reportFailure = (stage, reason, error = null) => {
+    const collectFailureContext = async () => {
+        try {
+            const results = await chrome.scripting.executeScript({
+                target: { tabId }, world: 'MAIN', args: [panelId],
+                func: targetPanelId => {
+                    const candidates = [...document.querySelectorAll(
+                        '.react-grid-item, .panel-container, [data-panelid], [data-viz-panel-key^="panel-"]'
+                    )].slice(0, 40);
+                    const panel = window.DashBridgeGrafanaDom?.findPanelById?.(targetPanelId)
+                        || window.DashBridgeGrafanaDom?.findPanel?.({ panelId: targetPanelId });
+                    const describe = node => {
+                        const rect = node?.getBoundingClientRect?.();
+                        return {
+                            tag: node?.tagName || null,
+                            panelId: node?.getAttribute?.('data-panelid') || null,
+                            title: node?.querySelector?.('h1,h2,h3,h4,h5,h6,[data-testid="panel title"]')?.textContent?.trim()?.slice(0, 160) || null,
+                            width: Math.round(rect?.width || 0), height: Math.round(rect?.height || 0),
+                            visible: !!rect && rect.width > 1 && rect.height > 1,
+                            canvas: node?.querySelectorAll?.('canvas').length || 0,
+                            svg: node?.querySelectorAll?.('svg').length || 0,
+                            uplot: node?.querySelectorAll?.('.uplot').length || 0,
+                            flot: node?.querySelectorAll?.('.flot-base').length || 0,
+                        };
+                    };
+                    return {
+                        searchedSelectors: [
+                            '.react-grid-item', '.panel-container', '[data-panelid]',
+                            '[data-viz-panel-key^="panel-"]', 'canvas', 'svg', '.uplot', '.flot-base'
+                        ],
+                        readyState: document.readyState,
+                        loadingMarkers: document.querySelectorAll('.panel-loading,[data-testid="spinner"]').length,
+                        target: describe(panel), candidateCount: candidates.length,
+                        candidates: candidates.slice(0, 8).map(describe),
+                        network: {
+                            activeRequests: Number(window.__dashbridgeDataInterceptorDiagnostic?.activeRequests) || 0,
+                            responseKind: String(window.__dashbridgePanelToolsVisualMetadata?.responseDataStatus?.kind || '').slice(0, 80),
+                        },
+                    };
+                }
+            });
+            return results?.[0]?.result || null;
+        } catch (contextError) {
+            return { contextError: String(contextError?.message || contextError).slice(0, 240) };
+        }
+    };
+    const reportFailure = async (stage, reason, error = null) => {
         const detail = {
             stage, reason: String(reason || 'unknown'),
             error: error?.message ? String(error.message) : null,
+            category: /not-found|empty|lookup/i.test(`${stage} ${reason}`) ? 'not-found'
+                : /timeout|deadline/i.test(`${stage} ${reason}`) ? 'timeout'
+                    : /cancel/i.test(`${stage} ${reason}`) ? 'cancelled'
+                        : /restore/i.test(`${stage} ${reason}`) ? 'restore' : 'capture',
+            elapsedMs: Date.now() - startedAt, panelId: String(panelId ?? ''),
+            context: await collectFailureContext(),
         };
         try { onDiagnostic?.(detail); } catch { /* diagnostics must not break capture cleanup */ }
         return null;
@@ -214,7 +266,14 @@ async function captureGrafanaPanelImage({
                     if (frame) window.DashBridgeGrafanaVisualEngine?.setThreshold?.({ root: frame, enabled: false });
                     return window.DashBridgeGrafanaBatchCapture?.restore(sessionId);
                 }
-            }).catch(() => undefined);
+            }).catch(async error => {
+                const detail = {
+                    stage: 'restore', reason: 'restore-failed', category: 'restore',
+                    panelId: String(panelId ?? ''), elapsedMs: Date.now() - startedAt,
+                    error: String(error?.message || error).slice(0, 500),
+                };
+                try { onDiagnostic?.(detail); } catch { /* diagnostics must not break cleanup */ }
+            });
         }
     }
 }

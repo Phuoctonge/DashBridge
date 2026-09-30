@@ -4,6 +4,7 @@
         lifecycle, progressFactory, captureWindowRunner, loadPanel }) {
         let processing = false;
         const captureRecords = [];
+        const failureDiagnostics = [];
         const progress = progressFactory.create({ onCancel: cancel });
         const updateActionVisibility = () => {
             const mainTab = document.querySelector('.tab-btn.active')?.dataset.tab === 'tab-main';
@@ -26,6 +27,7 @@
         }
         const begin = async ({ title, phase }) => {
             captureRecords.length = 0;
+            failureDiagnostics.length = 0;
             const runId = lifecycle.begin(); setProcessing(true);
             await progress.openPictureInPicture({ title, phase, width: 390, height: 300 }); return runId;
         };
@@ -38,10 +40,11 @@
             if (!isActive()) return null;
             const captured = await captureGrafanaPanelImage({
                 tabId, windowId: win.id, panelId,
-                onDiagnostic: detail => logMessage(
-                    `Причина ошибки снимка [${panelId}]: ${detail.stage}/${detail.reason}`
-                        + (detail.error ? ` (${detail.error})` : ''), true,
-                ),
+                onDiagnostic: detail => {
+                    failureDiagnostics.push({ file: filename, panelId: String(panelId), ...detail });
+                    logMessage(`Причина ошибки снимка [${panelId}]: ${detail.stage}/${detail.reason}`
+                        + (detail.error ? ` (${detail.error})` : ''), true);
+                },
                 ...captureOptions,
             });
             if (!isActive()) return null;
@@ -62,11 +65,13 @@
         };
         const addArchiveReport = async (archive, report, isActive = () => true) => {
             if (!isActive()) return false;
-            const manifestBytes = new TextEncoder().encode(`${JSON.stringify({ schemaVersion: 2, generatedAt: new Date().toISOString(), captures: captureRecords.slice(), ...report }, null, 2)}\n`);
+            const manifest = { schemaVersion: 2, generatedAt: new Date().toISOString(), captures: captureRecords.slice(), ...report };
+            if (failureDiagnostics.length) manifest.failureDiagnostics = failureDiagnostics.slice(0, 100);
+            const manifestBytes = new TextEncoder().encode(`${JSON.stringify(manifest, null, 2)}\n`);
             await archive.add('manifest.json', manifestBytes, manifestBytes.byteLength);
             if (!isActive()) return false;
             if (report.errors?.length) {
-                const errorBytes = new TextEncoder().encode(`${report.errors.map(item => `${item.file}: ${item.reason}`).join('\n')}\n`);
+                const errorBytes = new TextEncoder().encode(`${JSON.stringify({ errors: report.errors, diagnostics: failureDiagnostics.slice(0, 100) }, null, 2)}\n`);
                 await archive.add('errors.txt', errorBytes, errorBytes.byteLength);
                 if (!isActive()) return false;
             }
