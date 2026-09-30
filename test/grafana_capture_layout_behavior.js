@@ -89,6 +89,9 @@ assert(tools.includes("outer.querySelector('.graph-panel')")
     && tools.includes('legacySnapshot?.forEach')
     && tools.includes('layout?.resizeUPlot(layoutTarget, layoutTarget, captureUPlot)'),
     'native compact capture must resize and restore Grafana 10 legacy graph content instead of only its grid item');
+assert(!tools.includes('setTimeout(resolve, 250)')
+    && tools.includes('waitForStableLayout?.(layoutTarget)'),
+    'native compact capture must use paint/layout checkpoints instead of a fixed renderer delay');
 assert(compactLayout.includes('relaxInlineSizeConstraints')
     && tools.includes('captureInnerSizeController = layout?.relaxInlineSizeConstraints(layoutTarget)')
     && tools.includes('captureInnerSizeController?.restore()'),

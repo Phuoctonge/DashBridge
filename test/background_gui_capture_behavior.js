@@ -86,8 +86,8 @@ const assertGuiCaptureArchiveSize = context.DashBridgeBackgroundGuiCapture.asser
 const guiCaptureSource = fs.readFileSync('js/background-gui-capture.js', 'utf8');
 const contentSource = fs.readFileSync('js/content/content.js', 'utf8');
 assert(!guiCaptureSource.includes('PANEL_CAPTURE_SETTLE_MS')
-    && contentSource.includes('const waitForCapturePaint = () =>')
-    && contentSource.includes('await waitForCapturePaint();'),
+    && contentSource.includes('waitForStableLayout')
+    && contentSource.includes('await globalThis.DashBridgeGrafanaCaptureOutput?.waitForStableLayout?.(document.documentElement);'),
     'visible panel capture must use an adaptive paint checkpoint instead of a fixed delay');
 const isTrustedExtensionPage = vm.runInContext('isTrustedExtensionPage', context);
 const isTrustedGrafanaContentSender = vm.runInContext(

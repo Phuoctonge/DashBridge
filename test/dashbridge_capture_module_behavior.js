@@ -28,5 +28,7 @@ assert(capture.includes('captureSnapshot?.forEach')
     'capture cleanup must remain inside the extracted lifecycle owner');
 assert(!capture.includes('setTimeout(resolve, prepared ? 260 : 80)'),
     'DashBridge capture must settle from data/layout checkpoints instead of a machine-dependent delay');
+assert(capture.includes('waitForStableLayout?.(card || sourceIframe)'),
+    'DashBridge capture must use the shared adaptive layout checkpoint before tab capture');
 
 console.log('PASS DashBridge capture module owns sequencing and restoration boundaries');

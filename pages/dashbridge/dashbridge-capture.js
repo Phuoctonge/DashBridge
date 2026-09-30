@@ -117,6 +117,7 @@ globalThis.DashBridgeCapture = (() => {
                 await request.waitForData?.();
                 request.assertCurrent?.();
                 await waitForLayout();
+                await window.DashBridgeGrafanaCaptureOutput?.waitForStableLayout?.(card || sourceIframe);
                 const rect = sourceIframe.getBoundingClientRect();
                 if (rect.width <= 1 || rect.height <= 1) throw new Error('capture-panel-empty');
                 const tab = await chrome.tabs.getCurrent();

@@ -40,6 +40,69 @@
             top: Math.max(margin, Math.round((Number(viewportHeight) - height) / 2))
         };
     };
+    // Layout evidence is advisory: an unfamiliar renderer or a stalled RAF
+    // must not break save/copy. Only cancellation rejects the capture.
+    const waitForStableLayout = (root = null, { signal } = {}) => new Promise((resolve, reject) => {
+        const view = globalThis;
+        const documentRef = view.document;
+        if (signal?.aborted) { reject(new Error('capture-cancelled')); return; }
+        if (typeof view.requestAnimationFrame !== 'function' || !documentRef) {
+            resolve({ status: 'unavailable' });
+            return;
+        }
+        let frameId = null;
+        let timerId = null;
+        let finished = false;
+        let stable = 0;
+        let previous = null;
+        const finish = (status, error = null) => {
+            if (finished) return;
+            finished = true;
+            if (frameId != null) view.cancelAnimationFrame(frameId);
+            if (timerId != null) view.clearTimeout(timerId);
+            view.removeEventListener('visibilitychange', onVisibility);
+            view.removeEventListener('pagehide', onAbort);
+            signal?.removeEventListener('abort', onAbort);
+            error ? reject(error) : resolve({ status });
+        };
+        const onAbort = () => finish('cancelled', new Error('capture-cancelled'));
+        const onVisibility = () => {
+            if (documentRef.visibilityState === 'hidden') finish('hidden');
+        };
+        const sample = () => {
+            if (!root) return [];
+            const nodes = [root, ...Array.from(root.querySelectorAll?.(
+                'canvas, .uplot, .graph-panel, .u-legend, table, [role="table"]'
+            ) || []).slice(0, 24)];
+            return nodes.map(node => {
+                const bounds = node.getBoundingClientRect();
+                return { node, values: [bounds.left, bounds.top, bounds.width, bounds.height,
+                    node.width || 0, node.height || 0].map(value => Math.round(value * 2) / 2).join(',') };
+            });
+        };
+        const inspect = () => {
+            frameId = null;
+            if (finished) return;
+            if (signal?.aborted) return onAbort();
+            if (documentRef.visibilityState === 'hidden') return finish('hidden');
+            try {
+                const current = sample();
+                const unchanged = previous && current.length === previous.length
+                    && current.every((item, index) => item.node === previous[index].node
+                        && item.values === previous[index].values);
+                stable = unchanged ? stable + 1 : 0;
+                previous = current;
+                if (stable >= 3) return finish('stable');
+                frameId = view.requestAnimationFrame(inspect);
+            } catch (_) { finish('unavailable'); }
+        };
+        signal?.addEventListener('abort', onAbort, { once: true });
+        view.addEventListener('visibilitychange', onVisibility);
+        view.addEventListener('pagehide', onAbort, { once: true });
+        timerId = view.setTimeout(() => finish('deadline'), 2000);
+        if (documentRef.visibilityState === 'hidden') return finish('hidden');
+        frameId = view.requestAnimationFrame(inspect);
+    });
     const crop = async (source, rect, outputSize = null) => {
         const image = await loadImage(source);
         const dpr = Number(rect?.dpr) || 1;
@@ -65,5 +128,6 @@
             .replace(/[^a-z0-9а-яё]+/gi, '_').replace(/_+/g, '_').replace(/^_|_$/g, '').slice(0, 120) || 'panel';
         return `grafana_${clean}_${new Date().toISOString().slice(0, 10)}.png`;
     };
-    globalThis.DashBridgeGrafanaCaptureOutput = Object.freeze({ normalizeOutputSize, fitPreparedSize, crop, copy, filename });
+    globalThis.DashBridgeGrafanaCaptureOutput = Object.freeze({ normalizeOutputSize, fitPreparedSize,
+        waitForStableLayout, crop, copy, filename });
 })();

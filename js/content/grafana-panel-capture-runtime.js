@@ -437,7 +437,7 @@
                         outer.style.setProperty('transition', 'none', 'important');
                     }
                     window.dispatchEvent(new Event('resize'));
-                    await new Promise(resolve => setTimeout(resolve, 250));
+                    await window.DashBridgeGrafanaCaptureOutput?.waitForStableLayout?.(layoutTarget);
                     layout?.redrawFlot(layoutTarget, true);
                     window.DashBridgeGrafanaVisualEngine?.reflowChart?.({ root: layoutTarget });
                     // Grafana's ResizeObserver may rewrite measured inline sizes

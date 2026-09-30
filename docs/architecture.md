@@ -936,6 +936,16 @@ click в Grafana document
   → finally: восстановление стилей, размеров, renderer и меню
 ```
 
+Перед `captureVisibleTab` direct Grafana, DashBridge и MAIN-подготовка панели
+используют общий `grafana-capture-output.js` checkpoint `waitForStableLayout`.
+Он сравнивает геометрию панели, canvas и известных renderer-узлов в нескольких
+кадрах браузера; смена узла или размера сбрасывает устойчивость. Проверка имеет
+только верхний watchdog и является advisory: `deadline`, скрытый документ или
+неизвестная геометрия продолжают захват, а отмена/pagehide освобождает все
+listeners и RAF. Фиксированные задержки перед первым снимком не являются частью
+контракта; отдельный rate-limit между частыми вызовами и correlation timeout
+сохраняются как защита ресурсов и устаревших ответов.
+
 Prepared mode сохраняет пропорции и вписывается в viewport. В DashBridge
 временно меняются карточка и вложенная панель. Для legacy `.graph-panel`/Flot
 обновляются container и plot; это нужно в том числе Grafana 10.1.10.
