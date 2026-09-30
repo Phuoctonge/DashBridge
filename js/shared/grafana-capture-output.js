@@ -42,7 +42,7 @@
     };
     // Layout evidence is advisory: an unfamiliar renderer or a stalled RAF
     // must not break save/copy. Only cancellation rejects the capture.
-    const waitForStableLayout = (root = null, { signal } = {}) => new Promise((resolve, reject) => {
+    const waitForStableLayout = (root = null, { signal, watchdogMs = 8000 } = {}) => new Promise((resolve, reject) => {
         const view = globalThis;
         const documentRef = view.document;
         if (signal?.aborted) { reject(new Error('capture-cancelled')); return; }
@@ -99,7 +99,7 @@
         signal?.addEventListener('abort', onAbort, { once: true });
         view.addEventListener('visibilitychange', onVisibility);
         view.addEventListener('pagehide', onAbort, { once: true });
-        timerId = view.setTimeout(() => finish('deadline'), 2000);
+        timerId = view.setTimeout(() => finish('deadline'), Math.max(250, Number(watchdogMs) || 8000));
         if (documentRef.visibilityState === 'hidden') return finish('hidden');
         frameId = view.requestAnimationFrame(inspect);
     });

@@ -37,7 +37,7 @@
         const capturePanelToZip = async (win, tabId, panelId, filename, archive, captureOptions = {}, isActive = () => true) => {
             if (!isActive()) return null;
             const captured = await captureGrafanaPanelImage({
-                tabId, windowId: win.id, panelId, settleMs: 300,
+                tabId, windowId: win.id, panelId,
                 onDiagnostic: detail => logMessage(
                     `Причина ошибки снимка [${panelId}]: ${detail.stage}/${detail.reason}`
                         + (detail.error ? ` (${detail.error})` : ''), true,

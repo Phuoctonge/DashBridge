@@ -53,6 +53,7 @@ checks = {
     "batch compact capture uses the shared prepared panel layout": "DashBridgeGrafanaBatchCapture?.prepare" in (ROOT / "js/shared/grafana-panel-capture.js").read_text(encoding="utf-8")
         and "const batchCaptureApi = Object.freeze" in PANEL_CAPTURE_RUNTIME
         and "window.DashBridgeGrafanaBatchCapture = batchCaptureApi" in PANEL_CAPTURE_RUNTIME,
+    "batch capture uses adaptive renderer readiness": "waitForStableLayout" in (ROOT / "js/shared/grafana-panel-capture.js").read_text(encoding="utf-8"),
     "batch defaults Grafana capture theme to light without persistence": 'value="light" checked' in HTML and "state.captureTheme" not in BATCH,
     "batch keeps current Grafana theme URL-neutral": "url.searchParams.delete('theme')" in URLS,
     "batch applies explicit Grafana themes to capture URLs": "theme === 'light' || theme === 'dark'" in URLS,

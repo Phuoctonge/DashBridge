@@ -66,7 +66,7 @@ async function scrollGrafanaPanelIntoView({ tabId, panelId = null, title = '', t
 }
 
 async function captureGrafanaPanelImage({
-    tabId, windowId, panelId = null, settleMs = 800,
+    tabId, windowId, panelId = null, settleMs = 0,
     prepared = false, outputWidth = 1000, outputHeight = 520,
     onDiagnostic = null,
 }) {
@@ -143,7 +143,21 @@ async function captureGrafanaPanelImage({
             rect = results?.[0]?.result;
             if (!rect) return reportFailure('panel-geometry', 'panel-empty-or-zero-size');
         }
-        await new Promise(resolve => setTimeout(resolve, settleMs));
+        // Batch uses the same renderer-aware checkpoint as direct Grafana and
+        // DashBridge. The legacy settleMs option remains accepted for callers
+        // but no longer controls screenshot readiness.
+        await chrome.scripting.executeScript({
+            target: { tabId }, world: 'MAIN', files: ['js/shared/grafana-capture-output.js']
+        }).catch(() => undefined);
+        await chrome.scripting.executeScript({
+            target: { tabId }, world: 'MAIN', args: [panelId],
+            func: async targetPanelId => {
+                const panel = window.DashBridgeGrafanaDom?.findPanelById?.(targetPanelId)
+                    || window.DashBridgeGrafanaDom?.findPanel?.({ panelId: targetPanelId });
+                return window.DashBridgeGrafanaCaptureOutput?.waitForStableLayout?.(panel, { watchdogMs: 8000 })
+                    || { status: 'unavailable' };
+            }
+        }).catch(() => undefined);
         if (prepared) {
             await chrome.scripting.executeScript({
                 target: { tabId }, world: 'MAIN', args: [panelId],
