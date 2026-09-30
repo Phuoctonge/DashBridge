@@ -62,17 +62,19 @@ assert(tools.includes('captureLegendBackgroundController.start();')
     && tools.includes('captureLegendBackgroundController.apply();')
     && tools.includes('captureLegendBackgroundController?.restore();'),
     'compact capture must style replacement legend rows after resize and clean them up afterwards');
-assert(tools.includes('const fallbackStripeBackground = `rgb(')
-    && tools.includes("setTemporaryStyle(element, 'background-color', background)"),
-    'compact capture must synthesize a visible opaque zebra stripe when Grafana exposes only one background color');
+assert(tools.includes("setTemporaryStyle(element, 'background-color', background)")
+    && tools.includes('do not invent a second shade')
+    && tools.includes("const background = nativeBackgrounds[index]")
+    && tools.includes("? distinctBackgrounds[index % distinctBackgrounds.length]")
+    && tools.includes(": 'transparent'"),
+    'compact capture must preserve observed legend colors and keep originally transparent rows transparent');
 assert(tools.includes('const isNeutralBackground = value =>')
     && tools.includes('Math.max(...rgb) - Math.min(...rgb) <= 14')
     && tools.includes('.find(isNeutralBackground) || null'),
     'compact capture must not mistake coloured series swatches for legend row backgrounds');
-assert(tools.includes('const backgroundAncestors = []')
-    && tools.includes('for (let element = root; element; element = element.parentElement)')
-    && tools.includes('backgroundAncestors.push(document.documentElement)'),
-    'compact legend background lookup must follow the full original ancestor chain');
+assert(!tools.includes('const backgroundAncestors = []')
+    && !tools.includes('backgroundAncestors.push(document.documentElement)'),
+    'compact legend background lookup must not inherit a color from an external ancestor');
 assert(tools.includes('const layoutRows = getLayoutRows()')
     && tools.includes('const columnWidths = []')
     && tools.includes("setTemporaryStyle(cell, 'flex', `0 0 ${width}px`)")
@@ -85,7 +87,7 @@ assert(tools.includes('captureAnchor.replaceWith(captureNode)'), 'native panel m
 assert(tools.includes('(captureFrame || outer).getBoundingClientRect()'), 'prepared capture must crop the isolated overlay instead of the Grafana viewport');
 assert(tools.includes("outer.querySelector('.graph-panel')")
     && tools.includes('legacySnapshot?.forEach')
-    && tools.includes('layout?.resizeUPlot(layoutTarget, layoutTarget)'),
+    && tools.includes('layout?.resizeUPlot(layoutTarget, layoutTarget, captureUPlot)'),
     'native compact capture must resize and restore Grafana 10 legacy graph content instead of only its grid item');
 assert(compactLayout.includes('relaxInlineSizeConstraints')
     && tools.includes('captureInnerSizeController = layout?.relaxInlineSizeConstraints(layoutTarget)')

@@ -83,6 +83,10 @@ const guiCaptureController = vm.runInContext('guiCaptureController', context);
 const waitForGuiCaptureReady = guiCaptureController.waitForReady;
 const reserveGuiCaptureBytes = context.DashBridgeBackgroundGuiCapture.reserveBytes;
 const assertGuiCaptureArchiveSize = context.DashBridgeBackgroundGuiCapture.assertArchiveSize;
+const guiCaptureSource = fs.readFileSync('js/background-gui-capture.js', 'utf8');
+assert(guiCaptureSource.includes('const PANEL_CAPTURE_SETTLE_MS = 120;')
+    && guiCaptureSource.includes('await wait(PANEL_CAPTURE_SETTLE_MS);'),
+    'visible panel capture must allow a bounded compositor settle window before captureVisibleTab');
 const isTrustedExtensionPage = vm.runInContext('isTrustedExtensionPage', context);
 const isTrustedGrafanaContentSender = vm.runInContext(
     'sender => grafanaInfrastructure.isTrustedContentSender(sender)', context

@@ -66,23 +66,33 @@
     const rememberUPlotSize = (root, boundsElement = root) => {
         const uplot = findUPlot(root);
         const canvas = root && Array.from(root.querySelectorAll('canvas')).find(item => !item.classList.contains('flot-base') && !item.classList.contains('flot-overlay'));
-        if (!uplot || !canvas || Object.prototype.hasOwnProperty.call(uplot, '__dashBridgeCompactSize')) return;
-        const panelBounds = boundsElement.getBoundingClientRect();
-        const canvasBounds = canvas.getBoundingClientRect();
-        uplot.__dashBridgeCompactSize = {
-            width: uplot.width, height: uplot.height,
-            horizontalChrome: Math.max(0, panelBounds.width - canvasBounds.width),
-            verticalChrome: Math.max(0, panelBounds.height - canvasBounds.height),
-            // Compact capture temporarily changes the plot width. Keep the
-            // exact native X increment so restoring the size does not leave a
-            // denser set of vertical time-grid lines behind.
-            xAxisIncrement: Number.isFinite(uplot.axes?.[0]?._found?.[0])
-                ? uplot.axes[0]._found[0]
-                : null
-        };
+        if (!uplot || !canvas) return null;
+        if (!Object.prototype.hasOwnProperty.call(uplot, '__dashBridgeCompactSize')) {
+            const panelBounds = boundsElement.getBoundingClientRect();
+            const canvasBounds = canvas.getBoundingClientRect();
+            uplot.__dashBridgeCompactSize = {
+                width: uplot.width, height: uplot.height,
+                horizontalChrome: Math.max(0, panelBounds.width - canvasBounds.width),
+                verticalChrome: Math.max(0, panelBounds.height - canvasBounds.height),
+                // Compact capture temporarily changes the plot width. Keep the
+                // exact native X increment so restoring the size does not leave a
+                // denser set of vertical time-grid lines behind.
+                xAxisIncrement: Number.isFinite(uplot.axes?.[0]?._found?.[0])
+                    ? uplot.axes[0]._found[0]
+                    : null
+            };
+            const chartRoot = uplot.root;
+            if (chartRoot?.style?.getPropertyValue && !uplot.__dashBridgeCompactInlineSize) {
+                uplot.__dashBridgeCompactInlineSize = new Map(['width', 'height'].map(property => [property, {
+                    value: chartRoot.style.getPropertyValue(property),
+                    priority: chartRoot.style.getPropertyPriority(property)
+                }]));
+            }
+        }
+        return uplot;
     };
-    const resizeUPlot = (root, boundsElement = root) => {
-        const uplot = findUPlot(root);
+    const resizeUPlot = (root, boundsElement = root, retainedUPlot = null) => {
+        const uplot = retainedUPlot || findUPlot(root);
         const savedSize = uplot && uplot.__dashBridgeCompactSize;
         if (!uplot || !savedSize) return;
         const panelBounds = boundsElement.getBoundingClientRect();
@@ -90,6 +100,48 @@
         const height = Math.max(1, Math.round(panelBounds.height - savedSize.verticalChrome));
         uplot.setSize({ width, height });
         uplot.redraw(true, true);
+        const chartRoot = uplot.root;
+        if (chartRoot?.style?.setProperty) {
+            if (!uplot.__dashBridgeCompactInlineSize) {
+                uplot.__dashBridgeCompactInlineSize = new Map(['width', 'height'].map(property => [property, {
+                    value: chartRoot.style.getPropertyValue(property),
+                    priority: chartRoot.style.getPropertyPriority(property)
+                }]));
+            }
+            chartRoot.style.setProperty('width', `${width}px`, 'important');
+            chartRoot.style.setProperty('height', `${height}px`, 'important');
+            if (!uplot.__dashBridgeCompactNativeSetSize && typeof uplot.setSize === 'function') {
+                const nativeSetSize = uplot.setSize;
+                const guardedSetSize = size => {
+                    nativeSetSize.call(uplot, { width, height });
+                    chartRoot.style.setProperty('width', `${width}px`, 'important');
+                    chartRoot.style.setProperty('height', `${height}px`, 'important');
+                };
+                uplot.__dashBridgeCompactNativeSetSize = { nativeSetSize };
+                uplot.setSize = guardedSetSize;
+            }
+            uplot.__dashBridgeCompactSizePin?.disconnect?.();
+            const applyPinnedSize = () => {
+                const widthValue = `${width}px`;
+                const heightValue = `${height}px`;
+                const widthMatches = chartRoot.style.getPropertyValue('width') === widthValue
+                    && chartRoot.style.getPropertyPriority('width') === 'important';
+                const heightMatches = chartRoot.style.getPropertyValue('height') === heightValue
+                    && chartRoot.style.getPropertyPriority('height') === 'important';
+                if (widthMatches && heightMatches) return;
+                chartRoot.style.setProperty('width', widthValue, 'important');
+                chartRoot.style.setProperty('height', heightValue, 'important');
+                if (uplot.width !== width || uplot.height !== height) {
+                    uplot.setSize({ width, height });
+                    uplot.redraw(true, true);
+                }
+            };
+            const observer = typeof MutationObserver === 'function'
+                ? new MutationObserver(applyPinnedSize)
+                : null;
+            observer?.observe(chartRoot, { attributes: true, attributeFilter: ['style'] });
+            uplot.__dashBridgeCompactSizePin = { disconnect: () => observer?.disconnect() };
+        }
     };
     const relaxInlineSizeConstraints = root => {
         const uplot = findUPlot(root);
@@ -128,23 +180,43 @@
             }
         };
     };
-    const restoreUPlot = panels => {
-        panels.forEach(panel => {
-            const uplot = findUPlot(panel);
+    const restoreUPlot = (panels, retainedUPlot = null) => {
+        const instances = new Set([
+            ...(retainedUPlot ? [retainedUPlot] : []),
+            ...panels.map(panel => findUPlot(panel)).filter(Boolean)
+        ]);
+        instances.forEach(uplot => {
             const savedSize = uplot && uplot.__dashBridgeCompactSize;
             if (!savedSize) return;
             const xAxis = uplot.axes?.[0];
             const originalXAxisIncrements = xAxis?._incrs;
             const restoreNativeTimeGrid = Number.isFinite(savedSize.xAxisIncrement)
                 && typeof originalXAxisIncrements === 'function';
-            if (restoreNativeTimeGrid) xAxis._incrs = () => [savedSize.xAxisIncrement];
-            try {
-                uplot.setSize({ width: savedSize.width, height: savedSize.height });
-                uplot.redraw(true, true);
-            } finally {
-                if (restoreNativeTimeGrid) xAxis._incrs = originalXAxisIncrements;
+            const guardedSetSize = uplot.__dashBridgeCompactNativeSetSize;
+            if (guardedSetSize) {
+                uplot.setSize = guardedSetSize.nativeSetSize;
+                delete uplot.__dashBridgeCompactNativeSetSize;
             }
-            delete uplot.__dashBridgeCompactSize;
+            try {
+                if (restoreNativeTimeGrid) xAxis._incrs = () => [savedSize.xAxisIncrement];
+                try {
+                    uplot.setSize({ width: savedSize.width, height: savedSize.height });
+                    uplot.redraw(true, true);
+                } finally {
+                    if (restoreNativeTimeGrid) xAxis._incrs = originalXAxisIncrements;
+                }
+            } finally {
+                const chartRoot = uplot.root;
+                uplot.__dashBridgeCompactSizePin?.disconnect?.();
+                delete uplot.__dashBridgeCompactSizePin;
+                const inlineSize = uplot.__dashBridgeCompactInlineSize;
+                inlineSize?.forEach(({ value, priority }, property) => {
+                    if (value) chartRoot?.style?.setProperty(property, value, priority);
+                    else chartRoot?.style?.removeProperty(property);
+                });
+                delete uplot.__dashBridgeCompactInlineSize;
+                delete uplot.__dashBridgeCompactSize;
+            }
         });
     };
     const restoreFlot = panels => {

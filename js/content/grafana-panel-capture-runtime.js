@@ -167,25 +167,7 @@
                     .find(isNeutralBackground) || null;
             };
             const nativeBackgrounds = getRows().map(readBackground);
-            const backgroundAncestors = [];
-            for (let element = root; element; element = element.parentElement) {
-                backgroundAncestors.push(element);
-                if (element === document.body) break;
-            }
-            backgroundAncestors.push(document.documentElement);
-            const rootBackground = backgroundAncestors
-                .map(element => getComputedStyle(element).backgroundColor)
-                .find(isNeutralBackground);
-            const primaryBackground = nativeBackgrounds.find(Boolean) || rootBackground
-                || (document.documentElement.classList.contains('theme-light') ? 'rgb(255, 255, 255)' : 'rgb(17, 18, 23)');
-            const capturedBackgrounds = nativeBackgrounds.map(background => background || rootBackground || primaryBackground);
-            const distinctBackgrounds = [...new Set(capturedBackgrounds.filter(Boolean))];
-            const primaryRgb = parseRgb(primaryBackground) || [255, 255, 255];
-            const luminance = primaryRgb.reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index], 0);
-            const stripeDelta = luminance > 128 ? -12 : 12;
-            const fallbackStripeBackground = `rgb(${primaryRgb
-                .map(channel => Math.max(0, Math.min(255, Math.round(channel + stripeDelta))))
-                .join(', ')})`;
+            const distinctBackgrounds = [...new Set(nativeBackgrounds.filter(Boolean))];
             const touched = new Map();
             const rememberStyle = (element, property) => {
                 let properties = touched.get(element);
@@ -208,9 +190,14 @@
             };
             const apply = () => {
                 getRows().forEach((row, index) => {
-                    const background = distinctBackgrounds.length > 1
-                        ? (capturedBackgrounds[index] || capturedBackgrounds[index % capturedBackgrounds.length])
-                        : (index % 2 === 1 ? fallbackStripeBackground : primaryBackground);
+                    // Preserve only colors that were actually observed before
+                    // reparenting. If Grafana exposes one neutral background,
+                    // do not invent a second shade: the panel/frame background
+                    // is the renderer's source of truth for that theme.
+                    const background = nativeBackgrounds[index]
+                        || (distinctBackgrounds.length > 1
+                            ? distinctBackgrounds[index % distinctBackgrounds.length]
+                            : 'transparent');
                     for (const element of [row, ...row.children]) {
                         setTemporaryStyle(element, 'background-color', background);
                     }
@@ -326,6 +313,7 @@
             let captureAnchor = null;
             let captureLegendBackgroundController = null;
             let captureInnerSizeController = null;
+            let captureUPlot = null;
             const restore = async () => {
                 if (captureFrame) {
                     if (captureAnchor?.parentNode) captureAnchor.replaceWith(captureNode);
@@ -351,7 +339,8 @@
                 window.dispatchEvent(new Event('resize'));
                 if (prepared) {
                     layout?.restoreFlot([outer]);
-                    layout?.restoreUPlot([outer]);
+                    layout?.restoreUPlot([outer], captureUPlot);
+                    captureUPlot = null;
                 }
                 if (legacyGraphPanel) {
                     syncThresholdHighlightState(outer, captureVisualState);
@@ -361,7 +350,7 @@
             };
             try {
                 if (prepared) {
-                    layout?.rememberUPlotSize(outer, layoutTarget);
+                    captureUPlot = layout?.rememberUPlotSize(outer, layoutTarget) || null;
                     const fitted = fitPanelCaptureSize({
                         viewportWidth: window.innerWidth, viewportHeight: window.innerHeight,
                         outputWidth: dimensions.width, outputHeight: dimensions.height
@@ -456,7 +445,7 @@
                     // those stale constraints after that pass, immediately before
                     // sizing the native renderer.
                     captureInnerSizeController = layout?.relaxInlineSizeConstraints(layoutTarget);
-                    layout?.resizeUPlot(layoutTarget, layoutTarget);
+                    layout?.resizeUPlot(layoutTarget, layoutTarget, captureUPlot);
                     captureLegendBackgroundController.apply();
                     if (legacyGraphPanel) {
                         // Prepared legacy capture moves .graph-panel outside its

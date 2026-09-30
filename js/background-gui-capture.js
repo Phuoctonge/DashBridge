@@ -2,6 +2,7 @@
     'use strict';
 
     const CAPTURE_INTERVAL_MS = 750;
+    const PANEL_CAPTURE_SETTLE_MS = 120;
     const SOURCE_BUDGET_BYTES = 128 * 1024 * 1024;
     const ARCHIVE_BUDGET_BYTES = 64 * 1024 * 1024;
 
@@ -204,6 +205,12 @@
                     if (waitMs) await wait(waitMs);
                     await assertTarget();
                     lastPanelVisibleCaptureAt = now();
+                    // Allow the compositor to commit the prepared panel after
+                    // the DOM event crosses from the content script. The
+                    // interval above only throttles repeated captures; the
+                    // first capture otherwise has no settle window.
+                    await wait(PANEL_CAPTURE_SETTLE_MS);
+                    await assertTarget();
                     const dataUrl = await chromeRef.tabs.captureVisibleTab(windowId, { format: 'png' });
                     await assertTarget();
                     return dataUrl;
