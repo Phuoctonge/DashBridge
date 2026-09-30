@@ -189,8 +189,13 @@ const grafanaSender = (url, frameId = 0) => ({
 assert(contentSource.includes('let grafanaMenuScopeAllowed = false')
     && contentSource.includes('grafanaMenuScopeAllowed = allowed')
     && contentSource.includes("!grafanaMenuScopeAllowed ? 'scope'")
-    && contentSource.includes("!hasActiveUserGesture() ? 'user-activation'"),
+    && contentSource.includes('hasActiveUserGesture()')
+    && contentSource.includes('hasReservedAuthorization'),
     'isolated Grafana authority must remain in closure state and require an active user gesture');
+assert(contentSource.includes('dashbridgePanelCaptureIntent')
+    && contentSource.includes('dashbridgePanelCaptureAuthorization')
+    && contentSource.includes('authorizationToken'),
+    'long captures must reserve a one-shot authorization while the click is still active');
 assert(contentSource.includes("stage: rejectedStage")
     && contentSource.includes("stage = 'capture-visible-tab'")
     && contentSource.includes("stage = 'crop'")

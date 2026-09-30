@@ -12,6 +12,30 @@
     // isolated-world closure and publish the dataset value only for MAIN UI.
     let grafanaMenuScopeAllowed = false;
     const hasActiveUserGesture = () => navigator.userActivation?.isActive === true;
+    const pendingPanelCaptureAuthorizations = new Map();
+    const createPanelCaptureAuthorization = requestId => {
+        while (pendingPanelCaptureAuthorizations.size >= 8) {
+            pendingPanelCaptureAuthorizations.delete(pendingPanelCaptureAuthorizations.keys().next().value);
+        }
+        const token = globalThis.crypto?.randomUUID?.()
+            || `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        pendingPanelCaptureAuthorizations.set(requestId, token);
+        setTimeout(() => {
+            if (pendingPanelCaptureAuthorizations.get(requestId) === token) {
+                pendingPanelCaptureAuthorizations.delete(requestId);
+            }
+        }, 30000);
+        return token;
+    };
+    document.addEventListener('dashbridgePanelCaptureIntent', event => {
+        const requestId = event.detail?.requestId;
+        if (!grafanaMenuScopeAllowed || typeof requestId !== 'string' || !hasActiveUserGesture()) return;
+        const authorizationToken = createPanelCaptureAuthorization(requestId);
+        document.dispatchEvent(new CustomEvent('dashbridgePanelCaptureAuthorization', {
+            detail: { requestId, authorizationToken }
+        }));
+    });
+    window.addEventListener('pagehide', () => pendingPanelCaptureAuthorizations.clear(), { once: true });
     const syncGrafanaAnalysisSettings = () => {
         if (!grafanaMenuScopeAllowed) {
             delete document.documentElement.dataset.dashbridgeGrafanaAnalysisSettings;
@@ -129,14 +153,18 @@
         const publishResult = result => document.dispatchEvent(new CustomEvent('dashbridgePanelCaptureResult', {
             detail: { requestId: detail.requestId, ...result }
         }));
+        const authorizationToken = pendingPanelCaptureAuthorizations.get(detail.requestId);
+        const hasReservedAuthorization = typeof detail.authorizationToken === 'string'
+            && authorizationToken === detail.authorizationToken;
         const rejectedStage = !grafanaMenuScopeAllowed ? 'scope'
-            : !hasActiveUserGesture() ? 'user-activation'
+            : !hasActiveUserGesture() && !hasReservedAuthorization ? 'user-activation'
                 : panelCaptureInProgress ? 'busy'
                     : !['download', 'copy'].includes(detail.action) ? 'request-validation' : '';
         if (rejectedStage) {
             publishResult({ ok: false, stage: rejectedStage, error: `capture-${rejectedStage}-rejected` });
             return;
         }
+        if (hasReservedAuthorization) pendingPanelCaptureAuthorizations.delete(detail.requestId);
         panelCaptureInProgress = true;
         let stage = 'capture-visible-tab';
         let result = { ok: false, stage, error: 'capture-failed' };

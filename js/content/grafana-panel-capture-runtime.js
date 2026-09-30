@@ -275,6 +275,16 @@
             if (iframe) window.addEventListener('message', onMessage);
             else document.addEventListener('dashbridgePanelCaptureResult', onEvent);
         });
+        const reservePanelCaptureAuthorization = requestId => {
+            let authorizationToken = null;
+            const onAuthorization = event => {
+                if (event.detail?.requestId === requestId) authorizationToken = event.detail.authorizationToken;
+            };
+            document.addEventListener('dashbridgePanelCaptureAuthorization', onAuthorization);
+            document.dispatchEvent(new CustomEvent('dashbridgePanelCaptureIntent', { detail: { requestId } }));
+            document.removeEventListener('dashbridgePanelCaptureAuthorization', onAuthorization);
+            return authorizationToken;
+        };
         const prepareNativePanelCapture = async (panel, prepared, dimensions = panelCaptureDimensions()) => {
             const outer = window.DashBridgeGrafanaDom?.outerPanel(panel) || panel;
             const captureVisualState = readPanelCaptureState(panel);
@@ -526,6 +536,7 @@
                 userActivationAtClick: navigator.userActivation?.isActive === true,
                 phase: 'started'
             };
+            const authorizationToken = reservePanelCaptureAuthorization(requestId);
             const publishDiagnostic = patch => {
                 Object.assign(diagnostic, patch, {
                     elapsedMs: Date.now() - startedAt,
@@ -548,6 +559,7 @@
                     resultPromise = waitForPanelCaptureResult(requestId, true);
                     window.parent.postMessage({
                         action: 'dashbridgePanelCaptureRequest', requestId, outputAction: action,
+                        authorizationToken,
                         prepared, outputWidth: dimensions.width, outputHeight: dimensions.height,
                         panelId: getPanelStateKey(panel), title: getPanelCaptureTitle(panel)
                     }, extensionOrigin);
@@ -556,7 +568,7 @@
                     publishDiagnostic({ phase: 'prepared', rect: { ...session.rect } });
                     resultPromise = waitForPanelCaptureResult(requestId, false);
                     document.dispatchEvent(new CustomEvent('dashbridgePanelCaptureRequest', { detail: {
-                        requestId, action, prepared, outputWidth: dimensions.width, outputHeight: dimensions.height,
+                        requestId, action, authorizationToken, prepared, outputWidth: dimensions.width, outputHeight: dimensions.height,
                         rect: session.rect, title: getPanelCaptureTitle(panel)
                     } }));
                 }

@@ -951,7 +951,12 @@ Prepared mode сохраняет пропорции и вписывается в
 обновляются container и plot; это нужно в том числе Grafana 10.1.10.
 
 Copy выполняется максимально близко к клику из сфокусированного Grafana
-document. Ошибка capture/crop/download/clipboard также проходит восстановление.
+document. Для долгого renderer isolated content bridge резервирует одноразовое
+разрешение по `requestId` в момент клика, до ожидания adaptive layout checkpoint;
+токен очищается после одного запроса или через bounded cleanup. Это сохраняет
+защиту от произвольного DOM-события и не требует, чтобы transient user
+activation жила всё время загрузки Grafana. Ошибка capture/crop/download/clipboard
+также проходит восстановление.
 
 Direct Grafana и DashBridge обращаются к общей очереди background capture.
 Broker проверяет активную вкладку до и после ожидания и снимка; переключение
