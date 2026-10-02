@@ -12,6 +12,9 @@ const reportController = read('pages/dashbridge/dashbridge-report-controller.js'
 const dashboard = `${dashboardPage}\n${dashboardUi}\n${dashboardMessages}\n${reportController}`;
 const profileController = read('pages/dashbridge/dashbridge-profile-controller.js');
 const reportUi = read('pages/dashbridge/dashbridge-report-ui.js');
+const reportUiDependencies = dashboardPage.match(/window\.DashBridgeReportUi\.create\(\{([\s\S]*?)\}\)/)?.[1] || '';
+assert(/\bgetActiveProfile\b/.test(reportUiDependencies),
+    'report settings and panel editors must receive the current profile provider from the dashboard');
 const reportAudit = read('pages/dashbridge/dashbridge-report-audit.js');
 const reportTestRunner = read('pages/dashbridge/dashbridge-report-test-runner.js');
 const reportTransport = read('pages/dashbridge/dashbridge-report-transport.js');

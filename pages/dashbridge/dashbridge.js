@@ -119,6 +119,7 @@ const {
     openPanelEditor: openPanelReportEditor,
     openReportSettings,
 } = window.DashBridgeReportUi.create({
+    getActiveProfile,
     getTransformSettings: () => grafanaTransformSettings,
     getPanels: () => panels,
     savePanels,
