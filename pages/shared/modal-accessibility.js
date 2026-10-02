@@ -65,7 +65,10 @@
             const overlay = top();
             if (!overlay) return;
             if (event.key === 'Escape') {
-                const cancel = [...overlay.querySelectorAll(cancelSelector)].find(visible);
+                // Selector order is intentional: querySelectorAll returns DOM order, which can
+                // place a destructive .modal-ok before the modal's explicit cancel control.
+                const cancel = cancelSelector.split(',').map(value => value.trim())
+                    .map(value => overlay.querySelector(value)).find(node => node && visible(node));
                 if (!cancel || cancel.disabled) return;
                 event.preventDefault(); event.stopImmediatePropagation();
                 cancel.click();
