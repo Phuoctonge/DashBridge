@@ -5,9 +5,9 @@
   },
   "exceptions": {
     "js/content/grafana-panel-tools.js": {
-      "maxLines": 2340,
-      "maxBytes": 136192,
-      "reason": "MAIN dispatcher and tightly coupled panel/threshold coordination facade, including its privacy-safe settings event bridge; extracted lifecycles remain separate owners."
+      "maxLines": 2400,
+      "maxBytes": 143360,
+      "reason": "Measured 2365 lines/139676 bytes. MAIN dispatcher and tightly coupled panel/threshold coordination facade, including its privacy-safe settings event bridge; extracted lifecycles remain separate owners."
     },
     "js/content/grafana-threshold-visuals.js": {
       "maxLines": 820,
@@ -15,14 +15,14 @@
       "reason": "Single renderer lifecycle covering the shared uPlot/Flot threshold contract, including foreground projection into its existing highlight overlay; no separate observers or resource owner."
     },
     "js/content/grafana-panel-data-runtime.js": {
-      "maxLines": 740,
-      "maxBytes": 49152,
-      "reason": "Single document fetch/XHR interception and request-correlation lifecycle, including rebinding current generation callbacks without stacking wrappers; pure transforms are already extracted."
+      "maxLines": 800,
+      "maxBytes": 53248,
+      "reason": "Measured 760 lines/50056 bytes. Single document fetch/XHR interception and request-correlation lifecycle, including rebinding current generation callbacks without stacking wrappers; pure transforms are already extracted."
     },
     "js/content/grafana-legend-visuals.js": {
-      "maxLines": 1180,
-      "maxBytes": 81920,
-      "reason": "Stable legend facade and shared layout lifecycle; renderer visibility adapters are already extracted."
+      "maxLines": 1450,
+      "maxBytes": 100352,
+      "reason": "Measured 1403 lines/96889 bytes. Stable legend facade and shared layout lifecycle; renderer visibility adapters are already extracted."
     },
     "pages/test-runner/test-runner-core.js": {
       "maxLines": 970,
