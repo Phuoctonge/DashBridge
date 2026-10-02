@@ -30,7 +30,7 @@ checks = {
         'id="capturePreparedToggleBtn"' in html and 'btn-capture-toggle' in html
         and "setCapturePrepared(!getCapturePrepared())" in page_ui,
     'archive is memory bounded':
-        'DashBridgeArchiveBudget.create(64 * 1024 * 1024)' in capture,
+        'bytes > 64 * 1024 * 1024' in capture,
     'capture always restores its card':
         "card.classList.remove('dashbridge-panel-capture-active')" in capture and 'window.scrollTo(scroll.x, scroll.y)' in capture,
     'dashboard still batches card DOM insertion':

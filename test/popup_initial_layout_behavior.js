@@ -90,10 +90,10 @@ assert(sectionIcon('Время для Django')
     && sectionIcon('Учет времени')
     && sectionIcon('Время для Django') !== sectionIcon('Учет времени'),
     'Django timestamp conversion must not reuse the Jira time-tracking icon');
-assert(sectionIcon('Traffic Recorder')
+assert(sectionIcon('Запись трафика')
     && tabIcon('tab-recorder')
-    && sectionIcon('Traffic Recorder') === tabIcon('tab-recorder')
-    && sectionIcon('Traffic Recorder') !== sectionIcon('Учет времени'),
+    && sectionIcon('Запись трафика') === tabIcon('tab-recorder')
+    && sectionIcon('Запись трафика') !== sectionIcon('Учет времени'),
     'Traffic Recorder must reuse its recording icon instead of the Jira clock');
 assert(buttonIcon('grafanaTimestampReadBtn')
     && buttonIcon('grafanaTimestampReadBtn').includes('<rectx="3"y="4"width="18"height="16"rx="2"/>'),

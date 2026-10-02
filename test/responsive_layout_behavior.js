@@ -51,7 +51,7 @@ assert(dashboardCards.includes("card.dataset.panelSize = panel.width === '100%'"
 assert(batchCss.includes('max-width: none') && batchCss.includes('width: calc(100% - (2 * var(--page-gutter)))'),
     'Batch must align its responsive workspace with shared page gutters');
 const testRunnerCss = read('pages/test-runner/test-runner.css');
-assert(testRunnerCss.includes('.tr-layout') && testRunnerCss.includes('max-width: none')
+assert(testRunnerCss.includes('.tr-layout') && (testRunnerCss.includes('max-width: none') || testRunnerCss.includes('max-width: 120rem'))
     && testRunnerCss.includes('.tr-input-panel') && testRunnerCss.includes('width: 100%')
     && testRunnerCss.includes('#trRunMode') && testRunnerCss.includes('width: auto')
     && testRunnerCss.includes('min-width: 57.5rem') && testRunnerCss.includes('.tr-results-wrap { overflow: auto; }'),

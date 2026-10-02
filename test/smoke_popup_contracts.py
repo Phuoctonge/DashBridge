@@ -27,7 +27,7 @@ CASES = [
         "name": "Traffic Recorder section",
         "html": [
             'data-tab="tab-recorder"', 'id="tab-recorder"', 'id="openTrafficRecorderBtn"',
-            'Открыть Traffic Recorder', '<rect x="3" y="5" width="18" height="14" rx="3" />',
+            'Открыть запись трафика', '<rect x="3" y="5" width="18" height="14" rx="3" />',
         ],
         "sources": {
             "pages/popup/popup-core.js": [
