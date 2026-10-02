@@ -19,12 +19,12 @@ const port = Number(portIndex >= 0 ? process.argv[portIndex + 1] : 9222) || 9222
                 const response = await fetch('/api/user', { credentials: 'include' });
                 return {
                     apiUserStatus: response.status,
-                    url: location.href,
-                    path: location.pathname,
-                    authenticated: response.status === 200 && !/^\/login(?:\/|$)/.test(location.pathname),
+                    url: globalThis.location.href,
+                    path: globalThis.location.pathname,
+                    authenticated: response.status === 200 && !/^\/login(?:\/|$)/.test(globalThis.location.pathname),
                 };
             } catch (error) {
-                return { url: location.href, authenticated: false, error: String(error) };
+                return { url: globalThis.location.href, authenticated: false, error: String(error) };
             }
         });
         results.push(result);
