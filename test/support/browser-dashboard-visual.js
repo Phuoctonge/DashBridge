@@ -26,7 +26,9 @@ module.exports = async function inspectDashboardVisual(context, extensionId) {
         });
         await page.reload();
         await page.locator('#profilePickerLabel').filter({ hasText: 'Проверка нагрузки' }).waitFor();
-        await page.locator('#reportMenuBtn').click(); await page.locator('#configureReportBtn').click();
+        await page.locator('#reportMenuBtn').click();
+        await page.locator('#reportDropdown').waitFor({ state: 'visible' });
+        await page.locator('#configureReportBtn').click();
         for (const theme of ['light', 'dark']) {
             await page.evaluate(value => document.documentElement.setAttribute('data-theme', value), theme);
             for (const width of [1440, 900, 600]) {
