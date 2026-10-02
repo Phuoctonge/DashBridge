@@ -192,11 +192,28 @@
                 || !item.totalField.values || !item.availField.values);
             if (incompletePair) return { data, modifiedCount, applied: false, reason: 'incomplete-pair' };
     
+            // Remove only the exact source fields that formed a complete pair.
+            // Matching generic words such as "free" or "available" here would
+            // silently delete unrelated metrics from the same panel response.
+            const sourceFields = new Set();
+            memoryPairs.forEach(item => {
+                sourceFields.add(item.totalField.field);
+                sourceFields.add(item.availField.field);
+            });
             Object.values(data.results).forEach(result => {
-                result.frames = (result.frames || []).filter(frame => !(frame.schema?.fields || []).some(field => {
-                    const text = getFieldText(field);
-                    return text.includes(totalKeyword) || text.includes(availKeyword) || /\b(used|available|total|free)\b/i.test(text);
-                }));
+                result.frames = (result.frames || []).flatMap(frame => {
+                    const fields = frame.schema?.fields || [];
+                    const values = frame.data?.values || [];
+                    const keptIndexes = fields.map((field, index) => sourceFields.has(field) ? -1 : index)
+                        .filter(index => index >= 0);
+                    const keptFields = keptIndexes.map(index => fields[index]);
+                    const keptValues = keptIndexes.map(index => values[index]);
+                    const hasValueField = keptFields.some(field => field.type !== 'time' && field.name !== 'Time');
+                    if (!hasValueField) return [];
+                    frame.schema.fields = keptFields;
+                    if (frame.data) frame.data.values = keptValues;
+                    return [frame];
+                });
             });
     
             Object.entries(serverFrames).forEach(([server, item]) => {

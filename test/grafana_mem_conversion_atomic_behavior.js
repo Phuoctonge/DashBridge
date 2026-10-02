@@ -74,6 +74,22 @@ assert.deepStrictEqual(Array.from(calculated.data.values[1]), [60, 75]);
 assert(frames.some(item => item.schema.fields.some(field => field.name === 'requests')),
     'unrelated series must survive a successful RAM conversion');
 
+const keywordCollision = { results: {
+    T: { frames: [frame('server-01 total', 'server-01', [100, 100])] },
+    A: { frames: [frame('server-01 available', 'server-01', [40, 25])] },
+    X: { frames: [frame('free slots', 'server-01', [7, 9])] },
+    Y: { frames: [frame('total_requests', 'server-01', [11, 13])] },
+    Z: { frames: [frame('available_connections', 'server-01', [3, 4])] }
+} };
+context.transformMem(keywordCollision);
+const keywordCollisionFrames = Object.values(keywordCollision.results).flatMap(result => result.frames);
+assert(keywordCollisionFrames.some(item => item.schema.fields.some(field => field.name === 'free slots')),
+    'a free-named unrelated series must survive RAM conversion');
+assert(keywordCollisionFrames.some(item => item.schema.fields.some(field => field.name === 'total_requests')),
+    'an underscore-named unrelated series must survive RAM conversion');
+assert(keywordCollisionFrames.some(item => item.schema.fields.some(field => field.name === 'available_connections')),
+    'an underscore-named available series must survive RAM conversion');
+
 context.tools.availKeyword = 'consumed';
 context.tools.memCalcMode = 'used';
 const customUsed = { results: {
