@@ -19,7 +19,8 @@ assert.deepStrictEqual(manifestReferences.filter(reference => !exists(reference)
 const htmlFiles = [];
 const loadedScriptPaths = new Set((manifest.content_scripts || []).flatMap(entry => entry.js || []));
 const ignoredDevelopmentDirectories = new Set([
-    '.git', '.pytest_cache', '__pycache__', 'dist', 'docs', 'node_modules', 'plans', 'test-results'
+    '.git', '.pytest_cache', '__pycache__', '.dashbridge-local', 'dist', 'dist-audit',
+    'docs', 'node_modules', 'plans', 'test-results'
 ]);
 const collectHtml = directory => {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {

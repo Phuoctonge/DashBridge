@@ -8,7 +8,10 @@
 const fs = require('fs');
 const path = require('path');
 
-const SKIP_DIRS = new Set(['.git', '.gitnexus', 'node_modules', '__pycache__']);
+const SKIP_DIRS = new Set([
+    '.git', '.gitnexus', '.dashbridge-local', 'dist', 'dist-audit',
+    'node_modules', '__pycache__', 'test-results',
+]);
 const CUSTOM_GLOBAL = /^(?:DashBridge|Batch|Grafana|Recorder|TestRunner|__dashbridge|__dashBridge|getGrafana|normalizeGrafana|parseHttp)/;
 const CUSTOM_EVENT = /^dashbridge/i;
 
