@@ -219,6 +219,17 @@ listener снимаются на pagehide и восстанавливаются 
 | Legend columns | grafana-legend-columns.js | Чистый расчёт статистик и выбранных колонок легенды без DOM/observer lifecycle; потребитель — visual engine. |
 | Legend visuals | `grafana-legend-visuals.js` | `grafana-visual-engine.js`; layout, palette, facade renderer adapters и единый реестр legacy observer cleanup. |
 | Настройки панели | `grafana-panel-settings-modal.js` | Direct Grafana, DashBridge. |
+| Видимость функций панели | `grafana-panel-analysis.js`, `grafana-settings.js` | Host policy и title-gated/full режимы для CPU/RAM/Load controls. |
+
+В обычной Grafana видимость type-specific функций панели определяется общей
+host policy. Для `mon-dc.mos.ru` по умолчанию сохраняется точная классификация
+по настроенным названиям CPU/RAM/Load; для других валидных HTTP(S) host
+показывается полный набор существующих controls. Настройка
+`grafanaShowAllPanelFunctions` явно включает полный набор для любого host.
+Невалидный URL использует безопасный title-gated fallback. Panel ID остаётся
+ключом состояния и сохранённых настроек, но не является семантическим
+classifier. Полный режим только показывает controls и не включает
+преобразования автоматически.
 | Allowlist легенды | `grafana-legend-selection.js` | Tools, карточки. |
 | Load по vCPU | `grafana-cpu-capacity-filter.js` | Transport pipeline. |
 | vCPU в легенде и отчёте | `grafana-cpu-capacity-legend.js` | MAIN: сопоставление series с capacity, колонка/сортировка легенды и ограниченный remount observer; создаётся `grafana-panel-tools.js`, который сохраняет порядок reflow/threshold и владеет cleanup поколения. |

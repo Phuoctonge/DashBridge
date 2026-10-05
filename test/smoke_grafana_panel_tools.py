@@ -314,13 +314,14 @@ checks = {
         and "legendIgnoreFilter: ''" in NATIVE_PANEL_SETTINGS
         and "keepCompleteHideSelection && typeof saved.legendSelectFilter === 'string'" in DASHBOARD
         and "keepCompleteHideSelection && typeof saved.legendIgnoreFilter === 'string'" in DASHBOARD,
-    "Grafana panel menu exposes transform and threshold controls": "transformFields(state, { panelKind })" in COMMON and "thresholdFields(state)" in COMMON,
-    "panel-specific data transforms use the configured exact title scope":
+    "Grafana panel menu exposes transform and threshold controls": "transformFields(state, { panelKind, functionVisibilityPolicy })" in COMMON and "thresholdFields(state)" in COMMON,
+    "panel-specific data transforms support full and title-gated visibility":
         "const panelSettings = readPanelAnalysisSettings();" in COMMON
         and "classifyPanelTitle(panelTitle, panelSettings)" in COMMON
-        and "panelKind === 'cpu'" in PANEL_SETTINGS
-        and "panelKind === 'ram'" in PANEL_SETTINGS
-        and "panelKind === 'load'" in PANEL_SETTINGS,
+        and "const showAllFunctions = functionVisibilityPolicy?.mode === 'all';" in PANEL_SETTINGS
+        and "showAllFunctions || panelKind === 'cpu'" in PANEL_SETTINGS
+        and "showAllFunctions || panelKind === 'ram'" in PANEL_SETTINGS
+        and "showAllFunctions || panelKind === 'load'" in PANEL_SETTINGS,
     "Grafana panel menu saves advanced panel state": "Object.assign(tools, nextState)" in COMMON and "applyThresholdWhenChartReady()" in COMMON,
     "Native Grafana transform settings install the data interceptor": "installDataInterceptor();" in NATIVE_PANEL_SETTINGS,
     "Native Grafana transform settings refresh only the selected panel data":
