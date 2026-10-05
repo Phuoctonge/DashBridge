@@ -7,7 +7,7 @@
     const SYNC_IMPORT_KEYS = new Set([
         'grafanaIdleKeyword', 'grafanaTrimDomain', 'grafanaTrimDomainEnabled', 'grafanaTrimDomainVersion', 'cpuWarnThreshold', 'cpuCritThreshold',
         'grafanaMemTotalKeyword', 'grafanaMemAvailKeyword', 'grafanaMemCalcMode', 'memWarnThreshold', 'memCritThreshold',
-        'grafanaCpuPanelTitle', 'grafanaMemPanelTitle', 'grafanaLoadPanelTitle', 'grafanaCpuCapacityCoefficient',
+        'grafanaCpuPanelTitle', 'grafanaMemPanelTitle', 'grafanaLoadPanelTitle', 'grafanaShowAllPanelFunctions', 'grafanaCpuCapacityCoefficient',
         'memTemplateFull', 'memTemplateTop3', 'jiraBaseUrl', 'tdmDomain', 'rememberLastTab', 'rememberLastSubTab',
         'cpuTemplateFull', 'cpuTemplateTop3', 'jiraTz', 'wikiDomains', 'grafanaKeepParams', 'grafanaIframeDomains',
         'tdmExcludeUserTextDefault', 'tdmRememberDate', 'tdmSavePhotosDefault', 'tdmExcludeUserDefault',
@@ -126,6 +126,9 @@
                     throw new Error(`Некорректное логическое значение настройки ${key}.`);
                 }
             });
+            if (sync.grafanaShowAllPanelFunctions !== undefined && typeof sync.grafanaShowAllPanelFunctions !== 'boolean') {
+                throw new Error('Некорректное логическое значение настройки полного набора функций.');
+            }
             if (sync.tdmExcludeUserTextDefault !== undefined
                 && (typeof sync.tdmExcludeUserTextDefault !== 'string' || sync.tdmExcludeUserTextDefault.length > 500)) {
                 throw new Error('Некорректное имя пользователя TDM по умолчанию.');

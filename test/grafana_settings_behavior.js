@@ -12,6 +12,10 @@ const { getGrafanaSettingsDefaults, getGrafanaSettingsStorageKeys, normalizeGraf
 assert.strictEqual(getGrafanaSettingsDefaults().grafanaMemCalcMode, 'available');
 assert(getGrafanaSettingsStorageKeys().includes('grafanaMemCalcMode'));
 assert(getGrafanaSettingsStorageKeys().includes('grafanaCpuPanelTitle'));
+assert(getGrafanaSettingsStorageKeys().includes('grafanaShowAllPanelFunctions'));
+assert.strictEqual(normalizeGrafanaSettings({}).grafanaShowAllPanelFunctions, false);
+assert.strictEqual(normalizeGrafanaSettings({ grafanaShowAllPanelFunctions: true }).grafanaShowAllPanelFunctions, true);
+assert.strictEqual(normalizeGrafanaSettings({ grafanaShowAllPanelFunctions: 'true' }).grafanaShowAllPanelFunctions, false);
 assert(getGrafanaSettingsStorageKeys().includes('grafanaCpuCapacityCoefficient'));
 assert.strictEqual(getGrafanaSettingsDefaults().grafanaCpuCapacityCoefficient, 0.8);
 assert.deepStrictEqual([

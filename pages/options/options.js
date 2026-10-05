@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.storage.sync.get([
         'grafanaIdleKeyword', 'grafanaTrimDomain', 'grafanaTrimDomainEnabled', 'grafanaTrimDomainVersion', 'cpuWarnThreshold', 'cpuCritThreshold',
         'grafanaMemTotalKeyword', 'grafanaMemAvailKeyword', 'grafanaMemCalcMode', 'memWarnThreshold', 'memCritThreshold',
-        'grafanaCpuPanelTitle', 'grafanaMemPanelTitle', 'grafanaLoadPanelTitle', 'grafanaCpuCapacityCoefficient',
+        'grafanaCpuPanelTitle', 'grafanaMemPanelTitle', 'grafanaLoadPanelTitle', 'grafanaShowAllPanelFunctions', 'grafanaCpuCapacityCoefficient',
         'grafanaCompactExportWidth', 'grafanaCompactExportHeight',
         'memTemplateFull', 'memTemplateTop3',
         'jiraBaseUrl', 'tdmDomain',
@@ -148,6 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById("settingGrafanaCpuPanelTitle").value = normalizePanelTitle(config.grafanaCpuPanelTitle, defaults.grafanaCpuPanelTitle);
         document.getElementById("settingGrafanaMemPanelTitle").value = normalizePanelTitle(config.grafanaMemPanelTitle, defaults.grafanaMemPanelTitle);
         document.getElementById("settingGrafanaLoadPanelTitle").value = normalizePanelTitle(config.grafanaLoadPanelTitle, defaults.grafanaLoadPanelTitle);
+        document.getElementById("settingGrafanaShowAllPanelFunctions").checked = config.grafanaShowAllPanelFunctions === true;
         document.getElementById("settingGrafanaCpuCapacityCoefficient").value = config.grafanaCpuCapacityCoefficient;
         document.getElementById("settingGrafanaMemTotalKeyword").value = config.grafanaMemTotalKeyword;
         document.getElementById("settingGrafanaMemAvailKeyword").value = config.grafanaMemAvailKeyword;
@@ -375,6 +376,7 @@ document.addEventListener('DOMContentLoaded', () => {
             grafanaCpuPanelTitle: cpuPanelTitle,
             grafanaMemPanelTitle: memPanelTitle,
             grafanaLoadPanelTitle: loadPanelTitle,
+            grafanaShowAllPanelFunctions: document.getElementById("settingGrafanaShowAllPanelFunctions").checked,
             grafanaCpuCapacityCoefficient: cpuCapacityCoefficient,
             grafanaCompactExportWidth: compactWidth,
             grafanaCompactExportHeight: compactHeight,

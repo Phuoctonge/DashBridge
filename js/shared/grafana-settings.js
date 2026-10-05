@@ -8,6 +8,7 @@ globalThis.getGrafanaSettingsDefaults = () => ({
     grafanaCpuPanelTitle: 'CPU Usage',
     grafanaMemPanelTitle: 'Memory',
     grafanaLoadPanelTitle: 'Load Average',
+    grafanaShowAllPanelFunctions: false,
     grafanaCpuCapacityCoefficient: 0.8,
     grafanaTrimDomain: '.passport.local:9182',
     grafanaTrimDomainEnabled: true,
@@ -31,6 +32,7 @@ globalThis.normalizeGrafanaSettings = settings => {
     const source = settings && typeof settings === 'object' ? settings : {};
     const normalized = { ...globalThis.getGrafanaSettingsDefaults(), ...source };
     const defaults = globalThis.getGrafanaSettingsDefaults();
+    normalized.grafanaShowAllPanelFunctions = source.grafanaShowAllPanelFunctions === true;
     // Version 2 expands shortening from calculated CPU/RAM/Load rows to every
     // Grafana series. Migrate the old default `false` once; an explicitly saved
     // v2 value remains user-controllable afterwards.

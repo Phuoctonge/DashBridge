@@ -1,7 +1,7 @@
 (function () {
     const analysisSettingKeys = new Set([
         'grafanaIdleKeyword', 'grafanaMemTotalKeyword', 'grafanaMemAvailKeyword', 'grafanaMemCalcMode',
-        'grafanaCpuPanelTitle', 'grafanaMemPanelTitle', 'grafanaLoadPanelTitle',
+        'grafanaCpuPanelTitle', 'grafanaMemPanelTitle', 'grafanaLoadPanelTitle', 'grafanaShowAllPanelFunctions',
         'grafanaCpuCapacityCoefficient',
         'grafanaTrimDomain', 'grafanaTrimDomainEnabled',
         'cpuWarnThreshold', 'cpuCritThreshold', 'memWarnThreshold', 'memCritThreshold',
