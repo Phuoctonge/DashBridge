@@ -267,6 +267,9 @@
             const panelSettings = normalizeSettings(storedSettings);
             let resolvedTitle = panel.title;
             let panelKind = panelAnalysis?.classifyPanelTitle(resolvedTitle, panelSettings) || null;
+            const functionVisibilityPolicy = panelAnalysis?.getPanelFunctionVisibilityPolicy?.({
+                url: panel.src, settings: panelSettings
+            }) || { mode: 'title-gated', host: '' };
             if (!panelKind) {
                 const liveTitle = await requestTitle(panel, iframe);
                 resolvedTitle = normalizePanelMetadataText(liveTitle, 240) || resolvedTitle;
@@ -282,7 +285,7 @@
             let saving = false;
             const overlay = settingsModal.open({
                 state: tools,
-                content: `${settingsModal.transformFields(tools, { panelKind })}${settingsModal.thresholdFields(tools)}${settingsModal.legendFields(tools.legendMode, tools)}`,
+                content: `${settingsModal.transformFields(tools, { panelKind, functionVisibilityPolicy })}${settingsModal.thresholdFields(tools)}${settingsModal.legendFields(tools.legendMode, tools)}`,
                 advanced: {
                     cpuCapacityFilterCoefficientDefault: panelSettings.grafanaCpuCapacityCoefficient,
                     getLegendSeries: () => requestLegendSeries(panel, iframe),

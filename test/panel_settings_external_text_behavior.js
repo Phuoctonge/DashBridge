@@ -9,6 +9,12 @@ vm.createContext(context);
 vm.runInContext(source, context);
 
 const modal = context.window.DashBridgePanelSettingsModal;
+const allFunctions = modal.transformFields({}, { functionVisibilityPolicy: { mode: 'all' } });
+for (const key of ['invertIdle', 'convertMemToUsed', 'cpuCapacityFilterEnabled']) {
+    assert(allFunctions.includes(`name="${key}"`), `full mode exposes ${key}`);
+    assert(!allFunctions.includes(`name="${key}" checked`), `full mode does not auto-enable ${key}`);
+}
+assert(!modal.transformFields({}, { panelKind: 'cpu' }).includes('name="convertMemToUsed"'));
 const hostileUnit = 'GiB</span><input name="thresholdValue" value="999">';
 const thresholdHtml = modal.thresholdFields({ thresholdEnabled: true, thresholdValue: 10, thresholdUnit: hostileUnit });
 const disabledThresholdHtml = modal.thresholdFields({ thresholdEnabled: false, thresholdNotifyEnabled: true });

@@ -2151,6 +2151,9 @@
         const panelTitle = getPanelAnalysisTitle(panel);
         const panelSettings = readPanelAnalysisSettings();
         const panelKind = window.DashBridgeGrafanaPanelAnalysis?.classifyPanelTitle(panelTitle, panelSettings) || null;
+        const functionVisibilityPolicy = window.DashBridgeGrafanaPanelAnalysis?.getPanelFunctionVisibilityPolicy?.({
+            url: location.href, settings: panelSettings
+        }) || { mode: 'title-gated', host: '' };
         const savedState = normalizePanelLegendState(panelVisualState?.get(panel) || panel.__dashbridgeVisualState);
         const defaultCpuCapacityCoefficient = Number.isFinite(Number(panelSettings.grafanaCpuCapacityCoefficient))
             ? Number(panelSettings.grafanaCpuCapacityCoefficient) : 0.8;
@@ -2172,7 +2175,7 @@
         };
         window.DashBridgePanelSettingsModal?.open({
             state,
-            content: `${window.DashBridgePanelSettingsModal.transformFields(state, { panelKind })}${window.DashBridgePanelSettingsModal.thresholdFields(state)}${window.DashBridgePanelSettingsModal.legendFields(state.legendMode, state)}`,
+            content: `${window.DashBridgePanelSettingsModal.transformFields(state, { panelKind, functionVisibilityPolicy })}${window.DashBridgePanelSettingsModal.thresholdFields(state)}${window.DashBridgePanelSettingsModal.legendFields(state.legendMode, state)}`,
             advanced: {
                 panelKind,
                 cpuCapacityFilterCoefficientDefault: defaultCpuCapacityCoefficient,

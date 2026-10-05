@@ -343,5 +343,8 @@ assert(contentBridge.includes("'grafanaTrimDomainEnabled'")
 assert(contentBridge.includes("'grafanaMemCalcMode'")
     && source.includes('grafanaMemCalcMode'),
     'the explicit RAM calculation mode must reach panel analysis independently from custom series names');
+assert(contentBridge.includes("'grafanaShowAllPanelFunctions'")
+    && panelTools.includes('getPanelFunctionVisibilityPolicy'),
+    'the full-function visibility policy must reach the MAIN panel tools runtime');
 
 console.log('PASS panel-scoped CPU/RAM analysis keeps strict title and metric contracts');
