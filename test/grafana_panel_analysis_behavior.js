@@ -8,9 +8,30 @@ assert(fs.existsSync(sourcePath), 'shared panel analysis module must exist');
 const source = fs.readFileSync(sourcePath, 'utf8');
 const context = { globalThis: {} };
 context.window = context.globalThis;
+context.URL = URL;
 vm.createContext(context);
 vm.runInContext(source, context);
 const analysis = context.globalThis.DashBridgeGrafanaPanelAnalysis;
+const titleSettings = { grafanaCpuPanelTitle: 'CPU Usage', grafanaMemPanelTitle: 'Memory', grafanaLoadPanelTitle: 'Load Average' };
+
+const monDcPolicy = analysis.getPanelFunctionVisibilityPolicy({
+    url: 'https://mon-dc.mos.ru/d/QkZzx-fWz/linux-nodes-group?orgId=1&panelId=77',
+    settings: titleSettings
+});
+assert.strictEqual(monDcPolicy.mode, 'title-gated');
+assert.strictEqual(monDcPolicy.host, 'mon-dc.mos.ru');
+assert.strictEqual(analysis.getPanelFunctionVisibilityPolicy({
+    url: 'https://grafana.example/d/abc?panelId=77', settings: titleSettings
+}).mode, 'all');
+assert.strictEqual(analysis.getPanelFunctionVisibilityPolicy({
+    url: 'https://evil-mon-dc.mos.ru/d/abc', settings: titleSettings
+}).mode, 'all');
+assert.strictEqual(analysis.getPanelFunctionVisibilityPolicy({
+    url: 'not-a-url', settings: titleSettings
+}).mode, 'title-gated');
+assert.strictEqual(analysis.getPanelFunctionVisibilityPolicy({
+    url: 'https://mon-dc.mos.ru/d/abc', settings: { ...titleSettings, grafanaShowAllPanelFunctions: true }
+}).mode, 'all');
 
 assert.strictEqual(analysis.classifyTitle('CPU'), null);
 assert.strictEqual(analysis.classifyTitle(' cpu CALCULATED '), null);

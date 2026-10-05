@@ -4,6 +4,20 @@
     const escapeRegExp = value => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const normalizeText = value => String(value ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
     const baseTitle = value => normalizeText(value).replace(/\s+calculated$/i, '').trim();
+    const getPanelFunctionVisibilityPolicy = ({ url = '', settings = {} } = {}) => {
+        let host = '';
+        try {
+            const parsed = new URL(url);
+            if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('unsupported protocol');
+            host = parsed.hostname.toLowerCase();
+        } catch {
+            return { mode: 'title-gated', host: '' };
+        }
+        if (settings.grafanaShowAllPanelFunctions === true || host !== 'mon-dc.mos.ru') {
+            return { mode: 'all', host };
+        }
+        return { mode: 'title-gated', host };
+    };
     const classifyPanelTitle = (value, settings = {}) => {
         const title = baseTitle(value).toLowerCase();
         const configured = {
@@ -363,6 +377,7 @@
 
     root.DashBridgeGrafanaPanelAnalysis = Object.freeze({
         baseTitle,
+        getPanelFunctionVisibilityPolicy,
         classifyPanelTitle,
         classifyTitle,
         serverNameForCopy,
