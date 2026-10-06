@@ -201,7 +201,7 @@ async function captureGrafanaPanelImage({
         await chrome.scripting.executeScript({
             target: { tabId }, world: 'MAIN', files: ['js/shared/grafana-capture-output.js']
         }).catch(() => undefined);
-        await chrome.scripting.executeScript({
+        const layoutResults = await chrome.scripting.executeScript({
             target: { tabId }, world: 'MAIN', args: [panelId],
             func: async targetPanelId => {
                 const panel = window.DashBridgeGrafanaDom?.findPanelById?.(targetPanelId)
@@ -209,7 +209,11 @@ async function captureGrafanaPanelImage({
                 return window.DashBridgeGrafanaCaptureOutput?.waitForStableLayout?.(panel, { watchdogMs: 8000 })
                     || { status: 'unavailable' };
             }
-        }).catch(() => undefined);
+        }).catch(() => []);
+        const layoutStatus = layoutResults?.[0]?.result?.status;
+        if (layoutStatus === 'cancelled' || layoutStatus === 'hidden') {
+            return reportFailure('layout-readiness', layoutStatus);
+        }
         if (prepared) {
             await chrome.scripting.executeScript({
                 target: { tabId }, world: 'MAIN', args: [panelId],

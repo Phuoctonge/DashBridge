@@ -7,6 +7,7 @@ const calls = [];
 let outputCanvas = null;
 let runtimeAvailable = true;
 let ensureRuntimeCalls = 0;
+let layoutStatus = 'stable';
 let captureSource = 'data:image/png;base64,source';
 const diagnostics = [];
 function FakeImage() {
@@ -28,6 +29,7 @@ const context = {
                 if (options.args?.length === 4) {
                     return [{ result: { ok: true, rect: { x: 10, y: 20, width: 800, height: 400, dpr: 1 } } }];
                 }
+                if (options.args?.length === 1) return [{ result: { status: layoutStatus } }];
                 return [{ result: true }];
             }
         },
@@ -82,6 +84,15 @@ vm.runInContext(fs.readFileSync('js/shared/grafana-panel-capture.js', 'utf8'), c
     assert(calls.some(call => call.args?.length === 1), 'Batch must restore the prepared panel after capture');
     assert.strictEqual(ensureRuntimeCalls, 0,
         'Batch must reuse an already installed capture runtime instead of reinjecting it');
+
+    layoutStatus = 'cancelled';
+    const cancelledLayoutCapture = await context.captureGrafanaPanelImage({
+        tabId: 42, windowId: 7, panelId: '2', prepared: true,
+        onDiagnostic: detail => diagnostics.push(detail),
+    });
+    assert.equal(cancelledLayoutCapture, null, 'cancelled layout readiness must abort the screenshot');
+    assert.equal(diagnostics.at(-1).stage, 'layout-readiness');
+    layoutStatus = 'stable';
 
     calls.length = 0;
     runtimeAvailable = false;

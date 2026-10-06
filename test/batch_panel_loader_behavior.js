@@ -6,6 +6,7 @@ const vm = require('node:vm');
 
 const listeners = new Set();
 let currentTabUrl = 'https://grafana.example/d/dashboard?viewPanel=7';
+let ordinaryDataReady = true;
 const renderer = { getBoundingClientRect: () => ({ height: 300 }) };
 const panel = {
     querySelector: selector => selector.includes('canvas') ? renderer : null,
@@ -70,10 +71,14 @@ const context = {
         disconnect() {}
     },
     getComputedStyle: () => ({ display: 'none', visibility: 'hidden', opacity: '0' }),
-    __dashbridgeDataInterceptorDiagnostic: { activeRequests: 0, events: [{ stage: 'request-complete' }] },
+    __dashbridgeDataInterceptorDiagnostic: {
+        get activeRequests() { return ordinaryDataReady ? 0 : 1; },
+        get events() { return ordinaryDataReady ? [{ stage: 'request-complete' }] : []; },
+    },
     __dashbridgePanelToolsVisualMetadata: { responseDataStatus: { kind: 'filtered_empty' }, responseFilterEmptyIsNormal: true },
 };
 context.window = context;
+context.location = { get href() { return currentTabUrl; } };
 context.DashBridgeGrafanaDom = {
     findPanelById: () => panel,
     findPanel: () => panel,
@@ -94,6 +99,30 @@ vm.runInContext(fs.readFileSync('pages/batch/batch-panel-loader.js', 'utf8'), co
     assert.deepEqual({ ...result }, { x: 10, y: 20, w: 800, h: 400, dpr: undefined });
     assert.equal(logs[0], 'Загрузка панели 7…');
     assert.equal(listeners.size, 0, 'loader must remove its tab listener after readiness');
+
+    ordinaryDataReady = false;
+    const blankResult = await loadPanel(
+        7,
+        'https://grafana.example/d/dashboard?viewPanel=7',
+        '7', null, null, null,
+        { aborted: false, addEventListener() {}, removeEventListener() {} },
+    );
+    assert.equal(blankResult, null, 'ordinary data panels must not capture before their request settles');
+    ordinaryDataReady = true;
+
+    const originalFindPanelById = context.DashBridgeGrafanaDom.findPanelById;
+    context.DashBridgeGrafanaDom.findPanelById = () => null;
+    currentTabUrl = 'https://grafana.example/d/dashboard?viewPanel=panel-7';
+    const normalizedPanelIdResult = await loadPanel(
+        7,
+        'https://grafana.example/d/dashboard?viewPanel=7',
+        '7', null, null, null,
+        { aborted: false, addEventListener() {}, removeEventListener() {} },
+    );
+    assert.deepEqual({ ...normalizedPanelIdResult }, { x: 10, y: 20, w: 800, h: 400, dpr: undefined },
+        'single-panel fallback must normalize numeric and panel-N route IDs');
+    context.DashBridgeGrafanaDom.findPanelById = originalFindPanelById;
+    currentTabUrl = 'https://grafana.example/d/dashboard?viewPanel=7';
 
     const normalExecuteScript = context.chrome.scripting.executeScript;
     let frameRemovalCount = 0;

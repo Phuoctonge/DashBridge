@@ -1,6 +1,7 @@
 // Batch navigation and renderer readiness in the temporary Grafana tab.
 function createBatchPanelLoader({ log }) {
     const waitForPanelInMainWorld = (panelId, panelTools, timeoutMs = 25_000) => new Promise(resolve => {
+        const normalizePanelReference = value => String(value ?? '').replace(/^panel-/i, '');
         const findPanel = () => {
             const exact = window.DashBridgeGrafanaDom?.findPanelById(panelId);
             if (exact) return exact;
@@ -8,7 +9,7 @@ function createBatchPanelLoader({ log }) {
             const requested = route.searchParams.get('viewPanel') || route.searchParams.get('panelId');
             // Legacy fullscreen panels can omit their DOM id. Only the exact
             // single-panel route may use the runtime's active-panel fallback.
-            return String(requested) === String(panelId)
+            return normalizePanelReference(requested) === normalizePanelReference(panelId)
                 ? window.DashBridgeGrafanaDom?.findPanel({ panelId }) : null;
         };
         let previousRect = null;
@@ -82,7 +83,10 @@ function createBatchPanelLoader({ log }) {
                 schedule();
                 return;
             }
-            const requiresDataEvidence = panelTools?.invertIdle === true
+            const interceptor = window.__dashbridgeDataInterceptorDiagnostic;
+            const hasDataRenderer = renderer !== panel;
+            const requiresDataEvidence = (hasDataRenderer && !!interceptor)
+                || panelTools?.invertIdle === true
                 || panelTools?.convertMemToUsed === true
                 || panelTools?.forceMemByteUnit === true
                 || panelTools?.trimDomainEnabled === true
@@ -91,7 +95,6 @@ function createBatchPanelLoader({ log }) {
                 || (panelTools?.legendMode === 'fast_complete_hide'
                     && (panelTools.legendFilter?.length > 0 || panelTools.legendVisibleSeries?.length > 0));
             if (requiresDataEvidence) {
-                const interceptor = window.__dashbridgeDataInterceptorDiagnostic;
                 const requestSettled = interceptor?.activeRequests === 0
                     && interceptor.events?.some(event => event.stage === 'request-complete');
                 const chart = window.DashBridgeGrafanaVisualEngine?.findUPlot?.(panel);
@@ -104,9 +107,14 @@ function createBatchPanelLoader({ log }) {
                     try { return element.getBBox().width > 0 && element.getBBox().height > 0; }
                     catch { return false; }
                 });
+                const canvasHasGeometry = [...panel.querySelectorAll('canvas')].some(canvas => {
+                    const canvasRect = canvas.getBoundingClientRect();
+                    return (Number(canvas.width) > 1 && Number(canvas.height) > 1)
+                        || (canvasRect.width > 1 && canvasRect.height > 1);
+                }) || (renderer !== panel && renderer.getBoundingClientRect().width > 1);
                 const filteredEmpty = window.__dashbridgePanelToolsVisualMetadata?.responseFilterEmptyIsNormal === true
                     && window.__dashbridgePanelToolsVisualMetadata?.responseDataStatus?.kind === 'filtered_empty';
-                if (!requestSettled || !(chartHasPoints || flotHasPoints || svgHasGeometry || filteredEmpty)) {
+                if (!requestSettled || !(chartHasPoints || flotHasPoints || svgHasGeometry || canvasHasGeometry || filteredEmpty)) {
                     stableFrames = 0;
                     schedule();
                     return;
@@ -195,6 +203,11 @@ function createBatchPanelLoader({ log }) {
     const withoutRuntimeBootstrap = value => {
         const normalized = new URL(withoutCacheBust(value));
         normalized.searchParams.delete('dashbridgeCpuCapacityFilter');
+        for (const key of ['viewPanel', 'panelId']) {
+            const panel = normalized.searchParams.get(key);
+            if (panel && /^\d+$/.test(panel)) normalized.searchParams.set(key, `panel-${panel}`);
+        }
+        normalized.searchParams.sort();
         return normalized.toString();
     };
 
@@ -262,7 +275,7 @@ function createBatchPanelLoader({ log }) {
                 chrome.tabs.get(tabId, tab => resolveTab(chrome.runtime.lastError ? null : tab || null));
             });
             const matchesExpectedUrl = tab => !!tab && !!expectedUrl
-                && !tab.pendingUrl && withoutRuntimeBootstrap(tab.url) === withoutRuntimeBootstrap(expectedUrl);
+                && withoutRuntimeBootstrap(tab.url) === withoutRuntimeBootstrap(expectedUrl);
             const isCurrentAttempt = (generation, tab) => !settled && !signal?.aborted
                 && generation === navigationGeneration && matchesExpectedUrl(tab);
             const finish = value => {
@@ -276,7 +289,12 @@ function createBatchPanelLoader({ log }) {
             const abort = () => finish(false);
             const prepareCompleteTab = async (currentTab, generation) => {
                 if (settled || preparing || currentTab?.status !== 'complete'
-                    || !isCurrentAttempt(generation, currentTab)) return;
+                    || !isCurrentAttempt(generation, currentTab)) {
+                    if (currentTab?.status === 'complete' && !isCurrentAttempt(generation, currentTab)) {
+                        trace('navigation-rejected', `actualUrl=${currentTab.url || ''}`);
+                    }
+                    return;
+                }
                 preparing = true;
                 try {
                     for (let attempt = 0; attempt < 2; attempt++) {
