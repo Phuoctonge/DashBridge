@@ -1,15 +1,14 @@
 'use strict';
 
-const params = new URLSearchParams(location.search);
-const profile = params.get('mode') === 'full' ? 'full' : 'fast';
-const suite = typeof DASHBRIDGE_TEST_SUITE === 'undefined' ? [] : DASHBRIDGE_TEST_SUITE;
-const profileTests = suite.filter(test => !Array.isArray(test.runModes) || test.runModes.includes(profile));
-const selected = new Set();
-let history = { tests: {} };
-
-const outcomeLabel = outcome => ({ pass: 'PASS', fail: 'FAIL', skip: 'SKIP', 'not-run': 'NOT RUN' }[outcome] || 'нет истории');
-const estimateSeconds = test => Math.max(1, Math.round((Number(test.expectedRefreshCount) || 0) * 3.2));
-const selectionForProfile = () => profileTests.filter(test => selected.has(test.id));
+function createTestSelectorController(root = document, { onClose = () => {}, standalone = false } = {}) {
+    let profile = 'fast';
+    let profileTests = [];
+    const selected = new Set();
+    let history = { tests: {} };
+    const query = selector => root.querySelector(selector);
+    const outcomeLabel = outcome => ({ pass: 'PASS', fail: 'FAIL', skip: 'SKIP', 'not-run': 'NOT RUN' }[outcome] || 'нет истории');
+    const estimateSeconds = test => Math.max(1, Math.round((Number(test.expectedRefreshCount) || 0) * 3.2));
+    const selectionForProfile = () => profileTests.filter(test => selected.has(test.id));
 
 function createBadge(text, className = 'selector-badge') {
     const node = document.createElement('span');
@@ -22,15 +21,15 @@ function renderSummary() {
     const chosen = selectionForProfile();
     const seconds = chosen.reduce((sum, test) => sum + estimateSeconds(test), 0);
     const minutes = Math.ceil(seconds / 60);
-    document.getElementById('selectorSummary').textContent = `Выбрано ${chosen.length} из ${profileTests.length} · ориентировочно ${minutes || 0} мин`;
-    document.getElementById('selectorApply').disabled = chosen.length === 0;
+    query('#selectorSummary').textContent = `Выбрано ${chosen.length} из ${profileTests.length} · ориентировочно ${minutes || 0} мин`;
+    query('#selectorApply').disabled = chosen.length === 0;
 }
 
 function renderList() {
-    const list = document.getElementById('selectorList');
-    const query = document.getElementById('selectorSearch').value.trim().toLowerCase();
+    const list = query('#selectorList');
+    const search = query('#selectorSearch').value.trim().toLowerCase();
     const visible = profileTests.filter(test => [test.id, test.name, test.technicalName, test.description, ...(test.featureIds || [])]
-        .join(' ').toLowerCase().includes(query));
+        .join(' ').toLowerCase().includes(search));
     list.replaceChildren();
     if (!visible.length) {
         const empty = document.createElement('div');
@@ -95,14 +94,18 @@ function applyPreset(preset) {
     candidates.forEach(test => selected.add(test.id));
     renderList();
     if (!candidates.length && ['failed', 'not-run'].includes(preset)) {
-        document.getElementById('selectorStatus').textContent = 'В последнем запуске таких результатов нет';
+        query('#selectorStatus').textContent = 'В последнем запуске таких результатов нет';
     } else {
-        document.getElementById('selectorStatus').textContent = '';
+        query('#selectorStatus').textContent = '';
     }
 }
 
-async function init() {
-    document.getElementById('selectorProfile').textContent = profile === 'full'
+async function load(mode = 'fast') {
+    profile = mode === 'full' ? 'full' : 'fast';
+    selected.clear();
+    const suite = typeof DASHBRIDGE_TEST_SUITE === 'undefined' ? [] : DASHBRIDGE_TEST_SUITE;
+    profileTests = suite.filter(test => !Array.isArray(test.runModes) || test.runModes.includes(profile));
+    query('#selectorProfile').textContent = profile === 'full'
         ? `Полный профиль · доступно ${profileTests.length} сценариев`
         : `Быстрый профиль · доступно ${profileTests.length} сценариев`;
     const stored = await chrome.storage.local.get(['trTestSelection', 'trTestHistory']).catch(() => ({}));
@@ -111,9 +114,14 @@ async function init() {
     if (saved?.scope === 'selected' && Array.isArray(saved.ids)) saved.ids.forEach(id => selected.add(id));
     else profileTests.forEach(test => selected.add(test.id));
     renderList();
-    document.getElementById('selectorSearch').addEventListener('input', renderList);
-    document.querySelectorAll('[data-preset]').forEach(button => button.addEventListener('click', () => applyPreset(button.dataset.preset)));
-    const close = async () => {
+    query('#selectorSearch').value = '';
+    renderList();
+}
+
+async function closeSelector() {
+    const dialog = root.querySelector('dialog');
+    if (dialog?.open) dialog.close('cancel');
+    if (standalone) {
         try {
             const currentWindow = await chrome.windows.getCurrent();
             if (Number.isInteger(currentWindow?.id)) {
@@ -122,17 +130,50 @@ async function init() {
             }
         } catch (_) { }
         window.close();
-    };
-    document.getElementById('selectorClose').addEventListener('click', close);
-    document.getElementById('selectorCancel').addEventListener('click', close);
-    document.getElementById('selectorApply').addEventListener('click', async () => {
+    }
+    onClose();
+}
+
+async function saveSelection() {
         const ids = selectionForProfile().map(test => test.id);
         const allSelected = ids.length === profileTests.length;
         await chrome.storage.local.set({
             trTestSelection: allSelected ? { scope: 'all', ids: [] } : { scope: 'selected', ids },
         });
-        await close();
-    });
+        await closeSelector();
 }
 
-document.addEventListener('DOMContentLoaded', init);
+function initTestSelector() {
+    query('#selectorSearch').addEventListener('input', renderList);
+    root.querySelectorAll('[data-preset]').forEach(button => button.addEventListener('click', () => applyPreset(button.dataset.preset)));
+    query('#selectorClose').addEventListener('click', closeSelector);
+    query('#selectorCancel').addEventListener('click', closeSelector);
+    query('#selectorApply').addEventListener('click', saveSelection);
+    root.addEventListener('cancel', event => { event.preventDefault(); closeSelector(); });
+    root.addEventListener('click', event => {
+        const dialog = root.querySelector('dialog');
+        if (!dialog || event.target !== dialog || 'closedBy' in (globalThis.HTMLDialogElement?.prototype || {})) return;
+        const rect = dialog.getBoundingClientRect();
+        const inside = event.clientX >= rect.left && event.clientX <= rect.right
+            && event.clientY >= rect.top && event.clientY <= rect.bottom;
+        if (!inside) closeSelector();
+    });
+    return Object.freeze({ open: async mode => {
+        await load(mode);
+        const dialog = root.querySelector('dialog');
+        if (dialog && typeof dialog.showModal === 'function') dialog.showModal();
+        query('#selectorSearch').focus();
+    }, close: closeSelector });
+}
+
+    return initTestSelector();
+}
+
+if (document.getElementById('testSelectorDialog')) {
+    window.DashBridgeTestSelector = createTestSelectorController(document);
+} else {
+    document.addEventListener('DOMContentLoaded', async () => {
+        const controller = createTestSelectorController(document, { standalone: true });
+        await controller.open(new URLSearchParams(location.search).get('mode'));
+    });
+}

@@ -397,13 +397,9 @@ function updateSelectionSummary() {
 async function openTestSelector() {
     const mode = elRunMode?.value === 'full' ? 'full' : 'fast';
     await chrome.storage.local.set({ trRunMode: mode }).catch(() => undefined);
-    await chrome.windows.create({
-        url: chrome.runtime.getURL(`pages/test-runner/test-selector.html?mode=${mode}`),
-        type: 'popup',
-        focused: true,
-        width: 920,
-        height: 820,
-    });
+    if (globalThis.DashBridgeTestSelector?.open) {
+        await globalThis.DashBridgeTestSelector.open(mode);
+    }
 }
 
 function resultOutcome(test) {

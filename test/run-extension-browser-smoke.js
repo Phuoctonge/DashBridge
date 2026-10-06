@@ -278,10 +278,8 @@ async function inspectTestSelectionWorkflow(context, extensionId) {
             timeout: 20_000
         });
         await runner.locator('#trSelectTestsBtn').waitFor({ state: 'visible' });
-        const popupPromise = context.waitForEvent('page', { timeout: 10_000 });
         await runner.locator('#trSelectTestsBtn').click();
-        selector = await popupPromise;
-        await selector.waitForLoadState('load');
+        selector = runner;
         await selector.locator('.selector-test').first().waitFor({ state: 'visible' });
 
         const total = await selector.locator('.selector-test').count();
@@ -306,10 +304,8 @@ async function inspectTestSelectionWorkflow(context, extensionId) {
         const firstCheckbox = selector.locator('.selector-test input[type="checkbox"]').first();
         await firstCheckbox.uncheck();
         const expectedSelected = total - 1;
-        const selectorClosePromise = selector.waitForEvent('close');
         await selector.locator('#selectorApply').click();
-        await selectorClosePromise;
-        selector = null;
+        await selector.locator('#testSelectorDialog').waitFor({ state: 'hidden' });
         await runner.locator('#trSelectionSummary').waitFor({
             state: 'visible',
             timeout: 5_000
@@ -327,7 +323,7 @@ async function inspectTestSelectionWorkflow(context, extensionId) {
             await runner.screenshot({ path: path.join(projectRoot, result.screenshot), fullPage: true });
         }
     } finally {
-        if (selector && !selector.isClosed()) await selector.close();
+        if (selector && selector !== runner && !selector.isClosed()) await selector.close();
         if (!runner.isClosed()) await runner.close();
     }
     return result;
