@@ -7,6 +7,7 @@ const vm = require('node:vm');
 const listeners = new Set();
 let currentTabUrl = 'https://grafana.example/d/dashboard?viewPanel=7';
 let ordinaryDataReady = true;
+let earlyRuntimeCalls = 0;
 const renderer = { getBoundingClientRect: () => ({ height: 300 }) };
 const panel = {
     querySelector: selector => selector.includes('canvas') ? renderer : null,
@@ -52,7 +53,7 @@ const context = {
             },
         },
     },
-    ensureEarlyGrafanaRuntimeForUrl: async () => ({ ok: true }),
+    ensureEarlyGrafanaRuntimeForUrl: async () => { earlyRuntimeCalls++; return { ok: true }; },
     applySharedGrafanaPanelTools: async tools => ({ ok: true, tools }),
     setTimeout(callback, delay) {
         if (delay === 30_000) return setTimeout(callback, 500);
@@ -97,6 +98,7 @@ vm.runInContext(fs.readFileSync('pages/batch/batch-panel-loader.js', 'utf8'), co
     );
 
     assert.deepEqual({ ...result }, { x: 10, y: 20, w: 800, h: 400, dpr: undefined });
+    assert.equal(earlyRuntimeCalls, 1, 'ordinary Batch panels must install the MAIN runtime before navigation');
     assert.equal(logs[0], 'Загрузка панели 7…');
     assert.equal(listeners.size, 0, 'loader must remove its tab listener after readiness');
 

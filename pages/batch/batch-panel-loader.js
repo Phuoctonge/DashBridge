@@ -241,29 +241,21 @@ function createBatchPanelLoader({ log }) {
             hashParams.set('dashbridgePanelTransforms', JSON.stringify({ forceMemByteUnit: true }));
             targetUrl.hash = hashParams.toString();
         }
-        const requiresDataRuntime = panelTools?.invertIdle === true
-            || panelTools?.convertMemToUsed === true
-            || panelTools?.forceMemByteUnit === true
-            || panelTools?.trimDomainEnabled === true
-            || panelTools?.seriesQueryFilterEnabled === true
-            || panelTools?.cpuCapacityFilterEnabled === true
-            || (panelTools?.legendMode === 'fast_complete_hide'
-                && (panelTools.legendFilter?.length > 0 || panelTools.legendVisibleSeries?.length > 0));
-        if (requiresDataRuntime) {
-            try {
-                const registration = await ensureEarlyGrafanaRuntimeForUrl(targetUrl.toString());
-                if (!registration.ok) {
-                    trace('runtime-error', `reason=${registration.reason || 'unknown'}`);
-                    log(`Не удалось подготовить runtime панели ${panelId}: ${registration.reason || 'неизвестная ошибка'}`, true);
-                    return null;
-                }
-            } catch (error) {
-                trace('runtime-error', `reason=${error.message}`);
-                log(`Не удалось подготовить runtime панели ${panelId}: ${error.message}`, true);
+        // Install MAIN runtime for every Batch dashboard URL. Ordinary panels
+        // need the same request/render diagnostics even when no transform is enabled.
+        try {
+            const registration = await ensureEarlyGrafanaRuntimeForUrl(targetUrl.toString());
+            if (!registration.ok) {
+                trace('runtime-error', `reason=${registration.reason || 'unknown'}`);
+                log(`Не удалось подготовить runtime панели ${panelId}: ${registration.reason || 'неизвестная ошибка'}`, true);
                 return null;
             }
-            if (signal?.aborted) return false;
+        } catch (error) {
+            trace('runtime-error', `reason=${error.message}`);
+            log(`Не удалось подготовить runtime панели ${panelId}: ${error.message}`, true);
+            return null;
         }
+        if (signal?.aborted) return false;
 
         return new Promise(resolve => {
             let settled = false;
