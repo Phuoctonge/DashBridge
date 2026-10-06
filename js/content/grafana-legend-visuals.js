@@ -257,7 +257,7 @@
                     && flexContainer.style.getPropertyValue('flex-direction') === expectedDirection
                     && (expectedDirection !== 'column' || legendElement?.classList.contains('dashbridge-legend-bottom'));
                 if (layoutAlreadyApplied) {
-                    return { chartHost, chartBranch, flexContainer, legendElement, layoutChanged: false };
+                    return { chartHost, chartBranch, flexContainer, legendElement, direction: expectedDirection, layoutChanged: false };
                 }
                 const hadSavedLayout = layoutElements.some(element => element
                     && Object.prototype.hasOwnProperty.call(element, legendLayoutSnapshotKey));
@@ -272,7 +272,7 @@
                         flexClass: flexContainer.className,
                         legendClass: legendElement?.className || '',
                     });
-                    return { chartHost, chartBranch, flexContainer, legendElement, layoutChanged: hadSavedLayout };
+                    return { chartHost, chartBranch, flexContainer, legendElement, direction: null, layoutChanged: hadSavedLayout };
                 }
     
                 const currentStyle = getComputedStyle(flexContainer);
@@ -393,13 +393,14 @@
                     flexContainer, chartHost, legendElement,
                     direction: moveToBottom ? 'column' : 'row',
                 };
-                return { chartHost, chartBranch, flexContainer, legendElement, layoutChanged: true };
+                return { chartHost, chartBranch, flexContainer, legendElement, direction: moveToBottom ? 'column' : 'row', layoutChanged: true };
             };
-            const legendLayout = window.name === 'dashbridge-iframe'
-                ? applyLegendLayout()
-                : { chartHost: null, chartBranch: null, flexContainer: null, legendElement: null, layoutChanged: false };
-            if (window.name === 'dashbridge-iframe' && legendLayout.legendElement) { ensureResponsiveLegendStyles(); legendLayout.legendElement.classList.add('dashbridge-legend-bottom'); }
-            if (window.name === 'dashbridge-iframe' && legendLayout.legendElement) { const legend = legendLayout.legendElement; ['width','max-width'].forEach(p => legend.style.setProperty(p, '100%', 'important')); legend.style.setProperty('overflow-x', 'hidden', 'important'); legend.querySelectorAll('table').forEach(table => { ['width','max-width'].forEach(p => table.style.setProperty(p, '100%', 'important')); table.style.setProperty('table-layout', 'fixed', 'important'); const rows = [...table.rows]; const count = rows[0]?.cells.length || 0; rows.forEach(row => { const cell = row.cells[0]; if (cell && !cell.title) cell.title = cell.innerText.trim(); }); const widths = Array.from({ length: count }, (_, i) => i ? Math.max(...rows.map(row => row.cells[i]?.scrollWidth || 0), 0) + 12 : 0); const numericTotal = widths.reduce((sum, width) => sum + width, 0); rows.forEach(row => { row.cells[0]?.style.setProperty('width', `max(0px, calc(100% - ${numericTotal}px))`, 'important'); for (let i = 1; i < count; i++) row.cells[i]?.style.setProperty('width', `${widths[i]}px`, 'important'); }); }); }
+            // The core relocation is shared by direct Grafana and DashBridge.
+            // Only the responsive table treatment below is iframe-specific.
+            const legendLayout = applyLegendLayout();
+            const legendIsBottom = legendLayout.direction === 'column';
+            if (window.name === 'dashbridge-iframe' && legendIsBottom && legendLayout.legendElement) { ensureResponsiveLegendStyles(); legendLayout.legendElement.classList.add('dashbridge-legend-bottom'); }
+            if (window.name === 'dashbridge-iframe' && legendIsBottom && legendLayout.legendElement) { const legend = legendLayout.legendElement; ['width','max-width'].forEach(p => legend.style.setProperty(p, '100%', 'important')); legend.style.setProperty('overflow-x', 'hidden', 'important'); legend.querySelectorAll('table').forEach(table => { ['width','max-width'].forEach(p => table.style.setProperty(p, '100%', 'important')); table.style.setProperty('table-layout', 'fixed', 'important'); const rows = [...table.rows]; const count = rows[0]?.cells.length || 0; rows.forEach(row => { const cell = row.cells[0]; if (cell && !cell.title) cell.title = cell.innerText.trim(); }); const widths = Array.from({ length: count }, (_, i) => i ? Math.max(...rows.map(row => row.cells[i]?.scrollWidth || 0), 0) + 12 : 0); const numericTotal = widths.reduce((sum, width) => sum + width, 0); rows.forEach(row => { row.cells[0]?.style.setProperty('width', `max(0px, calc(100% - ${numericTotal}px))`, 'important'); for (let i = 1; i < count; i++) row.cells[i]?.style.setProperty('width', `${widths[i]}px`, 'important'); }); }); }
             const resizeUPlotAfterLegendLayout = async () => {
                 if (!legendLayout) return false;
                 if (legendLayout.layoutChanged) {

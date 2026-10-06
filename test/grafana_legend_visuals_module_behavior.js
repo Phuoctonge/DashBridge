@@ -23,6 +23,17 @@ vm.runInContext(fs.readFileSync(
 
 const factory = context.window.DashBridgeGrafanaLegendVisuals;
 assert(factory && Object.isFrozen(factory), 'legend visuals factory must expose one immutable MAIN dependency');
+const legendVisualsSource = fs.readFileSync(
+    path.join(__dirname, '..', 'js', 'content', 'grafana-legend-visuals.js'), 'utf8'
+);
+assert(
+    !/if \(window\.name === 'dashbridge-iframe' && legendLayout\.legendElement\) \{[^}]*classList\.add\('dashbridge-legend-bottom'\)/s.test(legendVisualsSource),
+    'iframe legend styling must not force bottom layout after the direction decision'
+);
+assert(
+    legendVisualsSource.includes('const legendLayout = applyLegendLayout();'),
+    'direct Grafana and DashBridge iframe must share the core legend layout application'
+);
 const legend = factory.create({ debugLog() {} });
 assert.strictEqual(legend.resetFlotSeriesVisibility({ root: {} }), false);
 assert.strictEqual(legend.findUPlotForThreshold({ querySelectorAll: () => [] }), null);
