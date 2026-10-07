@@ -35,7 +35,7 @@ const ids = [
     'batchProgressBar', 'seriesDashUrl', 'seriesPanelsContainer',
     'seriesPanelSelectionStatus', 'loadSelectedSeriesBtn', 'clearLogs',
     'copyMainSettingsToSeriesBtn', 'dashUrl', 'timestamps', 'seriesTimestamps',
-    'getPanelsBtn', 'tab-main',
+    'getPanelsBtn', 'tab-main', 'batchDetailedLogging',
 ];
 const elements = Object.fromEntries(ids.map(id => [id, new FakeElement(id)]));
 elements.seriesDashUrl.value = 'https://old.example/d/uid/name';
@@ -73,6 +73,11 @@ const context = {
     setTimeout(callback) { timers.push(callback); return timers.length; },
     Date, Event,
 };
+let storedDetailedLogging = false;
+context.chrome = { storage: { sync: {
+    async get() { return { batchDetailedLogging: storedDetailedLogging }; },
+    async set(values) { storedDetailedLogging = values.batchDetailedLogging; },
+} } };
 context.globalThis = context;
 vm.createContext(context);
 vm.runInContext(fs.readFileSync('pages/batch/batch-page-controller.js', 'utf8'), context);
@@ -132,7 +137,7 @@ const panelPicker = {
     clearSeriesSelection: () => pickerCalls.push(['clear']),
 };
 let actionVisibilityCalls = 0;
-controller.setup({
+const setupPromise = controller.setup({
     updateActionVisibility: () => { actionVisibilityCalls += 1; },
     loadBatchPanelRules: () => stateCalls.push('rules'),
     panelPicker,
@@ -163,4 +168,17 @@ assert.throws(
     () => controller.setup({}),
     /setup dependencies are incomplete/,
 );
-console.log('batch page controller behavior tests passed');
+
+setupPromise.then(async ready => {
+    assert.strictEqual(ready, true);
+    assert.strictEqual(elements.batchDetailedLogging.checked, false);
+    elements.batchDetailedLogging.checked = true;
+    elements.batchDetailedLogging.emit('change');
+    await new Promise(resolve => setImmediate(resolve));
+    assert.strictEqual(storedDetailedLogging, true);
+    assert.strictEqual(elements.batchDetailedLogging.disabled, false);
+    console.log('batch page controller behavior tests passed');
+}).catch(error => {
+    console.error(error);
+    process.exitCode = 1;
+});

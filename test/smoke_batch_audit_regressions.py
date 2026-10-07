@@ -45,9 +45,10 @@ check('Batch panel picker buttons match adjacent URL field height',
       and '.batch-url-actions .btn { height: 100%; min-height: var(--control-height-lg); margin-top: 0; }' in CSS
       and 'align-items: stretch' in CSS)
 check('Batch compact capture choices use accessible switches',
-      HTML.count('class="batch-switch-slider"') == 2
+      HTML.count('class="batch-switch-slider"') == 3
       and 'id="compactCaptureMain"' in HTML
       and 'id="compactCaptureSeries"' in HTML
+      and 'id="batchDetailedLogging"' in HTML
       and '.batch-switch input:checked + .batch-switch-slider' in CSS)
 check('Main action uses the shared primary button variant', 'id="startBtn" class="btn btn-primary"' in HTML)
 check('Cancel action uses the shared danger button variant', 'id="cancelBtn" class="btn btn-danger"' in HTML)

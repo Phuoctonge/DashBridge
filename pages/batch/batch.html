@@ -29,6 +29,13 @@
                 <h1>Массовый сборщик отчётов</h1>
                 <p>Снимки панелей Grafana по временным диапазонам и Series</p>
             </div>
+            <label class="batch-header-logging" for="batchDetailedLogging" title="Добавлять подробный batch-debug.jsonl в ZIP">
+                <span class="batch-switch">
+                    <input type="checkbox" id="batchDetailedLogging" role="switch" aria-describedby="batchDetailedLoggingLabel" checked>
+                    <span class="batch-switch-slider" aria-hidden="true"></span>
+                </span>
+                <span id="batchDetailedLoggingLabel">Подробные логи</span>
+            </label>
         </div>
     </header>
     <div class="container">

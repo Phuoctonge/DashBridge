@@ -30,6 +30,29 @@ body {
     display: flex;
     align-items: center;
     gap: .875rem;
+    flex-wrap: wrap;
+}
+
+.batch-header-logging {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    color: var(--text-main);
+    font-size: .8125rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.batch-header-logging .batch-switch { flex: 0 0 40px; }
+
+@media (max-width: 600px) {
+    .batch-header-logging {
+        flex-basis: 100%;
+        justify-content: flex-end;
+        margin-inline-start: 0;
+    }
 }
 
 .batch-brand-mark {

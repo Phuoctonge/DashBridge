@@ -57,6 +57,8 @@
         const batchProgressText = documentRef.getElementById('batchProgressText');
         const batchProgressStats = documentRef.getElementById('batchProgressStats');
         const batchProgressBar = documentRef.getElementById('batchProgressBar');
+        const detailedLoggingToggle = documentRef.getElementById('batchDetailedLogging');
+        let detailedLoggingSetupPromise = null;
         let operationProgressController = null;
         let previousSeriesDashboardUrl = documentRef.getElementById('seriesDashUrl').value.trim();
         const autoResizeTextarea = field => {
@@ -110,6 +112,51 @@
             });
         };
 
+        const setupDetailedLoggingToggle = () => {
+            if (!detailedLoggingToggle) return Promise.resolve(false);
+            if (detailedLoggingSetupPromise) return detailedLoggingSetupPromise;
+
+            detailedLoggingToggle.disabled = true;
+            detailedLoggingSetupPromise = (async () => {
+                const storage = root.chrome?.storage?.sync;
+                let enabled = true;
+                let persisted = true;
+                let writeSequence = 0;
+                try {
+                    if (typeof storage?.get !== 'function' || typeof storage?.set !== 'function') {
+                        throw new Error('chrome.storage.sync unavailable');
+                    }
+                    const stored = await storage.get(['batchDetailedLogging']);
+                    enabled = stored?.batchDetailedLogging !== false;
+                    persisted = enabled;
+                } catch {
+                    // Keep diagnostics enabled when the preference cannot be read.
+                }
+                detailedLoggingToggle.checked = enabled;
+                detailedLoggingToggle.disabled = false;
+                if (typeof storage?.set !== 'function') return false;
+
+                detailedLoggingToggle.addEventListener('change', async () => {
+                    const requested = detailedLoggingToggle.checked === true;
+                    const sequence = ++writeSequence;
+                    detailedLoggingToggle.disabled = true;
+                    try {
+                        await storage.set({ batchDetailedLogging: requested });
+                        if (sequence === writeSequence) persisted = requested;
+                    } catch {
+                        if (sequence === writeSequence) {
+                            detailedLoggingToggle.checked = persisted;
+                            showToast('Не удалось сохранить настройку подробных логов', 'error');
+                        }
+                    } finally {
+                        if (sequence === writeSequence) detailedLoggingToggle.disabled = false;
+                    }
+                });
+                return true;
+            })();
+            return detailedLoggingSetupPromise;
+        };
+
         const resetSeriesDashboardSelection = panelPicker => {
             const currentUrl = documentRef.getElementById('seriesDashUrl').value.trim();
             if (currentUrl === previousSeriesDashboardUrl) return;
@@ -149,6 +196,7 @@
             });
 
             pageState.bind();
+            void setupDetailedLoggingToggle();
             rangeTextareas.forEach(field => field.addEventListener('input', () => autoResizeTextarea(field)));
             pageState.restore().then(() => {
                 rangeTextareas.forEach(autoResizeTextarea);
@@ -183,6 +231,7 @@
                     context: 'main',
                 });
             });
+            return setupDetailedLoggingToggle();
         };
 
         return Object.freeze({
