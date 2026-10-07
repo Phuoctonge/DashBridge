@@ -46,7 +46,7 @@ async function captureIdentity() {
     const tabs = { get: async () => ({ ...tab }), query: async () => [{ id: active }],
         onActivated: event(), onUpdated: event(), onRemoved: event(),
         captureVisibleTab: async () => { duringCapture(); return 'image'; } };
-    const context = vm.createContext({ chrome: { tabs } });
+    const context = vm.createContext({ URL, chrome: { tabs } });
     vm.runInContext(read('js/shared/grafana-panel-capture.js'), context);
     assert.equal(await context.captureGrafanaVisibleTab(1, tab.url), 'image');
     duringCapture = () => tabs.onActivated.emit({ windowId: 99 });
