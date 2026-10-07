@@ -70,6 +70,11 @@
                 phase: 'Подготовка фильтров Series',
             });
             const captureFilename = captureUtils.createFilenameFactory();
+            const recordSeries = (event, details = {}, context = {}) => operation.recordDiagnostic?.({
+                stage: 'series', event, runId, panelId: context.panelId ?? null,
+                panelTitle: context.panelTitle ?? null, requestedUrl: context.requestedUrl ?? null,
+                details,
+            });
             logMessage('🚀 Начало сбора изолированных метрик (Series)...');
             let seriesDiscoveryTabId = null;
             let analyticsOutcome = 'error';
@@ -121,6 +126,8 @@
                     const panelId = new URLSearchParams(parsed.search).get('viewPanel') || 'Unknown';
                     const panelTitle = String(card.dataset.panelTitle || '');
                     const signatures = JSON.parse(card.dataset.querySignatures || '[]');
+                    recordSeries('card-discovered', { signatureCount: signatures.length },
+                        { panelId, panelTitle, requestedUrl: urlStr });
 
                     for (let rangeIndex = 0; rangeIndex < timestamps.length; rangeIndex++) {
                         const range = timestamps[rangeIndex];
@@ -133,6 +140,8 @@
                         const completedBeforeSlice = completedJobs;
                         let plannedSliceJobs = 0;
                         try {
+                            recordSeries('job-started', { range, mode, rangeIndex },
+                                { panelId, panelTitle, requestedUrl: urlStr });
                             const discoveryResult = await discovery.discoverForSlice({
                                 dashboardUrl: seriesDashboardUrl,
                                 panelId,
@@ -148,6 +157,11 @@
                             const selection = seriesSelection.resolvePatterns(
                                 discoveryResult.names, includePattern, ignorePattern,
                             );
+                            recordSeries('discovery-complete', {
+                                names: discoveryResult.names?.length || 0,
+                                matches: selection.matches?.length || 0,
+                                range,
+                            }, { panelId, panelTitle, requestedUrl: urlStr });
                             plannedSliceJobs = mode === 'group'
                                 ? (selection.matches.length ? 1 : 0)
                                 : selection.matches.length;
@@ -158,6 +172,8 @@
                                 phase: 'Сбор Series',
                             });
                             if (!selection.matches.length) {
+                                recordSeries('job-skipped', { reason: 'no-series-match', range },
+                                    { panelId, panelTitle, requestedUrl: urlStr });
                                 logMessage(
                                     `Для панели ${panelId} нет Series, подходящих под фильтры, в срезе ${range.from} → ${range.to}`,
                                 );
@@ -200,6 +216,9 @@
                                         captured, archivePath,
                                         'Не удалось захватить изображение панели',
                                     );
+                                    recordSeries(captured ? 'saved' : 'failed', {
+                                        file: archivePath, reason: captured ? null : 'capture-failed',
+                                    }, { panelId, panelTitle, requestedUrl: filteredUrl });
                                     if (!captured) {
                                         logMessage(`❌ Не удалось захватить панель: ${archivePath}`, true);
                                     }
@@ -208,6 +227,8 @@
                                         false, archivePath,
                                         'Панель не найдена, не отрисована или имеет пустой размер',
                                     );
+                                    recordSeries('failed', { file: archivePath, reason: 'panel-not-found-or-empty' },
+                                        { panelId, panelTitle, requestedUrl: fullUrl });
                                     logMessage(`❌ Панель не найдена или пустая: ${archivePath}`, true);
                                 }
                             } else {
@@ -246,6 +267,8 @@
                                                 false, archivePath,
                                                 'Не удалось применить фильтр легенды',
                                             );
+                                            recordSeries('failed', { file: archivePath, reason: 'legend-filter-failed' },
+                                                { panelId, panelTitle, requestedUrl: fullUrl });
                                             logMessage(
                                                 `Unable to apply the legend filter: ${seriesName}`,
                                                 true,
@@ -267,6 +290,10 @@
                                             captured, archivePath,
                                             'Не удалось захватить изображение Series',
                                         );
+                                        recordSeries(captured ? 'saved' : 'failed', {
+                                            file: archivePath, reason: captured ? null : 'capture-failed',
+                                            series: seriesName,
+                                        }, { panelId, panelTitle, requestedUrl: fullUrl });
                                         if (!captured) {
                                             logMessage(
                                                 `❌ Не удалось захватить серию: ${archivePath}`,
@@ -278,6 +305,8 @@
                                             false, archivePath,
                                             'Панель не найдена, не отрисована или имеет пустой размер',
                                         );
+                                        recordSeries('failed', { file: archivePath, reason: 'panel-not-found-or-empty', series: seriesName },
+                                            { panelId, panelTitle, requestedUrl: fullUrl });
                                         logMessage(
                                             `❌ Панель не найдена или пустая: ${archivePath}`,
                                             true,
@@ -287,6 +316,8 @@
                             }
                         } catch (error) {
                             if (!operation.isActive(runId)) break;
+                            recordSeries('failed', { reason: 'discovery-or-job-error', error: error.message || String(error), range },
+                                { panelId, panelTitle, requestedUrl: urlStr });
                             // Discovery failures count as one job; after discovery,
                             // account for every capture skipped by this slice failure.
                             if (!plannedSliceJobs) { plannedSliceJobs = 1; totalJobs++; }

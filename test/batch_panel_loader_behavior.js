@@ -279,6 +279,15 @@ vm.runInContext(fs.readFileSync('pages/batch/batch-panel-loader.js', 'utf8'), co
         { aborted: false, addEventListener() {}, removeEventListener() {} },
     );
     assert.equal(noDataResult, null, 'visible No data state must not be captured as a successful graph');
+    const diagnosticEvents = [];
+    const diagnosticTimeout = await loadPanel(
+        7, 'https://grafana.example/d/dashboard?viewPanel=7',
+        '7', null, null, null, null, 'CPU', event => diagnosticEvents.push(event),
+    );
+    assert.equal(diagnosticTimeout, null, 'diagnostic timeout must not become a capture rectangle');
+    const timeoutEvent = diagnosticEvents.find(event => event.stage === 'readiness' && event.event === 'timeout');
+    assert.ok(timeoutEvent?.details.result.readinessHistory.length > 0, 'timeout must retain readiness evidence');
+    assert.ok(timeoutEvent.details.result.readinessHistory.some(item => item.reason === 'no-data'));
     panelText = '';
     panelHasRenderer = false;
     ordinaryInterceptorAvailable = false;

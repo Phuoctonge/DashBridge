@@ -1,6 +1,6 @@
 // Batch navigation and renderer readiness in the temporary Grafana tab.
 function createBatchPanelLoader({ log }) {
-    const waitForPanelInMainWorld = (panelId, panelTools, timeoutMs = 25_000) => new Promise(resolve => {
+    const waitForPanelInMainWorld = (panelId, panelTools, timeoutMs = 25_000, collectDiagnostics = false) => new Promise(resolve => {
         const normalizePanelReference = value => String(value ?? '').replace(/^panel-/i, '');
         const findPanel = () => {
             const exact = window.DashBridgeGrafanaDom?.findPanelById(panelId);
@@ -21,6 +21,28 @@ function createBatchPanelLoader({ log }) {
         let observedPanel = null;
         let settled = false;
         let preparingCapture = false;
+        const history = [];
+        const inspectSnapshot = (panel, reason = '') => {
+            if (!collectDiagnostics) return;
+            const rect = panel?.getBoundingClientRect?.();
+            const rendererKinds = panel ? {
+                canvas: panel.querySelectorAll('canvas').length,
+                svg: panel.querySelectorAll('svg').length,
+                uplot: panel.querySelectorAll('.uplot').length,
+                flot: panel.querySelectorAll('.flot-base').length,
+            } : {};
+            history.push({
+                reason, readyState: document.readyState,
+                panelFound: !!panel,
+                width: Math.round(rect?.width || 0), height: Math.round(rect?.height || 0),
+                rendererKinds,
+                loadingMarkers: document.querySelectorAll('.panel-loading,[data-testid="spinner"]').length,
+                activeRequests: Number(window.__dashbridgeDataInterceptorDiagnostic?.activeRequests) || 0,
+                responseKind: String(window.__dashbridgePanelToolsVisualMetadata?.responseDataStatus?.kind || ''),
+                responseText: String(window.__dashbridgePanelToolsVisualMetadata?.responseDataStatus?.text || '').slice(0, 240),
+                at: Date.now(),
+            });
+        };
         const cleanup = () => {
             clearTimeout(timeout);
             if (frame) cancelAnimationFrame(frame);
@@ -41,6 +63,7 @@ function createBatchPanelLoader({ log }) {
             frame = 0;
             if (preparingCapture) return;
             const panel = findPanel() || null;
+            inspectSnapshot(panel, 'inspect');
             const loading = Array.from((panel || document).querySelectorAll('.panel-loading, [data-testid="spinner"]'))
                 .some(element => {
                     const style = getComputedStyle(element);
@@ -50,6 +73,7 @@ function createBatchPanelLoader({ log }) {
             if (loading || !panel) {
                 stableFrames = 0;
                 previousRect = null;
+                if (collectDiagnostics) history[history.length - 1].reason = loading ? 'loading' : 'panel-not-found';
                 schedule();
                 return;
             }
@@ -59,6 +83,7 @@ function createBatchPanelLoader({ log }) {
             if (visibleNoData && !filterMayProduceEmpty) {
                 stableFrames = 0;
                 previousRect = null;
+                if (collectDiagnostics) history[history.length - 1].reason = 'no-data';
                 schedule();
                 return;
             }
@@ -78,6 +103,7 @@ function createBatchPanelLoader({ log }) {
             }
             if (rect.width <= 5 || rect.height <= 10) {
                 stableFrames = 0;
+                if (collectDiagnostics) history[history.length - 1].reason = 'zero-size';
                 schedule();
                 return;
             }
@@ -89,6 +115,7 @@ function createBatchPanelLoader({ log }) {
                 || Array.from(panel.querySelectorAll('svg')).find(svg => svg.getBoundingClientRect().height > 1) || panel;
             if (renderer.getBoundingClientRect().height <= 1) {
                 stableFrames = 0;
+                if (collectDiagnostics) history[history.length - 1].reason = 'renderer-zero-size';
                 schedule();
                 return;
             }
@@ -145,6 +172,7 @@ function createBatchPanelLoader({ log }) {
                 if (!requestSettled || !(chartHasPoints || flotHasPoints || svgHasGeometry
                     || (canvasHasGeometry && canvasHasPaint) || filteredEmpty)) {
                     stableFrames = 0;
+                    if (collectDiagnostics) history[history.length - 1].reason = !requestSettled ? 'requests-active' : 'empty-renderer';
                     schedule();
                     return;
                 }
@@ -209,7 +237,9 @@ function createBatchPanelLoader({ log }) {
                 const finalPanel = findPanel() || null;
                 if (!finalPanel) return finish(null);
                 const finalRect = finalPanel.getBoundingClientRect();
-                finish({ x: finalRect.x, y: finalRect.y, w: finalRect.width, h: finalRect.height, dpr: window.devicePixelRatio });
+                const result = { x: finalRect.x, y: finalRect.y, w: finalRect.width, h: finalRect.height, dpr: window.devicePixelRatio };
+                if (collectDiagnostics) result.readinessHistory = history;
+                finish(result);
             }));
         };
         observer = new MutationObserver(schedule);
@@ -218,7 +248,11 @@ function createBatchPanelLoader({ log }) {
             attributeFilter: ['class', 'style', 'width', 'height']
         });
         resizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(schedule) : null;
-        timeout = setTimeout(() => finish(null), timeoutMs);
+        timeout = setTimeout(() => finish(
+            collectDiagnostics
+                ? { __diagnosticTimeout: true, readinessHistory: history }
+                : null,
+        ), timeoutMs);
         schedule();
     });
 
@@ -273,11 +307,15 @@ function createBatchPanelLoader({ log }) {
         return actual.panel === expected.panel && actual.query === expected.query;
     };
 
-    return async (tabId, url, panelId, _seriesFilter, previousSeriesFilter = null, panelTools = null, signal = null, panelTitle = '') => {
+    return async (tabId, url, panelId, _seriesFilter, previousSeriesFilter = null, panelTools = null, signal = null, panelTitle = '', recordDiagnostic = null) => {
         const context = () => `panelId=${String(panelId)}${panelTitle ? ` title="${String(panelTitle)}"` : ''} url=${url}`;
         const trace = (stage, detail = '') => log(`[Batch ${stage}] ${context()}${detail ? ` ${detail}` : ''}`);
+        const record = (stage, event, details = {}, actualUrl = null) => recordDiagnostic?.({
+            stage, event, panelId, panelTitle, requestedUrl: url, actualUrl, details,
+        });
         log(previousSeriesFilter ? 'Быстрое переключение на серию…' : `Загрузка панели ${panelId}…`);
         trace(previousSeriesFilter ? 'series-switch' : 'load-start');
+        record('run', previousSeriesFilter ? 'series-switch' : 'load-start');
         if (signal?.aborted) return false;
 
         // The early runtime is needed only when a panel's active tools actually
@@ -307,13 +345,16 @@ function createBatchPanelLoader({ log }) {
         // need the same request/render diagnostics even when no transform is enabled.
         try {
             const registration = await ensureEarlyGrafanaRuntimeForUrl(targetUrl.toString());
+            record('runtime', 'registered', { ok: registration.ok, reason: registration.reason || null });
             if (!registration.ok) {
                 trace('runtime-error', `reason=${registration.reason || 'unknown'}`);
+                record('runtime', 'failed', { reason: registration.reason || 'unknown' });
                 log(`Не удалось подготовить runtime панели ${panelId}: ${registration.reason || 'неизвестная ошибка'}`, true);
                 return null;
             }
         } catch (error) {
             trace('runtime-error', `reason=${error.message}`);
+            record('runtime', 'failed', { reason: error.message });
             log(`Не удалось подготовить runtime панели ${panelId}: ${error.message}`, true);
             return null;
         }
@@ -346,6 +387,7 @@ function createBatchPanelLoader({ log }) {
                     || !isCurrentAttempt(generation, currentTab)) {
                     if (currentTab?.status === 'complete' && !isCurrentAttempt(generation, currentTab)) {
                         trace('navigation-rejected', `actualUrl=${currentTab.url || ''}`);
+                        record('navigation', 'rejected', { reason: 'url-or-generation-mismatch' }, currentTab.url || null);
                     }
                     return;
                 }
@@ -355,6 +397,7 @@ function createBatchPanelLoader({ log }) {
                         const activeTab = await getTab();
                         if (!isCurrentAttempt(generation, activeTab)) {
                             trace('navigation-rejected', `actualUrl=${activeTab?.url || ''}`);
+                            record('navigation', 'rejected', { reason: 'url-or-generation-mismatch' }, activeTab?.url || null);
                             return finish(false);
                         }
                         const effectivePanelTools = panelTools ? {
@@ -372,9 +415,11 @@ function createBatchPanelLoader({ log }) {
                             const afterToolsTab = await getTab();
                             if (!isCurrentAttempt(generation, afterToolsTab)) {
                                 trace('navigation-rejected', `actualUrl=${afterToolsTab?.url || ''}`);
+                                record('navigation', 'rejected', { reason: 'url-or-generation-mismatch', stage: 'panel-tools' }, afterToolsTab?.url || null);
                                 return finish(false);
                             }
                             if (!applied?.ok) {
+                                record('panel-tools', 'failed', { reason: applied?.reason || 'unknown' }, afterToolsTab?.url || null);
                                 // A View/solo route may have no dashboard
                                 // Refresh control. The page still has a valid
                                 // first render; let readiness decide whether it
@@ -394,18 +439,26 @@ function createBatchPanelLoader({ log }) {
                             const afterDomTab = await getTab();
                             if (!isCurrentAttempt(generation, afterDomTab)) {
                                 trace('navigation-rejected', `actualUrl=${afterDomTab?.url || ''}`);
+                                record('navigation', 'rejected', { reason: 'url-or-generation-mismatch', stage: 'dom-runtime' }, afterDomTab?.url || null);
                                 return finish(false);
                             }
                             const results = await chrome.scripting.executeScript({
                                 target: { tabId }, world: 'MAIN', func: waitForPanelInMainWorld,
-                                args: [panelId, effectivePanelTools, 25_000]
+                                args: [panelId, effectivePanelTools, 25_000, !!recordDiagnostic]
                             });
                             const afterReadyTab = await getTab();
                             if (!isCurrentAttempt(generation, afterReadyTab)) {
                                 trace('navigation-rejected', `actualUrl=${afterReadyTab?.url || ''}`);
+                                record('navigation', 'rejected', { reason: 'url-or-generation-mismatch', stage: 'readiness' }, afterReadyTab?.url || null);
                                 return finish(false);
                             }
-                            const result = results?.[0]?.result || null;
+                            const rawResult = results?.[0]?.result || null;
+                            const result = rawResult?.__diagnosticTimeout ? null : rawResult;
+                            record('readiness', result ? 'ready' : 'timeout', {
+                                reason: result ? null : (rawResult?.__diagnosticTimeout ? 'readiness-deadline' : 'panel-not-found-or-empty'),
+                                result: result ? { width: result.w, height: result.h, readinessHistory: result.readinessHistory || [] }
+                                    : (rawResult?.__diagnosticTimeout ? { readinessHistory: rawResult.readinessHistory || [] } : null),
+                            }, afterReadyTab?.url || null);
                             if (!result) trace('readiness-failed', 'reason=timeout-or-panel-not-found');
                             else trace('ready', `rect=${result.w}x${result.h}`);
                             return finish(result);
@@ -428,11 +481,13 @@ function createBatchPanelLoader({ log }) {
             };
             const onUpdated = (updatedTabId, changeInfo, currentTab) => {
                 if (updatedTabId !== tabId || settled || changeInfo.status !== 'complete') return;
+                record('navigation', 'complete', { generation: navigationGeneration }, currentTab?.url || null);
                 void prepareCompleteTab(currentTab, navigationGeneration);
             };
             chrome.tabs.onUpdated.addListener(onUpdated);
             readinessTimeout = setTimeout(() => {
                 trace('timeout', 'reason=readiness-deadline');
+                record('readiness', 'timeout', { reason: 'readiness-deadline' });
                 finish(false);
             }, 30_000);
             signal?.addEventListener('abort', abort, { once: true });
@@ -445,6 +500,7 @@ function createBatchPanelLoader({ log }) {
                 if (currentBaseUrl !== targetBaseUrl) {
                     targetUrl.searchParams.set('_t', Date.now());
                     expectedUrl = targetUrl.toString();
+                    record('navigation', 'requested', {}, expectedUrl);
                     try {
                         const updatedTab = await chrome.tabs.update(tabId, { url: expectedUrl });
                         if (updatedTab?.status === 'complete') void prepareCompleteTab(updatedTab, navigationGeneration);
@@ -455,6 +511,7 @@ function createBatchPanelLoader({ log }) {
                     return;
                 }
                 expectedUrl = tab.url;
+                record('navigation', 'already-at-target', { status: tab.status }, tab.url || null);
                 void prepareCompleteTab(tab, navigationGeneration);
             });
         });

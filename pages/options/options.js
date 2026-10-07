@@ -110,7 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'tdmExcludeUserTextDefault', 'tdmRememberDate',
         'tdmSavePhotosDefault', 'tdmExcludeUserDefault', 'wikiIframeIds',
         'module_grafana', 'module_recorder', 'module_jira', 'module_tdm',
-        'module_grafana_links', 'module_grafana_batch', 'module_grafana_debug'
+        'module_grafana_links', 'module_grafana_batch', 'module_grafana_debug', 'batchDetailedLogging'
     ], (data) => {
         // Устанавливаем значения, используя дефолты если данных нет
         const defaults = {
@@ -192,6 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById("settingModuleTdm").checked = config.module_tdm;
         document.getElementById("settingModuleGrafanaLinks").checked = config.module_grafana_links;
         document.getElementById("settingModuleGrafanaBatch").checked = config.module_grafana_batch;
+        document.getElementById("settingBatchDetailedLogging").checked = config.batchDetailedLogging !== false;
         document.getElementById("settingModuleGrafanaDebug").checked = config.module_grafana_debug;
 
         document.getElementById("settingCpuTemplateFull").value = config.cpuTemplateFull;
@@ -411,6 +412,7 @@ document.addEventListener('DOMContentLoaded', () => {
             module_tdm: document.getElementById("settingModuleTdm").checked,
             module_grafana_links: document.getElementById("settingModuleGrafanaLinks").checked,
             module_grafana_batch: document.getElementById("settingModuleGrafanaBatch").checked,
+            batchDetailedLogging: document.getElementById("settingBatchDetailedLogging").checked,
             module_grafana_debug: document.getElementById("settingModuleGrafanaDebug").checked
         }, () => {
             const saveError = chrome.runtime.lastError;

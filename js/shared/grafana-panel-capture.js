@@ -90,11 +90,15 @@ async function scrollGrafanaPanelIntoView({ tabId, panelId = null, title = '', t
 async function captureGrafanaPanelImage({
     tabId, windowId, panelId = null, settleMs = 0,
     prepared = false, outputWidth = 1000, outputHeight = 520,
-    onDiagnostic = null,
+    onDiagnostic = null, onEvent = null,
 }) {
     let rect = null;
     let preparedSessionId = null;
     const startedAt = Date.now();
+    const emit = (stage, event, details = {}) => {
+        try { onEvent?.({ stage, event, details }); } catch { /* diagnostics must not break capture */ }
+    };
+    emit('capture', 'started', { prepared, outputWidth, outputHeight });
     const targetSize = prepared ? {
         width: Math.min(4096, Math.max(100, Math.round(Number(outputWidth) || 1000))),
         height: Math.min(4096, Math.max(100, Math.round(Number(outputHeight) || 520)))
@@ -155,11 +159,13 @@ async function captureGrafanaPanelImage({
             elapsedMs: Date.now() - startedAt, panelId: String(panelId ?? ''),
             context: await collectFailureContext(),
         };
+        emit('capture', 'failed', detail);
         try { onDiagnostic?.(detail); } catch { /* diagnostics must not break capture cleanup */ }
         return null;
     };
     try {
         const expectedUrl = (await chrome.tabs.get(tabId)).url;
+        emit('capture', 'target', { expectedUrl });
         if (prepared) {
             if (typeof ensureGrafanaRuntime !== 'function') {
                 return reportFailure('runtime', 'ensure-runtime-unavailable');
@@ -192,6 +198,7 @@ async function captureGrafanaPanelImage({
                 return reportFailure('prepare', preparedResult?.reason || 'panel-preparation-failed');
             }
             rect = preparedResult.rect;
+            emit('capture', 'prepared', { rect });
         } else {
             if (!await scrollGrafanaPanelIntoView({ tabId, panelId })) {
                 return reportFailure('panel-lookup', 'panel-not-found');
@@ -216,6 +223,7 @@ async function captureGrafanaPanelImage({
             });
             rect = results?.[0]?.result;
             if (!rect) return reportFailure('panel-geometry', 'panel-empty-or-zero-size');
+            emit('capture', 'geometry', { rect });
         }
         // Batch uses the same renderer-aware checkpoint as direct Grafana and
         // DashBridge. The legacy settleMs option remains accepted for callers
@@ -233,6 +241,7 @@ async function captureGrafanaPanelImage({
             }
         }).catch(() => []);
         const layoutStatus = layoutResults?.[0]?.result?.status;
+        emit('capture', 'layout-check', { status: layoutStatus || 'unknown' });
         if (layoutStatus === 'cancelled' || layoutStatus === 'hidden') {
             return reportFailure('layout-readiness', layoutStatus);
         }
@@ -262,6 +271,7 @@ async function captureGrafanaPanelImage({
             return reportFailure('capture-visible-tab', error?.message || 'capture-failed', error);
         }
         if (!source) return reportFailure('capture-visible-tab', 'empty-result');
+        emit('capture', 'visible-tab-captured');
         const dataUrl = await new Promise(resolve => {
             const image = new Image();
             image.onload = () => {
@@ -270,12 +280,20 @@ async function captureGrafanaPanelImage({
                 const y = Math.max(0, Math.round(rect.y * dpr));
                 const width = Math.min(Math.round(rect.width * dpr), image.naturalWidth - x);
                 const height = Math.min(Math.round(rect.height * dpr), image.naturalHeight - y);
+                emit('capture', 'crop', {
+                    sourceWidth: image.naturalWidth, sourceHeight: image.naturalHeight,
+                    x, y, width, height, dpr,
+                });
                 if (width <= 0 || height <= 0) return resolve({ dataUrl: null, reason: 'crop-outside-image' });
                 const canvas = document.createElement('canvas');
                 canvas.width = targetSize?.width || width;
                 canvas.height = targetSize?.height || height;
                 canvas.getContext('2d').drawImage(image, x, y, width, height, 0, 0, canvas.width, canvas.height);
-                try { resolve({ dataUrl: canvas.toDataURL('image/png'), reason: null }); }
+                try {
+                    const dataUrl = canvas.toDataURL('image/png');
+                    emit('capture', 'png-exported', { width: canvas.width, height: canvas.height, bytesApprox: dataUrl.length });
+                    resolve({ dataUrl, reason: null });
+                }
                 catch (error) { resolve({ dataUrl: null, reason: error?.message || 'canvas-export-failed' }); }
             };
             image.onerror = () => resolve({ dataUrl: null, reason: 'image-decode-failed' });
@@ -299,6 +317,7 @@ async function captureGrafanaPanelImage({
                     error: String(error?.message || error).slice(0, 500),
                 };
                 try { onDiagnostic?.(detail); } catch { /* diagnostics must not break cleanup */ }
+                emit('capture', 'restore-failed', detail);
             });
         }
     }

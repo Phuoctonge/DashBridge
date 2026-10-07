@@ -10,6 +10,9 @@ vm.runInContext(source, context);
 
 const { getGrafanaSettingsDefaults, getGrafanaSettingsStorageKeys, normalizeGrafanaSettings } = context.globalThis;
 assert.strictEqual(getGrafanaSettingsDefaults().grafanaMemCalcMode, 'available');
+assert.strictEqual(getGrafanaSettingsDefaults().batchDetailedLogging, true);
+assert.strictEqual(normalizeGrafanaSettings({ batchDetailedLogging: false }).batchDetailedLogging, false);
+assert.strictEqual(normalizeGrafanaSettings({ batchDetailedLogging: 'false' }).batchDetailedLogging, true);
 assert(getGrafanaSettingsStorageKeys().includes('grafanaMemCalcMode'));
 assert(getGrafanaSettingsStorageKeys().includes('grafanaCpuPanelTitle'));
 assert(getGrafanaSettingsStorageKeys().includes('grafanaShowAllPanelFunctions'));

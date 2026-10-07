@@ -16,7 +16,7 @@
         'jiraDefaultComment', 'jiraDefaultTimeSpent',
         'tdmLastStart', 'tdmLastEnd', 'lastActiveTab', 'lastActiveGrafanaSubTab',
         'module_grafana', 'module_recorder', 'module_jira', 'module_tdm', 'module_grafana_links',
-        'module_grafana_batch', 'module_grafana_debug'
+        'module_grafana_batch', 'module_grafana_debug', 'batchDetailedLogging'
     ]);
     const LOCAL_IMPORT_KEYS = new Set([
         'dashbridge_profiles', 'dashbridge_activeProfileId', 'jiraWorklogs', 'jiraSortOrder', 'jiraIssueCache',

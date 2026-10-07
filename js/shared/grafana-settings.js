@@ -18,6 +18,7 @@ globalThis.getGrafanaSettingsDefaults = () => ({
     grafanaCompactScreenshot: false,
     grafanaCompactExportWidth: 1000,
     grafanaCompactExportHeight: 520,
+    batchDetailedLogging: true,
     cpuWarnThreshold: 50,
     cpuCritThreshold: 80,
     memWarnThreshold: 80,
@@ -33,6 +34,7 @@ globalThis.normalizeGrafanaSettings = settings => {
     const normalized = { ...globalThis.getGrafanaSettingsDefaults(), ...source };
     const defaults = globalThis.getGrafanaSettingsDefaults();
     normalized.grafanaShowAllPanelFunctions = source.grafanaShowAllPanelFunctions === true;
+    normalized.batchDetailedLogging = source.batchDetailedLogging === false ? false : true;
     // Version 2 expands shortening from calculated CPU/RAM/Load rows to every
     // Grafana series. Migrate the old default `false` once; an explicitly saved
     // v2 value remains user-controllable afterwards.

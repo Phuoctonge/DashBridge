@@ -5,6 +5,10 @@
         let processing = false;
         const captureRecords = [];
         const failureDiagnostics = [];
+        const createJournal = root.BatchDiagnosticJournal?.create || (() => ({
+            enabled: false, record() {}, snapshot: () => [], toJsonl: () => '', clear() {},
+        }));
+        let diagnosticJournal = createJournal({ enabled: false });
         const progress = progressFactory.create({ onCancel: cancel });
         const updateActionVisibility = () => {
             const mainTab = document.querySelector('.tab-btn.active')?.dataset.tab === 'tab-main';
@@ -29,17 +33,31 @@
             captureRecords.length = 0;
             failureDiagnostics.length = 0;
             const runId = lifecycle.begin(); setProcessing(true);
+            let detailedLoggingEnabled = true;
+            try {
+                const stored = await chrome.storage.sync.get(['batchDetailedLogging']);
+                detailedLoggingEnabled = stored.batchDetailedLogging !== false;
+            } catch { /* retain diagnostic default when storage is unavailable */ }
+            diagnosticJournal = createJournal({ enabled: detailedLoggingEnabled, runId });
+            diagnosticJournal.record({ stage: 'run', event: 'started', details: { title, phase, detailedLoggingEnabled } });
             await progress.openPictureInPicture({ title, phase, width: 390, height: 300 }); return runId;
         };
+        const recordDiagnostic = event => diagnosticJournal.record(event);
+        const loadPanelWithDiagnostics = (...args) => loadPanel(...args,
+            diagnosticJournal.enabled ? recordDiagnostic : null);
         const isActive = runId => processing && lifecycle.isActive(runId);
         const finish = async runId => {
             if (!lifecycle.finish(runId)) return false;
+            diagnosticJournal.record({ stage: 'run', event: 'finished', details: { runId } });
             progress.finish(); await releaseWindow(); setProcessing(false); return true;
         };
         const capturePanelToZip = async (win, tabId, panelId, filename, archive, captureOptions = {}, isActive = () => true) => {
             if (!isActive()) return null;
             const captured = await captureGrafanaPanelImage({
                 tabId, windowId: win.id, panelId,
+                onEvent: detail => diagnosticJournal.record({
+                    ...detail, jobId: filename, panelId: String(panelId),
+                }),
                 onDiagnostic: detail => {
                     failureDiagnostics.push({ file: filename, panelId: String(panelId), ...detail });
                     logMessage(`Причина ошибки снимка [${panelId}]: ${detail.stage}/${detail.reason}`
@@ -52,6 +70,8 @@
             const bytes = BatchCaptureUtils.base64ToUint8Array(captured.dataUrl.split(',')[1]);
             if (!isActive()) return null;
             await archive.add(filename, bytes, bytes.byteLength);
+            diagnosticJournal.record({ stage: 'archive', event: 'png-added', jobId: filename,
+                panelId: String(panelId), details: { bytes: bytes.byteLength } });
             captureRecords.push({ file: filename });
             if (!isActive()) return null;
             logMessage(`Saved: ${filename} (${bytes.length} bytes)`);
@@ -69,6 +89,11 @@
             if (failureDiagnostics.length) manifest.failureDiagnostics = failureDiagnostics.slice(0, 100);
             const manifestBytes = new TextEncoder().encode(`${JSON.stringify(manifest, null, 2)}\n`);
             await archive.add('manifest.json', manifestBytes, manifestBytes.byteLength);
+            const journalText = diagnosticJournal.toJsonl();
+            if (journalText) {
+                const journalBytes = new TextEncoder().encode(journalText);
+                await archive.add('batch-debug.jsonl', journalBytes, journalBytes.byteLength);
+            }
             if (!isActive()) return false;
             if (report.errors?.length) {
                 const errorBytes = new TextEncoder().encode(`${JSON.stringify({ errors: report.errors, diagnostics: failureDiagnostics.slice(0, 100) }, null, 2)}\n`);
@@ -80,7 +105,8 @@
         cancelButton.addEventListener('click', cancel);
         window.addEventListener('pagehide', () => { lifecycle.cancel(); void progress.release(); });
         setProcessing(false);
-        return Object.freeze({ progress, loadPanel, updateActionVisibility, acquireWindow, releaseWindow,
+        return Object.freeze({ progress, loadPanel: loadPanelWithDiagnostics, recordDiagnostic,
+            updateActionVisibility, acquireWindow, releaseWindow,
             capturePanelToZip, getCaptureOptions, addArchiveReport, begin, isActive, finish,
             get processing() { return processing; } });
     }

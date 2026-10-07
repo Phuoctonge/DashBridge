@@ -116,6 +116,9 @@
                             filename, rangeIndex, rangeCount: timestamps.length,
                             from: range.from, to: range.to,
                         });
+                        operation.recordDiagnostic?.({ stage: 'job', event: 'started', jobId: archivePath,
+                            panelId, panelTitle: panels[panelId], requestedUrl: fullUrl,
+                            details: { rangeIndex, from: range.from, to: range.to } });
                         operation.progress.update({
                             done: completedJobs, total: totalJobs, success: successfulJobs,
                             failed: failedJobs, phase: `Панель ${panelId}`,
@@ -133,13 +136,22 @@
                             );
                             if (!operation.isActive(runId)) break;
                             if (captured) {
+                                operation.recordDiagnostic?.({ stage: 'job', event: 'finished', jobId: archivePath,
+                                    panelId, panelTitle: panels[panelId], requestedUrl: fullUrl,
+                                    details: { status: 'saved' } });
                                 successfulJobs++;
                             } else {
+                                operation.recordDiagnostic?.({ stage: 'job', event: 'failed', jobId: archivePath,
+                                    panelId, panelTitle: panels[panelId], requestedUrl: fullUrl,
+                                    details: { status: 'capture-failed' } });
                                 failedJobs++;
                                 captureErrors.push({ file: archivePath, reason: 'Не удалось захватить изображение панели' });
                                 logMessage(`❌ Не удалось захватить панель: ${archivePath}`, true);
                             }
                         } else {
+                            operation.recordDiagnostic?.({ stage: 'job', event: 'failed', jobId: archivePath,
+                                panelId, panelTitle: panels[panelId], requestedUrl: fullUrl,
+                                details: { status: 'panel-not-found-or-empty' } });
                             failedJobs++;
                             captureErrors.push({ file: archivePath, reason: 'Панель не найдена, не отрисована или имеет пустой размер' });
                             logMessage(`❌ Панель не найдена или пустая (w/h < 5): ${archivePath}`, true);
