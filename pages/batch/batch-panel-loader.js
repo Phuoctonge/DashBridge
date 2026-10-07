@@ -101,10 +101,8 @@ function createBatchPanelLoader({ log }) {
                 schedule();
                 return;
             }
-            // Header/menu SVG icons may precede the visualization and can be hidden.
-            // A rendered panel itself is enough for the ordinary capture path: Grafana
-            // may render valid no-data, table, stat, canvas and plugin panels without
-            // uPlot/Flot points or any observed data request.
+            // Header/menu SVG icons may precede the visualization. Choosing a
+            // sized element here does not establish data readiness below.
             const renderer = panel.querySelector('.flot-base, .uplot canvas, .graph-panel__chart canvas, canvas')
                 || Array.from(panel.querySelectorAll('svg')).find(svg => svg.getBoundingClientRect().height > 1) || panel;
             if (renderer.getBoundingClientRect().height <= 1) {
@@ -132,7 +130,17 @@ function createBatchPanelLoader({ log }) {
                     && (window.jQuery(renderer).data('plot')?.getData?.() || [])
                         .some(series => Array.isArray(series?.data) && series.data.length > 0);
                 const svgHasGeometry = [...panel.querySelectorAll('svg path, svg polyline, svg rect')].some(element => {
-                    try { return element.getBBox().width > 0 && element.getBBox().height > 0; }
+                    // Axes, background rectangles and menu icons have geometry
+                    // too. Require a renderer-owned series, not an arbitrary SVG.
+                    const series = element.closest('.series, .line-series, .area-series, .bar-series, '
+                        + '.recharts-line, .recharts-area, .recharts-bar, .trace.scatter, .trace.bars, .highcharts-series');
+                    if (!series || element.closest('.axis, .axes, .tick, .legend, [role="button"]')) return false;
+                    try {
+                        const svgRect = element.closest('svg')?.getBoundingClientRect();
+                        const bounds = element.getBBox();
+                        return svgRect?.width > 50 && svgRect.height > 50
+                            && bounds.width > 0 && bounds.height > 0;
+                    }
                     catch { return false; }
                 });
                 const canvasHasGeometry = [...panel.querySelectorAll('canvas')].some(canvas => {

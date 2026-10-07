@@ -13,6 +13,7 @@ let requestCompleteEventsAvailable = true;
 let filteredEmptyAllowed = false;
 let canvasPainted = true;
 let panelHasRenderer = true;
+let svgMode = 'canvas';
 let panelText = '';
 let earlyRuntimeCalls = 0;
 const renderer = {
@@ -21,11 +22,39 @@ const renderer = {
     getContext: () => ({ getImageData: () => ({ data: canvasPainted ? [255, 0, 0, 255] : [255, 255, 255, 0] }) }),
 };
 const panel = {
-    querySelector: selector => panelHasRenderer && selector.includes('canvas') ? renderer : null,
-    querySelectorAll: selector => panelHasRenderer && selector.includes('canvas') ? [renderer] : [],
+    querySelector: selector => {
+        if (!panelHasRenderer) return null;
+        if (selector.includes('canvas') && svgMode === 'canvas') return renderer;
+        if (selector.includes('svg')) return svgMode === 'svg-axis' || svgMode === 'svg-series' ? svgRoot : null;
+        return null;
+    },
+    querySelectorAll: selector => {
+        if (!panelHasRenderer) return [];
+        if (selector.includes('canvas')) return svgMode === 'canvas' ? [renderer] : [];
+        if (selector.includes('svg path, svg polyline, svg rect')) {
+            return svgMode === 'svg-axis' ? [svgAxisPath] : svgMode === 'svg-series' ? [svgSeriesPath] : [];
+        }
+        if (selector === 'svg') return svgMode === 'svg-axis' || svgMode === 'svg-series' ? [svgRoot] : [];
+        return [];
+    },
     get innerText() { return panelText; },
     get textContent() { return panelText; },
     getBoundingClientRect: () => ({ x: 10, y: 20, width: 800, height: 400 }),
+};
+const svgAxisPath = {
+    className: 'axis-line',
+    closest: () => null,
+    getBBox: () => ({ width: 900, height: 400 }),
+    getBoundingClientRect: () => ({ height: 400, width: 900 }),
+};
+const svgSeriesPath = {
+    className: 'line-series',
+    closest: selector => selector === 'svg' ? svgRoot : selector.includes('.series') ? svgSeriesPath : null,
+    getBBox: () => ({ width: 900, height: 120 }),
+    getBoundingClientRect: () => ({ height: 400, width: 900 }),
+};
+const svgRoot = {
+    getBoundingClientRect: () => ({ height: 400, width: 900 }),
 };
 const documentRef = {
     documentElement: {},
@@ -161,6 +190,26 @@ vm.runInContext(fs.readFileSync('pages/batch/batch-panel-loader.js', 'utf8'), co
     assert.deepEqual({ ...rendererWithoutCompletionEvent }, { x: 10, y: 20, w: 800, h: 400, dpr: undefined },
         'rendered panels must settle when activeRequests is zero even without request-complete diagnostics');
     requestCompleteEventsAvailable = true;
+
+    svgMode = 'svg-axis';
+    const axisOnlyResult = await loadPanel(
+        7,
+        'https://grafana.example/d/dashboard?viewPanel=7',
+        '7', null, null, null,
+        { aborted: false, addEventListener() {}, removeEventListener() {} },
+    );
+    assert.equal(axisOnlyResult, null, 'SVG axes and labels must not count as rendered data');
+
+    svgMode = 'svg-series';
+    const svgSeriesResult = await loadPanel(
+        7,
+        'https://grafana.example/d/dashboard?viewPanel=7',
+        '7', null, null, null,
+        { aborted: false, addEventListener() {}, removeEventListener() {} },
+    );
+    assert.deepEqual({ ...svgSeriesResult }, { x: 10, y: 20, w: 800, h: 400, dpr: undefined },
+        'SVG series geometry must count as rendered data');
+    svgMode = 'canvas';
 
     ordinaryInterceptorAvailable = false;
     canvasPainted = false;
