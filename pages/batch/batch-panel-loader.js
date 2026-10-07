@@ -80,13 +80,7 @@ function createBatchPanelLoader({ log }) {
             const filterMayProduceEmpty = panelTools?.cpuCapacityFilterEnabled === true
                 || panelTools?.seriesQueryFilterEnabled === true;
             const visibleNoData = /\bno\s+data\b|нет\s+данных/i.test(String(panel.innerText || panel.textContent || ''));
-            if (visibleNoData && !filterMayProduceEmpty) {
-                stableFrames = 0;
-                previousRect = null;
-                if (collectDiagnostics) history[history.length - 1].reason = 'no-data';
-                schedule();
-                return;
-            }
+            if (visibleNoData && collectDiagnostics) history[history.length - 1].reason = 'no-data';
             if (observedPanel !== panel) {
                 resizeObserver?.disconnect();
                 observedPanel = panel;
@@ -120,17 +114,11 @@ function createBatchPanelLoader({ log }) {
                 return;
             }
             const interceptor = window.__dashbridgeDataInterceptorDiagnostic;
-            const hasDataRenderer = renderer !== panel;
-            const requiresDataEvidence = hasDataRenderer
-                || panelTools?.invertIdle === true
-                || panelTools?.convertMemToUsed === true
-                || panelTools?.forceMemByteUnit === true
-                || panelTools?.trimDomainEnabled === true
-                || panelTools?.seriesQueryFilterEnabled === true
-                || panelTools?.cpuCapacityFilterEnabled === true
-                || (panelTools?.legendMode === 'fast_complete_hide'
-                    && (panelTools.legendFilter?.length > 0 || panelTools.legendVisibleSeries?.length > 0));
-            if (requiresDataEvidence) {
+            // Every panel must provide either renderer evidence or an explicit
+            // Grafana "No data" state. A sized outer container alone is not
+            // sufficient: it produces the white Memory captures seen in Batch.
+            const requiresDataEvidence = true;
+            if (requiresDataEvidence && !visibleNoData) {
                 const requestSettled = interceptor?.activeRequests === 0
                     && interceptor.events?.some(event => event.stage === 'request-complete');
                 const chart = window.DashBridgeGrafanaVisualEngine?.findUPlot?.(panel);

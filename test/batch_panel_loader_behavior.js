@@ -272,13 +272,17 @@ vm.runInContext(fs.readFileSync('pages/batch/batch-panel-loader.js', 'utf8'), co
     assert.match(currentTabUrl, /dashbridgeCpuCapacityFilter=/,
         'Batch must bootstrap CPU filtering before the first datasource request');
     panelText = 'No data';
+    panelHasRenderer = true;
     const noDataResult = await loadPanel(
         7,
         'https://grafana.example/d/dashboard?viewPanel=7',
         '7', null, null, null,
         { aborted: false, addEventListener() {}, removeEventListener() {} },
     );
-    assert.equal(noDataResult, null, 'visible No data state must not be captured as a successful graph');
+    assert.deepEqual({ ...noDataResult }, { x: 10, y: 20, w: 800, h: 400, dpr: undefined },
+        'visible No data state must be captured as a valid panel result');
+    panelText = '';
+    panelHasRenderer = false;
     const diagnosticEvents = [];
     const diagnosticTimeout = await loadPanel(
         7, 'https://grafana.example/d/dashboard?viewPanel=7',
@@ -287,7 +291,8 @@ vm.runInContext(fs.readFileSync('pages/batch/batch-panel-loader.js', 'utf8'), co
     assert.equal(diagnosticTimeout, null, 'diagnostic timeout must not become a capture rectangle');
     const timeoutEvent = diagnosticEvents.find(event => event.stage === 'readiness' && event.event === 'timeout');
     assert.ok(timeoutEvent?.details.result.readinessHistory.length > 0, 'timeout must retain readiness evidence');
-    assert.ok(timeoutEvent.details.result.readinessHistory.some(item => item.reason === 'no-data'));
+    assert.ok(timeoutEvent.details.result.readinessHistory.some(item =>
+        ['panel-not-found', 'empty-renderer'].includes(item.reason)));
     panelText = '';
     panelHasRenderer = false;
     ordinaryInterceptorAvailable = false;
@@ -297,8 +302,8 @@ vm.runInContext(fs.readFileSync('pages/batch/batch-panel-loader.js', 'utf8'), co
         '7', null, null, null,
         { aborted: false, addEventListener() {}, removeEventListener() {} },
     );
-    assert.deepEqual({ ...staticPanelResult }, { x: 10, y: 20, w: 800, h: 400, dpr: undefined },
-        'static panels without a data renderer must retain the compatible capture path');
+    assert.equal(staticPanelResult, null,
+        'a sized panel without renderer or No data must not produce a white capture');
     console.log('PASS Batch loader handles ordinary, transformed and transient-frame panels');
 })().catch(error => {
     console.error(error);
