@@ -323,7 +323,11 @@ function createBatchPanelLoader({ log }) {
                 preparing = true;
                 try {
                     for (let attempt = 0; attempt < 2; attempt++) {
-                        if (!isCurrentAttempt(generation, await getTab())) return finish(false);
+                        const activeTab = await getTab();
+                        if (!isCurrentAttempt(generation, activeTab)) {
+                            trace('navigation-rejected', `actualUrl=${activeTab?.url || ''}`);
+                            return finish(false);
+                        }
                         const effectivePanelTools = panelTools ? {
                             ...panelTools,
                             targetPanelId: String(panelId).replace(/^panel-/, ''),
@@ -336,7 +340,11 @@ function createBatchPanelLoader({ log }) {
                             // exact panel explicitly so its scoped response guard
                             // cannot fall back to an arbitrary visible canvas.
                             const applied = await applySharedGrafanaPanelTools(effectivePanelTools, { tabId, refresh });
-                            if (!isCurrentAttempt(generation, await getTab())) return finish(false);
+                            const afterToolsTab = await getTab();
+                            if (!isCurrentAttempt(generation, afterToolsTab)) {
+                                trace('navigation-rejected', `actualUrl=${afterToolsTab?.url || ''}`);
+                                return finish(false);
+                            }
                             if (!applied?.ok) {
                                 // A View/solo route may have no dashboard
                                 // Refresh control. The page still has a valid
@@ -354,12 +362,20 @@ function createBatchPanelLoader({ log }) {
                         }
                         try {
                             await chrome.scripting.executeScript({ target: { tabId }, world: 'MAIN', files: ['js/content/grafana-dom.js'] });
-                            if (!isCurrentAttempt(generation, await getTab())) return finish(false);
+                            const afterDomTab = await getTab();
+                            if (!isCurrentAttempt(generation, afterDomTab)) {
+                                trace('navigation-rejected', `actualUrl=${afterDomTab?.url || ''}`);
+                                return finish(false);
+                            }
                             const results = await chrome.scripting.executeScript({
                                 target: { tabId }, world: 'MAIN', func: waitForPanelInMainWorld,
                                 args: [panelId, effectivePanelTools, 25_000]
                             });
-                            if (!isCurrentAttempt(generation, await getTab())) return finish(false);
+                            const afterReadyTab = await getTab();
+                            if (!isCurrentAttempt(generation, afterReadyTab)) {
+                                trace('navigation-rejected', `actualUrl=${afterReadyTab?.url || ''}`);
+                                return finish(false);
+                            }
                             const result = results?.[0]?.result || null;
                             if (!result) trace('readiness-failed', 'reason=timeout-or-panel-not-found');
                             else trace('ready', `rect=${result.w}x${result.h}`);
