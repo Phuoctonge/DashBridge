@@ -9,6 +9,7 @@ let currentTabUrl = 'https://grafana.example/d/dashboard?viewPanel=7';
 let canonicalizeNavigation = false;
 let ordinaryDataReady = true;
 let ordinaryInterceptorAvailable = true;
+let requestCompleteEventsAvailable = true;
 let filteredEmptyAllowed = false;
 let canvasPainted = true;
 let panelHasRenderer = true;
@@ -95,7 +96,7 @@ const context = {
         if (!ordinaryInterceptorAvailable) return null;
         return {
             get activeRequests() { return ordinaryDataReady ? 0 : 1; },
-            get events() { return ordinaryDataReady ? [{ stage: 'request-complete' }] : []; },
+            get events() { return ordinaryDataReady && requestCompleteEventsAvailable ? [{ stage: 'request-complete' }] : []; },
         };
     },
     __dashbridgePanelToolsVisualMetadata: {
@@ -149,6 +150,17 @@ vm.runInContext(fs.readFileSync('pages/batch/batch-panel-loader.js', 'utf8'), co
     );
     assert.equal(blankResult, null, 'ordinary data panels must not capture before their request settles');
     ordinaryDataReady = true;
+
+    requestCompleteEventsAvailable = false;
+    const rendererWithoutCompletionEvent = await loadPanel(
+        7,
+        'https://grafana.example/d/dashboard?viewPanel=7',
+        '7', null, null, null,
+        { aborted: false, addEventListener() {}, removeEventListener() {} },
+    );
+    assert.deepEqual({ ...rendererWithoutCompletionEvent }, { x: 10, y: 20, w: 800, h: 400, dpr: undefined },
+        'rendered panels must settle when activeRequests is zero even without request-complete diagnostics');
+    requestCompleteEventsAvailable = true;
 
     ordinaryInterceptorAvailable = false;
     canvasPainted = false;

@@ -119,8 +119,12 @@ function createBatchPanelLoader({ log }) {
             // sufficient: it produces the white Memory captures seen in Batch.
             const requiresDataEvidence = true;
             if (requiresDataEvidence && !visibleNoData) {
-                const requestSettled = interceptor?.activeRequests === 0
-                    && interceptor.events?.some(event => event.stage === 'request-complete');
+                // Some Grafana transports do not publish our optional
+                // request-complete diagnostic event. activeRequests reaching
+                // zero is the authoritative settlement signal; renderer
+                // evidence below still prevents empty white containers.
+                const requestSettled = interceptor != null
+                    && Number(interceptor.activeRequests) === 0;
                 const chart = window.DashBridgeGrafanaVisualEngine?.findUPlot?.(panel);
                 const chartHasPoints = Array.isArray(chart?.data)
                     && chart.data.some(values => Array.isArray(values) && values.length > 0);
