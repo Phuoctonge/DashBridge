@@ -53,6 +53,15 @@ function createBatchPanelLoader({ log }) {
                 schedule();
                 return;
             }
+            const filterMayProduceEmpty = panelTools?.cpuCapacityFilterEnabled === true
+                || panelTools?.seriesQueryFilterEnabled === true;
+            const visibleNoData = /\bno\s+data\b|нет\s+данных/i.test(String(panel.innerText || panel.textContent || ''));
+            if (visibleNoData && !filterMayProduceEmpty) {
+                stableFrames = 0;
+                previousRect = null;
+                schedule();
+                return;
+            }
             if (observedPanel !== panel) {
                 resizeObserver?.disconnect();
                 observedPanel = panel;
@@ -85,7 +94,7 @@ function createBatchPanelLoader({ log }) {
             }
             const interceptor = window.__dashbridgeDataInterceptorDiagnostic;
             const hasDataRenderer = renderer !== panel;
-            const requiresDataEvidence = (hasDataRenderer && !!interceptor)
+            const requiresDataEvidence = hasDataRenderer
                 || panelTools?.invertIdle === true
                 || panelTools?.convertMemToUsed === true
                 || panelTools?.forceMemByteUnit === true
@@ -112,9 +121,29 @@ function createBatchPanelLoader({ log }) {
                     return (Number(canvas.width) > 1 && Number(canvas.height) > 1)
                         || (canvasRect.width > 1 && canvasRect.height > 1);
                 }) || (renderer !== panel && renderer.getBoundingClientRect().width > 1);
-                const filteredEmpty = window.__dashbridgePanelToolsVisualMetadata?.responseFilterEmptyIsNormal === true
+                const canvasHasPaint = [...panel.querySelectorAll('canvas')].some(canvas => {
+                    try {
+                        const context = canvas.getContext?.('2d', { willReadFrequently: true });
+                        const width = Math.min(256, Math.max(1, Number(canvas.width) || 1));
+                        const height = Math.min(256, Math.max(1, Number(canvas.height) || 1));
+                        const pixels = context?.getImageData?.(0, 0, width, height)?.data;
+                        if (!pixels?.length) return false;
+                        for (let index = 3; index < pixels.length; index += 4) {
+                            if (pixels[index] > 0) {
+                                const red = pixels[index - 3];
+                                const green = pixels[index - 2];
+                                const blue = pixels[index - 1];
+                                if (red < 245 || green < 245 || blue < 245) return true;
+                            }
+                        }
+                    } catch { /* tainted or unsupported canvas is not evidence */ }
+                    return false;
+                });
+                const filteredEmpty = filterMayProduceEmpty
+                    && window.__dashbridgePanelToolsVisualMetadata?.responseFilterEmptyIsNormal === true
                     && window.__dashbridgePanelToolsVisualMetadata?.responseDataStatus?.kind === 'filtered_empty';
-                if (!requestSettled || !(chartHasPoints || flotHasPoints || svgHasGeometry || canvasHasGeometry || filteredEmpty)) {
+                if (!requestSettled || !(chartHasPoints || flotHasPoints || svgHasGeometry
+                    || (canvasHasGeometry && canvasHasPaint) || filteredEmpty)) {
                     stableFrames = 0;
                     schedule();
                     return;

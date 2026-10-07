@@ -9,11 +9,21 @@ let currentTabUrl = 'https://grafana.example/d/dashboard?viewPanel=7';
 let canonicalizeNavigation = false;
 let ordinaryDataReady = true;
 let ordinaryInterceptorAvailable = true;
+let filteredEmptyAllowed = false;
+let canvasPainted = true;
+let panelHasRenderer = true;
+let panelText = '';
 let earlyRuntimeCalls = 0;
-const renderer = { getBoundingClientRect: () => ({ height: 300 }) };
+const renderer = {
+    width: 800, height: 300,
+    getBoundingClientRect: () => ({ height: 300, width: 800 }),
+    getContext: () => ({ getImageData: () => ({ data: canvasPainted ? [255, 0, 0, 255] : [255, 255, 255, 0] }) }),
+};
 const panel = {
-    querySelector: selector => selector.includes('canvas') ? renderer : null,
-    querySelectorAll: () => [],
+    querySelector: selector => panelHasRenderer && selector.includes('canvas') ? renderer : null,
+    querySelectorAll: selector => panelHasRenderer && selector.includes('canvas') ? [renderer] : [],
+    get innerText() { return panelText; },
+    get textContent() { return panelText; },
     getBoundingClientRect: () => ({ x: 10, y: 20, width: 800, height: 400 }),
 };
 const documentRef = {
@@ -88,7 +98,10 @@ const context = {
             get events() { return ordinaryDataReady ? [{ stage: 'request-complete' }] : []; },
         };
     },
-    __dashbridgePanelToolsVisualMetadata: { responseDataStatus: { kind: 'filtered_empty' }, responseFilterEmptyIsNormal: true },
+    __dashbridgePanelToolsVisualMetadata: {
+        get responseDataStatus() { return { kind: filteredEmptyAllowed ? 'filtered_empty' : 'success' }; },
+        get responseFilterEmptyIsNormal() { return filteredEmptyAllowed; },
+    },
 };
 context.window = context;
 context.location = { get href() { return currentTabUrl; } };
@@ -138,15 +151,17 @@ vm.runInContext(fs.readFileSync('pages/batch/batch-panel-loader.js', 'utf8'), co
     ordinaryDataReady = true;
 
     ordinaryInterceptorAvailable = false;
+    canvasPainted = false;
     const noInterceptorResult = await loadPanel(
         7,
         'https://grafana.example/d/dashboard?viewPanel=7',
         '7', null, null, null,
         { aborted: false, addEventListener() {}, removeEventListener() {} },
     );
-    assert.deepEqual({ ...noInterceptorResult }, { x: 10, y: 20, w: 800, h: 400, dpr: undefined },
-        'ordinary panels must not require an optional data interceptor');
+    assert.equal(noInterceptorResult, null,
+        'data renderers must not capture without request and visual evidence');
     ordinaryInterceptorAvailable = true;
+    canvasPainted = true;
 
     const originalFindPanelById = context.DashBridgeGrafanaDom.findPanelById;
     context.DashBridgeGrafanaDom.findPanelById = () => null;
@@ -235,16 +250,46 @@ vm.runInContext(fs.readFileSync('pages/batch/batch-panel-loader.js', 'utf8'), co
     assert.notDeepEqual(strictResult, { x: 10, y: 20, w: 800, h: 400, dpr: undefined },
         'data-transform panels must still wait for observed data and visual evidence');
     assert.equal(listeners.size, 0, 'every retry/timeout path must clean up its tab listener');
+    canvasPainted = false;
     const filteredEmptyResult = await loadPanel(
         7,
         'https://grafana.example/d/dashboard?viewPanel=7',
         '7', null, null, { cpuCapacityFilterEnabled: true },
         { aborted: false, addEventListener() {}, removeEventListener() {} },
     );
-    assert.deepEqual({ ...filteredEmptyResult }, { x: 10, y: 20, w: 800, h: 400, dpr: undefined },
+    filteredEmptyAllowed = true;
+    const filteredEmptyRetryResult = await loadPanel(
+        7,
+        'https://grafana.example/d/dashboard?viewPanel=7',
+        '7', null, null, { cpuCapacityFilterEnabled: true },
+        { aborted: false, addEventListener() {}, removeEventListener() {} },
+    );
+    filteredEmptyAllowed = false;
+    assert.equal(filteredEmptyResult, null,
+        'filtered-empty metadata must not allow an ordinary panel without an active filter');
+    assert.deepEqual({ ...filteredEmptyRetryResult }, { x: 10, y: 20, w: 800, h: 400, dpr: undefined },
         'a completed CPU filter with no matching series must still produce a valid empty-state capture');
     assert.match(currentTabUrl, /dashbridgeCpuCapacityFilter=/,
         'Batch must bootstrap CPU filtering before the first datasource request');
+    panelText = 'No data';
+    const noDataResult = await loadPanel(
+        7,
+        'https://grafana.example/d/dashboard?viewPanel=7',
+        '7', null, null, null,
+        { aborted: false, addEventListener() {}, removeEventListener() {} },
+    );
+    assert.equal(noDataResult, null, 'visible No data state must not be captured as a successful graph');
+    panelText = '';
+    panelHasRenderer = false;
+    ordinaryInterceptorAvailable = false;
+    const staticPanelResult = await loadPanel(
+        7,
+        'https://grafana.example/d/dashboard?viewPanel=7',
+        '7', null, null, null,
+        { aborted: false, addEventListener() {}, removeEventListener() {} },
+    );
+    assert.deepEqual({ ...staticPanelResult }, { x: 10, y: 20, w: 800, h: 400, dpr: undefined },
+        'static panels without a data renderer must retain the compatible capture path');
     console.log('PASS Batch loader handles ordinary, transformed and transient-frame panels');
 })().catch(error => {
     console.error(error);
