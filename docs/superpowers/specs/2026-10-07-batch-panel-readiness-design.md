@@ -92,6 +92,8 @@ ready → capturing → captured
 [Batch capture-failed] panelId=... reason=...
 ```
 
+Проверка актуальности вкладки внутри `js/shared/grafana-panel-capture.js` также использует ту же устойчивую identity, а не `tab.url === expectedUrl`. Иначе loader сможет принять штатно канонизированный Grafana URL, но capture-фаза снова отклонит его по исходной строке URL.
+
 `batch-operation-controller.js` различает:
 
 - loader не достиг `ready`;
@@ -116,8 +118,8 @@ Series Batch использует тот же loader, но обязан сохр
 
 Перед реализацией обновить GitNexus index и проверить upstream impact для `createBatchPanelLoader`, `captureGrafanaPanelImage` и потребителей batch operation. Реализация начинается с failing behavior tests для:
 
-1. epoch → ISO canonicalization;
-2. `_t` and query-order changes;
+1. epoch → ISO canonicalization in loader and capture;
+2. `_t` and query-order changes in loader and capture;
 3. wrong dashboard/panel rejection;
 4. delayed panel mount and white/loader state;
 5. ordinary panel without data interceptor;
