@@ -210,6 +210,39 @@ function createBatchPanelLoader({ log }) {
         normalized.searchParams.sort();
         return normalized.toString();
     };
+    const normalizePanelReference = value => {
+        const normalized = String(value ?? '').trim().replace(/^panel-/i, '');
+        return normalized || null;
+    };
+    const canonicalTime = value => {
+        const raw = String(value ?? '');
+        if (/^\d{10}$/.test(raw)) return String(Number(raw) * 1000);
+        if (/^\d{13}$/.test(raw)) return raw;
+        const parsed = Date.parse(raw);
+        return Number.isFinite(parsed) ? String(parsed) : raw;
+    };
+    const documentIdentity = value => {
+        try {
+            const parsed = new URL(value);
+            const panel = normalizePanelReference(parsed.searchParams.get('viewPanel') || parsed.searchParams.get('panelId'));
+            const ignored = new Set(['_t', 'dashbridgeCpuCapacityFilter', 'dashbridgePanelTransforms']);
+            const params = [];
+            for (const [key, item] of parsed.searchParams.entries()) {
+                if (ignored.has(key) || key === 'viewPanel' || key === 'panelId') continue;
+                params.push([key, key === 'from' || key === 'to' ? canonicalTime(item) : item]);
+            }
+            params.sort(([leftKey, leftValue], [rightKey, rightValue]) => leftKey.localeCompare(rightKey) || leftValue.localeCompare(rightValue));
+            return { origin: parsed.origin, pathname: parsed.pathname.replace(/\/$/, ''), panel, query: JSON.stringify(params) };
+        } catch {
+            return null;
+        }
+    };
+    const sameDocumentIdentity = (actualValue, expectedValue) => {
+        const actual = documentIdentity(actualValue);
+        const expected = documentIdentity(expectedValue);
+        if (!actual || !expected || actual.origin !== expected.origin || actual.pathname !== expected.pathname) return false;
+        return actual.panel === expected.panel && actual.query === expected.query;
+    };
 
     return async (tabId, url, panelId, _seriesFilter, previousSeriesFilter = null, panelTools = null, signal = null, panelTitle = '') => {
         const context = () => `panelId=${String(panelId)}${panelTitle ? ` title="${String(panelTitle)}"` : ''} url=${url}`;
@@ -267,7 +300,7 @@ function createBatchPanelLoader({ log }) {
                 chrome.tabs.get(tabId, tab => resolveTab(chrome.runtime.lastError ? null : tab || null));
             });
             const matchesExpectedUrl = tab => !!tab && !!expectedUrl
-                && withoutRuntimeBootstrap(tab.url) === withoutRuntimeBootstrap(expectedUrl);
+                && sameDocumentIdentity(tab.url, expectedUrl);
             const isCurrentAttempt = (generation, tab) => !settled && !signal?.aborted
                 && generation === navigationGeneration && matchesExpectedUrl(tab);
             const finish = value => {

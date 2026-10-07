@@ -6,7 +6,9 @@ const vm = require('node:vm');
 
 const listeners = new Set();
 let currentTabUrl = 'https://grafana.example/d/dashboard?viewPanel=7';
+let canonicalizeNavigation = false;
 let ordinaryDataReady = true;
+let ordinaryInterceptorAvailable = true;
 let earlyRuntimeCalls = 0;
 const renderer = { getBoundingClientRect: () => ({ height: 300 }) };
 const panel = {
@@ -42,6 +44,13 @@ const context = {
             },
             update: async (_tabId, options) => {
                 currentTabUrl = options.url;
+                if (canonicalizeNavigation) {
+                    const canonical = new URL(currentTabUrl);
+                    if (canonical.searchParams.has('from')) canonical.searchParams.set('from', '2026-08-28T12:11:29.256Z');
+                    if (canonical.searchParams.has('to')) canonical.searchParams.set('to', '2026-08-28T13:26:26.751Z');
+                    canonical.searchParams.set('_t', '123');
+                    currentTabUrl = canonical.toString();
+                }
                 return { id: 7, status: 'complete', url: currentTabUrl };
             },
         },
@@ -72,9 +81,12 @@ const context = {
         disconnect() {}
     },
     getComputedStyle: () => ({ display: 'none', visibility: 'hidden', opacity: '0' }),
-    __dashbridgeDataInterceptorDiagnostic: {
-        get activeRequests() { return ordinaryDataReady ? 0 : 1; },
-        get events() { return ordinaryDataReady ? [{ stage: 'request-complete' }] : []; },
+    get __dashbridgeDataInterceptorDiagnostic() {
+        if (!ordinaryInterceptorAvailable) return null;
+        return {
+            get activeRequests() { return ordinaryDataReady ? 0 : 1; },
+            get events() { return ordinaryDataReady ? [{ stage: 'request-complete' }] : []; },
+        };
     },
     __dashbridgePanelToolsVisualMetadata: { responseDataStatus: { kind: 'filtered_empty' }, responseFilterEmptyIsNormal: true },
 };
@@ -102,6 +114,19 @@ vm.runInContext(fs.readFileSync('pages/batch/batch-panel-loader.js', 'utf8'), co
     assert.equal(logs[0], 'Загрузка панели 7…');
     assert.equal(listeners.size, 0, 'loader must remove its tab listener after readiness');
 
+    canonicalizeNavigation = true;
+    currentTabUrl = 'https://grafana.example/d/other';
+    const canonicalizedResult = await loadPanel(
+        7,
+        'https://grafana.example/d/dashboard?from=1787919089256&to=1787923586751&viewPanel=7',
+        '7', null, null, null,
+        { aborted: false, addEventListener() {}, removeEventListener() {} },
+    );
+    assert.deepEqual({ ...canonicalizedResult }, { x: 10, y: 20, w: 800, h: 400, dpr: undefined },
+        'Grafana may canonicalize time parameters without cancelling panel readiness');
+    canonicalizeNavigation = false;
+    currentTabUrl = 'https://grafana.example/d/dashboard?viewPanel=7';
+
     ordinaryDataReady = false;
     const blankResult = await loadPanel(
         7,
@@ -111,6 +136,17 @@ vm.runInContext(fs.readFileSync('pages/batch/batch-panel-loader.js', 'utf8'), co
     );
     assert.equal(blankResult, null, 'ordinary data panels must not capture before their request settles');
     ordinaryDataReady = true;
+
+    ordinaryInterceptorAvailable = false;
+    const noInterceptorResult = await loadPanel(
+        7,
+        'https://grafana.example/d/dashboard?viewPanel=7',
+        '7', null, null, null,
+        { aborted: false, addEventListener() {}, removeEventListener() {} },
+    );
+    assert.deepEqual({ ...noInterceptorResult }, { x: 10, y: 20, w: 800, h: 400, dpr: undefined },
+        'ordinary panels must not require an optional data interceptor');
+    ordinaryInterceptorAvailable = true;
 
     const originalFindPanelById = context.DashBridgeGrafanaDom.findPanelById;
     context.DashBridgeGrafanaDom.findPanelById = () => null;

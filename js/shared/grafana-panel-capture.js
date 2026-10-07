@@ -1,19 +1,41 @@
 // Shared capture primitive.  It deliberately returns an image instead of
 // downloading it, so Popup and Batch can choose their own output workflow.
 async function captureGrafanaVisibleTab(tabId, expectedUrl) {
+    const matchesTarget = value => {
+        try {
+            const actual = new URL(value);
+            const expected = new URL(expectedUrl);
+            const panel = url => String(url.searchParams.get('viewPanel') || url.searchParams.get('panelId') || '')
+                .replace(/^panel-/i, '');
+            const canonicalTime = value => {
+                const raw = String(value || '');
+                if (/^\d{10}$/.test(raw)) return String(Number(raw) * 1000);
+                if (/^\d{13}$/.test(raw)) return raw;
+                const parsed = Date.parse(raw);
+                return Number.isFinite(parsed) ? String(parsed) : raw;
+            };
+            const ignored = new Set(['_t', 'dashbridgeCpuCapacityFilter', 'dashbridgePanelTransforms', 'viewPanel', 'panelId']);
+            const query = url => JSON.stringify([...url.searchParams.entries()]
+                .filter(([key]) => !ignored.has(key))
+                .map(([key, item]) => [key, key === 'from' || key === 'to' ? canonicalTime(item) : item])
+                .sort(([leftKey, leftValue], [rightKey, rightValue]) => leftKey.localeCompare(rightKey) || leftValue.localeCompare(rightValue)));
+            return actual.origin === expected.origin && actual.pathname === expected.pathname
+                && panel(actual) === panel(expected) && query(actual) === query(expected);
+        } catch { return false; }
+    };
     const initial = await chrome.tabs.get(tabId);
     let invalidated = false;
     const onActivated = info => { if (info.windowId === initial.windowId) invalidated = true; };
     const onUpdated = (id, change) => {
-        if (id === tabId && change.url && change.url !== expectedUrl) invalidated = true;
+        if (id === tabId && change.url && !matchesTarget(change.url)) invalidated = true;
     };
     const onRemoved = id => { if (id === tabId) invalidated = true; };
     const check = async () => {
         const tab = await chrome.tabs.get(tabId);
         const active = await chrome.tabs.query({ active: true, windowId: tab.windowId });
         if (invalidated || tab.windowId !== initial.windowId || active[0]?.id !== tabId
-            || (tab.pendingUrl && tab.pendingUrl !== expectedUrl)
-            || !expectedUrl || tab.url !== expectedUrl) {
+            || (tab.pendingUrl && !matchesTarget(tab.pendingUrl))
+            || !expectedUrl || !matchesTarget(tab.url)) {
             throw new Error('capture-target-changed');
         }
         return tab;

@@ -18,6 +18,7 @@ Object.defineProperty(FakeImage.prototype, 'src', {
     set() { queueMicrotask(() => this.onload?.()); }
 });
 const context = {
+    URL,
     chrome: {
         scripting: {
             executeScript: async options => {
