@@ -115,7 +115,7 @@ assert(/\.popup-launch-btn\s*\{[^}]*font-size:\s*0\.75rem;[^}]*padding:\s*0\.75r
 const dashboardsStart = html.indexOf('Мои дашборды');
 const dashboardsList = html.indexOf('id="customButtonsContainer"', dashboardsStart);
 const dashboardsAddAction = html.indexOf('class="popup-dashboard-add-action"', dashboardsList);
-const batchSection = html.indexOf('<!-- Подвкладка: Массовый сбор -->', dashboardsAddAction);
+const batchSection = html.indexOf('<!-- Подвкладка: Массовый сбор и замена скриншотов -->', dashboardsAddAction);
 assert(dashboardsStart >= 0 && dashboardsList > dashboardsStart
     && dashboardsAddAction > dashboardsList && batchSection > dashboardsAddAction,
     'the add-link action must remain inside the My dashboards section after its rendered list');
