@@ -70,3 +70,56 @@ console.log('PASS Grafana table Metric/Value rows feed report snapshots');
 rows.splice(0, rows.length, row(['fast', '510 ms']), row(['slow', '1.40 mins']));
 const durations = tableReport.collectGrafanaTableRecords(root, { unit: 'ms' });
 assert.deepStrictEqual(Array.from(durations, item => item.values[0]), [510, 84000]);
+
+assert.strictEqual(tableReport.parseGrafanaTableDisplayValue('1.50 mystery'), null,
+    'an unknown numeric suffix must never default to factor 1');
+assert.strictEqual(tableReport.parseGrafanaTableDisplayValue('1.50 Mil'), 1500000);
+context.window = context;
+vm.runInContext(source, context);
+const unitApi = context.DashBridgeGrafanaUnit;
+const report = context.DashBridgeGrafanaReportSnapshot.create({
+    mergeAxisAndPanelUnit: unitApi.mergeAxisAndPanelUnit,
+    inferUnitFromAxisTicks: unitApi.inferUnitFromAxisTicks,
+    getCachedPanelDefinition: () => ({ fieldConfig: { defaults: { unit: 'short' } } }),
+    unitFromPanelDefinition: unitApi.unitFromPanelDefinition,
+    collectGrafanaTableData: tableReport.collectGrafanaTableData,
+    collectGrafanaTableRecords: tableReport.collectGrafanaTableRecords,
+    findUPlot: () => null, getUPlotYScaleKey: () => 'y', getUPlotUnitDetails: () => null
+});
+const snapshot = (sla = {}) => report.collectPanelReportSnapshot({ root,
+    sla: { source: 'custom', value: 1000000, ...sla } });
+rows.splice(0, rows.length, row(['small', '949.00']), row(['currency', '1.50 Mil']));
+const mil = snapshot();
+assert.strictEqual(mil.state, 'critical', 'the DOM fallback must not drop the actual violating Mil row');
+assert.strictEqual(mil.maxValue, 1500000);
+assert.strictEqual(mil.series.length, 2);
+assert.strictEqual(snapshot({ unit: 'ms' }).state, 'configuration_error',
+    'a count table cannot be relabeled as a duration SLA');
+const summary = row(['Total', '7.93 Mil']);
+summary.matches = selector => selector.includes('.rdg-summary-row');
+rows.push(summary, row(['Total', '5']));
+const summarized = snapshot();
+assert.strictEqual(summarized.maxValue, 1500000, 'Grafana summary footer must not become an SLA series');
+assert.strictEqual(summarized.series.filter(item => item.name === 'Total').length, 1,
+    'an ordinary series named Total remains valid');
+for (const invalid of ['1.50 mystery', '1.50 ms', '', 'No data']) {
+    rows.splice(0, rows.length, row(['small', '949.00']), row(['unparsed', invalid]));
+    const incomplete = snapshot();
+    assert.strictEqual(incomplete.state, 'configuration_error', `${invalid} must prevent a false successful SLA`);
+    assert.strictEqual(incomplete.dataStatus, 'table_numeric_incomplete');
+    assert.strictEqual(incomplete.series.length, 0);
+    assert.strictEqual(incomplete.table.rows.length, 2, 'literal cells must survive numeric failure');
+    assert.strictEqual(snapshot({ source: 'none' }).state, 'configuration_error',
+        'informational numeric tables must not hide an incomplete numeric aggregate');
+}
+rows.splice(0, rows.length, row(['unknown', '1.50 mystery']));
+assert.strictEqual(snapshot().state, 'configuration_error', 'all-unparsed numeric table must remain explicit');
+rows.splice(0, rows.length, row(['small', '949.00']), row(['missing value cell']));
+assert.strictEqual(snapshot().state, 'configuration_error', 'an absent Value cell must prevent a false successful SLA');
+rows.splice(0, rows.length, row(['zero', '0']));
+assert.strictEqual(snapshot().maxValue, 0, 'a real zero must remain numeric data');
+rows.splice(0, rows.length, row(['service', 'Healthy']), row(['other', 'No data']));
+const literal = snapshot({ source: 'none' });
+assert.strictEqual(literal.state, 'no_threshold');
+assert.strictEqual(literal.series.length, 0);
+assert.strictEqual(literal.aggregateValue, null, 'literal tables must not manufacture a numeric zero');

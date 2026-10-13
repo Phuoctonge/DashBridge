@@ -2,6 +2,11 @@
     'use strict';
     if (root.DashBridgeGrafanaUnit) return;
 
+    // Grafana 12 Table's short formatter uses `Mil` for millions.
+    const numericDisplayScale = token => ({ K: 1e3, M: 1e6, G: 1e9, T: 1e12, Mil: 1e6 })[
+        token === 'Mil' ? token : token.toUpperCase()
+    ];
+
     const parseAxisUnitLabel = label => {
         const match = String(label || '').trim().match(/^([-+]?[\d.,]+)\s*(.*)$/);
         if (!match) return null;
@@ -29,9 +34,9 @@
 
         // Grafana's `short` formatter labels a plain count as `3 K`.
         // `K` is a compact numeric scale here, not the measurement unit.
-        const compactNumber = suffix.match(/^([kKmMgGtT])$/);
+        const compactNumber = suffix.match(/^(Mil|[kKmMgGtT])$/);
         if (compactNumber) {
-            const displayScale = ({ k: 1e3, m: 1e6, g: 1e9, t: 1e12 })[compactNumber[1].toLowerCase()];
+            const displayScale = numericDisplayScale(compactNumber[1]);
             return { value, unit: '', factor: null, displayScale };
         }
 
@@ -130,9 +135,9 @@
         };
         const a = byteScale(from), b = byteScale(to);
         if (a && b && a.rate === b.rate) return value * a.scale / b.scale;
-        const compact = from.match(/^([kKMGT])(?:\s+(.*))?$/);
+        const compact = from.match(/^(Mil|[kKMGT])(?:\s+(.*))?$/);
         if (compact && (compact[2] || '') === to) {
-            return value * ({ k: 1e3, K: 1e3, M: 1e6, G: 1e9, T: 1e12 })[compact[1]];
+            return value * numericDisplayScale(compact[1]);
         }
         return null;
     };

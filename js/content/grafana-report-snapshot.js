@@ -113,7 +113,14 @@
                             name: String(item?.name || ''), visible: true,
                             values: [item?.value]
                         })).filter(item => item.name && item.values.length)
-                        : collectGrafanaTableRecords(root, { unit: tableUnit.unit || '' });
+                        : collectGrafanaTableRecords(root, { unit: tableUnit.unit || '', table });
+                    if (!responseTableRecords.length && table?.numericParse?.complete === false
+                        && (table.numericParse.numeric || source !== 'none')) {
+                        const error = 'Не удалось разобрать все числовые значения таблицы в единице панели';
+                        return { state: 'configuration_error', source, evaluation, operator,
+                            engine: 'table-dom', unit: tableUnit.unit || '', series: [], table,
+                            dataStatus: 'table_numeric_incomplete', dataStatusText: error, error };
+                    }
                     if (!records.length && tableRecords.length) {
                         engine = table && responseTableRecords.length ? 'table-response' : 'table-dom';
                         const details = tableUnit;
@@ -195,7 +202,8 @@
                 ? Number(sla.rawValue) : null;
             const requestedUnit = String(sla.unit || unit || '').trim();
             if (requestedUnit !== unit) {
-                const conversion = window.DashBridgeGrafanaUnit.parseDisplayValue(`1 ${unit}`, requestedUnit);
+                // A bare count cannot acquire a measurement unit from the SLA label.
+                const conversion = unit ? window.DashBridgeGrafanaUnit.parseDisplayValue(`1 ${unit}`, requestedUnit) : null;
                 if (conversion === null || conversion <= 0) {
                     return { state: 'configuration_error', source, evaluation, operator, engine, unit,
                         series: [], dataStatus: 'unit_mismatch', error: 'Единица SLA несовместима с единицей панели' };

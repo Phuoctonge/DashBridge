@@ -2,23 +2,19 @@
     'use strict';
     if (root.DashBridgeGrafanaTableReport) return;
 
-    const parseAxisUnitLabel = root.DashBridgeGrafanaUnit?.parseAxisUnitLabel;
-    if (!parseAxisUnitLabel) {
+    const unitParser = root.DashBridgeGrafanaUnit;
+    if (!unitParser?.parseAxisUnitLabel) {
         throw new Error('DashBridgeGrafanaUnit must load before DashBridgeGrafanaTableReport');
     }
 
     const parseGrafanaTableDisplayValue = value => {
-        const normalized = String(value || '').trim().replace(/[−–-]/g, '-');
-        const plain = normalized.replace(/[  \s]/g, '').replace(',', '.');
-        if (/^[-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?$/i.test(plain)) {
-            const numeric = Number(plain);
-            return Number.isFinite(numeric) ? numeric : null;
+        // Without a requested unit, classify only canonical supported scales.
+        // Unknown suffixes cannot become a plain count with factor 1.
+        for (const unit of ['', 'B', 'B/s', 'ms', '%']) {
+            const numeric = unitParser.parseDisplayValue(value, unit);
+            if (numeric !== null) return numeric;
         }
-        const parsed = parseAxisUnitLabel(normalized);
-        if (!parsed) return null;
-        const scale = Number(parsed.factor ?? parsed.displayScale ?? 1);
-        const numeric = parsed.value * (Number.isFinite(scale) && scale > 0 ? scale : 1);
-        return Number.isFinite(numeric) ? numeric : null;
+        return null;
     };
 
     const getResponseTableFrameShape = frame => {
@@ -63,8 +59,14 @@
             const displayRows = [];
             for (const row of [...new Set(rows)]) {
                 if (row === headerRow || row.querySelector?.('[role="columnheader"], th')) continue;
+                // Native Data Grid totals are aggregates, not datasource rows.
+                if (row.matches?.('.rdg-summary-row, .rdg-bottom-summary-row, .rdg-top-summary-row')) continue;
                 const values = cellsOf(row).slice(0, columns.length).map(textOf);
-                if (values.length === columns.length && values.some(Boolean)) displayRows.push(values);
+                if (values.some(Boolean)) {
+                    // Missing cells remain visible to the completeness check.
+                    while (values.length < columns.length) values.push('');
+                    displayRows.push(values);
+                }
             }
             if (!displayRows.length || best && displayRows.length <= best.totalRows) continue;
             const visibleRows = displayRows.slice(0, TABLE_ROW_LIMIT);
@@ -82,18 +84,26 @@
         return best;
     };
 
-    const collectGrafanaTableRecords = (root = document, { unit } = {}) => {
-        const table = collectGrafanaTableData(root);
+    const collectGrafanaTableRecords = (root = document, { unit, table = collectGrafanaTableData(root) } = {}) => {
         if (!table) return [];
         let nameIndex = table.columns.findIndex(header => /^(?:metric|name|series|метрика|имя|серия|запрос)$/iu.test(header));
         const valueIndex = table.columns.findIndex(header => /^(?:value|current|last|значение|текущее(?: значение)?|количество|count)$/iu.test(header));
         if (nameIndex < 0 && valueIndex >= 0 && table.columns.length === 2) nameIndex = valueIndex === 0 ? 1 : 0;
         if (nameIndex < 0 || valueIndex < 0 || nameIndex === valueIndex) return [];
-        return table.rows.map(row => ({
-            name: String(row[nameIndex] || '').trim(), visible: true,
-            values: [unit === undefined ? parseGrafanaTableDisplayValue(row[valueIndex])
-                : globalThis.DashBridgeGrafanaUnit.parseDisplayValue(row[valueIndex], unit)].filter(Number.isFinite)
-        })).filter(record => record.name && record.values.length);
+        let invalidRows = 0;
+        let numeric = false;
+        const records = table.rows.map(row => {
+            const text = String(row[valueIndex] ?? '').trim();
+            const value = unit === undefined ? parseGrafanaTableDisplayValue(text)
+                : unitParser.parseDisplayValue(text, unit);
+            const name = String(row[nameIndex] || '').trim();
+            if (value !== null || /^[-+−–]?(?:\d|[.,]\d)/u.test(text)) numeric = true;
+            if (!name || value === null) invalidRows += 1;
+            return { name, visible: true, values: [value].filter(Number.isFinite) };
+        }).filter(record => record.name && record.values.length);
+        // Preserve the public records array; completeness belongs to this DOM snapshot.
+        table.numericParse = { complete: invalidRows === 0, numeric, invalidRows };
+        return records;
     };
 
     globalThis.DashBridgeGrafanaTableReport = Object.freeze({
