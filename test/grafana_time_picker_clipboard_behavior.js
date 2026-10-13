@@ -35,6 +35,30 @@ assert.deepStrictEqual(JSON.parse(JSON.stringify(clipboard.parseRange(
     'https://grafana.example/d/test?from=now-15m&to=now'
 ))), { from: 'now-15m', to: 'now' });
 assert.strictEqual(clipboard.parseRange('{"from":"now-1h"}'), null);
+for (const invalid of [
+    'garbage', 'also garbage', {}, [], true, null, 0, Infinity, 1745578080000.5,
+    '2025-02-29 12:00:00', '2024-02-30T12:00:00Z', '2026-04-31 12:00:00',
+    '2026-13-01 12:00:00', '2026-01-00 12:00:00', '2026-01-01 24:00:00',
+    '2026-01-01 12:60:00', '2026-01-01 12:00:60',
+    '2026-01-01T12:00:00+24:00', '2026-01-01T12:00:00+01:60',
+    'nowhere', 'now-1x', 'now/2d', 'now/0d', 'now/0.5d', 'now-1.5h', 'now-', 'now-1h junk'
+]) {
+    assert.strictEqual(clipboard.normalizeRange({ from: invalid, to: 'now' }), null,
+        `invalid from must reject the entire range: ${JSON.stringify(invalid)}`);
+    assert.strictEqual(clipboard.normalizeRange({ from: 'now-1h', to: invalid }), null,
+        `invalid to must reject the entire range: ${JSON.stringify(invalid)}`);
+    assert.strictEqual(clipboard.parseRange(JSON.stringify({ from: invalid, to: 'now' })), null);
+}
+for (const relative of ['now', 'now-15m', 'now+h', 'now-1M/M', 'now/d-1d', 'now/1w', 'now-1Q/fQ', 'now-fy', 'now - 1h / d']) {
+    assert.strictEqual(clipboard.normalizeEndpoint(relative), relative);
+    assert.strictEqual(clipboard.serializeRange({ from: relative, to: 'now' }),
+        JSON.stringify({ from: relative, to: 'now' }));
+}
+assert.strictEqual(clipboard.normalizeEndpoint('2024-02-29T23:59:59.12345'), '2024-02-29 23:59:59');
+assert.strictEqual(clipboard.normalizeEndpoint(1745578080000), localIso(1745578080000));
+assert.strictEqual(clipboard.normalizeEndpoint('2025-04-25T13:48:00+03:00'), localIso(1745578080000));
+assert.strictEqual(clipboard.normalizeEndpoint('2025-04-25t10:48:00z'), localIso(1745578080000));
+assert.strictEqual(clipboard.parseRange('https://grafana.example/d/test?from=now-1h&to=garbage'), null);
 assert.strictEqual(clipboard.serializeRange({ from: 'now-15m', to: 'now' }),
     '{"from":"now-15m","to":"now"}');
 assert(manifest.permissions.includes('clipboardRead') && manifest.permissions.includes('clipboardWrite'),

@@ -5,6 +5,7 @@
     const LOCAL_DATE_TIME_RE = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})(?:\.\d+)?$/;
     const ABSOLUTE_WITH_ZONE_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/i;
     const EPOCH_MILLISECONDS_RE = /^\d{13}$/;
+    const DATE_TIME_PARTS_RE = /^(\d{4})-(\d{2})-(\d{2})[ Tt](\d{2}):(\d{2}):(\d{2})/;
     const pad = value => String(value).padStart(2, '0');
     const formatLocalDateTime = milliseconds => {
         const date = new Date(milliseconds);
@@ -12,15 +13,47 @@
         return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
             + ` ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
     };
+    const hasValidCalendarTime = text => {
+        const parts = DATE_TIME_PARTS_RE.exec(text);
+        if (!parts) return false;
+        const [year, month, day, hour, minute, second] = parts.slice(1).map(Number);
+        const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+        const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+        return month >= 1 && month <= 12 && day >= 1 && day <= days[month - 1]
+            && hour <= 23 && minute <= 59 && second <= 59;
+    };
+    const isRelativeEndpoint = text => {
+        if (!text.startsWith('now')) return false;
+        // Grafana 12.2 datemath.ts strips whitespace and permits chained math,
+        // implicit count 1, Q/f units and only single-unit rounding.
+        const math = text.slice(3).replace(/\s/g, '');
+        const operation = /([+\-/])(\d*)(f?)([yMwdhmsQ])/y;
+        let cursor = 0;
+        while (cursor < math.length) {
+            operation.lastIndex = cursor;
+            const match = operation.exec(math);
+            if (!match) return false;
+            const count = match[2] ? Number(match[2]) : 1;
+            if (match[2] && cursor + 1 + match[2].length > 10) return false;
+            if (match[1] === '/' && count !== 1) return false;
+            cursor = operation.lastIndex;
+        }
+        return true;
+    };
     const normalizeEndpoint = value => {
+        if (typeof value !== 'string' && typeof value !== 'number') return '';
+        if (typeof value === 'number' && !Number.isSafeInteger(value)) return '';
         const text = normalizeText(value);
         if (!text) return '';
         const local = LOCAL_DATE_TIME_RE.exec(text);
-        if (local) return `${local[1]} ${local[2]}`;
-        if (ABSOLUTE_WITH_ZONE_RE.test(text) || EPOCH_MILLISECONDS_RE.test(text)) {
-            return formatLocalDateTime(EPOCH_MILLISECONDS_RE.test(text) ? Number(text) : Date.parse(text)) || text;
+        if (local) return hasValidCalendarTime(text) ? `${local[1]} ${local[2]}` : '';
+        if (ABSOLUTE_WITH_ZONE_RE.test(text)) {
+            const offset = /[+-](\d{2}):(\d{2})$/.exec(text);
+            if (!hasValidCalendarTime(text) || (offset && (Number(offset[1]) > 23 || Number(offset[2]) > 59))) return '';
+            return formatLocalDateTime(Date.parse(text)) || '';
         }
-        return text;
+        if (EPOCH_MILLISECONDS_RE.test(text)) return formatLocalDateTime(Number(text)) || '';
+        return typeof value === 'string' && isRelativeEndpoint(text) ? text : '';
     };
     const normalizeRange = range => {
         if (!range || typeof range !== 'object' || Array.isArray(range)) return null;

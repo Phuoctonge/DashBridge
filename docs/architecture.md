@@ -73,6 +73,11 @@ DashBridge ещё и `source === iframe.contentWindow`.
    Конкретные функции дополнительно ограничены доменом и сценарием. Clipboard
    time picker активируется по опубликованному UI scope Grafana
    и выполняет read/write по клику пользователя; ограничение scope описано ниже.
+   До записи любого input clipboard-парсер проверяет обе границы: Grafana `now`
+   datemath, корректное локальное календарное время, ISO с zone либо 13-значный
+   epoch milliseconds. Неверный тип, календарная дата, время или offset отклоняют
+   весь диапазон без input/change событий. ISO/epoch переводятся в прежний локальный
+   формат с секундами; relative выражения не вычисляются, Apply остаётся native.
    Разрешение capture и изменения общей настройки снимка в `content.js`
    хранится в isolated closure и не берётся из DOM. Dataset публикует UI scope
    для MAIN и отдельного isolated time-picker clipboard модуля. Последний
