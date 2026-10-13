@@ -180,6 +180,17 @@ page и network diagnostics в `test-results/extension-smoke.json`. При ош�
 изображения и при успехе как evidence. Путь к другому тестовому Chromium можно
 явно задать через `DASHBRIDGE_CHROME_PATH`.
 
+Worklog smoke подменяет только точный стартовый GET
+`https://jira.lanit.ru/rest/api/2/myself` локальным JSON fixture до навигации.
+Проверяются единственное обращение, имя пользователя и `auth-ok` в настоящем UI;
+остальные запросы и ошибки console не подавляются. HTTP 401 и network failure
+отдельно проверяются unit-тестом Jira client. Это проверка локального startup,
+а настоящая авторизация Jira требует отдельного явно выбранного live-теста.
+Клавиатурные проверки DashBridge используют paused sample panel в собственном
+временном профиле: внешние iframe не участвуют в этом локальном focus-тесте.
+Удержание фокуса при асинхронном autofocus живого iframe остаётся отдельной
+проверкой и открытым ограничением из roadmap.
+
 Для живых Grafana используется один постоянный профиль, отдельный от обычного
 Chrome и от временного smoke-профиля:
 

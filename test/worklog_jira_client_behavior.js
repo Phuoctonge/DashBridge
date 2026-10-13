@@ -45,5 +45,21 @@ vm.runInContext(fs.readFileSync('pages/worklog/worklog-jira-client.js', 'utf8'),
     assert.strictEqual(payload.started, '2026-08-24T10:30:00.000+0000');
     assert.strictEqual(calls[2].options.method, 'POST');
     assert.strictEqual(calls[2].options.headers['X-Atlassian-Token'], 'no-check');
+    const unauthorizedClient = context.DashBridgeWorklogJiraClient.create({
+        getBaseUrl: () => 'https://jira.example', getTimeZone: () => 'UTC',
+        request: async () => ({ ok: false, status: 401 })
+    });
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(await unauthorizedClient.checkAuth())), {
+        ok: false, reason: 'unauthorized'
+    });
+    const networkError = new Error('offline');
+    const offlineClient = context.DashBridgeWorklogJiraClient.create({
+        getBaseUrl: () => 'https://jira.example', getTimeZone: () => 'UTC',
+        request: async () => { throw networkError; }
+    });
+    const offline = await offlineClient.checkAuth();
+    assert.strictEqual(offline.ok, false);
+    assert.strictEqual(offline.reason, 'network');
+    assert.strictEqual(offline.error, networkError);
     console.log('PASS Worklog Jira client owns auth, issue lookup and worklog payloads');
 })().catch(error => { console.error(error); process.exitCode = 1; });

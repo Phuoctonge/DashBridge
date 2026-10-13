@@ -133,6 +133,23 @@ async function inspectPage(context, extensionId, relativePath) {
         status: 'passed'
     };
     const page = await context.newPage();
+    const isWorklog = relativePath === 'pages/worklog/worklog.html';
+    let worklogAuthRequests = 0;
+    const worklogDisplayName = 'Local smoke user';
+    if (isWorklog) {
+        // Install before navigation: only the startup read is local; Jira writes are not intercepted.
+        await page.route('https://jira.lanit.ru/rest/api/2/myself', async route => {
+            const request = route.request();
+            const target = new URL(request.url());
+            if (request.method() !== 'GET' || target.origin !== 'https://jira.lanit.ru'
+                || target.pathname !== '/rest/api/2/myself' || target.search || target.hash) {
+                await route.continue(); return;
+            }
+            worklogAuthRequests++;
+            await route.fulfill({ status: 200, contentType: 'application/json',
+                body: JSON.stringify({ displayName: worklogDisplayName }) });
+        });
+    }
 
     page.on('console', message => {
         const type = message.type();
@@ -150,14 +167,39 @@ async function inspectPage(context, extensionId, relativePath) {
     });
 
     try {
+        if (relativePath === 'pages/dashbridge/dashbridge.html') {
+            // The temporary smoke profile owns this fixture. External sample iframes can
+            // asynchronously take native focus; local modal checks must not race live sites.
+            const worker = context.serviceWorkers().find(candidate => candidate.url().startsWith(`chrome-extension://${extensionId}/`));
+            await worker.evaluate(async () => {
+                const profile = { id: 'local-modal-smoke', name: 'Local modal smoke', panels: [{
+                    id: 'local-paused-panel', title: 'Paused smoke panel', paused: true,
+                    src: 'https://smoke.invalid/d-solo/local/panel?panelId=1', width: '50%', height: '350px'
+                }] };
+                await chrome.storage.local.set({ dashbridge_profiles: [profile], dashbridge_activeProfileId: profile.id });
+            });
+        }
         await page.goto(url, { waitUntil: 'load', timeout: 20_000 });
         await page.waitForTimeout(settleMs);
+        if (isWorklog) {
+            await page.waitForFunction(name => document.getElementById('authText')?.textContent
+                === `Авторизован: ${name}` && document.getElementById('authDot')?.classList.contains('auth-ok'),
+            worklogDisplayName);
+            if (worklogAuthRequests !== 1) throw new Error(`Worklog startup auth fixture consumed ${worklogAuthRequests} times`);
+            result.authFixture = { requests: worklogAuthRequests,
+                text: await page.locator('#authText').textContent(),
+                dot: await page.locator('#authDot').getAttribute('class') };
+        }
         if (!page.isClosed()) {
             result.finalUrl = page.url();
             result.title = await page.title();
             const isDashboard = relativePath === 'pages/dashbridge/dashbridge.html';
             const isPopup = relativePath === 'pages/popup/popup.html';
             if (isDashboard) {
+                await page.locator('#profilePickerLabel').filter({ hasText: 'Local modal smoke' }).waitFor();
+                if (await page.locator('#dashboard iframe').count() !== 0) {
+                    throw new Error('Paused local modal fixture unexpectedly created an iframe');
+                }
                 await page.locator('#profilePickerBtn').click();
                 await page.locator('#cloneProfileBtn').click();
                 await page.locator('.modal-input').fill('Playwright profile copy');
@@ -217,11 +259,20 @@ async function inspectPage(context, extensionId, relativePath) {
                 const opener = isDashboard ? '#addPanelBtn' : '#openAddModal';
                 await page.locator(opener).click();
                 const modal = page.locator('#modalOverlay');
+                await modal.waitFor({ state: 'visible' });
+                await page.waitForFunction(() => document.getElementById('modalOverlay').contains(document.activeElement));
                 for (const key of ['Tab', 'Shift+Tab']) {
                     for (let index = 0; index < 12; index++) {
                         await page.keyboard.press(key);
                         if (!await modal.evaluate(element => element.contains(document.activeElement))) {
-                            throw new Error(`${key} escaped the modal`);
+                            const focus = await page.evaluate(() => {
+                                const active = document.activeElement;
+                                return { readyState: document.readyState, hasFocus: document.hasFocus(),
+                                    tag: active?.tagName, id: active?.id,
+                                    nativeIframe: active?.tagName === 'IFRAME',
+                                    modalVisible: document.getElementById('modalOverlay')?.getClientRects().length > 0 };
+                            });
+                            throw new Error(`${key} escaped the modal at step ${index}: ${JSON.stringify(focus)}`);
                         }
                     }
                 }

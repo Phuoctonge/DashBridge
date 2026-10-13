@@ -12,6 +12,36 @@
 
 ## Основания и пределы анализа
 
+### Статус пяти согласованных исправлений на 13 октября
+
+| Исправление | Подтверждённый результат |
+|---|---|
+| RAM byte/% (A11/F10) | Direct/iframe Flot, report и OFF проверены; рассчитанные проценты не смешиваются с оставшимися byte-сериями |
+| Mil/неразобранные Table-ячейки (A12/F11) | Живые Mil, footer и mismatch единиц проверены; неизвестная числовая ячейка не даёт успешный SLA |
+| Полный Table native DataFrame | Direct/iframe №31: 100 строк, max 1504287 при ON/OFF/scroll; №36/44/54, uPlot №138 и Flot CPU/RAM проверены. Старый ограниченный DOM fallback явно остаётся неполным |
+| Clipboard parser (A07/F07) | В обеих Grafana valid copy и invalid paste с изолированными заглушками: неверный payload сохраняет inputs/URL; grammar сверена с публичным Grafana 12.2 datemath |
+| Clipboard cleanup (часть A05/F05) | Grafana 10/12: deferred paste после revoke не меняет поля; native Copy восстановлен, modern writes=1, isolated writes=0, bindings=0; OS clipboard не менялся |
+
+Каждое исправление прошло spec/quality review и свой live-контракт. Это не
+закрывает весь A05 (независимая доверенная host authority остаётся исследованием),
+F01 collector, Confluence и остальные неподтверждённые/невыбранные направления.
+Последний полный прогон перед интеграцией Task 6: lint PASS, 220 JS и 41 Python
+PASS, Chromium 19/21: Jira startup HTTP 401 и потеря modal focus внешним iframe.
+Task 6 локализует только тестовый startup GET Jira и keyboard fixture с paused
+panel; production Worklog/modal не меняются. Итоговый текущий полный прогон
+прошёл: ESLint, 220 JS, 41 Python, Chromium 21/21; локальная Worklog auth fixture
+проверена вместе с реальным UI. Evidence: `test-results/task-6-all.log` и
+`test-results/task-6-smoke.json` (ignored). Финальная live matrix после полного
+перезапуска браузера также PASS: direct RAM 36→12%→36 OFF; iframe CPU 12 Load,
+RAM 12%→36 OFF; Table №31 ON/OFF до/после scroll — 100 строк, max 1504287;
+direct Table №31/36/44 no_data/54 literal и uPlot №138; unit mismatch даёт
+configuration error. В обеих Grafana invalid clipboard/deferred paste после
+revoke сохраняют inputs, modern native writes=1, isolated writes=0, bindings=0.
+Исходные страницы сохранены, временные закрыты; OS clipboard и сохранённые
+настройки не менялись. Итоговый общий review ветки ещё ожидается.
+Остаточный внешний autofocus описан в [roadmap](../../roadmap.md); зелёный
+локальный focus-тест не подтверждает его исправление.
+
 Дата: 2026-10-12. Рабочая версия: 2.4.4. Исходный HEAD: `3494d85`.
 Рабочая копия перед аудитом чистая. Production-код в этом задании не изменён.
 

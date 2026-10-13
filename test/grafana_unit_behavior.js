@@ -36,15 +36,6 @@ assert.deepStrictEqual(plain(unit.inferUnitFromAxisTicks([{ label: '1.50 Mil', v
 assert.strictEqual(unit.parseDisplayValue('1.50 Mil', ''), 1500000);
 assert.strictEqual(unit.parseDisplayValue('1.50 Mil', 'ms'), null);
 assert.strictEqual(unit.parseDisplayValue('1.50 mystery', ''), null);
-assert.deepStrictEqual(plain(unit.parseAxisUnitLabel('1.50 Mil')), {
-    value: 1.5, unit: '', factor: null, displayScale: 1e6
-});
-assert.deepStrictEqual(plain(unit.inferUnitFromAxisTicks([{ label: '1.50 Mil', v: 1500000 }])), {
-    unit: '', factor: 1
-});
-assert.strictEqual(unit.parseDisplayValue('1.50 Mil', ''), 1500000);
-assert.strictEqual(unit.parseDisplayValue('1.50 Mil', 'ms'), null);
-assert.strictEqual(unit.parseDisplayValue('1.50 mystery', ''), null);
 
 assert.deepStrictEqual(plain(unit.inferUnitFromAxisLabels(['1 KiB', '2 KiB'], { min: 1024, max: 2048 })), {
     unit: 'KiB', factor: 1024
