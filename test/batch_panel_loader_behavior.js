@@ -15,6 +15,12 @@ let canvasPainted = true;
 let panelHasRenderer = true;
 let svgMode = 'canvas';
 let panelText = '';
+let tableData = null;
+let tableIsLegend = false;
+const table = {
+    closest: () => tableIsLegend ? {} : null,
+    getBoundingClientRect: () => ({ width: 800, height: 300 }),
+};
 let earlyRuntimeCalls = 0;
 const renderer = {
     width: 800, height: 300,
@@ -30,6 +36,7 @@ const panel = {
     },
     querySelectorAll: selector => {
         if (!panelHasRenderer) return [];
+        if (selector === 'table, [role="table"], [role="grid"]') return tableData ? [table] : [];
         if (selector.includes('canvas')) return svgMode === 'canvas' ? [renderer] : [];
         if (selector.includes('svg path, svg polyline, svg rect')) {
             return svgMode === 'svg-axis' ? [svgAxisPath] : svgMode === 'svg-series' ? [svgSeriesPath] : [];
@@ -139,6 +146,7 @@ context.DashBridgeGrafanaDom = {
     findPanelById: () => panel,
     findPanel: () => panel,
 };
+context.DashBridgeGrafanaTableReport = { collectGrafanaTableData: () => tableData };
 vm.createContext(context);
 vm.runInContext(fs.readFileSync('pages/batch/batch-panel-loader.js', 'utf8'), context);
 
@@ -209,6 +217,25 @@ vm.runInContext(fs.readFileSync('pages/batch/batch-panel-loader.js', 'utf8'), co
     );
     assert.deepEqual({ ...svgSeriesResult }, { x: 10, y: 20, w: 800, h: 400, dpr: undefined },
         'SVG series geometry must count as rendered data');
+    svgMode = 'canvas';
+
+    svgMode = 'table';
+    tableData = { columns: ['Metric', 'Value'], rows: [['request', '100']] };
+    const loadTable = () => loadPanel(7, 'https://grafana.example/d/dashboard?viewPanel=7', '7', null, null, null,
+        { aborted: false, addEventListener() {}, removeEventListener() {} });
+    const tableResult = await loadTable();
+    assert.deepEqual({ ...tableResult }, { x: 10, y: 20, w: 800, h: 400, dpr: undefined },
+        'a populated native table is rendered data even without canvas or SVG series');
+    tableData.rows = [];
+    assert.equal(await loadTable(), null, 'table headers alone are not rendered data');
+    tableData.rows = [['request', '100']];
+    tableIsLegend = true;
+    assert.equal(await loadTable(), null, 'a legend table cannot prove chart readiness');
+    tableIsLegend = false;
+    ordinaryDataReady = false;
+    assert.equal(await loadTable(), null, 'populated tables must still wait for requests to settle');
+    ordinaryDataReady = true;
+    tableData = null;
     svgMode = 'canvas';
 
     ordinaryInterceptorAvailable = false;

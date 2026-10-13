@@ -129,6 +129,15 @@ function createBatchPanelLoader({ log }) {
                 const flotHasPoints = typeof window.jQuery === 'function'
                     && (window.jQuery(renderer).data('plot')?.getData?.() || [])
                         .some(series => Array.isArray(series?.data) && series.data.length > 0);
+                // Native Table/Data Grid has no canvas or series SVG. Reuse the
+                // table adapter, but never treat a chart's legend as its data.
+                const tableHasRows = [...panel.querySelectorAll('table, [role="table"], [role="grid"]')].some(table => {
+                    if (table.closest('.graph-legend, .u-legend, [class*="legend" i]')) return false;
+                    const bounds = table.getBoundingClientRect();
+                    if (bounds.width <= 1 || bounds.height <= 1) return false;
+                    const data = window.DashBridgeGrafanaTableReport?.collectGrafanaTableData?.(table);
+                    return data?.columns?.length >= 2 && data.rows?.length > 0;
+                });
                 const svgHasGeometry = [...panel.querySelectorAll('svg path, svg polyline, svg rect')].some(element => {
                     // Axes, background rectangles and menu icons have geometry
                     // too. Require a renderer-owned series, not an arbitrary SVG.
@@ -169,7 +178,7 @@ function createBatchPanelLoader({ log }) {
                 const filteredEmpty = filterMayProduceEmpty
                     && window.__dashbridgePanelToolsVisualMetadata?.responseFilterEmptyIsNormal === true
                     && window.__dashbridgePanelToolsVisualMetadata?.responseDataStatus?.kind === 'filtered_empty';
-                if (!requestSettled || !(chartHasPoints || flotHasPoints || svgHasGeometry
+                if (!requestSettled || !(chartHasPoints || flotHasPoints || tableHasRows || svgHasGeometry
                     || (canvasHasGeometry && canvasHasPaint) || filteredEmpty)) {
                     stableFrames = 0;
                     if (collectDiagnostics) history[history.length - 1].reason = !requestSettled ? 'requests-active' : 'empty-renderer';
