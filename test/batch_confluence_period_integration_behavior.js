@@ -25,7 +25,7 @@ function contextFor(ranges) {
     }
     return {c,elements};
 }
-async function produceAndImport(ranges) {
+async function produceAndImport(ranges, rejected = false) {
     const {c,elements} = contextFor(ranges);
     const zip = new JSZip(); let active=true; let finalized=false; const queries=[]; const notifications=[];
     const archive={add:async(name,bytes)=>{zip.file(name,bytes)},finalize:async()=>{finalized=true}};
@@ -44,7 +44,14 @@ async function produceAndImport(ranges) {
         normalizeRangesField:()=>c.normalizeGrafanaTimeRanges(elements.timestamps.value),
         getCaptureTheme:()=> 'light',updateProgress(){},showToast:(...args)=>notifications.push(args),logMessage(){},
         buildPanelUrl:c.buildGrafanaPanelUrl,createArchive:()=>archive,documentRef:c.document});
-    await controller.run(); assert.equal(finalized,true);
+    await controller.run();
+    if (rejected) {
+        assert.equal(finalized,false);
+        assert.equal(queries.length,0,'invalid period must be rejected before opening any capture URL');
+        assert(notifications.some(item=>item[1]==='error'));
+        return;
+    }
+    assert.equal(finalized,true);
     const bytes=await zip.generateAsync({type:'uint8array'});bytes.name='recheck.zip';bytes.size=bytes.length;
     const imported=await c.DashBridgeConfluenceReportZip.create({JSZip,schema:c.DashBridgeConfluenceReportSchema})
         .load(bytes,new AbortController().signal);
@@ -74,5 +81,6 @@ async function produceAndImport(ranges) {
     const repeated = await produceAndImport([{from:FROM,to:TO},{from:FROM,to:TO}]);
     assert.equal(repeated.analyzed.ranges.length,2,'equal periods entered twice are separate occurrences');
     assert(repeated.analyzed.ranges.every(x=>x.panels.length===2));
+    await produceAndImport([{from:TO,to:FROM}],true);
     console.log('PASS Batch ZIP to Confluence period metadata integration');
 })().catch(e=>{console.error(e);process.exitCode=1});

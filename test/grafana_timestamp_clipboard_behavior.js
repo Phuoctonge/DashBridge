@@ -42,3 +42,18 @@ assert(source.includes("chrome.tabs.query({ active: true, currentWindow: true })
     'the tool must read the active tab, retain the range for three minutes, and copy each endpoint independently');
 
 console.log('PASS Grafana URL time converts to copyable Django millisecond timestamps');
+for (const value of ['2026-02-30T12:00:00Z', '2026-02-29T12:00:00+03:00', '2026-04-31 12:00:00']) {
+    assert.strictEqual(context.parseGrafanaAbsoluteTime(value), null, 'impossible calendar date is not an instant');
+}
+assert.strictEqual(context.parseGrafanaAbsoluteTime('2024-02-29T12:00:00.123+03:00'), Date.parse('2024-02-29T12:00:00.123+03:00'));
+assert.strictEqual(context.parseGrafanaAbsoluteTime('2026-08-26'), Date.parse('2026-08-26'), 'URL date-only semantics remain UTC');
+assert.strictEqual(context.parseGrafanaAbsoluteTime('2026-08-26 22:57:39'), new Date(2026,7,26,22,57,39).getTime());
+for (const value of ['2026-01-01T24:00:00Z', '2026-01-01T12:60:00Z', '2026-01-01T12:00:00+24:00']) {
+    assert.strictEqual(context.parseGrafanaAbsoluteTime(value),null);
+}
+for (const value of ['2026-02-30T12:00:00+0300', '2026-02-30 12:00:00 GMT+0300']) {
+    assert.strictEqual(context.parseGrafanaAbsoluteTime(value),null,'native timezone fallback must not bypass calendar validation');
+}
+for (const value of ['2024-02-29T12:00:00+0300', '2024-02-29 12:00:00 GMT+0300']) {
+    assert.strictEqual(context.parseGrafanaAbsoluteTime(value), Date.parse(value));
+}

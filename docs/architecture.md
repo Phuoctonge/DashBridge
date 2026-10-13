@@ -583,6 +583,20 @@ milliseconds для навигации и `DASHBRIDGE_TIME_UPDATE`, незави
 Миллисекунды сохраняют тот же момент с учётом offset и дробной части секунд;
 выражения `now` остаются без изменений. Исходная ссылка профиля не переписывается.
 Проверка реального codec — [time state](../test/dashbridge_time_state_behavior.js).
+`parseGrafanaAbsoluteTime` в `js/shared/grafana-time.js` проверяет календарные
+компоненты числовых дат и ISO до преобразования: 30 февраля не переносится
+молча в март. Валидируются високосный год, часы, минуты, секунды и zone offset.
+DashBridge Apply и чтение истории используют этот parser до изменения state.
+Batch подключает helper перед `grafana-url.js` и вызывает его с
+`numericDates: true`: `dd/mm/yyyy` и дата без времени означают локальный ввод.
+Без этой опции стандартная ISO-дата без времени сохраняет прежнюю UTC-семантику.
+Unix seconds в Batch и произвольный числовой epoch-ввод DashBridge остаются
+адаптерами их владельцев; относительные выражения не вычисляются парсером.
+`normalizeGrafanaTimeRanges` отклоняет начало позже окончания для абсолютных
+границ до открытия capture URL. Равные границы и смешанные/относительные
+периоды сохраняют прежний контракт. Проверки: [Batch ranges](../test/grafana_time_ranges_behavior.js),
+[Apply/history](../test/dashbridge_time_controller_behavior.js) и
+[ZIP integration](../test/batch_confluence_period_integration_behavior.js).
 История выбора времени принадлежит `dashbridge-time-controller.js`: четыре
 последних уникальных диапазона с хотя бы одной абсолютной границей, новые
 сверху. Клик применяет диапазон штатным путём один раз. Локальный ключ

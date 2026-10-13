@@ -91,6 +91,7 @@ const timeState = {
 
 const context = { console, URL, URLSearchParams, Intl, Date, DOMException, setTimeout, clearTimeout };
 context.globalThis = context;
+vm.runInNewContext(fs.readFileSync('js/shared/grafana-time.js', 'utf8'), context);
 vm.runInNewContext(fs.readFileSync('pages/dashbridge/dashbridge-time-controller.js', 'utf8'), context);
 const controller = context.DashBridgeTimeController.create({
     timeState,
@@ -197,6 +198,15 @@ const openHistory = () => {
     elements.timePickerBtn.click();
     return elements.recentTimeRanges.children;
 };
+for (const impossible of ['2026-02-30 12:00:00', '2026-02-29 12:00:00', '2026-04-31 12:00:00']) {
+    const before = {state: JSON.stringify(controller.getState()), history: storage.get(historyKey), saves: saveCount, navigations: navigated.length};
+    applyRange(impossible, '2026-05-03 12:00:00');
+    assert.equal(elements.timeRangeError.hidden, false, 'invalid calendar input must be reported');
+    assert.equal(JSON.stringify(controller.getState()), before.state);
+    assert.equal(storage.get(historyKey), before.history);
+    assert.equal(saveCount, before.saves);
+    assert.equal(navigated.length, before.navigations);
+}
 assert.equal(JSON.parse(storage.get(historyKey)).length, 1);
 for (let day = 1; day <= 5; day++) applyRange(`2025-05-0${day}T10:00:00.123Z`, `2025-05-0${day}T11:00:00.456Z`);
 let history = JSON.parse(storage.get(historyKey));

@@ -30,7 +30,7 @@
         const parseTimeInput = value => {
             if (typeof value !== 'string' || !value || value.length > 100) return null;
             if (/^now(?:[+-]\d+[smhdwMy]|\/(?:[smhdwMy]|fy))*$/.test(value)) return value;
-            const milliseconds = /^-?\d+$/.test(value) ? Number(value) : Date.parse(value);
+            const milliseconds = /^-?\d+$/.test(value) ? Number(value) : parseGrafanaAbsoluteTime(value);
             return Number.isFinite(milliseconds) && Number.isFinite(new Date(milliseconds).getTime())
                 ? String(milliseconds) : null;
         };

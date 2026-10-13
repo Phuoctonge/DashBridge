@@ -217,6 +217,27 @@ async function inspectPage(context, extensionId, relativePath) {
                 if (await page.locator('#dashboard iframe').count() !== 0) {
                     throw new Error('Paused local modal fixture unexpectedly created an iframe');
                 }
+                const timeSnapshot = () => page.evaluate(async () => JSON.stringify({
+                    profiles: (await chrome.storage.local.get('dashbridge_profiles')).dashbridge_profiles,
+                    history: globalThis.localStorage.getItem('dashbridge.timepicker.history'),
+                }));
+                const beforeInvalidTime = await timeSnapshot();
+                await page.locator('#timePickerBtn').click();
+                for (const invalid of ['2026-02-30 12:00:00', '2026-02-29 12:00:00', '2026-04-31 12:00:00']) {
+                    await page.locator('#absTimeFrom').fill(invalid);
+                    await page.locator('#absTimeTo').fill('2026-05-03 12:00:00');
+                    await page.locator('#applyAbsoluteTime').click();
+                    await page.locator('#timeRangeError').waitFor({ state: 'visible' });
+                    if (await timeSnapshot() !== beforeInvalidTime) throw new Error('Invalid date changed profile or time history');
+                }
+                await page.locator('#absTimeFrom').fill('2024-02-29 12:00:00');
+                await page.locator('#absTimeTo').fill('2024-03-01 12:00:00');
+                await page.locator('#applyAbsoluteTime').click();
+                await page.waitForFunction(async () => {
+                    const stored = await chrome.storage.local.get('dashbridge_profiles');
+                    return stored.dashbridge_profiles?.[0]?.timeState?.from === String(new Date(2024, 1, 29, 12).getTime());
+                });
+                result.calendarInput = 'impossible dates rejected without persistence; valid leap date saved';
                 await page.locator('#profilePickerBtn').click();
                 await page.locator('#cloneProfileBtn').click();
                 await page.locator('.modal-input').fill('Playwright profile copy');

@@ -34,28 +34,9 @@ function parseGrafanaTimePoint(value) {
         return Number.isFinite(timestamp) ? String(timestamp) : null;
     }
 
-    // Parse numeric dates explicitly. This avoids browser-dependent handling of
-    // 01/02/2026 and treats it as the usual Russian dd/mm/yyyy format.
-    const match = source.match(/^(?:(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})|(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4}))(?:[ T](\d{1,2})(?::(\d{2}))?(?::(\d{2})(?:[.,](\d{1,3}))?)?)?$/);
-    if (match) {
-        const year = Number(match[1] || match[6]);
-        const month = Number(match[2] || match[5]);
-        const day = Number(match[3] || match[4]);
-        const hour = Number(match[7] || 0);
-        const minute = Number(match[8] || 0);
-        const second = Number(match[9] || 0);
-        const millisecond = Number(String(match[10] || 0).padEnd(3, '0'));
-        const date = new Date(year, month - 1, day, hour, minute, second, millisecond);
-        if (date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day
-            && date.getHours() === hour && date.getMinutes() === minute && date.getSeconds() === second) {
-            return String(date.getTime());
-        }
-        return null;
-    }
-
-    // ISO 8601 (including an explicit UTC offset) and textual browser-supported
-    // formats are useful fallbacks. Invalid dates intentionally return null.
-    const timestamp = Date.parse(source);
+    // Calendar validation is shared with DashBridge. Batch keeps its local
+    // numeric-date convention (dd/mm/yyyy), seconds adapter and relative grammar.
+    const timestamp = parseGrafanaAbsoluteTime(source, { numericDates: true });
     return Number.isFinite(timestamp) ? String(timestamp) : null;
 }
 
@@ -67,7 +48,9 @@ function normalizeGrafanaTimeRanges(value) {
         const [from, to, ...rest] = line.split(',').map(item => item.trim());
         const normalizedFrom = rest.length === 0 ? parseGrafanaTimePoint(from) : null;
         const normalizedTo = rest.length === 0 ? parseGrafanaTimePoint(to) : null;
-        if (normalizedFrom && normalizedTo) ranges.push({ from: normalizedFrom, to: normalizedTo });
+        if (normalizedFrom && normalizedTo && !(Number(normalizedFrom) > Number(normalizedTo))) {
+            ranges.push({ from: normalizedFrom, to: normalizedTo });
+        }
         else errors.push(index + 1);
     });
     return { ranges, errors };
