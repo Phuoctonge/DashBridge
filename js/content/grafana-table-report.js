@@ -37,6 +37,109 @@
     };
 
     const TABLE_ROW_LIMIT = 100;
+    const NATIVE_ROW_LIMIT = 5000;
+    // Internal React/renderer properties are data only: never run a getter.
+    const ownValue = (object, key) => object && Object.getOwnPropertyDescriptor(object, key)?.value;
+    const currentTableFiber = element => {
+        const keys = Object.keys(element).filter(key => key.startsWith('__reactFiber'));
+        if (keys.length !== 1) return null;
+        let fiber = ownValue(element, keys[0]);
+        const path = [];
+        // Scenes/provider nesting in Grafana 12 can exceed 90 fibers before
+        // HostRoot. This proof-only walk reads no ancestor props or app graph.
+        for (let depth = 0; fiber && depth < 256; depth += 1) {
+            path.push(fiber);
+            const parent = ownValue(fiber, 'return');
+            if (!parent) break;
+            fiber = parent;
+        }
+        if (ownValue(fiber, 'tag') !== 3) return null;
+        let current = ownValue(ownValue(fiber, 'stateNode'), 'current');
+        if (current !== fiber && current !== ownValue(fiber, 'alternate')) return null;
+        // Follow only this DOM node's ancestry, selecting each committed child.
+        // A DOM __reactFiber pointer itself may still refer to the previous tree.
+        for (let index = path.length - 2; index >= 0; index -= 1) {
+            const expected = path[index];
+            const alternate = ownValue(expected, 'alternate');
+            let child = ownValue(current, 'child');
+            let found = null;
+            for (let sibling = 0; child && sibling < 256; sibling += 1) {
+                if (child === expected || child === alternate) { found = child; break; }
+                child = ownValue(child, 'sibling');
+            }
+            if (!found) return null;
+            current = found;
+        }
+        return ownValue(current, 'stateNode') === element ? current : null;
+    };
+    const nativeVector = values => {
+        if (Array.isArray(values) || ArrayBuffer.isView(values) && !(values instanceof DataView)) {
+            return { length: values.length, at: index => ownValue(values, String(index)) };
+        }
+        const buffer = ownValue(values, 'buffer');
+        const length = ownValue(values, 'length') ?? (Array.isArray(buffer) ? buffer.length : undefined);
+        let prototype = values;
+        let get;
+        for (let depth = 0; prototype && depth < 3 && !get; depth += 1) {
+            get = ownValue(prototype, 'get');
+            prototype = Object.getPrototypeOf(prototype);
+        }
+        return Number.isInteger(length) && typeof get === 'function'
+            ? { length, at: index => get.call(values, index) } : null;
+    };
+    const collectNativeTable = element => {
+        try {
+            let fiber = currentTableFiber(element);
+            let grid = null;
+            for (let depth = 0; fiber && depth < 16; depth += 1, fiber = ownValue(fiber, 'return')) {
+                const props = ownValue(fiber, 'memoizedProps');
+                if (!props) continue;
+                const data = ownValue(props, 'data');
+                // Stop at the plugin/panel owner; never search dashboard or siblings.
+                if (ownValue(props, 'id') != null || ownValue(data, 'series')) break;
+                const rows = ownValue(props, 'rows');
+                const columns = ownValue(props, 'columns');
+                if (Array.isArray(rows) && Array.isArray(columns)) {
+                    if (grid) return null;
+                    grid = { rows, columns };
+                }
+                const fields = ownValue(data, 'fields');
+                if (!Array.isArray(fields)) continue;
+                const length = ownValue(data, 'length');
+                if (!grid || fields.length > 20 || !Number.isInteger(length) || length < 1
+                    || grid.rows.length !== length || grid.columns.length < 2
+                    || !grid.columns.every(column => fields.includes(ownValue(column, 'field')))) return null;
+                const selected = grid.columns.map(column => ownValue(column, 'field'));
+                const fieldName = field => String(ownValue(ownValue(field, 'config'), 'displayName')
+                    || ownValue(field, 'name') || '').trim();
+                const nameField = selected.find(field => ownValue(field, 'type') === 'string'
+                    && /^(?:metric|name|series|метрика|имя|серия|запрос)$/iu.test(fieldName(field)));
+                const numeric = selected.filter(field => ownValue(field, 'type') === 'number');
+                const valueField = numeric.find(field => /^(?:value|current|last|значение|текущее(?: значение)?|количество|count)$/iu.test(fieldName(field)))
+                    || (numeric.length === 1 ? numeric[0] : null);
+                if (!nameField || !valueField) return null;
+                const names = nativeVector(ownValue(nameField, 'values'));
+                const values = nativeVector(ownValue(valueField, 'values'));
+                if (!names || !values || names.length !== length || values.length !== length) return null;
+                if (length > NATIVE_ROW_LIMIT) return { complete: false, totalRows: length, records: [],
+                    numericParse: { complete: true, numeric: true, invalidRows: 0 } };
+                const records = [];
+                let invalidRows = 0;
+                for (let index = 0; index < length; index += 1) {
+                    const rawName = names.at(index);
+                    const value = values.at(index);
+                    const name = typeof rawName === 'string' ? rawName.trim() : '';
+                    if (!name || typeof value !== 'number' || !Number.isFinite(value)) invalidRows += 1;
+                    else records.push({ name, visible: true, values: [value] });
+                }
+                const code = ownValue(ownValue(valueField, 'config'), 'unit');
+                return { complete: true, totalRows: length, records,
+                    numericParse: { complete: invalidRows === 0, numeric: true, invalidRows },
+                    unitDetails: code ? unitParser.unitFromPanelDefinition({ fieldConfig: { defaults: { unit: code } } }) : null };
+            }
+        } catch (_) { /* Unsupported native internals retain the literal DOM fallback. */ }
+        return null;
+    };
     const textOf = element => String(element?.innerText ?? element?.textContent ?? '').trim();
     const cellsOf = row => {
         if (row?.cells?.length) return Array.from(row.cells);
@@ -72,14 +175,23 @@
             const visibleRows = displayRows.slice(0, TABLE_ROW_LIMIT);
             const numericColumns = columns.map((_column, index) => visibleRows.some(row => row[index])
                 && visibleRows.every(row => !row[index] || parseGrafanaTableDisplayValue(row[index]) !== null));
+            const native = collectNativeTable(table);
+            const ariaCount = Number(table.getAttribute?.('aria-rowcount'));
+            const summaryCount = rows.filter(row => row.matches?.('.rdg-summary-row, .rdg-bottom-summary-row, .rdg-top-summary-row')).length;
+            const expectedRows = ariaCount > 0 ? Math.max(0, ariaCount - 1 - summaryCount) : null;
+            const isGrid = table.getAttribute?.('role') === 'grid';
+            const complete = native ? native.complete : displayRows.length <= TABLE_ROW_LIMIT
+                && columns.length <= 20 && (expectedRows === null ? !isGrid : expectedRows === displayRows.length);
             best = {
                 columns: columns.slice(0, 20),
                 rows: visibleRows.map(row => row.slice(0, 20)),
                 numericColumns: numericColumns.slice(0, 20),
-                totalRows: displayRows.length,
-                truncated: displayRows.length > TABLE_ROW_LIMIT || columns.length > 20,
+                totalRows: native?.totalRows ?? expectedRows ?? displayRows.length,
+                truncated: (native?.totalRows ?? expectedRows ?? displayRows.length) > visibleRows.length || columns.length > 20,
+                complete,
                 source: 'dom'
             };
+            if (native) Object.defineProperty(best, 'native', { value: native });
         }
         return best;
     };

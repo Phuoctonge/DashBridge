@@ -59,8 +59,7 @@ assert.strictEqual(tableReport.getResponseTableFrameShape({
 }), null, 'response tables without a numeric value column must fail open');
 vm.runInContext(tableSource, context);
 assert.strictEqual(context.DashBridgeGrafanaTableReport, tableReport, 'reinstallation must preserve the table report API');
-assert(source.includes("engine = table && responseTableRecords.length ? 'table-response' : 'table-dom'")
-    && source.includes('records = tableRecords;'),
+assert(source.includes('records = tableRecords;'),
     'report snapshots must use table rows when neither Flot nor uPlot exists');
 const collectorSource = source.slice(source.indexOf('const collectPanelReportSnapshot'));
 assert(collectorSource.indexOf('records = tableRecords;') < collectorSource.indexOf('const failureKinds = new Set')
@@ -123,3 +122,112 @@ const literal = snapshot({ source: 'none' });
 assert.strictEqual(literal.state, 'no_threshold');
 assert.strictEqual(literal.series.length, 0);
 assert.strictEqual(literal.aggregateValue, null, 'literal tables must not manufacture a numeric zero');
+
+// The offscreen maximum must come from the selected, committed table frame.
+const nativeNames = Array.from({ length: 100 }, (_, i) => `metric-${i}`);
+const nativeValues = Array.from({ length: 100 }, (_, i) => i === 99 ? 1504287 : 949);
+const frame = { length: 100, fields: [
+    { name: 'Metric', type: 'string', values: nativeNames },
+    { name: 'Value', type: 'number', config: { unit: 'short' }, values: nativeValues }
+] };
+const host = { stateNode: table, memoizedProps: { role: 'grid' } };
+const grid = { memoizedProps: { rows: nativeNames.map((Metric, i) => ({ Metric, Value: nativeValues[i] })),
+    columns: frame.fields.map(field => ({ field, name: field.name })) }, child: host };
+const component = { memoizedProps: { data: frame }, child: grid };
+const panel = { memoizedProps: { id: 31, data: { series: [frame] } }, child: component };
+const reactRoot = { tag: 3, stateNode: {}, child: panel };
+reactRoot.stateNode.current = reactRoot;
+host.return = grid; grid.return = component; component.return = panel; panel.return = reactRoot;
+table.__reactFiber$test = host;
+table.getAttribute = name => ({ role: 'grid', 'aria-rowcount': '102' })[name] ?? null;
+rows.splice(0, rows.length, ...nativeNames.slice(0, 24).map(name => row([name, '949.00'])));
+assert.strictEqual(snapshot().maxValue, 1504287, 'virtualized report must include offscreen maximum');
+assert.strictEqual(snapshot().series.length, 100);
+assert.strictEqual(snapshot().engine, 'table-native');
+const wrapPanel = count => {
+    let child = panel;
+    for (let index = 0; index < count; index += 1) {
+        const parent = { child };
+        child.return = parent;
+        child = parent;
+    }
+    child.return = reactRoot;
+    reactRoot.child = child;
+};
+wrapPanel(100);
+assert.strictEqual(snapshot().maxValue, 1504287, 'deep Grafana providers must still reach the committed root');
+wrapPanel(300);
+assert.strictEqual(snapshot().dataStatus, 'table_data_incomplete', 'excessive ancestry must remain bounded and explicit');
+panel.return = reactRoot;
+reactRoot.child = panel;
+context.__dashbridgePanelToolsVisualMetadata = { responseTableRecords: [{ name: 'stale', value: 1 }] };
+assert.strictEqual(snapshot().maxValue, 1504287, 'current renderer data must supersede stale transport metadata');
+delete context.__dashbridgePanelToolsVisualMetadata;
+
+const refreshed = { ...component, memoizedProps: { data: { ...frame, fields: [frame.fields[0],
+    { ...frame.fields[1], values: nativeValues.map(() => 5) }] } } };
+const newGrid = { ...grid, memoizedProps: { ...grid.memoizedProps,
+    columns: refreshed.memoizedProps.data.fields.map(field => ({ field, name: field.name })) } };
+const newHost = { ...host };
+const newPanel = { ...panel };
+const newRoot = { ...reactRoot };
+component.alternate = refreshed; refreshed.alternate = component;
+grid.alternate = newGrid; newGrid.alternate = grid;
+host.alternate = newHost; newHost.alternate = host;
+panel.alternate = newPanel; newPanel.alternate = panel;
+reactRoot.alternate = newRoot; newRoot.alternate = reactRoot;
+newRoot.child = newPanel; newPanel.child = refreshed; refreshed.child = newGrid; newGrid.child = newHost;
+newHost.return = newGrid; newGrid.return = refreshed; refreshed.return = newPanel; newPanel.return = newRoot;
+reactRoot.stateNode.current = newRoot;
+assert.strictEqual(snapshot().maxValue, 5, 'DOM fiber alternate must resolve the committed refresh');
+reactRoot.stateNode.current = reactRoot;
+
+for (const bad of [null, '', undefined]) {
+    nativeValues[99] = bad;
+    assert.strictEqual(snapshot().state, 'configuration_error', 'native missing numeric value must not become zero');
+}
+nativeValues[99] = 1504287;
+const originalData = component.memoizedProps.data;
+component.memoizedProps.data = { ...frame, length: 101 };
+assert.strictEqual(snapshot().dataStatus, 'table_data_incomplete', 'mismatched frame shape must not use partial DOM');
+component.memoizedProps.data = originalData;
+grid.memoizedProps.columns = [{ field: {} }, { field: {} }];
+assert.strictEqual(snapshot().state, 'configuration_error', 'unrelated frame fields must not be accepted');
+grid.memoizedProps.columns = frame.fields.map(field => ({ field, name: field.name }));
+for (const [code, value, want, unit] of [['percentunit', 0.8, 80, '%'], ['ms', 84000, 84000, 'ms'], ['short', 1504287, 1504287, '']]) {
+    frame.fields[1].config.unit = code;
+    frame.fields[1].values = new Float64Array(100).fill(value);
+    const result = snapshot();
+    assert.strictEqual(result.maxValue, want, `${code} native scale must agree with report units`);
+    assert.strictEqual(result.unit, unit);
+}
+frame.fields[1].config.unit = 'short';
+frame.fields[1].values = { buffer: nativeValues, get(index) { return this.buffer[index]; } };
+assert.strictEqual(snapshot().maxValue, 1504287, 'legacy Vector.get must support bounded numeric reads');
+frame.fields[1].values = nativeValues;
+const savedRows = grid.memoizedProps.rows;
+grid.memoizedProps.rows = Array.from({ length: 5001 }, () => ({}));
+component.memoizedProps.data = { length: 5001, fields: [
+    { ...frame.fields[0], values: Array(5001).fill('large') },
+    { ...frame.fields[1], values: Array(5001).fill(1) }
+] };
+grid.memoizedProps.columns = component.memoizedProps.data.fields.map(field => ({ field, name: field.name }));
+assert.strictEqual(snapshot().dataStatus, 'table_data_incomplete', 'native row cap must never yield successful partial SLA');
+assert.strictEqual(snapshot({ source: 'none' }).dataStatus, 'table_data_incomplete', 'numeric native cap stays explicit without SLA');
+component.memoizedProps.data = frame;
+grid.memoizedProps.rows = savedRows;
+grid.memoizedProps.columns = frame.fields.map(field => ({ field, name: field.name }));
+component.memoizedProps = { id: 99, data: { series: [frame] } };
+panel.memoizedProps = { data: frame };
+assert.strictEqual(snapshot().dataStatus, 'table_data_incomplete', 'nearest panel boundary must stop unrelated ancestor extraction');
+component.memoizedProps = { data: frame };
+panel.memoizedProps = { id: 31, data: { series: [frame] } };
+Object.defineProperty(component.memoizedProps, 'data', { get() { throw new Error('must not execute getter'); }, configurable: true });
+assert.strictEqual(snapshot().dataStatus, 'table_data_incomplete');
+Object.defineProperty(component.memoizedProps, 'data', { value: frame, configurable: true });
+assert.strictEqual(JSON.stringify(snapshot().table).includes('metric-99'), false, 'full native point arrays must not escape in table payload');
+delete table.__reactFiber$test;
+assert.strictEqual(snapshot().dataStatus, 'table_data_incomplete', 'virtualized DOM alone cannot prove whole-table SLA');
+assert.strictEqual(snapshot({ source: 'none' }).state, 'configuration_error');
+delete table.getAttribute;
+console.log('PASS native complete/current table reports and explicit partial fallback');

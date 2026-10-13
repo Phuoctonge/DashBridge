@@ -107,25 +107,35 @@
                         ? window.__dashbridgePanelToolsVisualMetadata.responseTableRecords : [];
                     const table = collectGrafanaTableData(root);
                     visualTable = table;
-                    const tableUnit = unitFromPanelDefinition(getCachedPanelDefinition());
-                    const tableRecords = table && responseTableRecords.length
+                    const native = table?.native;
+                    const tableUnit = native?.unitDetails || unitFromPanelDefinition(getCachedPanelDefinition());
+                    const tableRecords = native ? native.records : table && responseTableRecords.length
                         ? responseTableRecords.map(item => ({
                             name: String(item?.name || ''), visible: true,
                             values: [item?.value]
                         })).filter(item => item.name && item.values.length)
                         : collectGrafanaTableRecords(root, { unit: tableUnit.unit || '', table });
-                    if (!responseTableRecords.length && table?.numericParse?.complete === false
-                        && (table.numericParse.numeric || source !== 'none')) {
+                    const numericParse = native?.numericParse || table?.numericParse;
+                    const requiresNumeric = tableRecords.length || numericParse?.numeric || source !== 'none';
+                    if (requiresNumeric && (native?.complete === false
+                        || !native && (table?.complete === false || responseTableRecords.length >= 5000))) {
+                        const error = 'Получена только часть строк таблицы; невозможно проверить SLA всей таблицы';
+                        return { state: 'configuration_error', source, evaluation, operator,
+                            engine: 'table-dom', unit: tableUnit.unit || '', series: [], table,
+                            dataStatus: 'table_data_incomplete', dataStatusText: error, error };
+                    }
+                    if ((native || !responseTableRecords.length) && numericParse?.complete === false
+                        && requiresNumeric) {
                         const error = 'Не удалось разобрать все числовые значения таблицы в единице панели';
                         return { state: 'configuration_error', source, evaluation, operator,
                             engine: 'table-dom', unit: tableUnit.unit || '', series: [], table,
                             dataStatus: 'table_numeric_incomplete', dataStatusText: error, error };
                     }
                     if (!records.length && tableRecords.length) {
-                        engine = table && responseTableRecords.length ? 'table-response' : 'table-dom';
+                        engine = native ? 'table-native' : table && responseTableRecords.length ? 'table-response' : 'table-dom';
                         const details = tableUnit;
                         unit = details.unit || '';
-                        factor = engine === 'table-response' ? (Number(details.factor) || 1) : 1;
+                        factor = engine !== 'table-dom' ? (Number(details.factor) || 1) : 1;
                         records = tableRecords;
                     }
                 }

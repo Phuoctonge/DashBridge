@@ -210,7 +210,7 @@ listener снимаются на pagehide и восстанавливаются 
 | Ответ до renderer | `grafana-series-capture.js` | Batch series mode. |
 | Определение панели и query signatures | `grafana-panel-definition.js` | Visual engine, panel tools, test runner. |
 | Разбор и согласование единиц Grafana | `grafana-unit.js` | Visual engine: axis/panel units, threshold, table report, uPlot/Flot. |
-| Чтение Grafana Table | `grafana-table-report.js` | Ограниченный DOM-снимок заголовков/отображаемых ячеек и shape response frames для Visual engine report snapshot. |
+| Чтение Grafana Table | `grafana-table-report.js` | Ограниченный DOM-снимок, read-only чтение текущего renderer DataFrame по явному report request и shape response frames для Visual engine report snapshot. |
 | uPlot/Flot visuals | `grafana-visual-engine.js` | Direct Grafana, DashBridge; стабильный facade и renderer lifecycle. |
 | Снимок данных панели для отчёта | `grafana-report-snapshot.js` | `grafana-visual-engine.js`; чистая агрегация Flot/uPlot/Table без собственного observer lifecycle. |
 | Локальные стили серий | `grafana-series-styles.js` | `grafana-visual-engine.js`; fill/line-width, panel-scoped reapply observer, renderer reflow и диагностика с единым cleanup. |
@@ -552,9 +552,10 @@ SLA-карточку с источником `graph`/`custom`/`none`, режим
 iframe запрос `collectPanelReportSnapshot`. MAIN-runtime читает видимые серии
 uPlot/Flot. Для видимой table-panel он сохраняет ограниченный DOM-снимок с
 исходными отображаемыми строками и предпочитает точные числовые значения из
-перехваченного DataFrame response; наличие DOM-таблицы служит guard, чтобы
+текущего renderer DataFrame выбранной таблицы; наличие DOM-таблицы служит guard, чтобы
 однозначные Stat/графики не классифицировались как Table. Если response shape
-не распознан, числовая агрегация безопасно откатывается к DOM. Снимок таблицы
+не распознан, числовая агрегация использует существующие response metadata либо
+полный DOM-набор; частичный DOM не подтверждает SLA всей таблицы. Снимок таблицы
 доступен шаблону как `{{tableMarkdown}}`, а размеры — как
 `{{tableRowCount}}` и `{{tableColumnCount}}`; Markdown сохраняет подписи Grafana,
 экранирует управляющие символы и ограничен 20 колонками и 100 строками.
@@ -652,8 +653,25 @@ DOM-снимок Metric/Value передаёт полноту разбора ч�
 с `source: none` остаётся информационной без выдуманных числовых значений.
 Известные строки итогов Data Grid (`rdg-summary-row`, `rdg-bottom-summary-row`,
 `rdg-top-summary-row`) не входят в DOM-таблицу и отчётные серии; само имя
-`Total` не исключает обычный ряд. DOM по-прежнему ограничен видимыми строками:
-эта проверка полноты разбора не обещает чтение всей виртуализированной таблицы.
+`Total` не исключает обычный ряд. DOM по-прежнему ограничен видимыми строками.
+По явному report request Table adapter ограниченно читает ancestor chain
+выбранного grid, разрешая устаревший React DOM fiber через committed
+`HostRoot.current` и membership его child chain. Grid rows length и
+`column.field` identity должны совпасть с renderer DataFrame; поиск
+останавливается до plugin/panel owner, без обхода dashboard, вызовов
+React-функций или getters. Массивы, typed arrays и legacy Vector.get читаются
+не более чем для 5000 строк. Полный текущий frame имеет приоритет над response
+metadata; null/пустые/нечисловые значения не становятся нулём. Raw unit берётся
+из numeric field.config.unit либо panel definition. Превышение cap или
+частичный DOM без подтверждённого native frame возвращает
+`configuration_error` / `table_data_incomplete`, без успешного SLA.
+Полнота fallback учитывает aria-rowcount, header/summary rows и лимит
+DOM-снимка; неизвестная полнота grid не считается полным набором. Response
+metadata на границе 5000 записей также не доказывают полноту. Literal таблица
+с source:none сохраняет информационный режим. Native records временные и не
+входят в публичный table payload; Markdown остаётся снимком видимых строк,
+totalRows/truncated учитывают известный полный размер. Наблюдение fetch/XHR
+при всех выключенных tools, refresh для отчёта и постоянный polling не добавлены.
 Сохранённая единица SLA пересчитывает значения, а не только подпись.
 Анализ Memory различает десятичные KB/MB/GB и двоичные KiB/MiB/GiB.
 
