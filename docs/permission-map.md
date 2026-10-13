@@ -24,6 +24,14 @@
 import ограничен 16 МиБ. Test runner остаётся внутренней extension page и не
 публикуется через `web_accessible_resources`.
 
+Confluence Report использует существующие `windows`, `tabs`, `scripting` и
+host access для отдельного окна выбранной HTTP(S) страницы без credentials в
+URL. Scan читает same-origin REST storage/attachments в текущей сессии через
+executeScript. По явному Apply page controller отправляет attachment POST и
+page PUT, затем GET для проверки версии и структурных ссылок изображений.
+Это отдельный UI, его scope не задаётся allowlist wiki editor. Новых permissions
+нет; ошибочная проверка не отменяет уже совершённые REST-записи.
+
 Isolated `content.js` вычисляет Grafana UI scope по настроенному host/hostname.
 Постоянная MAIN-регистрация/backfill дополнительно ограничены dashboard routes.
 Для привилегированных direct Grafana сообщений service worker независимо

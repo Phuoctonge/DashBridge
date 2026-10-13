@@ -13,6 +13,7 @@ const inspectFrameStartup = require('./support/browser-frame-startup');
 const inspectAuditFixes = require('./support/browser-audit-fixes');
 const inspectDashboardVisual = require('./support/browser-dashboard-visual');
 const inspectRuntimePortScope = require('./support/browser-runtime-port-scope');
+const inspectConfluenceTarget = require('./support/browser-confluence-target');
 const inspectIframeSettings = require('./dashbridge_iframe_settings_browser.cjs');
 
 const projectRoot = path.resolve(__dirname, '..');
@@ -632,6 +633,8 @@ async function main() {
             await inspectReportCollage(context, extensionId),
             await inspectAuditFixes(context, extensionId),
             await inspectDashboardVisual(context, extensionId),
+            await inspectConfluenceTarget(context, extensionId),
+            await inspectConfluenceTarget(context, extensionId, { corruptVerification: true }),
             await inspectTestSelectionWorkflow(context, extensionId),
             await inspectPanelUnitWorkflow(context),
             await inspectNoDataWorkflow(context),

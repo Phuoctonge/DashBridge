@@ -23,8 +23,20 @@
 | Clipboard cleanup (часть A05/F05) | Grafana 10/12: deferred paste после revoke не меняет поля; native Copy восстановлен, modern writes=1, isolated writes=0, bindings=0; OS clipboard не менялся |
 
 Каждое исправление прошло spec/quality review и свой live-контракт. Это не
-закрывает весь A05 (независимая доверенная host authority остаётся исследованием),
-F01 collector, Confluence и остальные неподтверждённые/невыбранные направления.
+закрывает весь A05 (независимая доверенная host authority остаётся исследованием).
+Остальные неподтверждённые/невыбранные направления остаются открытыми.
+Дополнительная проверка 13 октября закрыла A01/F01, A04/F04 и A08/F08:
+null/blank response cells больше не создают zero metadata; выбранное изображение
+Confluence сохраняет адрес исходной разметки до verification; добавление панелей
+закрывает форму только после принятого commit и повторяет dirty draft без дублей.
+Для неполной Metric/Value таблицы response fallback отклоняется целиком;
+reduced-series пропускает отсутствующие samples, настоящий ноль сохранён.
+Table проверена в обеих Grafana direct/iframe после полного restart браузера;
+Confluence проверен фактическим UI на локальном REST fixture, без записи на рабочую
+страницу. Specific/group precedence, original occurrence, no-cascade, разные
+Batch ranges и заменяемый anchor дополнительно закреплены behavior tests.
+Confluence частичные загрузки, отмена и version conflict остаются задачей E05;
+исправление точной цели не объявляет атомарность REST-операций.
 Последний полный прогон перед интеграцией Task 6: lint PASS, 220 JS и 41 Python
 PASS, Chromium 19/21: Jira startup HTTP 401 и потеря modal focus внешним iframe.
 Task 6 локализует только тестовый startup GET Jira и keyboard fixture с paused

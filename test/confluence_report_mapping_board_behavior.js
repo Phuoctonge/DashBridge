@@ -62,3 +62,34 @@ assert.match(reportSource, /function sourceForKey\(sourceKey, rangeKey = null\)/
 assert.match(reportSource, /function findSourceForTarget\(sourceKey, test\)/);
 assert.match(reportSource, /const targetFilename = findSourceForTarget\(link\.sourceKey, targetTest\)/);
 console.log('PASS Confluence report mapping board');
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'pages', 'confluence-report', 'confluence-report-scanner.js'), 'utf8'), context);
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'pages', 'confluence-report', 'confluence-report-storage.js'), 'utf8'), context);
+context.root = context;
+vm.runInContext(reportSource.slice(reportSource.indexOf('    function sourceForKey('), reportSource.indexOf('    function createLiveClient(')), context);
+const imageBlock = filename => `<ac:image><ri:attachment ri:filename="${filename}" /></ac:image>`;
+const targetHtml = '<h3>T1</h3><h4>G</h4><p>CPU</p>' + imageBlock('old.png') + '<p>Memory</p>' + imageBlock('old.png') + '<h3>T2</h3><h4>G</h4><p>CPU</p>' + imageBlock('old.png');
+context.liveResult = { page: { storageHtml: targetHtml }, snapshot: context.DashBridgeConfluenceReportScanner.fromStorageHtml(targetHtml) };
+context.archiveAnalysisData = { ranges: [{ rangeKey: 'r1', panels: [{ panelId: '1', title: 'Panel', source: { path: 'r1/group.png' } }, { panelId: '2', title: 'Specific', source: { path: 'r1/specific.png' } }] }, { rangeKey: 'r2', panels: [{ panelId: '1', title: 'Panel', source: { path: 'r2/group-second.png' } }] }] };
+context.customGraphs = []; context.customSections = [];
+const selectedKey = ['test-01', 'G', 'cpu', 0].join('\0');
+const specificLink = { mode: 'specific', sourceKey: 'r1\0' + '2\0Specific', targetKey: selectedKey };
+const groupLink = { mode: 'group', sourceKey: 'r1\0' + '1\0Panel', targetKey: 'metric\0G\0cpu' };
+const filenames = value => [...value.matchAll(/ri:filename="([^"]+)"/g)].map(match => match[1]);
+context.connections = [specificLink];
+let targetedPlan = context.buildApplyPlan();
+assert.strictEqual(targetedPlan.replacements.length, 1);
+assert.strictEqual(targetedPlan.replacements[0].sourceOffset, context.liveResult.snapshot.tests[0].groups[0].images[0].sourceLocation.offset);
+assert.deepStrictEqual(filenames(context.DashBridgeConfluenceReportStorage.transform(targetHtml, targetedPlan).html), ['specific.png', 'old.png', 'old.png']);
+for (const links of [[groupLink, specificLink], [specificLink, groupLink]]) {
+    context.connections = links;
+    targetedPlan = context.buildApplyPlan();
+    assert.strictEqual(targetedPlan.replacements.length, 2);
+    assert.deepStrictEqual(filenames(context.DashBridgeConfluenceReportStorage.transform(targetHtml, targetedPlan).html), ['specific.png', 'old.png', 'group.png']);
+}
+context.connections = [{ ...groupLink, sourceKey: 'aggregate\0' + '1\0Panel' }];
+assert.deepStrictEqual(filenames(context.DashBridgeConfluenceReportStorage.transform(targetHtml, context.buildApplyPlan()).html), ['group.png', 'old.png', 'group-second.png']);
+const addedKey = 'added-graph\0test-01\0fixture';
+context.customGraphs = [{ targetKey: addedKey, testKey: 'test-01', groupTitle: 'G', caption: 'Insert', insertionBeforeFilename: 'old.png', insertionBeforeSourceOffset: context.liveResult.snapshot.tests[0].groups[0].images[1].sourceLocation.offset }];
+context.connections = [specificLink, { mode: 'specific', sourceKey: 'r1\0' + '1\0Panel', targetKey: addedKey }];
+assert.strictEqual(context.buildApplyPlan().additions[0].insertion.beforeSourceOffset, context.customGraphs[0].insertionBeforeSourceOffset);
+console.log('PASS Confluence report apply planner target identity and precedence');

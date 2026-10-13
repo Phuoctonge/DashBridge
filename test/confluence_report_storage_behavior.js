@@ -40,3 +40,27 @@ assert(storage.verifyPlan(pairedAnchorResult.html, { additions: [{ newFilename: 
 assert.strictEqual(storage.verifyPlan(pairedAnchorResult.html, { additions: [{ newFilename: 'load.png', caption: 'Load Average', insertion: { groupTitle: 'Другая группа', testTitle: 'Тест 1', beforeFilename: 'average.png' } }] }), false);
 assert.strictEqual(storage.verifyPlan('<h3>Тест 1</h3><h5>Метрики серверов системы</h5><p>CPU Usage</p><ac:image><ri:attachment ri:filename="old.png" /></ac:image><p>CPU Usage</p><ac:image><ri:attachment ri:filename="new.png" /></ac:image>', { additions: [{ newFilename: 'new.png', caption: 'CPU Usage', insertion: { groupTitle: 'Метрики серверов системы', testTitle: 'Тест 1' } }] }), true);
 console.log('PASS Confluence report storage transformation');
+const imageBlock = filename => `<ac:image><ri:attachment ri:filename="${filename}" /></ac:image>`;
+const filenames = value => [...value.matchAll(/ri:filename="([^"]+)"/g)].map(match => match[1]);
+const repeatedHtml = '<h3>T1</h3><h4>G</h4><p>CPU</p>' + imageBlock('old.png') + '<p>Memory</p>' + imageBlock('old.png') + '<h3>T2</h3><h4>G</h4><p>CPU</p>' + imageBlock('old.png');
+const offsets = [...repeatedHtml.matchAll(/<ac:image\b/g)].map(match => match.index);
+for (const index of [0, 1, 2]) {
+    const targeted = storage.transform(repeatedHtml, { replacements: [{ oldFilename: 'old.png', newFilename: 'new.png', sourceOffset: offsets[index] }] });
+    assert.deepStrictEqual(filenames(targeted.html), ['old.png', 'old.png', 'old.png'].map((name, position) => position === index ? 'new.png' : name));
+}
+for (const sourceOffset of [-1, offsets[1] + 1, repeatedHtml.length, '0']) assert.throws(() => storage.transform(repeatedHtml, { replacements: [{ oldFilename: 'old.png', newFilename: 'new.png', sourceOffset }] }), /Replacement target/);
+assert.throws(() => storage.transform(repeatedHtml, { replacements: [{ oldFilename: 'other.png', newFilename: 'new.png', sourceOffset: offsets[0] }] }), /Replacement target/);
+assert.throws(() => storage.transform(repeatedHtml, { replacements: [{ oldFilename: 'old.png', newFilename: 'a.png', sourceOffset: offsets[0] }, { oldFilename: 'old.png', newFilename: 'b.png', sourceOffset: offsets[0] }] }), /Conflicting replacement/);
+const occurrencePlan = [{ oldFilename: 'old.png', newFilename: 'a.png', occurrence: 0 }, { oldFilename: 'old.png', newFilename: 'b.png', occurrence: 1 }];
+for (const replacements of [occurrencePlan, occurrencePlan.slice().reverse()]) assert.deepStrictEqual(filenames(storage.transform(repeatedHtml, { replacements }).html), ['a.png', 'b.png', 'old.png']);
+const cascadePlan = [{ oldFilename: 'a.png', newFilename: 'b.png' }, { oldFilename: 'b.png', newFilename: 'c.png' }];
+for (const replacements of [cascadePlan, cascadePlan.slice().reverse()]) assert.deepStrictEqual(filenames(storage.transform(imageBlock('a.png') + imageBlock('b.png'), { replacements }).html), ['b.png', 'c.png']);
+const anchoredPlan = { replacements: [{ oldFilename: 'old.png', newFilename: 'new.png', sourceOffset: offsets[1] }], additions: [{ newFilename: 'insert.png', caption: 'Insert', insertion: { testTitle: 'T1', groupTitle: 'G', beforeFilename: 'old.png', beforeSourceOffset: offsets[1] } }] };
+const anchored = storage.transform(repeatedHtml, anchoredPlan);
+assert.deepStrictEqual(filenames(anchored.html), ['old.png', 'insert.png', 'new.png', 'old.png']);
+assert(anchored.html.indexOf('insert.png') < anchored.html.indexOf('<p>Memory</p>'));
+assert(storage.verifyPlan(anchored.html, { ...anchoredPlan, expectedStorageHtml: anchored.html }));
+assert.strictEqual(storage.verifyPlan(anchored.html.replace('ri:filename="new.png"', 'ri:filename="old.png"').replace('ri:filename="old.png"', 'ri:filename="new.png"'), { expectedStorageHtml: anchored.html }), false);
+assert.strictEqual(storage.verifyPlan(anchored.html.replace('ri:filename="old.png"', 'ri:filename="new.png"'), { expectedStorageHtml: anchored.html }), false);
+assert(storage.verifyPlan(anchored.html.replaceAll('ri:filename="', "ri:filename='" ).replace(/\.png"/g, ".png'"), { expectedStorageHtml: anchored.html }));
+console.log('PASS Confluence report original target identity and verification');

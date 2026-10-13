@@ -25,7 +25,7 @@ manifest.json
 ├── AGENTS.md                   # Обязательная точка входа для AI-анализа
 ├── pages/                      # Feature-папки полноразмерных extension pages
 │   ├── batch/                  # Пакетный PNG/ZIP: UI и lifecycle-модули
-│   ├── confluence-report/      # Read-only сканирование и будущая замена вложений отчёта
+│   ├── confluence-report/      # Сканирование, сопоставление и явная замена вложений отчёта
 │   ├── dashbridge/             # Единый дашборд: renderer, profiles, time
 │   ├── options/                # HTML, CSS и контроллер настроек
 │   ├── popup/                  # Основной Popup: HTML, CSS и page-модули
@@ -52,7 +52,7 @@ manifest.json
 | Service worker | `js/background.js`, `js/background-grafana-infrastructure.js`, `js/background-profile-storage.js`, `js/background-gui-capture.js`, `js/background-update-indicator.js` | Единый message dispatcher; изолированные владельцы MAIN-регистрации/tab-scoped DNR, сериализованных profile/storage commits, GUI capture lifecycle и постоянного action-индикатора обновления. |
 | Isolated content world | `content.js`, `grafana-iframe.js` | Мост Chrome API, Confluence, iframe time/crosshair/title и вывод снимка. |
 | Grafana MAIN world | Файлы runtime manifest | fetch/XHR, данные, visual state, меню, легенда, threshold, vCPU и подготовка снимка. |
-| Extension pages | Popup, Options, DashBridge, Batch, Worklog, Confluence Report | UI, команды и долговечное состояние. Confluence Report читает live-страницу через executeScript в её origin; mutation/upload пока не входит в контракт. |
+| Extension pages | Popup, Options, DashBridge, Batch, Worklog, Confluence Report | UI, команды и долговечное состояние. Confluence Report читает REST storage/attachments и по явному Apply загружает вложения, обновляет страницу и проверяет результат через executeScript в её origin. |
 | Внешние сайты | Grafana, Jira, TDM, Confluence | Недоверенные URL, DOM, API и текст. |
 
 MAIN и isolated world не смешиваются. Связь идёт через
@@ -259,6 +259,7 @@ classifier. Полный режим только показывает controls �
 | Confluence report live schema/client | `confluence-report-live-schema.js`, `confluence-report-live-client.js` | Extension page «Замена изображений в отчёте»; нормализация REST storage/attachments и bounded read-only scan. |
 | Confluence report storage scanner | `confluence-report-scanner.js` | Extension page; строит test/group/image snapshot из storage-разметки без записи во внешний сайт. |
 | Confluence replacement preview | `confluence-report-preview.js` | Extension page; извлекает метрики из attachment names, строит детерминированный план «было → станет» и запрещает молчаливое применение неоднозначных строк. |
+| Confluence report apply | `confluence-report.js`, `confluence-report-storage.js`, `confluence-report-apply.js` | Page controller владеет выбранными связями и REST transport; storage преобразует исходную разметку; apply загружает вложения, выполняет page update и post-save verification. |
 | Profiles storage | `dashbridge-profile-store.js` | `dashbridge-profile-controller.js`. |
 | Profiles UI/lifecycle | `dashbridge-profile-controller.js` | `dashbridge.js`; tab-local selection, cross-tab sync, panel-state checkpoint. |
 | DashBridge iframe transport | `dashbridge-iframe-message-controller.js` | Двусторонняя trust boundary: guarded post/navigation reset, проверка source + exact origin, dispatch report/analysis/capture/tools/crosshair и iframe ready/rendered lifecycle. |
@@ -1186,6 +1187,26 @@ bounded network status и результат восстановления. URL, 
 - Confluence активен только для настроенных wiki-доменов. Его синхронный
   observer предотвращает скачок редактора и намеренно не debounce-ится.
 - Внешние строки назначаются через DOM API/`textContent` либо экранируются.
+
+Confluence Report — отдельная extension page. Scan читает REST storage и
+attachments в сессии открытой страницы, без записи. Явная кнопка Apply после
+сопоставления с Batch ZIP выполняет attachment POST, затем page PUT с версией
+исходного снимка + 1 и контрольное GET. Конфликт версии или ошибка проверки
+не объявляются успехом; уже загруженные вложения автоматически не откатываются.
+Read-only live client остаётся владельцем чтения, requestTab page controller —
+владельцем записи. Они исполняют запросы в origin выбранной HTTP(S) страницы
+без credentials в URL; настройки wiki editor не ограничивают этот отдельный UI.
+
+Точечная замена несёт offset изображения из исходного storage scan, а не
+локальный occurrence группы. Все replacement selectors разрешаются на одной
+исходной разметке до изменения: совпадение filename обязательно, конфликтующие
+замены одной цели отклоняются, новые имена не становятся целями следующих замен.
+Legacy occurrence означает индекс среди исходных изображений с тем же filename.
+Specific-связь имеет приоритет над общей metric-связью; aggregate источник
+выбирается по диапазону соответствующего теста. Якорь добавления сохраняет
+идентичность исходного изображения при его одновременной замене.
+Post-save verification сверяет версию, итоговую последовательность структурных
+ссылок изображений, включая невыбранные, и расположение подписей добавлений.
 
 ### Traffic Recorder
 
