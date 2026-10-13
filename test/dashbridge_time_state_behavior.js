@@ -11,16 +11,10 @@ const legacyValues = {
 };
 const context = {
     URL, URLSearchParams, Date, Number, String,
-    localStorage: { getItem: key => legacyValues[key] ?? null },
-    parseGrafanaAbsoluteTime: value => {
-        const text = String(value || '');
-        const milliseconds = /^\d{13}$/.test(text) ? Number(text) : Date.parse(text);
-        return Number.isFinite(milliseconds) ? milliseconds : null;
-    },
-    serializeGrafanaAbsoluteTime: value => String(value),
-    detectGrafanaTimeFormat: () => 'milliseconds'
+    localStorage: { getItem: key => legacyValues[key] ?? null }
 };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync('js/shared/grafana-time.js', 'utf8'), context);
 vm.runInContext(fs.readFileSync('js/shared/grafana-panel-bootstrap.js', 'utf8'), context);
 vm.runInContext(fs.readFileSync('pages/dashbridge/dashbridge-time-state.js', 'utf8'), context);
 const state = vm.runInContext('DashBridgeTimeState', context);
@@ -61,5 +55,29 @@ const activeUrl = new URL(state.applyToUrl(offUrl.toString(), {
 }));
 assert.strictEqual(activeUrl.searchParams.get('refresh'), '30s');
 assert.strictEqual(new URLSearchParams(activeUrl.hash.slice(1)).has('dashbridgeRefresh'), false);
+
+// Grafana 12.2 solo ignores ISO URL endpoints and queries its fallback period.
+// Exercise the real shared codec: mocking it to always return milliseconds
+// previously hid the incompatible inherited format.
+const isoSource = 'https://grafana.example/d-solo/uid/name?panelId=138&orgId=1'
+    + '&from=2026-09-08T14%3A49%3A17.146Z&to=2026-09-08T15%3A37%3A56.429Z'
+    + '&timezone=Europe%2FMoscow&var-project=RussPass&var-station=%24__all';
+const absoluteRange = { from: '2026-08-26T22:57:39.463+03:00',
+    to: '2026-08-27T03:47:28.851+03:00', refresh: '30s' };
+const absoluteUrl = new URL(state.applyToUrl(isoSource, absoluteRange));
+assert.strictEqual(absoluteUrl.searchParams.get('from'), '1787774259463',
+    'an ISO source URL must not make Grafana ignore the selected absolute start');
+assert.strictEqual(absoluteUrl.searchParams.get('to'), '1787791648851');
+assert.strictEqual(absoluteUrl.searchParams.get('timezone'), 'Europe/Moscow');
+assert.strictEqual(absoluteUrl.searchParams.get('var-project'), 'RussPass');
+assert.strictEqual(absoluteUrl.searchParams.get('var-station'), '$__all');
+assert.strictEqual(absoluteUrl.searchParams.get('refresh'), '30s');
+assert.strictEqual(state.formatForUrl(isoSource, absoluteRange.from), '1787774259463',
+    'iframe time updates must use the same supported absolute codec as navigation');
+assert.strictEqual(state.formatForUrl(isoSource, '1787774259463'), '1787774259463');
+assert.strictEqual(state.formatForUrl(isoSource, 'now-1h'), 'now-1h');
+assert.strictEqual(state.formatForUrl(isoSource, 'now/d'), 'now/d');
+assert.strictEqual(new URL(isoSource).searchParams.get('from'), '2026-09-08T14:49:17.146Z',
+    'formatting a runtime URL must leave the persisted source untouched');
 
 console.log('PASS DashBridge time state normalizes profile settings and reads legacy migration values');

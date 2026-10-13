@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Sent DashBridge absolute time ranges as epoch milliseconds so Grafana solo panels query the selected period even when the saved source URL uses ISO dates.
 - Preserved exact Confluence image targets and insertion anchors from the original storage scan through Apply, then verified page version and the full image-reference sequence after save.
 - Waited for successful profile commits before completing panel addition; retained drafts and rejected stale completions.
 - Rejected missing or non-numeric Grafana table response values before numeric conversion and evaluated table SLA from complete current native data.

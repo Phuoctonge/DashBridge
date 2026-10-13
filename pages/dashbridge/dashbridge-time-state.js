@@ -74,9 +74,11 @@ const DashBridgeTimeState = {
         }
         return `${start.day}.${start.month}.${start.year} ${startTime}–${end.day}.${end.month}.${end.year} ${endTime}`;
     },
-    formatForUrl(urlValue, value) {
+    formatForUrl(_urlValue, value) {
         const milliseconds = parseGrafanaAbsoluteTime(value);
-        return milliseconds === null ? value : (serializeGrafanaAbsoluteTime(milliseconds, detectGrafanaTimeFormat(urlValue)) || value);
+        // Grafana 12.2 solo ignores ISO URL endpoints and queries a fallback range.
+        // Use epoch milliseconds for navigation and time updates; keep datemath intact.
+        return milliseconds === null ? value : String(milliseconds);
     },
     applyToUrl(urlValue, { from, to, refresh }) {
         try {

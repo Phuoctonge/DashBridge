@@ -12,7 +12,6 @@ PANEL_TRANSFER_CONTROLLER = (ROOT / "pages/dashbridge/dashbridge-panel-transfer-
 PANEL_ADDITION_CONTROLLER = (ROOT / "pages/dashbridge/dashbridge-panel-addition-controller.js").read_text(encoding="utf-8")
 PANEL_CARD_CONTROLLER = (ROOT / "pages/dashbridge/dashbridge-panel-card-controller.js").read_text(encoding="utf-8")
 PROFILE_STORE = (ROOT / "js/shared/dashbridge-profile-store.js").read_text(encoding="utf-8")
-TIME_STATE = (ROOT / "pages/dashbridge/dashbridge-time-state.js").read_text(encoding="utf-8")
 TIME_CONTROLLER = (ROOT / "pages/dashbridge/dashbridge-time-controller.js").read_text(encoding="utf-8")
 MIGRATION = (ROOT / "pages/dashbridge/dashbridge-data-migration.js").read_text(encoding="utf-8")
 HTML = (ROOT / "pages/dashbridge/dashbridge.html").read_text(encoding="utf-8")
@@ -39,8 +38,11 @@ checks = {
         and "migrateProfiles" in MIGRATION and "clearLegacyTimeState" in MIGRATION
         and 'src="dashbridge-data-migration.js"' in HTML,
     "dashboard loads the Grafana time helper": 'src="../../js/shared/grafana-time.js"' in HTML,
-    "panel URLs retain their time format": "timeState.applyToUrl" in TIME_CONTROLLER
-        and "detectGrafanaTimeFormat(urlValue)" in TIME_STATE,
+    # Absolute serialization is exercised with the real codec in the Node
+    # time-state regression; this smoke checks both runtime consumers are wired.
+    "panel URLs and iframe updates share the time policy": "timeState.applyToUrl" in TIME_CONTROLLER
+        and "from: timeState.formatForUrl(timeUrl, effective.from)" in TIME_CONTROLLER
+        and "to: timeState.formatForUrl(timeUrl, effective.to)" in TIME_CONTROLLER,
     "time controls are present": all(token in HTML for token in ['id="absTimeFrom"', 'id="absTimeTo"', 'id="applyAbsoluteTime"']),
     "crosshair mode is stored": "dashbridge_crosshairMode" in JS,
     "active panels enter startup queue and paused panels remain excluded": "scheduleFrameLoad(iframe, iframe.dataset.src)" in PANEL_CARD_CONTROLLER
