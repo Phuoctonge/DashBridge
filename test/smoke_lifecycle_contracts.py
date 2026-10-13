@@ -58,8 +58,9 @@ checks = {
         and "flex:1 1 0% !important" in visual_engine
         and "flex:0 0 auto !important" in visual_engine
         and "text-align:right !important" in visual_engine,
-    "Legend-only layout has no persistent size observer": "const watchLegendLayoutSize" not in visual_engine
-        and "__dashbridgeLegendLayoutObserver" not in visual_engine,
+    "Relocated legend size observer shares panel cleanup": "new ResizeObserver(scheduleVisualRefresh)" in visual_engine
+        and "node.__dashBridgeLegendResizeObserver?.disconnect?.()" in visual_engine
+        and "if (invertLegendArg) resizeUPlotToLegendBranch();" in visual_engine,
     "Legend relocation retains its original direction across reapplies": "__dashBridgeLegendOriginalDirection" in visual_engine,
     "Grafana right-legend panels always relocate below": "graph-panel--legend-right" in visual_engine,
     "Legend relocation waits for two committed frames before sizing uPlot": "await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));" in visual_engine

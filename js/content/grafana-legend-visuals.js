@@ -401,12 +401,11 @@
             const legendIsBottom = legendLayout.direction === 'column';
             if (window.name === 'dashbridge-iframe' && legendIsBottom && legendLayout.legendElement) { ensureResponsiveLegendStyles(); legendLayout.legendElement.classList.add('dashbridge-legend-bottom'); }
             if (window.name === 'dashbridge-iframe' && legendIsBottom && legendLayout.legendElement) { const legend = legendLayout.legendElement; ['width','max-width'].forEach(p => legend.style.setProperty(p, '100%', 'important')); legend.style.setProperty('overflow-x', 'hidden', 'important'); legend.querySelectorAll('table').forEach(table => { ['width','max-width'].forEach(p => table.style.setProperty(p, '100%', 'important')); table.style.setProperty('table-layout', 'fixed', 'important'); const rows = [...table.rows]; const count = rows[0]?.cells.length || 0; rows.forEach(row => { const cell = row.cells[0]; if (cell && !cell.title) cell.title = cell.innerText.trim(); }); const widths = Array.from({ length: count }, (_, i) => i ? Math.max(...rows.map(row => row.cells[i]?.scrollWidth || 0), 0) + 12 : 0); const numericTotal = widths.reduce((sum, width) => sum + width, 0); rows.forEach(row => { row.cells[0]?.style.setProperty('width', `max(0px, calc(100% - ${numericTotal}px))`, 'important'); for (let i = 1; i < count; i++) row.cells[i]?.style.setProperty('width', `${widths[i]}px`, 'important'); }); }); }
-            const resizeUPlotAfterLegendLayout = async () => {
+            const resizeUPlotToLegendBranch = () => {
                 if (!legendLayout) return false;
-                if (legendLayout.layoutChanged) {
-                    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-                }
                 const uplot = findUPlotForThreshold(outerPanel);
+                // Prepared capture owns a pinned size until its finally restore.
+                if (uplot?.__dashBridgeCompactSize) return false;
                 const { chartHost, chartBranch } = legendLayout;
                 const sizeTarget = chartBranch || chartHost;
                 if (!sizeTarget?.getBoundingClientRect) return false;
@@ -430,6 +429,12 @@
                     if (!invertLegendArg) delete outerPanel[legendOriginalXAxisIncrementKey];
                 }
                 return true;
+            };
+            const resizeUPlotAfterLegendLayout = async () => {
+                if (legendLayout?.layoutChanged) {
+                    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                }
+                return resizeUPlotToLegendBranch();
             };
             const uplotResizedAfterLegendLayout = await resizeUPlotAfterLegendLayout();
             if (legendLayout?.layoutChanged || uplotResizedAfterLegendLayout) {
@@ -807,22 +812,31 @@
                     if (outerPanel.__dashBridgeObserver) {
                         outerPanel.__dashBridgeObserver.disconnect();
                     }
+                    outerPanel.__dashBridgeLegendResizeObserver?.disconnect();
+                    outerPanel.__dashBridgeLegendResizeObserver = null;
                     if (outerPanel.__dashBridgeObserverRaf) {
                         cancelAnimationFrame(outerPanel.__dashBridgeObserverRaf);
                         outerPanel.__dashBridgeObserverRaf = null;
                     }
                     let rafPending = false;
-                    outerPanel.__dashBridgeObserver = new MutationObserver(() => {
+                    const scheduleVisualRefresh = () => {
+                        if (outerPanel.__dashBridgeObserver !== observer || !outerPanel.isConnected) return;
                         if (!rafPending) {
                             rafPending = true;
                             outerPanel.__dashBridgeObserverRaf = requestAnimationFrame(() => {
                                 outerPanel.__dashBridgeObserverRaf = null;
                                 rafPending = false;
+                                if (outerPanel.__dashBridgeObserver !== observer || !outerPanel.isConnected) return;
+                                // Native View/resize writes the full panel width to
+                                // uPlot. Its relocated legend leaves a smaller branch.
+                                if (invertLegendArg) resizeUPlotToLegendBranch();
                                 applyColors();
                                 repaintDomLegend();
                             });
                         }
-                    });
+                    };
+                    const observer = new MutationObserver(scheduleVisualRefresh);
+                    outerPanel.__dashBridgeObserver = observer;
                     outerPanel.__dashBridgeObserver.observe(outerPanel, {
                         childList: true,
                         subtree: true,
@@ -831,6 +845,11 @@
                             ? ['width', 'height', 'class', 'd']
                             : ['width', 'height', 'class', 'style', 'd']
                     });
+                    if (invertLegendArg && legendLayout && typeof ResizeObserver === 'function') {
+                        const resizeObserver = new ResizeObserver(scheduleVisualRefresh);
+                        resizeObserver.observe(legendLayout.chartBranch || legendLayout.chartHost);
+                        outerPanel.__dashBridgeLegendResizeObserver = resizeObserver;
+                    }
                     legacyVisualObserverOwners.add(outerPanel);
                     legacyObserverDiagnostic.created += 1;
                     legacyObserverDiagnostic.activeOwners = legacyVisualObserverOwners.size;
@@ -989,6 +1008,8 @@
                 }
                 node.__dashBridgeObserver?.disconnect?.();
                 node.__dashBridgeObserver = null;
+                node.__dashBridgeLegendResizeObserver?.disconnect?.();
+                node.__dashBridgeLegendResizeObserver = null;
                 stopLegendColumnsObserver(node);
                 legacyVisualObserverOwners.delete(node);
             });
