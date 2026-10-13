@@ -133,6 +133,22 @@ async function inspectPage(context, extensionId, relativePath) {
         status: 'passed'
     };
     const page = await context.newPage();
+    if (relativePath === 'pages/popup/popup.html') {
+        // Startup smoke is local; release validation is covered separately.
+        // Do not let a live GitHub rate limit turn a healthy popup into a failure.
+        const version = JSON.parse(fs.readFileSync(path.join(projectRoot, 'manifest.json'), 'utf8')).version;
+        const releaseUrl = `https://github.com/Phuoctonge/DashBridge/releases/download/v${version}/`;
+        await page.route('https://api.github.com/repos/Phuoctonge/DashBridge/releases/latest', route => route.fulfill({
+            status: 200, contentType: 'application/json', body: JSON.stringify({
+                tag_name: `v${version}`, draft: false, prerelease: false,
+                html_url: `https://github.com/Phuoctonge/DashBridge/releases/tag/v${version}`,
+                assets: [
+                    { name: `DashBridge-${version}.zip`, browser_download_url: `${releaseUrl}DashBridge-${version}.zip` },
+                    { name: 'Install-DashBridge.ps1', browser_download_url: `${releaseUrl}Install-DashBridge.ps1` },
+                ],
+            }),
+        }));
+    }
     const isWorklog = relativePath === 'pages/worklog/worklog.html';
     let worklogAuthRequests = 0;
     const worklogDisplayName = 'Local smoke user';
