@@ -180,8 +180,9 @@
                     if (timeIndex >= 0 && !item.timeField) {
                         item.timeField = { field: fields[timeIndex], values: frame.data.values[timeIndex] };
                     }
-                    if (isTotal && !item.totalField) item.totalField = { field, values: frame.data.values[fieldIndex] };
-                    if (isAvail && !item.availField) item.availField = { field, values: frame.data.values[fieldIndex] };
+                    const metric = { field, values: frame.data.values[fieldIndex], times: frame.data.values[timeIndex] };
+                    if (isTotal && !item.totalField) item.totalField = metric;
+                    if (isAvail && !item.availField) item.availField = metric;
                 });
             }));
     
@@ -191,11 +192,55 @@
                 || typeof item.timeField.values?.map !== 'function'
                 || !item.totalField.values || !item.availField.values);
             if (incompletePair) return { data, modifiedCount, applied: false, reason: 'incomplete-pair' };
+
+            // Used can be a separate Prometheus expression (name=Value). Match
+            // its semantic display name and complete series labels, not merely
+            // instance or the word Used: those also occur in unrelated metrics.
+            const metricName = (field, keyword) => String(field.config?.displayName
+                || field.config?.displayNameFromDS || field.name || '')
+                .replace(new RegExp(`\\b${escapeKeywordRegExp(keyword)}\\b`, 'gi'), '').trim();
+            const labelIdentity = field => JSON.stringify(Object.entries(field.labels || {})
+                .filter(([key]) => key !== '__name__').sort(([left], [right]) => left.localeCompare(right)));
+            const sameTimes = (left, right) => !!left && !!right && left.length === right.length
+                && Array.from(left).every((value, index) => value === right[index]);
+            const relatedUsedFields = new Set();
+            let ambiguousUsed = false;
+            if (memCalcMode === 'available') {
+                const usedByIdentity = new Map();
+                Object.values(data.results).forEach(result => (result.frames || []).forEach(frame => {
+                    const fields = frame.schema?.fields || [];
+                    const timeIndex = fields.findIndex(field => field.type === 'time' || field.name === 'Time');
+                    fields.forEach(field => {
+                        const display = String(field.config?.displayName || field.config?.displayNameFromDS || field.name || '');
+                        const unit = String(field.config?.unit || '').toLowerCase();
+                        if (field.type !== 'number' || !/\bused\b/i.test(display)
+                            || !['', 'bytes', 'decbytes'].includes(unit)) return;
+                        const key = JSON.stringify([labelIdentity(field), metricName(field, 'used')]);
+                        const candidates = usedByIdentity.get(key) || [];
+                        candidates.push({ field, times: frame.data?.values?.[timeIndex] });
+                        usedByIdentity.set(key, candidates);
+                    });
+                }));
+                memoryPairs.forEach(item => {
+                    const identity = labelIdentity(item.totalField.field);
+                    const name = metricName(item.totalField.field, totalKeyword);
+                    if (identity !== labelIdentity(item.availField.field)
+                        || name !== metricName(item.availField.field, availKeyword)) return;
+                    const matches = usedByIdentity.get(JSON.stringify([identity, name])) || [];
+                    matches.forEach(candidate => {
+                        if (!sameTimes(candidate.times, item.totalField.times)
+                            || !sameTimes(item.availField.times, item.totalField.times)) ambiguousUsed = true;
+                        relatedUsedFields.add(candidate.field);
+                    });
+                    if (matches.length > 1) ambiguousUsed = true;
+                });
+            }
+            if (ambiguousUsed) return { data, modifiedCount, applied: false, reason: 'ambiguous-used-series' };
     
-            // Remove only the exact source fields that formed a complete pair.
+            // Remove the exact pair and the proven related Used byte field.
             // Matching generic words such as "free" or "available" here would
             // silently delete unrelated metrics from the same panel response.
-            const sourceFields = new Set();
+            const sourceFields = new Set(relatedUsedFields);
             memoryPairs.forEach(item => {
                 sourceFields.add(item.totalField.field);
                 sourceFields.add(item.availField.field);
@@ -228,7 +273,7 @@
                 modifiedCount++;
                 const field = JSON.parse(JSON.stringify(item.availField.field));
                 field.name = `${server} Used % (calc)`;
-                field.config = { ...(field.config || {}), displayName: field.name, unit: 'percent' };
+                field.config = { ...(field.config || {}), displayName: field.name, displayNameFromDS: field.name, unit: 'percent' };
                 delete field.config.min;
                 delete field.config.max;
                 Object.keys(field.labels || {}).forEach(key => {

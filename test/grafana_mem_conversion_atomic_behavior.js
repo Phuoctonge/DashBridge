@@ -90,6 +90,58 @@ assert(keywordCollisionFrames.some(item => item.schema.fields.some(field => fiel
 assert(keywordCollisionFrames.some(item => item.schema.fields.some(field => field.name === 'available_connections')),
     'an underscore-named available series must survive RAM conversion');
 
+// Grafana 10 Prometheus response: Used is an expression named Value, while
+// Total/Available retain __name__. All three carry the same remaining labels.
+const memoryFrame = (role, values, overrides = {}) => {
+    const result = frame(role === 'Used' ? 'Value' : `node_memory_Mem${role}_bytes`, 'vm-01:9182', values);
+    const field = result.schema.fields[1];
+    field.labels = { instance: 'vm-01:9182', job: 'node', vm_name: 'vm-01', zone: 'production',
+        ...(role === 'Used' ? {} : { __name__: field.name }), ...(overrides.labels || {}) };
+    field.config = { displayNameFromDS: `vm-01:9182 ${role}`, ...(overrides.config || {}) };
+    if (overrides.time) result.data.values[0] = overrides.time;
+    return result;
+};
+const threeSeries = () => ({ results: {
+    U: { frames: [memoryFrame('Used', [55, 70])] },
+    A: { frames: [memoryFrame('Available', [40, 25])] },
+    T: { frames: [memoryFrame('Total', [100, 100])] }
+} });
+const coherent = threeSeries();
+assert.strictEqual(context.transformMem(coherent).applied, true);
+const coherentFrames = Object.values(coherent.results).flatMap(result => result.frames);
+assert.strictEqual(coherentFrames.length, 1,
+    'related original Used bytes must be replaced together with Total/Available');
+assert.deepStrictEqual(Array.from(coherentFrames[0].data.values[1]), [60, 75],
+    'Available-based conversion must retain its formula even when original Used differs');
+assert.strictEqual(coherentFrames[0].schema.fields[1].config.unit, 'percent');
+assert.strictEqual(coherentFrames[0].schema.fields[1].config.displayNameFromDS, 'vm-01:9182 Used % (calc)',
+    'response/report name collectors must receive the calculated identity instead of stale Available');
+
+const unrelatedUsed = threeSeries();
+unrelatedUsed.results.X = { frames: [
+    memoryFrame('Used', [7, 9], { config: { displayNameFromDS: 'vm-01:9182 Used requests' } }),
+    memoryFrame('Used', [8, 10], { labels: { job: 'another-job' } }),
+    memoryFrame('Used', [20, 30], { config: { unit: 'percent' } })
+] };
+const unrelatedBefore = clone(unrelatedUsed.results.X);
+context.transformMem(unrelatedUsed);
+assert.deepStrictEqual(unrelatedUsed.results.X, unrelatedBefore,
+    'Used text alone, different complete labels or explicit percent units must not remove unrelated fields');
+
+const misalignedUsed = threeSeries();
+misalignedUsed.results.U.frames[0].data.values[0] = [2, 3];
+const misalignedBefore = clone(misalignedUsed);
+assert.strictEqual(context.transformMem(misalignedUsed).applied, false);
+assert.deepStrictEqual(misalignedUsed, misalignedBefore,
+    'a related Used series with incompatible timestamps must fail open atomically');
+
+const ambiguousUsed = threeSeries();
+ambiguousUsed.results.U.frames.push(memoryFrame('Used', [60, 75]));
+const ambiguousBefore = clone(ambiguousUsed);
+assert.strictEqual(context.transformMem(ambiguousUsed).applied, false);
+assert.deepStrictEqual(ambiguousUsed, ambiguousBefore,
+    'multiple related original Used fields must fail open atomically');
+
 context.tools.availKeyword = 'consumed';
 context.tools.memCalcMode = 'used';
 const customUsed = { results: {
