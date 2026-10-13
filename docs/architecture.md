@@ -1475,6 +1475,10 @@ fill/width-настройки к текущему Flot/uPlot и оставляю
 Это необходимо, потому что перестройка легенды может заменить Flot plot после
 того, как legacy painter изменил старый instance; guard не вмешивается в цвета,
 layout или visibility.
+Оба painter используют один исходный fill/width на каждой серии, включая Flot:
+повторный repaint не принимает уже применённую толщину или снятую заливку за
+native baseline. Новая серия получает собственный baseline, OFF восстанавливает
+исходные значения независимо от порядка применения painter.
 
 Дополнительно: `pages/test-runner/test-runner.html` запускает живые E2E на Grafana. По user action
 он открывает общий Document Picture-in-Picture progress controller с количеством

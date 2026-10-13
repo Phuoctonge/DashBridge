@@ -681,11 +681,18 @@
                                     seriesArray.forEach((s) => {
                                         if (!s._originalColor) {
                                             s._originalColor = s.color;
-                                            if (s.lines) {
-                                                s._originalFill = s.lines.fill;
-                                                s._originalLineWidth = s.lines.lineWidth;
-                                                if (s.lines.lineWidth !== undefined) s.__dashbridgeOriginalLineWidth = s.lines.lineWidth;
+                                        }
+                                        if (s.lines) {
+                                            // The local style guard may already have applied fill/width.
+                                            // Both painters must retain the same native series baseline.
+                                            if (!Object.prototype.hasOwnProperty.call(s, '__dashbridgeOriginalAreaFill')) {
+                                                s.__dashbridgeOriginalAreaFill = s.lines.fill;
                                             }
+                                            if (!Object.prototype.hasOwnProperty.call(s, '__dashbridgeOriginalLineWidth')) {
+                                                s.__dashbridgeOriginalLineWidth = s.lines.lineWidth;
+                                            }
+                                            s._originalFill = s.__dashbridgeOriginalAreaFill;
+                                            s._originalLineWidth = s.__dashbridgeOriginalLineWidth;
                                         }
                                     });
     
