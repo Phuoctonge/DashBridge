@@ -30,6 +30,56 @@
         let dashboardPickerState = null;
         let dashboardPickerLoadVersion = 0;
         let connectionPending = false;
+        let additionPending = false;
+        const pendingAdditions = new Map();
+        const formVersions = new Map();
+        const signatureOf = ids => () => JSON.stringify(ids.map(id => documentRef.getElementById(id).value));
+        const singleSignature = signatureOf(['newPanelUrl', 'newPanelWidth']);
+        const quickSignature = signatureOf(['quickAddDashboardUrl', 'quickAddPanelIds', 'quickAddPanelWidth']);
+        const pickerSignature = () => JSON.stringify([
+            dashboardPickerUrl.value, documentRef.getElementById('dashboardPanelPickerWidth').value,
+            [...dashboardPickerList.querySelectorAll('input[type="checkbox"]:checked')].map(input => input.dataset.panelIndex)
+        ]);
+        const invalidateForm = id => formVersions.set(id, (formVersions.get(id) || 0) + 1);
+        const persistAddition = async record => {
+            if (additionPending) return;
+            additionPending = true;
+            const button = documentRef.getElementById(record.id);
+            const disabled = button.disabled;
+            button.disabled = true;
+            try {
+                const result = await savePanels();
+                if (result?.error || result?.current === false) return;
+                pendingAdditions.delete(record.id);
+                if (getPanels() === record.owner && record.signature === record.getSignature()
+                    && record.version === (formVersions.get(record.id) || 0)) {
+                    button.disabled = disabled;
+                    await record.onSaved();
+                }
+            } catch (error) {
+                await showAlert(`Изменения не сохранены: ${error?.message || error}`);
+            } finally {
+                additionPending = false;
+                if (record.id === 'addSelectedDashboardPanelsBtn') updateDashboardPickerSelection();
+                else button.disabled = disabled;
+            }
+        };
+        const retryAddition = async (id, getSignature) => {
+            const record = pendingAdditions.get(id);
+            if (!record || record.owner !== getPanels() || record.signature !== getSignature()
+                || record.version !== (formVersions.get(id) || 0)) return false;
+            await persistAddition(record);
+            return true;
+        };
+        const addAndSave = async (id, addedPanels, getSignature, onSaved) => {
+            const owner = getPanels();
+            const record = { id, owner, getSignature, signature: getSignature(), onSaved,
+                version: formVersions.get(id) || 0 };
+            owner.push(...addedPanels);
+            appendPanelCards(addedPanels);
+            pendingAdditions.set(id, record);
+            await persistAddition(record);
+        };
         const ensureConnection = async (url, isCurrent) => {
             if (connectionPending) return false;
             connectionPending = true;
@@ -50,6 +100,7 @@
         };
 
         const closeSingleModal = () => {
+            invalidateForm('savePanelBtn');
             singleModal.style.display = 'none';
             documentRef.getElementById('newPanelUrl').value = '';
         };
@@ -59,13 +110,14 @@
             documentRef.getElementById('quickAddPanelIds').value = '';
         };
         const closeQuickAddModal = () => {
+            invalidateForm('saveQuickPanelsBtn');
             quickAddModal.style.display = 'none';
             clearQuickAddForm();
         };
 
         const updateDashboardPickerSelection = () => {
             const selected = dashboardPickerList.querySelectorAll('input[type="checkbox"]:checked').length;
-            dashboardPickerAdd.disabled = selected === 0;
+            dashboardPickerAdd.disabled = additionPending || !dashboardPickerState || selected === 0;
             if (dashboardPickerState) {
                 const available = dashboardPickerList
                     .querySelectorAll('input[type="checkbox"]:not(:disabled)').length;
@@ -86,6 +138,7 @@
             dashboardPickerLoad.textContent = 'Получить панели';
         };
         const closeDashboardPicker = () => {
+            invalidateForm('addSelectedDashboardPanelsBtn');
             dashboardPicker.style.display = 'none';
             resetDashboardPicker();
         };
@@ -147,6 +200,7 @@
                 if (event.target === singleModal) closeSingleModal();
             });
             documentRef.getElementById('savePanelBtn').addEventListener('click', async () => {
+                if (additionPending || await retryAddition('savePanelBtn', singleSignature)) return;
                 let url = documentRef.getElementById('newPanelUrl').value.trim();
                 const width = documentRef.getElementById('newPanelWidth').value;
                 if (!url) { await showAlert('Укажите URL!'); return; }
@@ -167,13 +221,12 @@
                     && documentRef.getElementById('newPanelUrl').value === input)) return;
                 if (currentProfileHasPanel(url)) return;
                 const addedPanel = { id: randomUUID(), src: url, width, height: '350px' };
-                getPanels().push(addedPanel);
-                savePanels();
-                appendPanelCards([addedPanel]);
+                await addAndSave('savePanelBtn', [addedPanel], singleSignature, () => {
                 root.DashBridgeAnalytics?.outcome('dashbridge.panel_added', 'success', {
                     method: 'single_url', countBucket: '1'
                 });
                 closeSingleModal();
+                });
             });
 
             documentRef.getElementById('quickAddPanelsBtn').addEventListener('click', () => {
@@ -186,6 +239,7 @@
                 if (event.target === quickAddModal) closeQuickAddModal();
             });
             documentRef.getElementById('saveQuickPanelsBtn').addEventListener('click', async () => {
+                if (additionPending || await retryAddition('saveQuickPanelsBtn', quickSignature)) return;
                 const dashboardUrl = documentRef.getElementById('quickAddDashboardUrl').value.trim();
                 const width = documentRef.getElementById('quickAddPanelWidth').value;
                 if (!dashboardUrl) {
@@ -227,9 +281,7 @@
                     && documentRef.getElementById('quickAddPanelIds').value === idsInput)) return;
                 const currentIdentities = getCurrentProfilePanelIdentities();
                 if (newPanels.some(panel => currentIdentities.has(getPanelIdentity(panel.src)))) return;
-                getPanels().push(...newPanels);
-                savePanels();
-                appendPanelCards(newPanels);
+                await addAndSave('saveQuickPanelsBtn', newPanels, quickSignature, async () => {
                 root.DashBridgeAnalytics?.outcome('dashbridge.panels_added_manual',
                     newPanels.length === panelIds.length ? 'success' : 'partial', {
                         method: 'manual_ids', countBucket: root.DashBridgeAnalytics.bucket(newPanels.length)
@@ -238,6 +290,7 @@
                 if (newPanels.length !== panelIds.length) {
                     await showAlert(`Добавлено панелей: ${newPanels.length}. Уже существующие панели пропущены.`);
                 }
+                });
             });
 
             documentRef.getElementById('discoverDashboardPanelsBtn').addEventListener('click', () => {
@@ -307,6 +360,7 @@
                 updateDashboardPickerSelection();
             });
             dashboardPickerAdd.addEventListener('click', async () => {
+                if (additionPending || await retryAddition('addSelectedDashboardPanelsBtn', pickerSignature)) return;
                 if (!dashboardPickerState) return;
                 const pickerState = dashboardPickerState;
                 const owner = getPanels();
@@ -335,9 +389,7 @@
                 const addedPanels = selectedPanels.map(panel => ({
                     id: randomUUID(), src: panel.url, title: panel.title, width, height: '350px'
                 }));
-                getPanels().push(...addedPanels);
-                await savePanels();
-                appendPanelCards(addedPanels);
+                await addAndSave('addSelectedDashboardPanelsBtn', addedPanels, pickerSignature, async () => {
                 root.DashBridgeAnalytics?.outcome('dashbridge.panels_added_from_discovery',
                     selectedPanels.length === selectedIndexes.length ? 'success' : 'partial', {
                         method: 'dashboard_discovery', countBucket: root.DashBridgeAnalytics.bucket(addedPanels.length)
@@ -346,6 +398,7 @@
                 if (selectedPanels.length !== selectedIndexes.length) {
                     await showAlert(`Добавлено панелей: ${selectedPanels.length}. Уже существующие панели пропущены.`);
                 }
+                });
             });
         };
 

@@ -104,8 +104,9 @@ assert(iframeSettingsStart >= 0 && iframeSettingsEnd > iframeSettingsStart
 
 assert(profileSource.includes('else reconcileDashboardPanelCards(previousPanelStates);')
     && panelCardSource.includes('updatePanelCard(panel.id, { reloadFrame: false });')
-    && panelAdditionSource.includes('appendPanelCards([addedPanel]);')
-    && panelAdditionSource.includes('appendPanelCards(newPanels);')
+    && panelAdditionSource.includes('appendPanelCards(addedPanels);')
+    && panelAdditionSource.includes("addAndSave('savePanelBtn', [addedPanel]")
+    && panelAdditionSource.includes("addAndSave('saveQuickPanelsBtn', newPanels")
     && source.includes('appendPanelCards: appendDashboardPanelCards')
     && profileSource.includes('adoptPanelState(previous, panel)'),
     'panel-only storage sync and additions must preserve unchanged iframe elements');

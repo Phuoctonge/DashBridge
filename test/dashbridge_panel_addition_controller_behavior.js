@@ -59,6 +59,11 @@ const documentRef = {
 const panels = [];
 const appended = [];
 let saves = 0;
+let saveResult = { current: true };
+let saveHook = null;
+let discoveredPanels = [];
+const analytics = [];
+context.DashBridgeAnalytics = { outcome: (...args) => analytics.push(args), bucket: value => String(value) };
 let uuidIndex = 0;
 const alerts = [];
 const connections = [];
@@ -74,7 +79,7 @@ const controller = context.DashBridgePanelAdditionController.create({
     getPanelIdentity: identity,
     parsePanelIds: value => value.split(',').map(item => item.trim()).filter(Boolean),
     parseDashboardUrl: value => value.includes('/d/') ? {} : null,
-    fetchDashboardPanels: async () => ({ panelList: [] }),
+    fetchDashboardPanels: async () => ({ panelList: discoveredPanels }),
     normalizePanelMetadataText: value => String(value),
     showAlert: async message => { alerts.push(message); },
     showConfirm: async message => { confirmations.push(message); confirmHook(); return confirmResult; },
@@ -86,7 +91,7 @@ const controller = context.DashBridgePanelAdditionController.create({
     currentProfileHasPanel: () => false,
     getCurrentProfilePanelIdentities: () => new Set(panels.map(panel => identity(panel.src))),
     getPanels: () => panels,
-    savePanels: async () => { saves += 1; },
+    savePanels: async () => { saves += 1; return saveHook ? saveHook() : saveResult; },
     appendPanelCards: value => appended.push(...value),
     documentRef,
     randomUUID: () => `panel-${++uuidIndex}`,
@@ -154,8 +159,87 @@ controller.setup();
     elements.dashboardPanelPickerUrl.value = 'https://grafana.example/d/uid/name';
     assert.strictEqual(controller.closeDashboardPickerIfOpen(), true);
     assert.strictEqual(elements.dashboardPanelPickerOverlay.style.display, 'none');
+    assert.strictEqual(elements.addSelectedDashboardPanelsBtn.disabled, true, 'closed picker must reset its selection action');
     assert.strictEqual(elements.dashboardPanelPickerUrl.value, '');
     assert.strictEqual(controller.closeDashboardPickerIfOpen(), false);
+
+    configured = true;
+    confirmResult = true;
+    await elements.addPanelBtn.emit('click');
+    elements.newPanelUrl.value = 'https://grafana.example/d-solo/retry/single';
+    saveResult = { current: false, error: 'storage unavailable' };
+    const beforeFailure = panels.length;
+    const eventsBeforeFailure = analytics.length;
+    await elements.savePanelBtn.emit('click');
+    assert.strictEqual(elements.modalOverlay.style.display, 'flex', 'failed commit must preserve the form');
+    assert.strictEqual(elements.newPanelUrl.value, 'https://grafana.example/d-solo/retry/single');
+    assert.strictEqual(panels.length, beforeFailure + 1, 'failed addition remains a dirty profile draft');
+    assert.strictEqual(analytics.length, eventsBeforeFailure, 'failure must not publish success');
+    saveResult = { current: true };
+    await elements.savePanelBtn.emit('click');
+    assert.strictEqual(panels.length, beforeFailure + 1, 'retry must not duplicate the draft panel');
+    assert.strictEqual(elements.modalOverlay.style.display, 'none');
+
+    await elements.quickAddPanelsBtn.emit('click');
+    elements.quickAddDashboardUrl.value = 'https://grafana.example/d/retry/quick';
+    elements.quickAddPanelIds.value = '60,61';
+    saveResult = { current: false, error: 'storage unavailable' };
+    const beforeQuickFailure = panels.length;
+    await elements.saveQuickPanelsBtn.emit('click');
+    assert.strictEqual(elements.quickAddModalOverlay.style.display, 'flex');
+    assert.strictEqual(elements.quickAddPanelIds.value, '60,61');
+    saveResult = { current: true };
+    await elements.saveQuickPanelsBtn.emit('click');
+    assert.strictEqual(panels.length, beforeQuickFailure + 2);
+    assert.strictEqual(elements.quickAddModalOverlay.style.display, 'none');
+
+    discoveredPanels = [{ id: '70', title: 'Retry discovery', type: 'timeseries' }];
+    await elements.discoverDashboardPanelsBtn.emit('click');
+    elements.dashboardPanelPickerUrl.value = 'https://grafana.example/d/retry/discovery';
+    await elements.loadDashboardPanelsBtn.emit('click');
+    const beforePickerFailure = panels.length;
+    saveResult = { current: false, error: 'storage unavailable' };
+    await elements.addSelectedDashboardPanelsBtn.emit('click');
+    assert.strictEqual(elements.dashboardPanelPickerOverlay.style.display, 'flex');
+    assert.strictEqual(elements.dashboardPanelPickerList.querySelectorAll('input[type="checkbox"]:checked').length, 1);
+    saveResult = { current: true };
+    await elements.addSelectedDashboardPanelsBtn.emit('click');
+    assert.strictEqual(panels.length, beforePickerFailure + 1);
+    assert.strictEqual(elements.dashboardPanelPickerOverlay.style.display, 'none');
+    assert.strictEqual(elements.addSelectedDashboardPanelsBtn.disabled, true, 'successful picker reset must keep empty selection disabled');
+
+    discoveredPanels = [{ id: '71', title: 'Selection during save', type: 'timeseries' }];
+    await elements.discoverDashboardPanelsBtn.emit('click');
+    elements.dashboardPanelPickerUrl.value = 'https://grafana.example/d/retry/selection';
+    await elements.loadDashboardPanelsBtn.emit('click');
+    let releasePickerSave;
+    saveHook = () => new Promise(resolve => { releasePickerSave = resolve; });
+    const pickerSave = elements.addSelectedDashboardPanelsBtn.emit('click');
+    while (!releasePickerSave) await Promise.resolve();
+    await elements.clearDashboardPanelsBtn.emit('click');
+    releasePickerSave({ current: true });
+    await pickerSave;
+    assert.strictEqual(elements.addSelectedDashboardPanelsBtn.disabled, true, 'late save must respect current empty selection');
+    saveHook = null;
+    await elements.closeDashboardPanelPickerBtn.emit('click');
+
+    await elements.addPanelBtn.emit('click');
+    elements.newPanelUrl.value = 'https://grafana.example/d-solo/retry/slow';
+    let releaseSave;
+    saveHook = () => new Promise(resolve => { releaseSave = resolve; });
+    const inFlight = elements.savePanelBtn.emit('click');
+    while (!releaseSave) await Promise.resolve();
+    const duringSave = panels.length;
+    await elements.savePanelBtn.emit('click');
+    assert.strictEqual(panels.length, duringSave, 'double click must not stage a second panel');
+    assert.strictEqual(elements.savePanelBtn.disabled, true);
+    await elements.closeModalBtn.emit('click');
+    const afterCloseEvents = analytics.length;
+    releaseSave({ current: true });
+    await inFlight;
+    assert.strictEqual(analytics.length, afterCloseEvents, 'late commit must not complete a closed form');
+    assert.strictEqual(elements.savePanelBtn.disabled, false);
+    saveHook = null;
 
     assert.throws(
         () => context.DashBridgePanelAdditionController.create({ documentRef }),
