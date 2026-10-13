@@ -15,6 +15,9 @@
             || typeof panelPicker?.getSeriesSelectedPanelIds !== 'function'
             || typeof chromeRef?.tabs?.update !== 'function'
             || typeof chromeRef?.tabs?.create !== 'function'
+            || typeof chromeRef?.tabs?.get !== 'function'
+            || typeof chromeRef?.tabs?.onUpdated?.addListener !== 'function'
+            || typeof chromeRef?.tabs?.onUpdated?.removeListener !== 'function'
             || typeof chromeRef?.scripting?.executeScript !== 'function') {
             throw new TypeError('Batch Series discovery dependencies are incomplete');
         }
@@ -50,9 +53,11 @@
             return { url: url.toString(), token };
         };
 
-        const navigateCaptureTab = async (tabId, captureUrl, windowId = null) => {
+        const navigateCaptureTab = async (tabId, captureUrl, windowId = null, signal = null, onTabId = null) => {
+            if (signal?.aborted) throw new DOMException('Batch run cancelled', 'AbortError');
             const registration = await ensureEarlyRuntime(captureUrl);
             if (!registration.ok) throw new Error('Не удалось подготовить ранний Grafana runtime');
+            if (signal?.aborted) throw new DOMException('Batch run cancelled', 'AbortError');
             if (tabId) await chromeRef.tabs.update(tabId, { url: captureUrl });
             else {
                 const tab = await chromeRef.tabs.create({
@@ -63,6 +68,38 @@
                 if (!tab.id) throw new Error('Не удалось открыть фоновую вкладку Grafana');
                 tabId = tab.id;
             }
+            // Publish ownership before any cancellable navigation wait so the
+            // run's finally can close a newly created discovery tab on failure.
+            onTabId?.(tabId);
+            // tabs.update resolves before the new document commits. A MAIN waiter
+            // injected immediately can die with the previous panel's document.
+            const expected = new URL(captureUrl);
+            await new Promise((resolve, reject) => {
+                let done = false;
+                const finish = error => {
+                    if (done) return;
+                    done = true;
+                    clearTimeout(timer);
+                    chromeRef.tabs.onUpdated.removeListener(onUpdated);
+                    signal?.removeEventListener('abort', abort);
+                    error ? reject(error) : resolve();
+                };
+                const inspect = tab => {
+                    if (tab?.status !== 'complete') return;
+                    try {
+                        const actual = new URL(tab.url);
+                        if (actual.origin === expected.origin && actual.pathname === expected.pathname
+                            && actual.searchParams.get('dashbridgeSeriesCapture') === expected.searchParams.get('dashbridgeSeriesCapture')) finish();
+                    } catch { /* A pending/invalid URL is not the new capture document. */ }
+                };
+                const onUpdated = (id, _change, tab) => { if (id === tabId) inspect(tab); };
+                const abort = () => finish(new DOMException('Batch run cancelled', 'AbortError'));
+                const timer = setTimeout(() => finish(new Error('Истёк срок загрузки вкладки Grafana')), 30_000);
+                chromeRef.tabs.onUpdated.addListener(onUpdated);
+                signal?.addEventListener('abort', abort, { once: true });
+                if (signal?.aborted) abort();
+                else chromeRef.tabs.get(tabId).then(inspect, finish);
+            });
             return tabId;
         };
 
@@ -168,8 +205,7 @@
             let lastError = null;
             for (const capturePanelId of panelIdCandidates(dashboardUrl, panelId)) {
                 const capture = buildCaptureUrl(dashboardUrl, capturePanelId, range, signatures);
-                nextTabId = await navigateCaptureTab(nextTabId, capture.url, discoveryWindowId);
-                onTabId?.(nextTabId);
+                nextTabId = await navigateCaptureTab(nextTabId, capture.url, discoveryWindowId, signal, onTabId);
                 try {
                     const names = await waitForCapturedSeries(nextTabId, capture.token, 15000, signal);
                     rememberPanelIdFormat(dashboardUrl, capturePanelId);

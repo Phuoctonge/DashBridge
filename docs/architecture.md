@@ -1093,6 +1093,10 @@ series-контейнеров (series/line/area/bar, Recharts, Plotly, Highchart
 Неизвестный SVG-плагин без остальных признаков renderer остаётся неготовым;
 по deadline Batch возвращает ошибку вместо белого PNG. Это ограничение
 эвристики, а не классификация панели по её названию или ID.
+Series discovery перед MAIN waiter ждёт `complete` именно новой вкладки и URL
+с текущим capture token. Это относится и к fallback между `panel-N` и numeric
+ID: Promise `tabs.update` ещё не означает commit нового документа. Ожидание
+ограничено 30 секундами; завершение, ошибка и отмена снимают listener и timer.
 
 ```text
 batch.js

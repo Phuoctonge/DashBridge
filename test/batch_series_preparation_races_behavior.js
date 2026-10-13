@@ -21,7 +21,7 @@ function fixture() {
     const pending = [], notices = [], logs = [];
     let selectedIds = ['7'];
     const documentRef = { getElementById: id => elements[id], createElement: () => new Element() };
-    const chromeRef = { tabs: { create() {}, update() {} }, scripting: { executeScript() {} } };
+    const chromeRef = { tabs: { create() {}, update() {}, get() {}, onUpdated: { addListener() {}, removeListener() {} } }, scripting: { executeScript() {} } };
     const context = vm.createContext({ URL, DOMException, document: documentRef, chrome: chromeRef });
     vm.runInContext(fs.readFileSync('pages/batch/batch-series-discovery-controller.js', 'utf8'), context);
     const controller = context.BatchSeriesDiscoveryController.create({
