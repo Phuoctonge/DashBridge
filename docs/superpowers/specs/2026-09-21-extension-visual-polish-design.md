@@ -1,5 +1,8 @@
 # DashBridge Extension Visual Polish Design
 
+> **Статус на 2026-10-13:** Основные Worklog/Options CSS-решения реализованы. Восьмиразмерный sweep и все пользовательские focus состояния остаются отдельным acceptance; зелёный smoke с локальной paused fixture не закрывает внешний iframe autofocus.
+> Действующее поведение: [архитектура](../../architecture.md), команды и проверки: [разработка](../../development-guide.md), незавершённые направления: [roadmap](../../roadmap.md).
+
 ## Goal
 
 Improve desktop responsive behavior and visual clarity across extension pages from 1024px through 8K, with priority on Worklog, Options, and DashBridge, while preserving existing lifecycle, storage, and Grafana runtime contracts.

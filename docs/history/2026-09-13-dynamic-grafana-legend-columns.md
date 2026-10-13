@@ -1,5 +1,8 @@
 # Dynamic Grafana Legend Columns Implementation Plan
 
+> **Статус документа на 2026-10-13:** Исторический план реализованного контракта legendColumns и чистого helper `grafana-legend-columns.js`. Незаполненные checkbox сохраняют исходные шаги, а не текущую очередь работ. Актуальные владельцы и runtime order — в architecture.
+> Текущие контракты: [архитектура](../architecture.md), проверки: [разработка](../development-guide.md), остатки работы: [roadmap](../roadmap.md).
+
 > **For agentic workers:** Execute the tasks sequentially with tests and checkpoints.
 
 **Goal:** Build panel-scoped legend column settings that discover real Grafana legend columns, compute Last from raw series, and apply only enabled columns in direct Grafana and DashBridge.

@@ -47,6 +47,14 @@
 новые долгие операции DashBridge: service worker или extension page могут быть
 повторно загружены браузером уже из новых файлов.
 
+После reload обновите открытые Grafana-страницы и заново откройте рабочие
+страницы расширения. Если диагностика показывает прежний MAIN-runtime,
+проверенный в локальной unpacked-среде путь — штатно закрыть и снова запустить
+браузер соответствующего профиля, затем проверить изменённый контракт.
+Extension reload сам по себе не доказывает актуальность кода уже открытого
+Grafana-документа; подробности проверки — в
+[development guide](development-guide.md#ранние-transport-wrappers).
+
 `browser://tune` в Яндекс Браузере предназначен для сценария с упакованным CRX
 и не используется installer: на нём нет управления Developer Mode и загрузки
 исходной папки unpacked-расширения.
@@ -68,8 +76,9 @@ Install-DashBridge.ps1
 Install-DashBridge.ps1.sha256
 ```
 
-Release workflow сначала выполняет полный тестовый прогон и `-SelfTest`
-installer, затем публикует assets. Popup принимает update metadata только если
+Release workflow сначала выполняет полный тестовый прогон, `-SelfTest`
+installer и `test/installer_regressions.ps1`, затем публикует assets. Popup
+принимает update metadata только если
 точные ZIP и installer URL принадлежат ожидаемому тегу официального репозитория.
 Кнопка обновления скачивает installer; запуск PowerShell остаётся явным действием
 пользователя.

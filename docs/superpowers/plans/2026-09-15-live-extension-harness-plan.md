@@ -1,5 +1,8 @@
 # DashBridge Live Extension Harness Implementation Plan
 
+> **Статус на 2026-10-13:** Частично реализован. В `test/live/` есть schema, profile lock, observers, probes, command router, scenario engine и opt-in check/scenario/smoke/matrix; живые сценарии ограничены legend и threshold. Имена предлагаемых файлов, marker/token topology и команды ниже — исходный проект, а не точный контракт текущего launcher. Полный capability catalog и все поверхности не объявляются проверенными.
+> Действующие контракты: [архитектура](../../architecture.md), [разработка](../../development-guide.md); актуальные остатки: [roadmap](../../roadmap.md). Нижние шаги и команды сохранены как исходный план; перед продолжением сверять их с кодом и текущими владельцами.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build an opt-in Playwright harness that executes capability-level scenarios against the real DashBridge MV3 extension on authenticated Grafana environments and records proof of execution, observable outcome, diagnostics, and cleanup.

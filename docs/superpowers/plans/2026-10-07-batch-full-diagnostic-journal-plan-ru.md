@@ -1,5 +1,8 @@
 # Полный диагностический журнал Batch Implementation Plan
 
+> **Статус на 2026-10-13:** Основной журнал реализован (`1c244e7`), переключатель находится в шапке Batch (`a0868ed`), читает/пишет sync `batchDetailedLogging`, по умолчанию включён. Operation owner добавляет `batch-debug.jsonl` только при enabled. Предложенное размещение в Options и некоторые имена callbacks ниже — исторический проект; фактический контракт описан в architecture.
+> Действующие контракты: [архитектура](../../architecture.md), [разработка](../../development-guide.md); актуальные остатки: [roadmap](../../roadmap.md). Нижние шаги и команды сохранены как исходный план; перед продолжением сверять их с кодом и текущими владельцами.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Добавить управляемый подробный журнал Batch в `batch-debug.jsonl`, который восстанавливает полный lifecycle каждого задания и опционально попадает в ZIP.

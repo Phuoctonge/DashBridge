@@ -1,5 +1,8 @@
 # План реализации live-тестового контура DashBridge
 
+> **Статус на 2026-10-13:** Частично реализован: opt-in check/scenario/smoke/matrix, bounded evidence, lock, probes, legend и threshold уже есть в `test/live/`. Этап 8 остаётся расширением покрытия; исходные целевые сроки и bridge topology не являются обещанием текущего runtime. Актуальные команды — в development-guide.
+> Действующие контракты: [архитектура](../../architecture.md), [разработка](../../development-guide.md); актуальные остатки: [roadmap](../../roadmap.md). Нижние шаги и команды сохранены как исходный план; перед продолжением сверять их с кодом и текущими владельцами.
+
 ## Этап 1. Схемы и паспорта
 
 Создать русскоязычную схему окружения, сценария и команды с caps, deadline и статусами `passed`, `failed`, `blocked`, `timeout`. Добавить паспорт первого сценария legend complete-hide.

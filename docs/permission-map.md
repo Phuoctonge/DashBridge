@@ -1,7 +1,7 @@
 # DashBridge permission map
 
-Сверено с `manifest.json` версии 2.4.3 и действующими runtime-потоками
-2026-09-09.
+Сверено с `manifest.json` рабочей версии 2.4.4 и действующими runtime-потоками
+2026-10-13. Дата относится к ревизии документации, не к новому runtime-прогону.
 
 | Permission | Функция |
 |---|---|
@@ -132,3 +132,26 @@ MAIN runtime. URL, имена и варианты переменных не от
 действием. Прямой отправки в Telegram, новых сетевых endpoints и записи
 изображений в storage нет. Ограничения захвата и проверка active tab/URL
 отправителя сохраняются.
+
+## Где проверять причину и фактическую область полномочий
+
+| Механизм | Причина и владелец | Проверка контракта |
+|---|---|---|
+| MAIN scripting | Доступ к renderer и ответу Grafana до отрисовки; `syncRegistration`, `backfillOpenFrames` в [infrastructure](../js/background-grafana-infrastructure.js); явный loader в [runtime](../js/shared/grafana-runtime.js). | [registration](../test/grafana_runtime_registration_behavior.js), [port scope](../test/grafana_runtime_port_scope_behavior.js). |
+| Session DNR | Встроенные Grafana с XFO/CSP; `planSessionRules` в [dnr-rules](../js/shared/dnr-rules.js), `syncRules` в infrastructure. | [DNR](../test/dnr_session_rules_behavior.js), `inspectSecurityBoundaries` в [browser smoke](../test/run-extension-browser-smoke.js). |
+| Clipboard/download capture | Снимок реального renderer по пользовательскому действию; [isolated content bridge](../js/content/content.js), [GUI broker](../js/background-gui-capture.js), [page capture helper](../js/shared/grafana-panel-capture.js). | [broker](../test/background_gui_capture_behavior.js), [capture context](../test/batch_panel_capture_context_behavior.js). |
+| Native time clipboard | Копирование/вставка периода через native picker; [time-picker clipboard](../js/content/grafana-time-picker-clipboard.js). | [DOM/scope lifecycle](../test/grafana_time_picker_clipboard_dom_behavior.js), [parser](../test/grafana_time_picker_clipboard_behavior.js). |
+| Profile storage | Единый сериализованный CAS commit нескольких extension pages; [background broker](../js/background-profile-storage.js). | [concurrency](../test/dashbridge_profile_concurrency_behavior.js), [migration](../test/dashbridge_migration_concurrency_behavior.js). |
+| Confluence REST | Пользовательская замена изображений, page version и контрольное чтение; [page controller](../pages/confluence-report/confluence-report.js), [apply](../pages/confluence-report/confluence-report-apply.js). | [targeted apply](../test/confluence_report_apply_behavior.js), [local REST/browser](../test/support/browser-confluence-target.js). |
+
+DNR удаляет XFO и **весь** response CSP для совпавшего subframe. Это не только
+удаление `frame-ancestors`; scope ограничивает применение, но не возвращает
+остальные директивы CSP внутри этого ответа. Login, права Grafana и same-origin
+policy от этого не появляются. Серверная настройка embedding остаётся
+альтернативой, когда она доступна. Подробные причины MAIN/transport/renderer
+решений и их lifecycle находятся в [архитектуре](architecture.md#почему-используются-нестандартные-механизмы).
+
+Разрешение manifest — верхняя граница возможностей, а не доказательство
+допустимости каждого сообщения. Проверка sender/route/origin выполняется
+владельцем конкретного действия. Известные DOM-scope и explicit-loader
+ограничения выше остаются ограничениями; текст документа не устраняет их.

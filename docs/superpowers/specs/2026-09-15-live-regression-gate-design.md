@@ -1,5 +1,8 @@
 # DashBridge Live Regression Gate — спецификация
 
+> **Статус на 2026-10-13:** Предложение полного gate. `run-release-gate.js`, coverage CLI, отдельный capability registry и Unified Dashboard gate из этой спецификации пока отсутствуют. Действующий E2E runner не означает реализацию всего описанного cross-surface gate.
+> Действующее поведение: [архитектура](../../architecture.md), команды и проверки: [разработка](../../development-guide.md), незавершённые направления: [roadmap](../../roadmap.md).
+
 ## Цель
 
 Создать один автоматический release-gate, которому передают один или два

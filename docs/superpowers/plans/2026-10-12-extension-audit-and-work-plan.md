@@ -1,5 +1,7 @@
 # DashBridge: аудит расширения и план работ
 
+> **Статус на 2026-10-13, checkpoint `663afff`:** частично завершённый план. Закрытые условия A01/A04/A07/A08/A09/A11/A12 отделены ниже от частичного A05 и исследований. Разделы первоначального аудита сохраняют исторические наблюдения и не объявляют исправленный код снова сломанным. Текущие runtime-контракты — в [архитектуре](../../architecture.md), открытые работы — в [roadmap](../../roadmap.md), команды — в [development-guide](../../development-guide.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Сделать редактирование графиков Grafana достоверным, предсказуемым и проверяемым; привести вспомогательные сценарии и документацию в соответствие с текущим кодом.
@@ -13,6 +15,18 @@
 ## Основания и пределы анализа
 
 ### Статус пяти согласованных исправлений на 13 октября
+
+Позднейшие интегрированные изменения: RAM `a4cffb3`, Mil/strict numeric Table
+`cbbf452`, полный native Table frame `efe2afa`, clipboard parser/cleanup
+`9ba97e4`/`46ce5b6`; add/commit `d59b1c8`, null response `1481b42`,
+Confluence target `9714463`. Legend View sizing (`31d5c32`), общий native
+Flot baseline (`8871670`), native Table readiness (`a2de993`), compact
+geometry (`efaa0fa`, `6ad4460`) и Series navigation (`7dbf2b4`) также
+уже исправлены, а не новые задачи аудита. Local release fixture — `edd499e`.
+Последний автономный прогон до этой prose-ревизии: ESLint PASS, 221 JS,
+41 Python, Chromium 23/23. Это прежняя проверка кода, не новый runtime-прогон
+правки документации. Jira POST, Apply на рабочем Confluence и Recorder live
+этим набором не объявляются проверенными. Полная D01-матрица остаётся частичной.
 
 | Исправление | Подтверждённый результат |
 |---|---|
@@ -50,7 +64,8 @@ direct Table №31/36/44 no_data/54 literal и uPlot №138; unit mismatch да�
 configuration error. В обеих Grafana invalid clipboard/deferred paste после
 revoke сохраняют inputs, modern native writes=1, isolated writes=0, bindings=0.
 Исходные страницы сохранены, временные закрыты; OS clipboard и сохранённые
-настройки не менялись. Итоговый общий review ветки ещё ожидается.
+настройки не менялись. Пометка об ожидаемом review относилась к тому этапу;
+последующие исправления интегрированы в checkpoint `663afff`.
 Остаточный внешний autofocus описан в [roadmap](../../roadmap.md); зелёный
 локальный focus-тест не подтверждает его исправление.
 
@@ -74,7 +89,7 @@ verification-before-completion, modern-web-guidance; brainstorming — для
 modern-web-guidance сообщает об обновлении самого навыка: локальная версия
 2026_08_31-6ba3cecd, доступная 2026_09_04-7de96777.
 
-### Проверки текущего состояния
+### Исходный baseline 12 октября (исторический снимок)
 
 | Проверка | Результат |
 |---|---|
@@ -112,7 +127,7 @@ permissions и новой навигационной гонки capture этим
 | DashBridge | Профили, iframe-карточки, размеры/тема/пауза/fullscreen/reorder, период/refresh, групповые переменные, сохранённые tools, импорт/экспорт, снимки/ZIP | Активный профиль принадлежит вкладке; профили общие, CAS отвергает конфликт целого профиля |
 | Сводный отчёт | Текстовые шаблоны, SLA, снимки uPlot/Flot/Table, списки метрик, согласованный период, до восьми PNG в коллаже | Это не транзакция datasource и не автоматическая доставка отчётов |
 | Batch | Inventory панелей, правила по ID, несколько периодов, Main/Series, discovery, PNG/ZIP, диагностика, cancel, отдельное capture-окно | Готовность определяется renderer/transport; неизвестные плагины не обещаны |
-| Confluence Report | Чтение live storage/attachments, импорт Batch ZIP, сопоставление, preview, загрузка вложений, обновление страницы и post-save проверка | Запись уже существует; документация read-only устарела, точность замены требует исправления |
+| Confluence Report | Чтение live storage/attachments, импорт Batch ZIP, сопоставление, preview, загрузка вложений, обновление страницы и post-save проверка | Запись уже существует; exact target исправлен в `9714463`, partial/cancel/version-conflict остаются E05 |
 | Worklog/Jira | Черновики, история, пакетная отправка, подтверждённые sent IDs, timezone, перенос/копирование, настоящая отмена | POST и локальная запись не атомарны; при аварии нужна сверка Jira |
 | Recorder | CDP capture, actions/network/HAR/streams/bodies, `.dashflow` v2, import/replay/comparison, cache/incognito режимы | HAR-проекция внутри архива — не отдельный готовый JMX/WebPageTest экспортёр |
 | TDM/Confluence editor | Экспорт чата/фото и отдельный editor scroll fix | Долгая TDM-операция пока зависит от popup; потеря результата при закрытии ещё не доказана |
@@ -126,7 +141,11 @@ bounded diagnostics/archives; отдельные владельцы окон Bat
 
 ## Перепроверка выводов: факты, условия и неподтверждённые предположения
 
-### Живая проверка 13 октября 2026
+### Живая проверка 13 октября 2026 до исправлений (историческая evidence)
+
+Наблюдения F10/F11, неверный clipboard parser и native cleanup ниже
+зафиксированы до соответствующих исправлений. Итог после исправлений указан
+выше; старые номера строк не являются актуальными указателями в исходниках.
 
 Пользователь предоставил два дашборда и авторизовал отдельный visible-profile.
 Production-файлы, dashboard JSON, профили и сохранённые настройки тестами не
@@ -296,7 +315,7 @@ Single/quick handlers не ждут savePanels, picker ждёт, но не пр�
 авторизации. Ошибка production Worklog этим не доказана. Повторный полный runtime
 прогон в ходе prose-перепроверки не выполнялся; прежний результат не новый PASS.
 
-### Основания для исправлений и очередность
+### Первоначальные основания для исправлений и очередность
 
 F01/F04/F05/F07 — воспроизведённые либо прямо установленные локальные дефекты
 с указанными условиями. F08 — установленное расхождение завершения UI и save
@@ -346,14 +365,19 @@ test). Проверяет целые CPU/RAM/Table фабрики, parser и pri
 
 ## Перечень работ и порядок выполнения
 
-Ниже кандидаты в самостоятельные work packages. Checkbox означает открытую
-работу, а не подтверждённую ошибку и не обязательство реализовать все предложения.
+Ниже кандидаты в самостоятельные work packages. `[x]` обозначает закрытое
+указанное условие, `[ ]` — остаток, исследование или продуктовый кандидат,
+а не подтверждённую ошибку и не обязательство реализовать все предложения.
 Подробные patch-планы новых функций составляются при начале соответствующего
 этапа: этот документ не подменяет проектирование UX и не разрешает вымышленные
 API. Для подтверждённых дефектов сначала regression RED, затем минимальное
 исправление текущего владельца, targeted GREEN и общий набор.
 
 ### Этап A — достоверность и безопасное завершение операций
+
+Таблица сохраняет исходные постановки и приоритеты. Актуальный статус каждого
+условия указан в checklist после таблицы; слово «исправить» в исходной постановке
+не означает, что эта задача остаётся открытой.
 
 | ID | Работа и владелец | Проверка и критерий завершения | Зависимости |
 |---|---|---|---|
@@ -370,31 +394,39 @@ API. Для подтверждённых дефектов сначала regress
 | A11 / P1 | Исправить живой F10: согласовать byte и percent серии RAM в renderer/report | Memory №6 с тремя исходными наборами не рисует байты как проценты; рассчитанные 12 рядов сохраняют правильные значения; report не выдаёт байтовый максимум как %; direct/iframe Flot и OFF проверены | Отдельно от отложенного A02 |
 | A12 / P1 | Исправить живой F11: Mil и неразобранные ячейки Table fallback | Реальная ячейка 1.50 Mil учитывается как 1500000; snapshot не возвращает ok при пропуске неразобранной числовой строки; response path остаётся точным. Контракт частичной виртуализированной таблицы определить отдельно | F01 не является причиной этого случая |
 
-После живой проверки практический порядок: A11/A12 → A04 → A01 → A05/A07 → A08/A09 и A10.
-A02/A03 отложены, A06 исследуется без заранее назначенного исправления. Неправильная внешняя Confluence replacement не должна
-ждать косметических улучшений Grafana. A10 обновляется вместе с контрактами.
+Исходный порядок после живой проверки был A11/A12 → A04 → A01 → A05/A07 → A08/A09
+и A10. Завершённые условия ниже повторно не выполнять. A02/A03 отложены,
+A06 исследуется без заранее назначенного исправления.
 
-- [ ] Закрепить F01 пользовательским regression; A02/A03 не менять без реального основания.
-- [ ] Исправить подтверждённые условия A04/A05/A07; A06 сначала подтвердить или закрыть как not reproduced.
-- [ ] Завершить A08–A09 с failure/retry/cancellation tests.
-- [ ] Сверить A10; получить зелёный автономный прогон и явно отделённые live results.
+- [x] A01/F01: null/blank response и reduced-series не создают zero; regression и direct/iframe Table выполнены (`1481b42`).
+- [x] A04/F04: original image target, no-cascade, specific/group precedence, ranges и verification закреплены behavior tests и локальным REST UI fixture (`9714463`).
+- [x] A07/F07: строгий time parser сохраняет оба inputs при invalid payload; Grafana 10/12 проверены (`9ba97e4`).
+- [x] A08/F08: форма ждёт commit, failure сохраняет dirty draft, retry без дублей; single/ID-list/picker regression и browser fixture (`d59b1c8`).
+- [x] A09/F09: smoke использует локальный Jira startup fixture и явный unauthorized state; рабочая Jira этим не проверялась (`9c3f0d7`).
+- [x] A11/F10: RAM byte/% согласованы, Flot direct/iframe/report/OFF проверены (`a4cffb3`).
+- [x] A12/F11: Mil scale и отказ от частичного numeric SLA; native DataFrame полный и независим от scroll (`cbbf452`, `efe2afa`).
+- [x] Часть A05/F05: native listeners/markers/timers очищаются; deferred paste после revoke не меняет поля (`46ce5b6`).
+- [ ] Остаток A05: независимая trusted host authority и synthetic/off-host сценарии; cleanup не закрывает эту границу.
+- [ ] A02/A03 остаются HOLD до реальных условий/выбора совместимости; A06 — исследование полного capture dispatcher, без утверждения утечки.
+- [x] A10: проектные руководства, интеграции, история, UX и планы/specs пересверены отдельной документационной ревизией 2026-10-13 после checkpoint `663afff`. Причины MAIN/DNR/transport/renderer/CDP связаны с владельцами и тестами; roadmap согласован. Это проверка prose, не новый runtime PASS.
 
 ### Этап B — проверить потенциальные дефекты, не фиксировать наугад
 
 | ID | Исследование | Точный сценарий и решение после проверки |
 |---|---|---|
 | B01 / P1 | Direct settings Save после смены dashboard/generation | Задержать query signatures (`grafana-panel-tools.js:2220/2234`), перейти A→B с тем же panel ID или reinject. Проверить state/DOM B. При подтверждении добавить captured identity/generation guard текущему owner; DashBridge profile guard уже существует |
-| B02 / P1 | Grouped Confluence replacement и временные срезы | Два теста × два Batch ranges с разными PNG; проверить, что каждый target получает свой range. Текущий grouped branch `confluence-report.js:144` разрешает source без range, в отличие от additions `:143` |
+| B02 / закрыто для локального контракта | Grouped Confluence replacement и временные срезы | `9714463`: behavior tests закрепляют ranges, specific/group precedence, original occurrence и anchor. Acceptance записи на рабочем Confluence остаётся отдельной проверкой E05 |
 | B03 / P2 | Отзыв Grafana host в уже загруженном MAIN | Включить transforms/threshold, удалить host, инициировать новый запрос. Согласовать немедленную деактивацию либо явный reload-контракт; проверить observers, wrappers, меню и повторное разрешение |
 | B04 / P2 | Backfill navigation между probe и executeScript | Навигация фрейма после проверенного URL и до frameId injection. Подтвердить исполнение в нужном document или воспроизвести scope race; затем использовать document-specific injection там, где API поддерживает |
-| B05 / P2 | Early legend-as-Table / единичный Table timeout | Легенда до uPlot, настоящий Table до response, offscreen iframe, delayed datasource. Снять correlated transport/renderer evidence; не объединять разные renderer lookups без доказательства |
+| B05 / исследование | Early legend-as-Table / единичный Table timeout | HP8_2 timeout не воспроизведён на повторе и не считается доказанным дефектом. Для early legend, offscreen и delayed datasource сохранять correlated transport/renderer evidence; успешный повтор не закрывает весь набор условий |
 | B06 / P2 | Runtime update/reinjection и поздние callbacks | Старый документ после reload extension; in-flight fetch/XHR, threshold readiness, singleton dependencies. Проверить только current generation и отсутствие накопления listeners/wrappers |
 | B07 / P2 | Batch cancel на подготовке и streaming snapshots | Cancel в storage/create/discovery, late window create, поток без idle. Capture не начинается после отмены; streaming получает явный unsupported/limited verdict вместо псевдостабильности |
 | B08 / P2 | Закрытие popup во время TDM export | Долгая передача photos → закрыть popup → проверить финализацию/cleanup. Если результат теряется, перенести владельца долгой операции на отдельную page, не дублировать lifecycle |
 | B09 / P2 | RAM identity за пределами timestamps | Один instance, разные job/device/mount/datasource и повторяющиеся названия. Найти однозначный ключ полного pair; неоднозначность не разрешать первым совпавшим полем |
 | B10 / P3 | Grafana Live WebSocket fallback semantics | Browser fixture blocked/native sockets, identity и brand checks; менять prototype только при доказанном требовании и сохранённой native семантике |
 
-- [ ] Для B01–B10 сохранить воспроизводимый минимальный сценарий и verdict confirmed / not reproduced / intentional limitation.
+- [x] B02: точный target/range локальный контракт проверен; рабочая внешняя запись не объявлена PASS.
+- [ ] Для B01/B03–B10 сохранить минимальный сценарий и verdict confirmed / not reproduced / intentional limitation; B05 единичный HP8_2 — not reproduced on repeat.
 - [ ] Подтверждённые ошибки исправить у установленного owner; неподтверждённые не выдавать за завершённые исправления.
 
 ### Этап C — сделать редактирование графиков понятным
@@ -438,7 +470,7 @@ A02/A03 отложены, A06 исследуется без заранее на�
 не утверждение измеренного bottleneck. Eager iframe и отсутствие постоянного
 polling — намеренные контракты, а не автоматически плохие решения.
 
-- [ ] После авторизации отдельного E2E-профиля завершить D01; до этого его статус BLOCKED.
+- [ ] D01 частично проверен после авторизации: direct/iframe Flot CPU/RAM, uPlot и Table, выбранные renderer/capture сценарии проходят; вся матрица тем, DPR, base path, ошибок и reset ещё не закрыта. Общий статус больше не BLOCKED из-за login.
 - [ ] Выполнить D02–D04, сохранив единого владельца основного E2E catalog.
 - [ ] Получить D05 baseline, затем выбрать только доказанные D06/D07 изменения.
 - [ ] Завершить D08/D09 как небольшие maintenance задачи.

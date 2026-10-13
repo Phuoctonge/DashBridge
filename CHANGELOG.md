@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Preserved exact Confluence image targets and insertion anchors from the original storage scan through Apply, then verified page version and the full image-reference sequence after save.
+- Waited for successful profile commits before completing panel addition; retained drafts and rejected stale completions.
+- Rejected missing or non-numeric Grafana table response values before numeric conversion and evaluated table SLA from complete current native data.
+- Preserved native Table/Grid geometry during compact capture and recognized populated native tables in Batch readiness.
+- Waited for the current Batch Series navigation before discovery, including panel-ID fallback.
+- Corrected shared Flot style baselines and resized relocated legends across native View transitions.
+- Released Grafana clipboard hooks on scope revocation and rejected invalid or stale picker actions.
+- Isolated local browser smoke fixtures, including release metadata and Jira startup responses, from external services.
+
 ## 2.4.4
 
 - Added configurable Grafana summary columns with a master edit toggle.

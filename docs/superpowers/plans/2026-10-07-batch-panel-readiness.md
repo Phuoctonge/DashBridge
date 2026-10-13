@@ -1,5 +1,8 @@
 # Batch panel readiness and capture reliability Implementation Plan
 
+> **Статус на 2026-10-13:** Реализован основной Batch navigation/readiness/capture путь; позднейшие уточнения: SVG axes-only отклоняются (`8188919`), populated native Table принимается (`a2de993`), Series ждёт commit текущей навигации (`7dbf2b4`), compact Table geometry удерживается до reparenting (`efaa0fa`, `6ad4460`). Ordinary readiness требует подтверждения известной визуализации, а не одной outer geometry. Полная live-матрица неизвестных плагинов не заявляется.
+> Действующие контракты: [архитектура](../../architecture.md), [разработка](../../development-guide.md); актуальные остатки: [roadmap](../../roadmap.md). Нижние шаги и команды сохранены как исходный план; перед продолжением сверять их с кодом и текущими владельцами.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Make Batch accept Grafana URL canonicalization, wait for actual panel rendering, and distinguish readiness from screenshot failure without changing Direct Grafana or DashBridge behavior.

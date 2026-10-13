@@ -1,5 +1,8 @@
 # Grafana Runtime Complexity Reduction Implementation Plan
 
+> **Статус на 2026-10-13:** Частично реализован; исходные шаги ниже — исторический план, не текущий backlog. `grafana-panel-data-transforms-runtime.js` и `grafana-legend-columns.js` уже существуют в MAIN manifest. Отдельные diagnostics/model-файлы из Tasks 3–4 не следует создавать автоматически: новая граница требует самостоятельного обоснования по module-design. Остатки complexity и advisory отслеживаются в roadmap.
+> Действующие контракты: [архитектура](../../architecture.md), [разработка](../../development-guide.md); актуальные остатки: [roadmap](../../roadmap.md). Нижние шаги и команды сохранены как исходный план; перед продолжением сверять их с кодом и текущими владельцами.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Reduce justified complexity in the three oversized Grafana MAIN modules while preserving their existing lifecycle ownership, trust boundaries, and runtime contracts.

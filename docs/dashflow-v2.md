@@ -6,6 +6,49 @@
 конвертеров. Он содержит секреты в открытом виде и должен храниться как файл с
 учётными данными.
 
+## Владелец записи и границы CDP
+
+Recorder — extension page. `createControlledTab` и `attachNetwork` в
+[`recorder-session-transport.js`](../pages/recorder/recorder-session-transport.js)
+создают отдельную вкладку `about:blank`, подключают CDP и настраивают Network/Page
+до первой навигации. CDP нужен для response bodies, ExtraInfo, redirects и
+stream events: DOM-only recorder или `webRequest` не предоставляют этот набор
+данных. Permission `debugger` объявлен при установке, поскольку Chrome не
+разрешает его в optional permissions; attach запускают только Record/Replay.
+Action recorder инжектируется в созданную вкладку и доступные frames, а не
+статически во все сайты. Недоступные frames могут оставить действия незаписанными;
+CDP-ошибки чтения тел отражаются в body capture status. Полнота flow не доказывается
+одним успешным attach.
+
+`Disable Cache` задаёт `Network.setCacheDisabled` и
+`Network.setBypassServiceWorker` для этой CDP-сессии. `Disable Cookies` означает
+чистое incognito-окно, а не запрет Cookie headers: cookies работают в пределах
+запуска для авторизации. `assertIncognitoReady` требует разрешение incognito и
+отсутствие других incognito-окон, поскольку Chrome делит между ними cookie store.
+Проверка выполняется перед созданием окна и не предотвращает открытие другого
+incognito-окна позже; данные исчезают после закрытия последнего такого окна.
+Обычный режим использует текущую сессию профиля браузера.
+
+[`recorder-session-controller.js`](../pages/recorder/recorder-session-controller.js)
+владеет Start/Stop: общий startup guard блокирует повторный старт и импорт,
+Stop во время подготовки помечает отмену. `stopSession` даёт pending body capture
+до трёх секунд после начальной паузы 250 мс, затем фиксирует неполноту и вызывает
+detach. Штатный Stop и `finalizeUnexpected` закрывают только ephemeral incognito
+window; обычное контролируемое окно остаётся открытым. Port
+`dashbridge-recorder-lifecycle` в [`background.js`](../js/background.js)
+принимает exact Recorder URL и при disconnect пытается detach привязанного tabId.
+Heartbeat каждые 20 секунд отправляется только при attached; его interval
+принадлежит документу и не снимается на Stop. Закрытие/перезагрузка Recorder
+также запускает best-effort detach через beforeunload. Fallback service worker
+не закрывает incognito window и не восстанавливает реестр сессий после restart:
+это не гарантия удаления cookies при аварии страницы.
+
+Контракты проверяют
+[`recorder_session_transport_behavior.js`](../test/recorder_session_transport_behavior.js),
+[`recorder_session_controller_behavior.js`](../test/recorder_session_controller_behavior.js),
+[`recorder_startup_races_behavior.js`](../test/recorder_startup_races_behavior.js) и
+[`recorder_navigation_scope_behavior.js`](../test/recorder_navigation_scope_behavior.js).
+
 ## Состав архива
 
 | Путь | Роль |
@@ -56,6 +99,11 @@ CDP-ошибка или аварийное завершение. Наличие 
 - 20 000 событий страницы;
 - 256 МиБ общего безопасного рабочего набора архива.
 
+Для входного файла отдельно задан cap 512 МиБ; обязательные entries ограничены
+1 МиБ для manifest, 64 МиБ для flow и streams, 256 МиБ для network и HAR,
+при этом общий cap читаемых entries остаётся 256 МиБ. Это оценки и caps данных,
+а не гарантия пикового RSS: JSON, base64 и JSZip создают промежуточные копии.
+
 Импорт сначала проверяет обязательные JSON, распакованные размеры, пути bodies
 и лимиты. Для каждого тела вычисляется SHA-256: при наличии `bodySha256`
 значение обязано совпасть; при отсутствии поле заполняется вычисленным digest.
@@ -67,11 +115,27 @@ CDP-ошибка или аварийное завершение. Наличие 
 проверяет общий budget и собирает ZIP при сохранении; Chrome Downloads и
 жизненный цикл Blob URL остаются ответственностью контроллера.
 
+`read` проверяет именно обязательные entries и тела, на которые ссылается
+network; дополнительные ZIP entries не извлекаются и не входят в его working-set
+подсчёт. Paths тел разрешены только как `bodies/[a-zA-Z0-9_.-]+.bin`, requestId
+не должны повторяться. SHA-256 защищает согласованность bytes с metadata, но
+не доказывает происхождение архива: подписи и доверенного ключа здесь нет.
+`validateNetwork`/`validateStreams` в
+[`dashflow-schema.js`](../js/shared/dashflow-schema.js) проверяют базовую форму и
+caps, а не каждое необязательное CDP-поле. Проверки ZIP, tampered digest и
+сохранения baseline при отказе находятся в
+[`dashflow_io_behavior.js`](../test/dashflow_io_behavior.js) и
+[`recorder_dashflow_controller_behavior.js`](../test/recorder_dashflow_controller_behavior.js).
+
 ## Секреты
 
 В архив могут попасть пароль, login/e-mail, request body, Authorization,
 Cookie, Set-Cookie, API key, токены и персональные данные. Маскирование в UI не
-изменяет содержимое файла. Это необходимо для повторного логина, но означает:
+изменяет содержимое файла. Сохранение исходных значений позволяет replay
+повторить ввод логина/пароля и сохраняет диагностическую сеть; cookies и старые
+токены из baseline автоматически не устанавливаются в новый браузерный запуск.
+Очищенный экспорт был бы другим контрактом и может потребовать ручной авторизации
+и correlation. Текущий формат означает:
 
 - не добавлять `.dashflow` в Git и общие артефакты CI;
 - передавать файл только по защищённому каналу;

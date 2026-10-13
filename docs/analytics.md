@@ -9,6 +9,11 @@
 произвольные сообщения ошибок. Работающий сервер обязан также отключить access
 logs с IP или настроить их немедленную анонимизацию.
 
+«Обезличенная» здесь означает ограниченный payload без пользовательского
+контента: UUID и история функций всё равно связывают события одной установки.
+HTTPS endpoint и его proxy видят сетевой адрес при соединении; запрет относится
+к сохранению IP в telemetry/логах, а не к отсутствию IP на сетевом уровне.
+
 `installationId` создаётся локально через `crypto.randomUUID()` и сохраняется
 отдельным ключом `dashbridgeInstallationId` в `storage.local`, независимо от
 очереди событий. Перезапуск service worker, штатное обновление по прежнему пути
@@ -22,6 +27,16 @@ logs с IP или настроить их немедленную аноними�
 Service worker принимает только объекты из статического каталога
 `js/shared/analytics-contract.js`. Неизвестная функция, signal, dimension,
 значение dimension или дополнительное поле отклоняются целиком.
+
+Входы и владельцы: fail-open facade
+[`analytics-client.js`](../js/shared/analytics-client.js), каталог
+[`analytics-contract.js`](../js/shared/analytics-contract.js), sender guards
+[`background.js`](../js/background.js), очередь и delivery
+[`background-analytics.js`](../js/background-analytics.js). MAIN не имеет Chrome
+API и сообщает закрытые actions через DOM event; isolated bridge переводит их
+в разрешённые feature IDs, service worker повторно проверяет sender. Эта схема
+ограничивает передаваемые поля, но событие страницы само по себе не доказывает
+настоящий человеческий клик.
 
 Сигналы имеют разный смысл:
 
@@ -98,6 +113,17 @@ Production endpoint — `https://analytics.tongehub.com/v1/events/batch`.
 30–1500 дней). Это настройка кода/Compose; фактическая конфигурация VPS
 проверяется отдельно. Сырые HTTP-логи с IP не допускаются.
 
+Collector [`server.js`](../deploy/dashbridge-analytics/server.js) принимает
+публичный POST без регистрации/аутентификации установки: `validateBatch`
+проверяет закрытый контракт, но не происхождение UUID. `readJson` ограничен
+256 КиБ; общий `takeIngestToken` имеет burst 60 и восстанавливает один token
+за 30 секунд без хранения IP. Это защита нагрузки, а не защита статистики от
+поддельных событий; исчерпание общей квоты затрагивает всех клиентов. Порог
+`MAX_DATABASE_MIB` (по умолчанию 512, минимум 64) останавливает новые записи с
+HTTP 507 по оценке занятых SQLite pages и WAL, а не гарантирует точный размер
+файла. `maintain` удаляет старые события при старте и ежедневно, делает WAL
+checkpoint; внешние backups требуют собственной retention-политики.
+
 Агрегация различает версии расширения. При восстановлении проверяются ID,
 канонические даты часа, версии и счётчики; inflight ограничен 100 событиями,
 общая очередь — 2000. Невалидные/лишние записи учитываются в droppedAggregates.
@@ -164,3 +190,21 @@ Production использует постоянный `node:24-alpine` с read-on
 Публикация backend выполняет проверенную загрузку, backup, короткий restart,
 health-check и rollback; SQLite находится в отдельном `/data` и не входит в
 release. Compose и root helper не обновляются через ограниченный deploy-канал.
+
+Админка доверяет `X-DashBridge-Admin` после bcrypt в Caddy (`requireAdmin`),
+поэтому отсутствие host port и доступ к Docker-сети входят в границу доверия.
+Внешний клиентский header должен удаляться/заменяться proxy, как в
+[`deployment README`](../deploy/dashbridge-analytics/README.md). Контейнер в той
+же сети может обратиться к backend с этим header напрямую; это не второй
+уровень проверки пароля приложением. Авторизованный deploy-пользователь может
+менять код приложения, хотя release не принимает Compose/root helper.
+
+Отрицательные проверки полей и восстановления доставки:
+[`analytics_contract_behavior.js`](../test/analytics_contract_behavior.js),
+[`analytics_delivery_recovery_behavior.js`](../test/analytics_delivery_recovery_behavior.js),
+[`background_analytics_behavior.js`](../test/background_analytics_behavior.js) и
+[`analytics_static_privacy_behavior.js`](../test/analytics_static_privacy_behavior.js).
+Приём/dedup/auth/report проверяет
+[`server.test.js`](../deploy/dashbridge-analytics/test/server.test.js);
+race результатов admin UI —
+[`admin-race.test.js`](../deploy/dashbridge-analytics/test/admin-race.test.js).

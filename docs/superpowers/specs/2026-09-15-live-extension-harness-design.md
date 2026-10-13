@@ -1,6 +1,9 @@
 # DashBridge Live Extension Harness Design
 
-**Status:** Proposed
+> **Статус на 2026-10-13:** Частично реализованный проект. Opt-in контур существует в `test/live/`, но ниже описана целевая topology, а не точная инвентаризация текущих модулей/bridge; подтверждённые сценарии не равны всему capability catalog.
+> Действующее поведение: [архитектура](../../architecture.md), команды и проверки: [разработка](../../development-guide.md), незавершённые направления: [roadmap](../../roadmap.md).
+
+**Исходный статус 2026-09-15:** Proposed; актуальная степень реализации указана выше.
 
 **Goal:** Add an opt-in Playwright live harness that runs capability-level scenarios against the real MV3 extension on one or more authenticated Grafana environments and proves command execution, observable result, diagnostics, and cleanup without duplicating production behavior.
 

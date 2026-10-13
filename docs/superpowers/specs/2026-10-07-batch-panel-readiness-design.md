@@ -1,5 +1,8 @@
 # Batch panel readiness and capture reliability — Design
 
+> **Статус на 2026-10-13:** Основной путь реализован и позднее уточнён. Для ordinary panel нужна подтверждённая визуализация и завершение наблюдаемых запросов; одной positive outer geometry недостаточно. Native Table readiness, compact geometry и Series navigation guards добавлены в `a2de993`, `efaa0fa`, `6ad4460`, `7dbf2b4`. Ниже — исходный дизайн; современный контракт проверять по architecture.
+> Действующее поведение: [архитектура](../../architecture.md), команды и проверки: [разработка](../../development-guide.md), незавершённые направления: [roadmap](../../roadmap.md).
+
 ## Goal
 
 Сделать Batch устойчивым к штатной канонизации URL и медленной отрисовке Grafana: не пропускать ещё не готовую панель, но и не блокировать обычный снимок из-за необязательных диагностических признаков. При этом сохранить преобразования CPU/RAM/vCPU, Series-фильтры, отмену операции и текущие режимы Direct Grafana/DashBridge.

@@ -1,5 +1,8 @@
 # Confluence Report Apply Implementation Plan
 
+> **Статус на 2026-10-13:** Реализован основной REST Apply: storage transformer, attachment upload, page update/version и verification; точность target исправлена в `9714463`. Исходные checkbox ниже сохраняют историю плана и не означают отсутствующий код. Полная acceptance на рабочем Confluence, cancellation/deadline и partial uploads остаются отдельными проверками.
+> Действующие контракты: [архитектура](../../architecture.md), [разработка](../../development-guide.md); актуальные остатки: [roadmap](../../roadmap.md). Нижние шаги и команды сохранены как исходный план; перед продолжением сверять их с кодом и текущими владельцами.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Apply validated ZIP-to-report mappings to Confluence 7.19.18 through the authenticated page session.

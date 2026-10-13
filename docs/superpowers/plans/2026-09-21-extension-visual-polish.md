@@ -1,5 +1,8 @@
 # DashBridge Extension Visual Polish Implementation Plan
 
+> **Статус на 2026-10-13:** Основные CSS-изменения реализованы: Worklog table container имеет stable scrollbar/contained horizontal overscroll, Options — caps 56/64rem на больших viewport. Текущий browser smoke проверяет локальные fixtures; свежий полный восьмиразмерный visual sweep в этой ревизии не выполнялся. Исходные smoke failures ниже не являются текущими blockers; внешний iframe autofocus остаётся открытым.
+> Действующие контракты: [архитектура](../../architecture.md), [разработка](../../development-guide.md); актуальные остатки: [roadmap](../../roadmap.md). Нижние шаги и команды сохранены как исходный план; перед продолжением сверять их с кодом и текущими владельцами.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Improve desktop visual behavior from 1024px through 8K without changing extension runtime ownership or storage contracts.

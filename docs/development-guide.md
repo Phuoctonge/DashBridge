@@ -1,6 +1,6 @@
 # DashBridge: ориентир для дальнейшей разработки
 
-> Для версии 2.4.3. Команды и описание проверок сверены 2026-09-09. Архитектурный источник
+> Для версии 2.4.4. Команды и описание проверок сверены 2026-10-13. Архитектурный источник
 > истины — [`architecture.md`](architecture.md), карта
 > разрешений — [`permission-map.md`](permission-map.md), незавершённые
 > направления — [`roadmap.md`](roadmap.md). История не описывает
@@ -83,7 +83,7 @@ Browser smoke не требует пользователя и ловит оши�
 | DashBridge panel/profile | schema, import/export, pause, theme, time, drag/drop, source+origin | `dashbridge.js`, report transport, renderer, profile store |
 | Time/refresh | relative/absolute range, Grafana 10/12 clipboard, Off vs saved dashboard refresh, iframe reload | `dashbridge-time-state.js`, `grafana-time-picker-clipboard.js`, `grafana-panel-bootstrap.js`, `grafana-refresh-policy.js` |
 | Batch | отдельное окно, cancel/error cleanup, лимиты PNG/ZIP, Blob URL lifecycle | `batch.js`, loader/capture/lifecycle helpers |
-| Confluence Report | авторизованная live-страница, REST storage/attachment scan, точное сопоставление test/group/metric/occurrence; mutation только отдельным подтверждаемым этапом | `pages/confluence-report/`, `confluence-report-live-*.js`, `confluence-report-scanner.js` |
+| Confluence Report | REST scan без записи; явный Apply: attachment POST, page PUT с исходной версией + 1, контрольное GET; точные sourceOffset/filename, конфликт целей, версия и последовательность ссылок, отсутствие автоматического rollback вложений | `pages/confluence-report/`, `confluence-report-live-*.js`, `confluence-report-scanner.js`, `confluence-report-storage.js`, `confluence-report-apply.js` |
 | Recorder/DashFlow | CDP lifecycle, network/HAR projection, atomic import, ZIP working-set и entry caps, SHA-256 bodies, secrets warning | `recorder.js`, `recorder-dashflow-export.js`, `recorder-dashflow-io.js`, `dashflow-schema.js` |
 | Test Runner | порядок runtime scripts, OPFS spool, planned/completed/NOT RUN, PiP cancel и elapsed time, cleanup окна Grafana | `pages/test-runner/test-runner-*.js`, `pages/shared/operation-progress-window.js`, `pages/test-runner/test-runner.html` |
 | Capture | save и copy, prepared on/off, DPR/crop, success/error restore | shared capture helpers, content bridge, background |
@@ -136,6 +136,15 @@ lifecycle. Refresh-policy — отдельный one-shot механизм: он
 dashboard definition; расширять его на datasource responses или direct
 Grafana нельзя.
 
+После изменения MAIN-кода недостаточно увидеть новые файлы на диске или новую
+версию popup. В живых проверках unpacked-профиля перезагрузка расширения и
+Grafana оставляла прежний зарегистрированный MAIN-код; полный штатный restart
+отдельного тестового браузера устранял расхождение. Проверенный путь: завершить
+операции, закрыть браузер этого профиля и запустить его снова тем же launcher,
+затем подтвердить runtime по изменённому контракту/диагностике. Это наблюдение
+конкретной среды, а не утверждение, что Chromium всегда требует restart.
+Пользовательский основной профиль для этого не используется.
+
 ### Clipboard совместимость времени
 
 Grafana 12 копирует absolute range как UTC ISO, а legacy Grafana ожидает
@@ -153,6 +162,28 @@ listeners; pageshow согласует UI с текущим scope. Dataset ос�
 а не независимой проверкой доверенного host.
 
 ## Проверка изменения
+
+Разделяйте доказательства: module/documentation/dependency guards проверяют
+структуру и контракты файлов; Node/Python behavior-тесты исполняют модули с
+подменёнными границами; Chromium smoke проверяет загрузку и зарегистрированные
+локальные UI-сценарии настоящего unpacked-расширения. Авторизованные live-тесты
+проверяют конкретные Grafana и renderer. PASS одного уровня не означает PASS
+других; результат живого окружения `blocked` не является подтверждением дефекта.
+
+Для Confluence Report источники контракта —
+[`requestTab` и `buildApplyPlan`](../pages/confluence-report/confluence-report.js),
+[`create().apply`](../pages/confluence-report/confluence-report-apply.js) и
+[`transform`/`verifyPlan`](../pages/confluence-report/confluence-report-storage.js).
+Регрессии точных целей, запрета upload при невалидной цели и ошибки verification
+проверяют [apply tests](../test/confluence_report_apply_behavior.js) и
+[storage tests](../test/confluence_report_storage_behavior.js). Это локальные
+проверки; реальный attachment POST/page PUT требует выбранной авторизованной
+Confluence. Отмена после уже выполненного POST не откатывает внешний результат.
+
+Если менялись только prose, ссылки и структура документов, достаточно
+`node scripts/check-documentation-links.js`, `git diff --check` и сверки
+описанных команд/контрактов с исходниками. Runtime-прогон обязателен при
+изменении кода, исполняемых конфигураций или поведения.
 
 Однократная установка dev-зависимостей и официального тестового Chromium:
 
@@ -240,8 +271,11 @@ npm run test:live:scenario -- --url 'https://grafana-one.example/d/...' --panelS
 npm run test:live:scenario -- --url 'https://grafana-one.example/d/...' --evidence test-results/live-scenario
 ```
 
-`test:live:check` ограничен readiness-проверкой (до 15 секунд на Grafana), а
-один сценарий — 30 секундами. Сценарий проходит `apply`, наблюдение результата,
+`test:live:check` выполняет readiness-проверку: навигация ограничена 15 секундами,
+запрос `/api/user` — отдельно 5 секундами. Бюджет apply/reset одного сценария
+составляет 30 секунд; запуск браузера, ожидание extension worker и подготовка
+страницы происходят до него, поэтому это не общий предел CLI-команды.
+Сценарий проходит `apply`, наблюдение результата,
 `reset` и проверку восстановления; ошибка авторизации, DNS или неподдержанный
 renderer получают `blocked`, а не `passed`. Эти команды не запускаются из
 `test:all` и не входят в release ZIP.
@@ -336,7 +370,7 @@ foreach ($file in $files) { node --check $file }
 в extension ZIP:
 
 ```powershell
-./scripts/build-release.ps1 -ExpectedTag 'v2.4.3'
+./scripts/build-release.ps1 -ExpectedTag 'v2.4.4'
 ```
 
 Push тега `vX.Y.Z` запускает `.github/workflows/release.yml`: полный набор

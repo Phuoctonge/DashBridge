@@ -1,5 +1,8 @@
 # Замена изображений в отчёте Implementation Plan
 
+> **Статус на 2026-10-13:** Частично реализован с изменённым дизайном. Отдельная Confluence Report page, scan, ZIP, matching/preview и Apply существуют. Фактический путь — REST storage/attachments через сессию выбранной страницы (POST → PUT → GET verification), а не предлагаемые editor bridge/native Save. Точность выбранной цели и ranges закреплена `9714463`; рабочая Confluence acceptance и полный cancel/partial lifecycle этим не подтверждены.
+> Действующие контракты: [архитектура](../../architecture.md), [разработка](../../development-guide.md); актуальные остатки: [roadmap](../../roadmap.md). Нижние шаги и команды сохранены как исходный план; перед продолжением сверять их с кодом и текущими владельцами.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Добавить отдельную extension page «Замена изображений в отчёте» с вертикальным потоком `Confluence → Цели → Источник → Сопоставление → Preview → Применение`, которая сопоставляет выбранные PNG с блоками живого отчёта и сохраняет результат с post-save verification.

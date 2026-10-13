@@ -1,5 +1,8 @@
 # Panel Function Visibility Policy Implementation Plan
 
+> **Статус на 2026-10-13:** Основная policy реализована: `grafanaShowAllPanelFunctions`, parsed-host policy в shared panel analysis, Options/config transfer и оба modal consumers. Checkbox ниже — исходные implementation steps, не доказательство отсутствия функции. Полный набор controls не включает transforms автоматически; полный live acceptance всех host/settings combinations не заявляется.
+> Действующие контракты: [архитектура](../../architecture.md), [разработка](../../development-guide.md); актуальные остатки: [roadmap](../../roadmap.md). Нижние шаги и команды сохранены как исходный план; перед продолжением сверять их с кодом и текущими владельцами.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make CPU/RAM/Load panel controls title-gated only for `mon-dc.mos.ru`, while other Grafana hosts expose the full existing panel-function set, with an explicit global override.

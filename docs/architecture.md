@@ -1,11 +1,11 @@
 # Архитектура DashBridge
 
-> Сверено с версией 2.4.3, исходным кодом, тестами и dependency graph
-> Уточнения загрузки, scope и лимитов внесены 2026-09-09. Здесь описан фактически работающий код. Незавершённые
+> Документация рабочей версии 2.4.4; пересверена 2026-10-13 по исходникам и
+> тестовым контрактам. Это дата ревизии текста, а не нового live-прогона. Здесь описан фактически работающий код. Незавершённые
 > направления вынесены в `docs/roadmap.md`, ключевые прежние решения — в
 > `docs/history/architecture-decisions.md`.
 
-DashBridge — Chrome MV3-расширение с шестью контурами: инструменты обычной
+DashBridge — Chrome MV3-расширение, включающее инструменты обычной
 Grafana, единый дашборд `pages/dashbridge/dashbridge.html`, пакетный экспорт `pages/batch/batch.html`, Jira
 worklog, Traffic Recorder и Popup-инструменты для Grafana/Jira/Confluence/TDM.
 
@@ -44,6 +44,121 @@ manifest.json
 ```
 
 `vendor/jszip.min.js` — сторонняя библиотека; вручную не изменять.
+
+## Почему используются нестандартные механизмы
+
+Ниже — причины действующего выбора, его владельцы и проверки. Эти механизмы
+не следует удалять только из-за их внешнего сходства с инъекцией или обходом
+ограничений. Обоснование не делает отсутствующий guard безопасным: если код
+расходится с указанной областью или cleanup, это самостоятельная находка.
+
+### MAIN-инъекция и ранняя загрузка
+
+Преобразования должны читать объекты renderer и ответ, который получает сама
+Grafana. Isolated world разделяет DOM, но не JS-глобалы страницы; одна правка
+DOM после загрузки не меняет исходные данные, статистики и следующий repaint.
+Поэтому [syncRegistration/backfillOpenFrames](../js/background-grafana-infrastructure.js)
+загружают упорядоченный [runtime manifest](../js/shared/grafana-runtime-manifest.js)
+в MAIN. Chrome API остаются в service worker/isolated world. Код поставляется
+в расширении, а не скачивается как исполняемый скрипт.
+
+Постоянная регистрация ограничена настроенными HTTP(S) hosts и dashboard
+routes; explicit loader имеет отдельно описанный session scope. Проверки:
+[registration](../test/grafana_runtime_registration_behavior.js),
+[manifest](../test/grafana_runtime_manifest_behavior.js) и
+[port scope](../test/grafana_runtime_port_scope_behavior.js).
+Удаление регистрации не выгружает уже исполненный код документа. При проверке
+обновлённого MAIN нужен новый документ с актуальной регистрацией; после обновления
+unpacked расширения проверенный в этой локальной среде путь — полный restart
+отдельного браузера. Одна перезагрузка Grafana здесь могла снова выполнить прежнюю
+регистрацию; это не универсальное требование Chromium для любого обновления.
+
+### Fetch/XHR до renderer
+
+[installDataInterceptor](../js/content/grafana-panel-data-runtime.js) нужен для
+Idle → Load, RAM → Used %, удаления отфильтрованных рядов и согласованных
+report metadata. Запрос напрямую из extension page создал бы второй сбор данных,
+а дорисовка текста поверх графика оставила бы native легенду и SLA несогласованными.
+Wrapper сохраняет native вызов для запросов вне query scope; ответ выбранного
+запроса сопоставляется с панелью/refIds. Dashboard variables не становятся
+панельными данными. Неизвестный shape или ошибка decode не дают права преобразовать
+произвольный ответ. Общий [network adapter](../js/content/grafana-network.js)
+создаёт изменённый Response и снимает устаревшие content-length/content-encoding.
+
+Wrappers устанавливаются один раз на документ; меняется привязка к текущему
+`__dashbridgePanelDataOwner`. Cleanup снимает только свою привязку; UI callbacks
+завершений in-flight запросов обращаются к текущему владельцу. Это не обещание
+восстановить fetch/XHR при каждом OFF, а намеренный lifecycle-контракт.
+Проверки: [transport scope](../test/grafana_panel_transport_scope_behavior.js),
+[generation](../test/grafana_panel_data_generation_behavior.js),
+[network](../test/grafana_network_behavior.js) и
+[runtime](../test/grafana_panel_data_runtime_behavior.js).
+
+### DNR для единого дашборда
+
+Некоторые Grafana запрещают embedding через X-Frame-Options/CSP. Простая
+вставка iframe тогда не создаёт рабочую карточку; серверная настройка embedding
+была бы альтернативой при доступе к конфигурации Grafana. Текущий клиентский
+вариант — [planSessionRules](../js/shared/dnr-rules.js) и
+[syncRules/getDashBridgeTabIds](../js/background-grafana-infrastructure.js).
+Правила требуют разрешённый exact hostname (запись без порта допускает его порты,
+запись с портом ограничивает этот порт), `sub_frame`, tab ID страницы DashBridge
+и extension initiator. Навигация с DashBridge, закрытие/замена вкладки
+вызывают пересинхронизацию; чужой pendingUrl исключается.
+
+Действие **удаляет весь заголовок CSP**, а не только `frame-ancestors`, и XFO;
+остальные директивы удалённого CSP в этом ответе также теряются. Это реальная
+цена выбранного решения, поэтому tab/host/initiator scope обязателен.
+Правила не выдают login, cookies или права datasource и не снимают same-origin
+policy; связь parent/iframe остаётся через origin/source guards. Проверки:
+[session rules](../test/dnr_session_rules_behavior.js) и browser workflow
+`inspectSecurityBoundaries` в [общем smoke](../test/run-extension-browser-smoke.js).
+
+### Внутренние renderer/React объекты и временный layout
+
+Grafana не предоставляет расширению универсальный публичный API для изменения
+всех вариантов uPlot/Flot/Table. [Visual engine](../js/content/grafana-visual-engine.js),
+[legend visuals](../js/content/grafana-legend-visuals.js) и
+[compact layout](../js/content/grafana-compact-layout.js) используют обнаруженный
+renderer/DOM. Это совместимость с конкретными shapes, а не гарантия для всех
+плагинов. Для виртуализированной Table видимые DOM-строки неполны;
+[collectGrafanaTableData](../js/content/grafana-table-report.js) ограниченно читает
+committed React DataFrame выбранного grid, без вызовов getters/React функций и
+без обхода всего dashboard. Caps и completeness определяют, допустим ли SLA.
+
+При PNG renderer нужно действительно перестроить под целевой размер; обрезка
+готового canvas не возвращает скрытые подписи или строки. Владельцы
+[panel capture](../js/content/grafana-panel-capture-runtime.js) и compact layout
+сохраняют baseline, перестраивают панель, затем восстанавливают DOM/styles и
+наблюдателей. Снимок проверяют по результату и restore, а не только по наличию
+canvas. Проверки: [layout](../test/grafana_capture_layout_behavior.js),
+[compact](../test/grafana_compact_layout_behavior.js),
+[Table](../test/grafana_table_report_behavior.js),
+[browser visual](../test/support/browser-dashboard-visual.js).
+Неудовлетворённая полнота возвращает явную ошибку; произвольные internals не
+считаются доверенными только потому, что находятся на странице Grafana.
+
+### Refresh Off и временный период отчёта
+
+Отсутствие `refresh` в URL может вернуть сохранённый dashboard refresh.
+[Refresh policy](../js/content/grafana-refresh-policy.js) выражает Off через
+fragment именованного iframe и узкий one-shot hook dashboard definition;
+legacy SoloPanel fallback ограничивает только известный scheduler stack.
+Direct Grafana и остальные timers сохраняют native поведение. Проверка:
+[refresh policy](../test/grafana_refresh_policy_behavior.js).
+
+[beginReport](../pages/dashbridge/dashbridge-time-controller.js) выдаёт временный
+lease с одним абсолютным периодом и новым документом iframe. Это защищает сбор
+от старых ответов и относительного периода, который менялся бы между снимками.
+Release восстанавливает только всё ещё принадлежащие lease навигации;
+профиль не получает временный `_t`. Сверка snapshots не объявляет datasource
+транзакционным. Проверки: [time controller](../test/dashbridge_time_controller_behavior.js)
+и [report integration](../test/dashbridge_report_integration_behavior.js).
+
+Причины CDP/секретов Recorder описаны в [DashFlow v2](dashflow-v2.md), полномочия
+clipboard/downloads и известные ограничения — в [permission map](permission-map.md).
+Источник истины для будущей правки — текущий владелец функции и его проверки,
+а не старые номера строк в аудитах или универсальный совет из импортированного skill.
 
 ## Контексты и границы доверия
 
@@ -1217,8 +1332,11 @@ Network capture применяет maxRequests также к ранним ExtraI
 
 `pages/recorder/recorder.html` загружает session transport, который владеет
 контролируемой вкладкой и CDP attach/detach.
-Lifecycle-port с heartbeat удерживает service worker доступным для аварийного
-detach, если Recorder закрыт или перезагружен.
+Lifecycle-port с heartbeat поддерживает worker для best-effort аварийного
+detach, если Recorder закрыт или перезагружен. Этот fallback не закрывает
+incognito window и не восстанавливает реестр сессий после restart worker;
+штатный cleanup и аварийный путь имеют разные гарантии, подробнее в
+[DashFlow v2](dashflow-v2.md#владелец-записи-и-границы-cdp).
 Обобщённый `scenario-recorder.js` динамически инжектируется только в эту
 вкладку и её доступные frames; он не входит в статический all-URL manifest.
 Network metadata и bodies собираются через `chrome.debugger`. Каноническим
@@ -1321,7 +1439,7 @@ UID, orgId и panel ID. Переход SPA на другой dashboard не пр
 |---|---|---|
 | `storage.sync` | Grafana/Options, домены, compact capture, Popup, тема | Небольшие настройки; частые inputs debounce + flush. |
 | `storage.local` | Profiles, backups, Worklog/cache, Batch, diagnostics/status, `dashbridgeUpdateIndicator`, `dashbridgeInstallationId` | Долговечные/объёмные данные, отдельный псевдоним аналитики и служебная версия доступного обновления. |
-| `storage.session` | `grafanaVisualState:<tabId>` | Служебное состояние вкладки, удаляется при закрытии. |
+| `storage.session` | `grafanaVisualState:<tabId>`, `dashbridgeBatchCaptureWindows` | Состояние визуальных вкладок и реестр Batch capture windows для восстановления cleanup после перезапуска worker; это не постоянные пользовательские профили. |
 | `localStorage` | Тема page, `dashbridge.timepicker.history` | Тема до paint с sync reconciliation; история времени локальная, до четырёх диапазонов. |
 | MAIN `Map` | Live state по `panelKey` | Только document, переживает React DOM repair. |
 
@@ -1362,21 +1480,9 @@ Fallback нельзя удалять по результату одной Grafan
 - `unlimitedStorage` сохранён для существующих больших профилей; удалять его
   можно только после измерения пользовательских данных.
 
-## Намеренно необычные реализации и их границы
-
-| Механизм | Почему это функция | Ограничения и проверяемый контракт |
-|---|---|---|
-| MAIN fetch/XHR adapters | Преобразование ответа должно произойти до Grafana renderer. | Настроенные hosts/routes для постоянной регистрации/backfill, выбранный HTTP(S) dashboard URL для explicit запуска; panel/request scope; generation cleanup; собственный wrapper не оборачивается повторно; helper-данные удаляются до renderer. |
-| `grafana-refresh-policy.js` меняет dashboard response | Иначе сохранённый Grafana refresh отменяет выбранный в DashBridge `Off`. | Самодостаточное чтение только fragment policy `off`; только `dashbridge-iframe`, same-origin GET `/api/dashboards/uid|db/...` либо узкая сигнатура scheduler `SoloPanelPage → setupIntervalTimer`; direct Grafana, datasource responses и прочие timers не затрагиваются. |
-| DNR снимает XFO/CSP | Иначе разрешённые Grafana dashboards нельзя встроить в DashBridge. | Только session rules, конкретный tab DashBridge и allowlisted Grafana host; закрытие вкладки удаляет rules; глобальное правило запрещено. |
-| `debugger`/CDP | Нужен Traffic Recorder для network bodies, streams и replay. | Attach только по Record/Replay к созданной Recorder вкладке; явные caps; detach при Stop, закрытии и lifecycle-разрыве; `.dashflow` предупреждает о секретах. |
-| Clipboard read/write | Перенос диапазона времени между Grafana 10/12 и DashBridge, копирование текста/PNG. | Только пользовательское действие и сфокусированный документ; time payload нормализуется и валидируется; ошибка не меняет диапазон. |
-| Временная перестройка renderer | Нужен предсказуемый PNG 1000×520 для uPlot и legacy Flot. | Изменяется только выбранная панель; исходные DOM/styles/renderer sizes сохраняются и восстанавливаются в `finally` при успехе и ошибке. |
-| Версионированная миграция storage | Нужен одноразовый переход существующих профилей без потери настроек. | Backup до commit, идемпотентная нормализация, marker последним, безопасный повтор после частичного сбоя. |
-
-Наличие механизма в этой таблице не является автоматическим доказательством
-безопасности. При ревью guards и cleanup сверяются с текущим кодом и
-отрицательными тестами; расхождение считается дефектом документации или кода.
+Причины нестандартных механизмов и ссылки на их проверки собраны в разделе
+[«Почему используются нестандартные механизмы»](#почему-используются-нестандартные-механизмы).
+Описание намерения не заменяет проверку текущих guards и cleanup.
 
 ## Производительность и lifecycle
 

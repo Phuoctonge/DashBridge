@@ -56,7 +56,8 @@
     schema, URL identity, capture helpers, тема, масштаб и analytics catalog
     берутся у текущих владельцев. Похожий renderer-код с другим lifecycle не
     объединять механически; shared helper не должен скрыто забирать владение.
-12. **Показывать честный результат.** Cancel не выполняет внешнюю запись,
+12. **Показывать честный результат.** Cancel останавливает следующие шаги,
+    но не откатывает уже выполненную внешнюю запись или отправленный запрос;
     unavailable/no_data не считается нормой, partial не считается полным
     успехом. Подписи различают временное Apply, сохранение профиля и общие
     defaults. Аналитика отражает подтверждённый результат и не блокирует функцию.
@@ -310,6 +311,9 @@ debugger attach, DNR rule, fetch/XHR wrapper и временного DOM/style �
 5. Точным `rg` найти message action/type, CustomEvent, storage key, DOM id,
    selector, script path и global facade.
 6. Запустить dependency guard с `--explain` для исходного файла.
+   До создания или переноса также выполнить `node scripts/check-module-boundaries.js`;
+   контекст и при необходимости путь между владельцем и потребителем проверить
+   через `gitnexus context`, `gitnexus trace`, затем `gitnexus detect-changes`.
 7. Зафиксировать API нового модуля до переноса: dependencies, methods, state,
    cleanup, fail-open/fail-closed.
 8. Перенести state и lifecycle целиком; dispatcher и facade не менять без

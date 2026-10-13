@@ -1,5 +1,8 @@
 # DashBridge Live Regression Gate Implementation Plan
 
+> **Статус на 2026-10-13:** Предложение, не завершённый release gate. Действующий Test Runner и opt-in `test/live` уже существуют, но предложенные `scripts/run-release-gate.js`, `scripts/check-live-coverage.js`, capability registry и Unified Dashboard gate отсутствуют. Не выполнять нижние команды как существующие CLI и не считать отдельные live-проверки доказательством полного gate.
+> Действующие контракты: [архитектура](../../architecture.md), [разработка](../../development-guide.md); актуальные остатки: [roadmap](../../roadmap.md). Нижние шаги и команды сохранены как исходный план; перед продолжением сверять их с кодом и текущими владельцами.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build one automated release gate that discovers capability coverage, selects verified Grafana panels, and runs the full DashBridge extension across direct Grafana and Unified Dashboard surfaces.

@@ -1,5 +1,8 @@
 # DashBridge — краткий план завершения проверок Grafana
 
+> **Статус документа на 2026-10-13:** Исторический обзор Test Runner и предложение Capture profile. Production capture уже существует; предложение C1–C7 не считается реализованным feature family по отдельным live снимкам. Старые unit failures и тестовые счётчики ниже относятся к запуску 16 сентября, не к текущему autonomous gate.
+> Текущие контракты: [архитектура](../architecture.md), проверки: [разработка](../development-guide.md), остатки работы: [roadmap](../roadmap.md).
+
 Дата: 16 сентября 2026
 
 ## Вывод по текущему Test Runner

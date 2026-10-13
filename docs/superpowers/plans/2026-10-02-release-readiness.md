@@ -1,5 +1,8 @@
 # DashBridge 2.4.4 Release Readiness Implementation Plan
 
+> **Статус на 2026-10-13:** Частично завершён; это исторический release-план, не разрешение повторно исправлять уже интегрированный код или создавать тег. Позднейшие RAM/Table/clipboard, local smoke и renderer fixes описаны в плане аудита 12 октября. Автономный набор прошёл до этой prose-ревизии, но installer/supply-chain/package/full live gate и решение о публикации требуют собственного актуального evidence.
+> Действующие контракты: [архитектура](../../architecture.md), [разработка](../../development-guide.md); актуальные остатки: [roadmap](../../roadmap.md). Нижние шаги и команды сохранены как исходный план; перед продолжением сверять их с кодом и текущими владельцами.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Подготовить DashBridge 2.4.4 к выпуску так, чтобы обязательные локальные и CI-проверки были зелёными, упаковка была воспроизводимой, а заявленная Grafana/uPlot/Flot/capture-совместимость имела живое подтверждение.
