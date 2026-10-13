@@ -210,6 +210,7 @@
                                     const captured = await operation.capturePanelToZip(
                                         captureWindow, tabId, panelId, archivePath,
                                         archive, captureOptions, () => operation.isActive(runId),
+                                        { panelTitle: panelTitle || `Panel ${panelId}`, from: range.from, to: range.to, rangeIndex },
                                     );
                                     if (!operation.isActive(runId)) break;
                                     recordSeriesJob(
@@ -284,6 +285,8 @@
                                         const captured = await operation.capturePanelToZip(
                                             captureWindow, tabId, panelId, archivePath,
                                             archive, captureOptions, () => operation.isActive(runId),
+                                            { panelTitle: panelTitle || `Panel ${panelId}`, seriesName, occurrence,
+                                                from: range.from, to: range.to, rangeIndex },
                                         );
                                         if (!operation.isActive(runId)) break;
                                         recordSeriesJob(

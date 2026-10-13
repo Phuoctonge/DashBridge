@@ -6,11 +6,6 @@
         const last = String(value || '').replace(/\\/g, '/').split('/').pop() || '';
         try { return decodeURIComponent(last); } catch { return last; }
     };
-    const filenameMetadata = value => {
-        const name = basename(value).replace(/\.[a-z0-9]{2,8}$/i, '');
-        const match = name.match(/^panel-([^_]+)_(.+?)_([^_]+)_([^_]+)$/i);
-        return match ? { panelId: match[1], label: match[2], from: match[3], to: match[4] } : {};
-    };
     const metricFromReference = reference => norm(basename(reference?.filename || reference?.src || '')
         .replace(/\.[a-z0-9]{2,8}(?:\?.*)?$/i, '')
         .replace(/_\d+_\d{8,}$/i, ''));
@@ -19,8 +14,7 @@
         capture,
         index,
         source: archive?.sources?.get?.(capture.file) || null,
-        searchable: norm(basename(capture.file).replace(/\.[a-z0-9]{2,8}$/i, '')),
-        filenameMetadata: filenameMetadata(capture.file),
+        searchable: norm(capture.seriesName || capture.panelTitle),
     })).filter(item => item.source);
 
     function metricOptions(snapshot) {
@@ -66,7 +60,7 @@
                 status,
                 target: Object.freeze({ testKey: target.test.testKey, testTitle: target.test.title, metricGroup: target.group.title, metric: target.metric, occurrence: target.image.occurrence, image: target.image }),
                 source: candidate?.source || null,
-                capture: candidate ? Object.freeze({ ...(candidate.capture || {}), ...candidate.filenameMetadata }) : null,
+                capture: candidate ? candidate.capture : null,
                 candidates: Object.freeze((occurrenceCandidate.length ? occurrenceCandidate : legacy).map(item => item.source)),
             });
         }));

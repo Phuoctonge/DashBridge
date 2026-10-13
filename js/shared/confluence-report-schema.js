@@ -19,6 +19,8 @@
             metric: optionalText(raw.metric)?.toLocaleLowerCase('ru-RU') || null,
             panelId: raw.panelId == null ? null : text(raw.panelId), panelTitle: optionalText(raw.panelTitle),
             from: optionalText(raw.from), to: optionalText(raw.to),
+            rangeIndex: Number.isInteger(raw.rangeIndex) && raw.rangeIndex >= 0 ? raw.rangeIndex : null,
+            seriesName: optionalText(raw.seriesName),
             sha256: optionalText(raw.sha256)?.toLocaleLowerCase('en-US') || null,
             occurrence: Number.isInteger(raw.occurrence) && raw.occurrence >= 0 ? raw.occurrence : null,
         });
@@ -26,9 +28,23 @@
     const normalizeManifest = raw => {
         if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Manifest must be an object');
         const captures = Array.isArray(raw.captures) ? raw.captures.map(normalizeCapture) : [];
+        if (raw.schemaVersion !== 3 || !Array.isArray(raw.captures)) {
+            throw new Error('Нужен новый архив Batch с manifest версии 3. Создайте снимки заново.');
+        }
+        const periods = new Map();
+        for (const capture of captures) {
+            if (!capture.panelId || !capture.panelTitle || !capture.from || !capture.to || capture.rangeIndex === null) {
+                throw new Error(`Неполные метаданные снимка: ${capture.file}. Создайте архив Batch заново.`);
+            }
+            const period = `${capture.from}\0${capture.to}`;
+            if (periods.has(capture.rangeIndex) && periods.get(capture.rangeIndex) !== period) {
+                throw new Error(`Разные периоды у одного диапазона: ${capture.rangeIndex + 1}`);
+            }
+            periods.set(capture.rangeIndex, period);
+        }
         const seen = new Set(); captures.forEach(item => { if (seen.has(item.file)) throw new Error(`Duplicate capture path: ${item.file}`); seen.add(item.file); });
         return Object.freeze({
-            schemaVersion: raw.schemaVersion === 2 ? 2 : 1,
+            schemaVersion: 3,
             kind: raw.kind === 'series' ? 'series' : 'panels', generatedAt: optionalText(raw.generatedAt),
             dashboard: raw.dashboard && typeof raw.dashboard === 'object' ? Object.freeze({
                 origin: optionalText(raw.dashboard.origin), basePath: optionalText(raw.dashboard.basePath) || '',

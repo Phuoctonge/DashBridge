@@ -33,8 +33,8 @@ const reservedFirst = reserve({ ...common, identity: 'same' });
 const reservedSecond = reserve({ ...common, identity: 'same' });
 assert.notStrictEqual(reservedFirst, reservedSecond, 'duplicate jobs inside one ZIP must never overwrite each other');
 assert(reservedSecond.endsWith('_002.png'));
-assert.strictEqual(utils.buildArchivePath({ filename: first, rangeCount: 1, from: 'now-1h', to: 'now' }), first,
-    'a single time range must keep images in the ZIP root');
+assert.strictEqual(utils.buildArchivePath({ filename: first, rangeCount: 1, from: 'now-1h', to: 'now' }), `01_fromnow-1h_tonow/${first}`,
+    'a single time range has its own folder too');
 const localTimestamp = (year, month, day, hour, minute) => String(new Date(year, month - 1, day, hour, minute).getTime());
 const archivePath = (rangeIndex, from, to) => utils.buildArchivePath({
     filename: first, rangeIndex, rangeCount: 3, from, to

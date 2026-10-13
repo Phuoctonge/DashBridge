@@ -1,13 +1,17 @@
 (function initConfluenceReportArchive(root) {
     'use strict';
     const norm = value => String(value ?? '').normalize('NFKC').replace(/[_\s]+/g, ' ').trim();
-    const basename = value => String(value || '').replace(/\\/g, '/').split('/').pop() || '';
     const parseFile = (capture, index) => {
         const file = String(capture?.file || ''); const parts = file.split('/'); const folder = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
-        const name = basename(file).replace(/\.[a-z0-9]{2,8}$/i, '');
-        const panel = name.match(/^panel-([^_]+)_(.+?)_(\d+)_([\d]+)(?:_[a-z0-9]+)?$/i);
         const range = folder.match(/^(\d+)\s*(.*)$/u);
-        return { capture, index, file, rangeKey: folder || `unfoldered-${index}`, rangeIndex: range ? Number(range[1]) : null, rangeLabel: range ? norm(range[2]) : 'Без временного диапазона', panelId: capture.panelId || (panel && panel[1]) || null, title: norm(capture.panelTitle || (panel && panel[2]) || 'Без названия'), from: capture.from || (panel && panel[3]) || null, to: capture.to || (panel && panel[4]) || null, source: null };
+        // The source picker keys by panelId + title; retain duplicate series occurrences.
+        const title = capture.seriesName && capture.occurrence != null
+            ? `${capture.seriesName} [${capture.occurrence + 1}]` : capture.seriesName || capture.panelTitle;
+        // rangeIndex preserves repeated periods; folders are presentation only.
+        return { capture, index, file, rangeKey: String(capture.rangeIndex), rangeIndex: capture.rangeIndex + 1,
+            rangeLabel: range ? norm(range[2]) : `${capture.from} → ${capture.to}`,
+            panelId: capture.panelId, title: norm(title),
+            from: capture.from, to: capture.to, source: null };
     };
     function analyze(archive) {
         const groups = new Map();

@@ -30,8 +30,8 @@ module.exports = async function inspectConfluenceTarget(context, extensionId, { 
     const origin = `http://127.0.0.1:${server.address().port}`;
     const page = await context.newPage();
     try {
-        const zip = new JSZip(); zip.file('manifest.json', JSON.stringify({ captures: [
-            { file: 'range/new.png', panelId: '1', panelTitle: 'CPU', from: '1000', to: '2000' }
+        const zip = new JSZip(); zip.file('manifest.json', JSON.stringify({ schemaVersion: 3, captures: [
+            { file: 'range/new.png', panelId: '1', panelTitle: 'CPU', rangeIndex: 0, from: '1787774259463', to: '1787791648851' }
         ] })); zip.file('range/new.png', Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6tQAAAABJRU5ErkJggg==', 'base64'));
         const buffer = await zip.generateAsync({ type: 'nodebuffer' });
         await page.goto(`chrome-extension://${extensionId}/pages/confluence-report/confluence-report.html`);

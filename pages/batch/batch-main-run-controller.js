@@ -133,6 +133,7 @@
                             const captured = await operation.capturePanelToZip(
                                 captureWindow, tabId, panelId, archivePath, archive, captureOptions,
                                 () => operation.isActive(runId),
+                                { panelTitle: panels[panelId] || `Panel ${panelId}`, from: range.from, to: range.to, rangeIndex },
                             );
                             if (!operation.isActive(runId)) break;
                             if (captured) {

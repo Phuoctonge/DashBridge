@@ -51,7 +51,7 @@
             diagnosticJournal.record({ stage: 'run', event: 'finished', details: { runId } });
             progress.finish(); await releaseWindow(); setProcessing(false); return true;
         };
-        const capturePanelToZip = async (win, tabId, panelId, filename, archive, captureOptions = {}, isActive = () => true) => {
+        const capturePanelToZip = async (win, tabId, panelId, filename, archive, captureOptions = {}, isActive = () => true, metadata = {}) => {
             if (!isActive()) return null;
             const captured = await captureGrafanaPanelImage({
                 tabId, windowId: win.id, panelId,
@@ -72,7 +72,8 @@
             await archive.add(filename, bytes, bytes.byteLength);
             diagnosticJournal.record({ stage: 'archive', event: 'png-added', jobId: filename,
                 panelId: String(panelId), details: { bytes: bytes.byteLength } });
-            captureRecords.push({ file: filename });
+            // Metadata belongs to the captured job, not to the readable PNG name.
+            captureRecords.push({ ...metadata, file: filename, panelId: String(panelId) });
             if (!isActive()) return null;
             logMessage(`Saved: ${filename} (${bytes.length} bytes)`);
             return true;
@@ -85,7 +86,7 @@
         };
         const addArchiveReport = async (archive, report, isActive = () => true) => {
             if (!isActive()) return false;
-            const manifest = { schemaVersion: 2, generatedAt: new Date().toISOString(), captures: captureRecords.slice(), ...report };
+            const manifest = { ...report, schemaVersion: 3, generatedAt: new Date().toISOString(), captures: captureRecords.slice() };
             if (failureDiagnostics.length) manifest.failureDiagnostics = failureDiagnostics.slice(0, 100);
             const manifestBytes = new TextEncoder().encode(`${JSON.stringify(manifest, null, 2)}\n`);
             await archive.add('manifest.json', manifestBytes, manifestBytes.byteLength);

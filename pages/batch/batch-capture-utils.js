@@ -78,8 +78,7 @@ const BatchCaptureUtils = {
         const endPart = end.relative || `${end.date}_${end.time}`;
         return `${ordinal}_from${startPart}_to${endPart}`;
     },
-    buildArchivePath({ filename, rangeIndex = 0, rangeCount = 1, from = '', to = '' }) {
-        if (!Number.isInteger(rangeCount) || rangeCount <= 1) return filename;
+    buildArchivePath({ filename, rangeIndex = 0, from = '', to = '' }) {
         return `${this.formatRangeFolder({ rangeIndex, from, to })}/${filename}`;
     }
 };

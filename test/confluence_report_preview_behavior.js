@@ -21,8 +21,8 @@ const snapshot = { tests: [
 ] };
 const archive = {
     manifest: { captures: [
-        { file: '01/panel-8_использование_диска_now-1h_now_a.png' },
-        { file: '02/panel-8_использование_диска_now-2h_now-1h_b.png' }
+        { file: '01/panel-8_использование_диска_now-1h_now_a.png', panelId: '8', panelTitle: 'использование диска', from: 'now-1h', to: 'now', rangeIndex: 0 },
+        { file: '02/panel-8_использование_диска_now-2h_now-1h_b.png', panelId: '8', panelTitle: 'использование диска', from: 'now-2h', to: 'now-1h', rangeIndex: 1 }
     ] },
     sources: new Map([
         ['01/panel-8_использование_диска_now-1h_now_a.png', { path: '01/panel-8_использование_диска_now-1h_now_a.png' }],

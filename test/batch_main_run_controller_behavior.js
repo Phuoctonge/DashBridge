@@ -74,6 +74,10 @@ controller.run().then(() => {
     assert(calls.some(call => Array.isArray(call) && call[0] === 'begin'));
     assert(calls.some(call => Array.isArray(call) && call[0] === 'load' && call[3] === '2'));
     assert(calls.some(call => Array.isArray(call) && call[0] === 'capture'));
+    const capturedMetadata = calls.find(call => call[0] === 'capture')[8];
+    assert.strictEqual(capturedMetadata.from, 'now-1h');
+    assert.strictEqual(capturedMetadata.rangeIndex, 0);
+    assert(capturedMetadata.panelTitle);
     assert(calls.some(call => Array.isArray(call) && call[0] === 'report' && call[2].kind === 'panels'));
     assert(calls.includes('finalize'));
     assert(calls.some(call => Array.isArray(call) && call[0] === 'finish' && call[1] === 7));

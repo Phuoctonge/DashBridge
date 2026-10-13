@@ -27,7 +27,7 @@ function createHarness({ mode = 'group', matches = [{ name: 'cpu', key: 'cpu\u00
         seriesDashUrl: { value: 'https://grafana.example/d/uid/name' },
     };
     const card = {
-        dataset: { querySignatures: '[{"refId":"A"}]' },
+        dataset: { panelTitle: 'CPU panel', querySignatures: '[{"refId":"A"}]' },
         querySelector: selector => {
             assert.strictEqual(selector, '.series-panel-url');
             return { value: 'https://grafana.example/d/uid/name?viewPanel=2' };
@@ -136,6 +136,11 @@ function createHarness({ mode = 'group', matches = [{ name: 'cpu', key: 'cpu\u00
     assert(group.calls.some(call => Array.isArray(call) && call[0] === 'capture'));
     assert(group.calls.some(call => Array.isArray(call) && call[0] === 'report'
         && call[2].kind === 'series' && call[2].successfulJobs === 1));
+    const groupMetadata = group.calls.find(call => call[0] === 'capture')[8];
+    assert.strictEqual(groupMetadata.panelTitle, 'CPU panel');
+    assert.strictEqual(groupMetadata.from, 'now-1h');
+    assert.strictEqual(groupMetadata.rangeIndex, 0);
+    assert.strictEqual(groupMetadata.seriesName, undefined);
     assert(group.calls.includes('finalize'));
     assert(group.calls.some(call => Array.isArray(call) && call[0] === 'remove' && call[1] === 9));
     assert(group.calls.some(call => Array.isArray(call) && call[0] === 'finish' && call[1] === 17));
@@ -148,6 +153,8 @@ function createHarness({ mode = 'group', matches = [{ name: 'cpu', key: 'cpu\u00
     ];
     const standalone = createHarness({ mode: 'standalone', matches: standaloneMatches });
     await standalone.controller.run();
+    const metadata = standalone.calls.filter(call => call[0] === 'capture').map(call => call[8]);
+    assert.deepStrictEqual(metadata.map(item => [item.panelTitle, item.seriesName, item.occurrence, item.rangeIndex]), [['CPU panel', 'cpu', 0, 0], ['CPU panel', 'cpu', 1, 0]]);
     const legendCalls = standalone.calls.filter(call => Array.isArray(call) && call[0] === 'legend');
     assert.deepStrictEqual(
         legendCalls.map(call => Array.from(call[1].selectedKeys)),
