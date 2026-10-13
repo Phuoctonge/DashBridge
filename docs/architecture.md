@@ -1082,6 +1082,10 @@ warning строго меньше critical. Если для TOP-3 доступн
 и подтверждение визуализации. Для native Table/Data Grid подтверждением служит
 видимая таблица с заголовками и непустыми строками через `grafana-table-report.js`;
 таблицы легенды исключены, завершение запросов по-прежнему обязательно.
+При compact capture native Table/Data Grid временно удерживает размеры panel
+container и его предков внутри capture frame, а также сбрасывает grid transform.
+Guard начинается до асинхронного resize, чтобы виртуализация не убрала строки
+после смещения за viewport; restore снимает observer и возвращает inline styles.
 Наличие произвольного SVG или его геометрии
 не означает готовность: SVG принимается только для геометрии известных
 series-контейнеров (series/line/area/bar, Recharts, Plotly, Highcharts), вне

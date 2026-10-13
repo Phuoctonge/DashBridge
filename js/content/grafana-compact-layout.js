@@ -144,14 +144,19 @@
         }
     };
     const relaxInlineSizeConstraints = root => {
-        const uplot = findUPlot(root);
+        const table = Array.from(root?.querySelectorAll('table, [role="table"], [role="grid"]') || []).find(candidate => {
+            if (candidate.closest('.graph-legend, .u-legend, [class*="legend" i]')) return false;
+            const data = window.DashBridgeGrafanaTableReport?.collectGrafanaTableData?.(candidate);
+            return data?.columns?.length >= 2 && data.rows?.length > 0;
+        });
+        const uplot = table ? null : findUPlot(root);
         const legendRow = root?.querySelector('table tbody tr, .u-legend tr, tr[class*="LegendRow"]');
         const legend = legendRow?.closest('table, [role="table"], .u-legend') || legendRow;
-        if (!uplot || !legend) return null;
+        if (!table && (!uplot || !legend)) return null;
         const chart = root.querySelector('.uplot');
-        let common = chart;
-        while (common && legend && !common.contains(legend)) common = common.parentElement;
-        if (!common || common === root) return null;
+        let common = table ? table.closest('section, .panel-container, [data-testid^="data-testid Panel header"]') : chart;
+        if (!table) while (common && legend && !common.contains(legend)) common = common.parentElement;
+        if (!common || table && !root.contains(common) || !table && common === root) return null;
         const properties = ['width', 'height', 'min-width', 'min-height', 'max-width', 'max-height'];
         const snapshots = [];
         const touched = new Set();
@@ -170,13 +175,39 @@
             touch(element);
             if (element === root) break;
         }
-        Array.from(common.children).forEach(element => touch(element, false));
+        if (!table) Array.from(common.children).forEach(element => touch(element, false));
+        const originalTransform = table && {
+            value: root.style.getPropertyValue('transform'), priority: root.style.getPropertyPriority('transform'),
+        };
+        // React grid and panel measurements can rewrite inline styles after
+        // reparenting. Pin only this native table's ancestry until restoration.
+        const pinTable = () => {
+            snapshots.forEach(({ element }) => properties.forEach(property => {
+                const value = property.startsWith('min-') ? '0' : '100%';
+                if (element.style.getPropertyValue(property) !== value || element.style.getPropertyPriority(property) !== 'important') {
+                    element.style.setProperty(property, value, 'important');
+                }
+            }));
+            if (root.style.getPropertyValue('transform') !== 'none' || root.style.getPropertyPriority('transform') !== 'important') {
+                root.style.setProperty('transform', 'none', 'important');
+            }
+        };
+        const observer = table && typeof MutationObserver === 'function' ? new MutationObserver(pinTable) : null;
+        if (table) {
+            pinTable();
+            observer?.observe(root, { subtree: true, attributes: true, attributeFilter: ['style'] });
+        }
         return {
             restore() {
+                observer?.disconnect();
                 snapshots.forEach(({ element, values }) => values.forEach(([property, value, priority]) => {
                     if (value) element.style.setProperty(property, value, priority);
                     else element.style.removeProperty(property);
                 }));
+                if (originalTransform) {
+                    if (originalTransform.value) root.style.setProperty('transform', originalTransform.value, originalTransform.priority);
+                    else root.style.removeProperty('transform');
+                }
             }
         };
     };

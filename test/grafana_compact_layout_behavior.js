@@ -128,3 +128,52 @@ assert.strictEqual(uplot.__dashBridgeCompactSize, undefined,
     'restore must release compact state after a renderer failure');
 
 console.log('PASS compact uPlot restoration preserves the native time grid');
+
+const element = () => {
+    const values = new Map();
+    return {
+        parentElement: null, children: [],
+        style: {
+            getPropertyValue: key => values.get(key)?.value || '',
+            getPropertyPriority: key => values.get(key)?.priority || '',
+            setProperty: (key, value, priority = '') => values.set(key, { value, priority }),
+            removeProperty: key => values.delete(key),
+        },
+        querySelector: () => null, querySelectorAll: () => [],
+    };
+};
+const tableRoot = element(), wrapper = element(), container = element(), grid = element();
+grid.parentElement = container; container.parentElement = wrapper; wrapper.parentElement = tableRoot;
+container.children = [grid]; wrapper.children = [container]; tableRoot.children = [wrapper];
+grid.closest = selector => selector.includes('legend') ? null : container;
+tableRoot.querySelectorAll = selector => selector.includes('[role="grid"]') ? [grid] : [];
+tableRoot.contains = node => [tableRoot, wrapper, container, grid].includes(node);
+wrapper.style.setProperty('width', '1588px');
+container.style.setProperty('height', '803.25px');
+tableRoot.style.setProperty('transform', 'translate(798px, 3686px)');
+context.window.DashBridgeGrafanaTableReport = {
+    collectGrafanaTableData: () => ({ columns: ['Metric', 'Value'], rows: [['request', '100']] }),
+};
+// Dashboard ancestors can expose hooks for a different chart; native table
+// evidence must take precedence over that broad legacy uPlot lookup.
+tableRoot.__reactFiber$otherChart = { memoizedState: { memoizedState: { current: uplot }, next: null }, return: null };
+const tableConstraints = layout.relaxInlineSizeConstraints(tableRoot);
+assert(tableConstraints, 'native tables need a temporary compact layout controller');
+assert.strictEqual(wrapper.style.getPropertyValue('width'), '100%');
+assert.strictEqual(container.style.getPropertyValue('height'), '100%');
+assert.strictEqual(tableRoot.style.getPropertyValue('transform'), 'none');
+const tableObserver = mutationObservers.at(-1);
+wrapper.style.setProperty('width', '1588px');
+tableRoot.style.setProperty('transform', 'translate(798px, 3686px)');
+tableObserver.callback();
+assert.strictEqual(wrapper.style.getPropertyValue('width'), '100%', 'native table resize cannot restore stale measured width');
+assert.strictEqual(tableRoot.style.getPropertyValue('transform'), 'none', 'React grid writes cannot move the table outside the capture frame');
+tableConstraints.restore();
+assert.strictEqual(tableObserver.disconnected, true);
+assert.strictEqual(wrapper.style.getPropertyValue('width'), '1588px');
+assert.strictEqual(container.style.getPropertyValue('height'), '803.25px');
+assert.strictEqual(tableRoot.style.getPropertyValue('transform'), 'translate(798px, 3686px)');
+grid.closest = () => ({});
+delete tableRoot.__reactFiber$otherChart;
+assert.strictEqual(layout.relaxInlineSizeConstraints(tableRoot), null, 'legend tables must keep the chart path');
+console.log('PASS compact native tables retain geometry and restore temporary constraints');

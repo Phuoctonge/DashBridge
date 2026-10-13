@@ -446,6 +446,12 @@
                         outer.style.setProperty('box-sizing', 'border-box', 'important');
                         outer.style.setProperty('transition', 'none', 'important');
                     }
+                    // Table virtualization can discard visible rows on the first
+                    // off-screen grid rewrite. Retain its geometry before that
+                    // asynchronous resize; uPlot keeps its later sizing pass.
+                    if (!captureUPlot && !legacyGraphPanel) {
+                        captureInnerSizeController = layout?.relaxInlineSizeConstraints(layoutTarget);
+                    }
                     window.dispatchEvent(new Event('resize'));
                     await window.DashBridgeGrafanaCaptureOutput?.waitForStableLayout?.(layoutTarget);
                     layout?.redrawFlot(layoutTarget, true);
@@ -454,7 +460,7 @@
                     // while the panel is moved under the capture frame. Release
                     // those stale constraints after that pass, immediately before
                     // sizing the native renderer.
-                    captureInnerSizeController = layout?.relaxInlineSizeConstraints(layoutTarget);
+                    captureInnerSizeController ||= layout?.relaxInlineSizeConstraints(layoutTarget);
                     layout?.resizeUPlot(layoutTarget, layoutTarget, captureUPlot);
                     captureLegendBackgroundController.apply();
                     if (legacyGraphPanel) {
