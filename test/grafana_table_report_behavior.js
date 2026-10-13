@@ -231,3 +231,82 @@ assert.strictEqual(snapshot().dataStatus, 'table_data_incomplete', 'virtualized 
 assert.strictEqual(snapshot({ source: 'none' }).state, 'configuration_error');
 delete table.getAttribute;
 console.log('PASS native complete/current table reports and explicit partial fallback');
+
+// Exercise transport metadata through the real report factory, including the
+// complete DOM fallback used by tables without a proven native DataFrame.
+{
+    const runtime = {};
+    runtime.window = runtime;
+    vm.createContext(runtime);
+    for (const file of ['grafana-unit', 'grafana-table-report', 'grafana-panel-data-transforms', 'grafana-report-snapshot']) {
+        vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'content', `${file}.js`), 'utf8'), runtime);
+    }
+    const visibleRows = [];
+    const plainTable = {
+        querySelector: selector => selector === 'thead tr' ? header : null,
+        querySelectorAll: selector => selector === 'tbody tr, [role="row"]' ? visibleRows : []
+    };
+    const plainRoot = {
+        matches: () => false,
+        querySelector: () => null,
+        querySelectorAll: selector => selector === 'table, [role="table"], [role="grid"]' ? [plainTable]
+            : selector === 'th, [role="columnheader"]' ? header.cells : []
+    };
+    const filterTools = { seriesQueryFilterEnabled: true, seriesQueryFilterValue: -1 };
+    const transforms = runtime.DashBridgeGrafanaPanelDataTransforms.create({
+        tools: filterTools, getTargetPanel: () => plainRoot
+    });
+    const api = runtime.DashBridgeGrafanaUnit;
+    const tables = runtime.DashBridgeGrafanaTableReport;
+    const collector = runtime.DashBridgeGrafanaReportSnapshot.create({
+        mergeAxisAndPanelUnit: api.mergeAxisAndPanelUnit,
+        inferUnitFromAxisTicks: api.inferUnitFromAxisTicks,
+        getCachedPanelDefinition: () => ({ fieldConfig: { defaults: { unit: 'short' } } }),
+        unitFromPanelDefinition: api.unitFromPanelDefinition,
+        collectGrafanaTableData: tables.collectGrafanaTableData,
+        collectGrafanaTableRecords: tables.collectGrafanaTableRecords,
+        findUPlot: () => null, getUPlotYScaleKey: () => 'y', getUPlotUnitDetails: () => null
+    });
+    const response = (names, values) => ({ results: { A: { frames: [{
+        schema: { fields: [{ name: 'Metric', type: 'string' }, { name: 'Value', type: 'number' }] },
+        data: { values: [names, values] }
+    }] } } });
+    const responseSnapshot = (names, values) => {
+        visibleRows.splice(0, visibleRows.length, ...names.map((name, index) => row([name, String(values[index] ?? '')])));
+        runtime.__dashbridgePanelToolsVisualMetadata = {
+            responseTableRecords: transforms.collectResponseTableRecords(response(names, values))
+        };
+        return collector.collectPanelReportSnapshot({ root: plainRoot, sla: { source: 'custom', value: 1 } });
+    };
+    const missing = responseSnapshot(['missing-null', 'missing-empty', 'zero'], [null, '', 0]);
+    assert.strictEqual(missing.state, 'configuration_error', 'transport metadata must not turn missing cells into a successful SLA');
+    assert.strictEqual(missing.dataStatus, 'table_numeric_incomplete');
+    assert.strictEqual(missing.series.length, 0, 'invalid table metadata must not publish partial zero-valued series');
+    for (const invalid of [undefined, ' ', 'bad', NaN, Infinity]) {
+        assert.strictEqual(responseSnapshot(['zero', 'invalid'], [0, invalid]).dataStatus, 'table_numeric_incomplete');
+    }
+    assert.strictEqual(responseSnapshot(['zero', ''], [0, 1]).dataStatus, 'table_numeric_incomplete',
+        'a missing response row name must abandon the complete response fallback');
+    const zero = responseSnapshot(['zero'], [0]);
+    assert.strictEqual(zero.state, 'ok');
+    assert.strictEqual(zero.engine, 'table-response');
+    assert.strictEqual(zero.aggregateValue, 0, 'a genuine zero remains valid response data');
+
+    const filtered = transforms.filterSeriesByThreshold(response(
+        ['missing-null', 'missing-empty', 'missing-space', 'missing-undefined', 'zero'], [null, '', ' ', undefined, 0]
+    ));
+    assert.deepStrictEqual(Array.from(filtered.data.results.A.frames[0].data.values[0]), ['zero'],
+        'a negative threshold must not retain missing table rows as invented zeros');
+    assert.strictEqual(filtered.metrics.thresholdMatchedSeries, 1);
+    assert.strictEqual(filtered.metrics.removedSeries, 4);
+
+    const reduced = values => ({ results: { A: { frames: [{
+        schema: { name: 'reduced', fields: [{ name: 'Time', type: 'time' }, { name: 'Value', type: 'number' }] },
+        data: { values: [values.map((_value, index) => index), values] }
+    }] } } });
+    assert.strictEqual(transforms.collectResponseTableRecords(reduced([null])).length, 0);
+    const reducedZero = transforms.collectResponseTableRecords(reduced([null, '', ' ', 0]));
+    assert.strictEqual(reducedZero.length, 1, 'missing samples must not suppress an available reduced value');
+    assert.strictEqual(reducedZero[0].value, 0);
+    console.log('PASS full-factory table metadata/filter validation preserves missing cells and genuine zero');
+}

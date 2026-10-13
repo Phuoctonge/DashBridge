@@ -321,6 +321,12 @@
             return Array.from(panel.querySelectorAll?.('th, [role="columnheader"]') || [])
                 .some(header => /^(?:metric|value|метрика|значение)$/iu.test(String(header.textContent || '').trim()));
         };
+
+        const parseResponseNumber = raw => {
+            if (raw == null || typeof raw === 'string' && !raw.trim()) return null;
+            const value = Number(raw);
+            return Number.isFinite(value) ? value : null;
+        };
     
         const collectResponseTableRecords = data => {
             const records = [];
@@ -333,7 +339,7 @@
                 const hasTime = fields.some(field => field?.type === 'time' || field?.name === 'Time');
                 if (!hasTime || numericIndexes.length !== 1) return null;
                 const valueIndex = numericIndexes[0];
-                const values = Array.from(columns[valueIndex] || []).map(Number).filter(Number.isFinite);
+                const values = Array.from(columns[valueIndex] || []).map(parseResponseNumber).filter(value => value !== null);
                 if (values.length !== 1) return null;
                 const valueField = fields[valueIndex] || {};
                 const name = String(valueField?.config?.displayNameFromDS || frame?.schema?.name
@@ -353,8 +359,11 @@
                     for (let index = 0; index < shape.rowCount; index++) {
                         if (records.length >= MAX_TABLE_RECORDS) break outer;
                         const name = String(shape.columns[shape.nameIndex]?.[index] ?? '').trim();
-                        const value = Number(shape.columns[shape.valueIndex]?.[index]);
-                        if (name && Number.isFinite(value)) records.push({ name: name.substring(0, 500), value });
+                        const value = parseResponseNumber(shape.columns[shape.valueIndex]?.[index]);
+                        // Partial metadata bypasses DOM numeric completeness in the
+                        // report fallback, so malformed tables must use DOM/native data.
+                        if (!name || value === null) return [];
+                        records.push({ name: name.substring(0, 500), value });
                     }
                 }
             }
@@ -412,9 +421,9 @@
                     if (tableShape && (!tableShape.timeIndexes.length || tablePanel)) {
                         const keptRowIndexes = [];
                         for (let index = 0; index < tableShape.rowCount; index++) {
-                            const value = Number(tableShape.columns[tableShape.valueIndex]?.[index]);
+                            const value = parseResponseNumber(tableShape.columns[tableShape.valueIndex]?.[index]);
                             metrics.beforeSeries += 1;
-                            if (Number.isFinite(value) && isSeriesAboveThreshold(value)) {
+                            if (value !== null && isSeriesAboveThreshold(value)) {
                                 metrics.thresholdMatchedSeries += 1;
                                 keptRowIndexes.push(index);
                             }

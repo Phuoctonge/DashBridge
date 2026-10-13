@@ -686,8 +686,12 @@ metadata; null/пустые/нечисловые значения не стан�
 `configuration_error` / `table_data_incomplete`, без успешного SLA.
 Полнота fallback учитывает aria-rowcount, header/summary rows и лимит
 DOM-снимка; неизвестная полнота grid не считается полным набором. Response
-metadata на границе 5000 записей также не доказывают полноту. Literal таблица
-с source:none сохраняет информационный режим. Native records временные и не
+metadata на границе 5000 записей также не доказывают полноту.
+Metric/Value response metadata отклоняются целиком при пустом имени или
+отсутствующем/нечисловом значении строки: частичный набор не обходит проверку
+полноты DOM. Null и пустые строки исключаются до Number также в reduced-series
+и числовом фильтре таблицы; настоящий ноль остаётся данными.
+Literal таблица с source:none сохраняет информационный режим. Native records временные и не
 входят в публичный table payload; Markdown остаётся снимком видимых строк,
 totalRows/truncated учитывают известный полный размер. Наблюдение fetch/XHR
 при всех выключенных tools, refresh для отчёта и постоянный polling не добавлены.
