@@ -144,6 +144,13 @@ native Copy/Paste рядом с Apply либо добавляет эти две 
 сам Apply остаётся Grafana-native. Изменение формата требует round-trip тестов
 для local datetime, ISO с zone, epoch milliseconds, JSON и URL, плюс проверки
 невалидного payload.
+Lifecycle-регрессии должны отдельно проверять отзыв UI scope: native listeners
+Grafana сохраняются, DashBridge capture listener снимается с восстановлением
+title/marker/classes, legacy кнопки удаляются. Deferred clipboard read/write после
+отзыва, закрытия picker, замены inputs или pagehide не должны писать в старые
+inputs или показывать feedback. Повторные activation/remount не накапливают
+listeners; pageshow согласует UI с текущим scope. Dataset остаётся UI scope,
+а не независимой проверкой доверенного host.
 
 ## Проверка изменения
 

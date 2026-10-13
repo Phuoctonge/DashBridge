@@ -98,7 +98,7 @@
             const inputs = [...candidate.querySelectorAll('input')].filter(input =>
                 !['button', 'submit', 'hidden', 'search'].includes(String(input.type || 'text').toLowerCase()));
             if (/absolute time range/i.test(text) && inputs.length >= 2) {
-                return { root: candidate, inputs: inputs.slice(0, 2) };
+                return { root: candidate, inputs: inputs.slice(0, 2), applyButton };
             }
             candidate = candidate.parentElement;
         }
@@ -124,31 +124,107 @@
         });
         return svg;
     };
-    const flash = (button, message, failed = false) => {
-        const original = button.title;
+    // These records own only DashBridge listeners/presentation, never Grafana's
+    // native actions. A new record also invalidates continuations of an old mount.
+    const bindings = new Map();
+    let suspended = false;
+    const scopeAllowed = () => !suspended && document.documentElement.dataset.dashbridgeGrafanaMenuEnabled === 'true';
+    const pickerCurrent = picker => {
+        if (![picker.root, picker.applyButton, ...picker.inputs].every(node =>
+            node.isConnected && node.ownerDocument === document)) return false;
+        const current = findPicker(picker.applyButton);
+        return current?.root === picker.root && current.inputs.every((input, index) => input === picker.inputs[index]);
+    };
+    const bindingCurrent = record => bindings.get(record.button) === record && scopeAllowed()
+        && record.button.isConnected && record.button.ownerDocument === document
+        && record.picker.root.contains(record.button) && pickerCurrent(record.picker);
+    const restoreFlash = record => {
+        if (record.timer !== null) clearTimeout(record.timer);
+        record.timer = null;
+        record.button.title = record.activeTitle;
+        ['dashbridge-time-picker-failed', 'dashbridge-time-picker-success'].forEach((name, index) =>
+            record.button.classList.toggle(name, record.originalClasses[index]));
+    };
+    const releaseBinding = record => {
+        if (bindings.get(record.button) !== record) return;
+        bindings.delete(record.button);
+        record.button.removeEventListener('click', record.handler, record.native);
+        restoreFlash(record);
+        if (record.native) {
+            if (record.originalTitle === null) record.button.removeAttribute('title');
+            else record.button.setAttribute('title', record.originalTitle);
+            if (record.originalMarker === undefined) delete record.button.dataset.dashbridgeTimeClipboardBound;
+            else record.button.dataset.dashbridgeTimeClipboardBound = record.originalMarker;
+        } else record.button.remove();
+    };
+    const flash = (record, message, failed = false) => {
+        if (!bindingCurrent(record)) return;
+        restoreFlash(record);
+        const button = record.button;
         button.title = message;
         button.classList.toggle('dashbridge-time-picker-failed', failed);
         button.classList.toggle('dashbridge-time-picker-success', !failed);
-        setTimeout(() => {
-            if (!button.isConnected) return;
-            button.title = original;
-            button.classList.remove('dashbridge-time-picker-failed', 'dashbridge-time-picker-success');
+        record.timer = setTimeout(() => {
+            if (!bindingCurrent(record)) return;
+            restoreFlash(record);
         }, 1400);
     };
-    const copyPickerRange = async (button, picker) => {
+    const copyPickerRange = async record => {
+        if (!bindingCurrent(record)) return;
+        const picker = record.picker;
         const range = normalizeRange({ from: picker.inputs[0].value, to: picker.inputs[1].value });
         if (!range) throw new Error('empty-range');
         await navigator.clipboard.writeText(serializeRange(range));
+        if (!bindingCurrent(record)) return;
         globalThis.DashBridgeAnalytics?.outcome('grafana.time_range_copied', 'success', { surface: 'direct_grafana' });
-        flash(button, 'Диапазон скопирован');
+        flash(record, 'Диапазон скопирован');
     };
-    const pastePickerRange = async (button, picker) => {
+    const pastePickerRange = async record => {
+        if (!bindingCurrent(record)) return;
+        const picker = record.picker;
         const range = parseRange(await navigator.clipboard.readText());
+        if (!bindingCurrent(record)) return;
         if (!range) throw new Error('invalid-range');
         setInputValue(picker.inputs[0], range.from);
+        if (!bindingCurrent(record)) return;
         setInputValue(picker.inputs[1], range.to);
+        if (!bindingCurrent(record)) return;
         globalThis.DashBridgeAnalytics?.outcome('grafana.time_range_pasted', 'success', { surface: 'direct_grafana' });
-        flash(button, 'Диапазон вставлен');
+        flash(record, 'Диапазон вставлен');
+    };
+    const bindButton = (button, kind, picker, native) => {
+        if (bindings.has(button)) return;
+        const record = {
+            button, kind, picker, native, timer: null,
+            originalTitle: button.getAttribute('title'),
+            originalMarker: button.dataset.dashbridgeTimeClipboardBound,
+            originalClasses: ['dashbridge-time-picker-failed', 'dashbridge-time-picker-success']
+                .map(name => button.classList.contains(name))
+        };
+        if (native) {
+            button.dataset.dashbridgeTimeClipboardBound = kind;
+            button.title = kind === 'copy' ? 'Копировать совместимый диапазон времени' : 'Вставить диапазон времени';
+        }
+        record.activeTitle = button.title;
+        record.handler = event => {
+            if (!bindingCurrent(record)) {
+                releaseBinding(record);
+                return;
+            }
+            // Capture only these picker actions; an inactive handler must let
+            // Grafana receive the click, including its own clipboard behavior.
+            event.preventDefault();
+            if (native) event.stopImmediatePropagation(); else event.stopPropagation();
+            void (kind === 'copy' ? copyPickerRange(record) : pastePickerRange(record)).catch(() => {
+                if (!bindingCurrent(record)) return;
+                globalThis.DashBridgeAnalytics?.outcome(
+                    kind === 'copy' ? 'grafana.time_range_copied' : 'grafana.time_range_pasted',
+                    'invalid_input', { surface: 'direct_grafana' });
+                flash(record, kind === 'copy' ? 'Не удалось скопировать' : 'В буфере нет диапазона', true);
+            });
+        };
+        bindings.set(button, record);
+        button.addEventListener('click', record.handler, native);
     };
     const createButton = (kind, picker) => {
         const button = document.createElement('button');
@@ -157,43 +233,11 @@
         button.title = kind === 'copy' ? 'Копировать диапазон времени' : 'Вставить диапазон времени';
         button.setAttribute('aria-label', button.title);
         button.append(icon(kind));
-        button.addEventListener('click', async event => {
-            event.preventDefault(); event.stopPropagation();
-            try {
-                if (kind === 'copy') {
-                    await copyPickerRange(button, picker);
-                } else {
-                    await pastePickerRange(button, picker);
-                }
-            } catch {
-                globalThis.DashBridgeAnalytics?.outcome(
-                    kind === 'copy' ? 'grafana.time_range_copied' : 'grafana.time_range_pasted',
-                    'invalid_input', { surface: 'direct_grafana' });
-                flash(button, kind === 'copy' ? 'Не удалось скопировать' : 'В буфере нет диапазона', true);
-            }
-        });
+        bindButton(button, kind, picker, false);
         return button;
     };
     const bindNativeButton = (button, kind, picker) => {
-        if (button.dataset.dashbridgeTimeClipboardBound) return;
-        button.dataset.dashbridgeTimeClipboardBound = kind;
-        button.title = kind === 'copy'
-            ? 'Копировать совместимый диапазон времени'
-            : 'Вставить диапазон времени';
-        button.addEventListener('click', event => {
-            // Grafana 12 serializes absolute state as UTC ISO. Replace only the
-            // two native picker actions with the visible local values understood
-            // by both Grafana 10 and 12; Apply remains entirely native.
-            event.preventDefault();
-            event.stopImmediatePropagation();
-            void (kind === 'copy' ? copyPickerRange(button, picker) : pastePickerRange(button, picker))
-                .catch(() => {
-                    globalThis.DashBridgeAnalytics?.outcome(
-                        kind === 'copy' ? 'grafana.time_range_copied' : 'grafana.time_range_pasted',
-                        'invalid_input', { surface: 'direct_grafana' });
-                    flash(button, kind === 'copy' ? 'Не удалось скопировать' : 'В буфере нет диапазона', true);
-                });
-        }, true);
+        bindButton(button, kind, picker, true);
     };
     const enhanceNativeClipboard = (nativeButtons, applyButton, picker) => {
         const applyIndex = nativeButtons.indexOf(applyButton);
@@ -216,12 +260,13 @@
         document.documentElement.append(style);
     };
     const mount = () => {
-        if (document.documentElement.dataset.dashbridgeGrafanaMenuEnabled !== 'true') return;
+        bindings.forEach(record => { if (!bindingCurrent(record)) releaseBinding(record); });
+        if (!scopeAllowed()) return;
         [...document.querySelectorAll(buttonSelector)].filter(isApplyButton).forEach(applyButton => {
             const actions = applyButton.parentElement;
             if (!actions || actions.querySelector('.dashbridge-time-picker-clipboard')) return;
             const picker = findPicker(applyButton);
-            if (!picker) return;
+            if (!picker || !pickerCurrent(picker)) return;
             const nativeButtons = [...actions.children].filter(element =>
                 element.matches?.(buttonSelector)
                 && !element.classList?.contains('dashbridge-time-picker-clipboard'));
@@ -241,16 +286,18 @@
         requestAnimationFrame(() => { scheduled = false; mount(); });
     };
     const syncScope = () => {
-        const allowed = document.documentElement.dataset.dashbridgeGrafanaMenuEnabled === 'true';
+        const allowed = scopeAllowed();
         if (allowed && !observer) {
             observer = new MutationObserver(schedule);
             observer.observe(document.documentElement, { childList: true, subtree: true });
             schedule();
-        } else if (!allowed && observer) {
-            observer.disconnect(); observer = null;
-            document.querySelectorAll('.dashbridge-time-picker-clipboard').forEach(button => button.remove());
+        } else if (!allowed) {
+            observer?.disconnect(); observer = null;
+            bindings.forEach(releaseBinding);
         }
     };
     document.addEventListener('dashbridgeGrafanaMenuScopeChanged', syncScope);
+    root.addEventListener('pagehide', () => { suspended = true; syncScope(); });
+    root.addEventListener('pageshow', () => { suspended = false; syncScope(); });
     syncScope();
 })(globalThis);

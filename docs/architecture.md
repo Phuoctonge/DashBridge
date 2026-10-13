@@ -78,6 +78,14 @@ DashBridge ещё и `source === iframe.contentWindow`.
    epoch milliseconds. Неверный тип, календарная дата, время или offset отклоняют
    весь диапазон без input/change событий. ISO/epoch переводятся в прежний локальный
    формат с секундами; relative выражения не вычисляются, Apply остаётся native.
+   Clipboard-модуль владеет снимаемыми обработчиками native Copy/Paste и legacy
+   кнопками. Отзыв UI scope и pagehide снимают только его listeners, возвращают
+   исходные title/marker/classes и отменяют feedback timers; DOM remount очищает
+   устаревшие привязки. Перед clipboard action и после async read/write проверяются
+   текущий scope, привязка, документ, picker и inputs. Позднее завершение после
+   cleanup не меняет inputs и не сообщает success/error; pageshow восстанавливает
+   UI по актуальному scope. При выключенном scope native Grafana action проходит
+   без вмешательства DashBridge и остаётся ответственностью Grafana.
    Разрешение capture и изменения общей настройки снимка в `content.js`
    хранится в isolated closure и не берётся из DOM. Dataset публикует UI scope
    для MAIN и отдельного isolated time-picker clipboard модуля. Последний

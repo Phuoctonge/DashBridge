@@ -39,6 +39,11 @@ cookies или HTML. Родитель проверяет origin/source, проф
 навигации до однократного восстановления сохранённого URL. Новых permissions нет.
 
 Native time-picker clipboard использует DOM dataset для включения UI.
+Отзыв UI scope снимает принадлежащие DashBridge native handlers, восстанавливает
+исходное представление кнопок и удаляет legacy actions. Handler повторно проверяет
+scope и актуальный picker перед clipboard action и после async completion;
+закрытый/заменённый picker и pagehide отменяют применение и feedback. Native
+clipboard поведение Grafana при выключенном scope остаётся ответственностью сайта.
 Это не независимая проверка доверенного host; усиление этой границы требует
 отдельной правки и отрицательных тестов. Capture bridge в `content.js`, напротив,
 проверяет собственный closure scope и user activation. Web-accessible остаются только
