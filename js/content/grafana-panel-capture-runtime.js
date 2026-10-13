@@ -396,6 +396,11 @@
                     // Compact capture moves the real panel under document.body, so
                     // remember the already computed row backgrounds before that move.
                     captureLegendBackgroundController = createCompactCaptureLegendBackgroundController(captureNode);
+                    // Read native table evidence before reparenting: innerText
+                    // and virtualized rows can disappear in the detached layout.
+                    if (!captureUPlot && !legacyGraphPanel) {
+                        captureInnerSizeController = layout?.relaxInlineSizeConstraints(layoutTarget);
+                    }
                     originalParent.insertBefore(captureAnchor, captureNode);
                     document.body.appendChild(captureFrame);
                     if (legacyTitleOutsideGraph) {
@@ -445,12 +450,6 @@
                         outer.style.setProperty('margin', '0', 'important');
                         outer.style.setProperty('box-sizing', 'border-box', 'important');
                         outer.style.setProperty('transition', 'none', 'important');
-                    }
-                    // Table virtualization can discard visible rows on the first
-                    // off-screen grid rewrite. Retain its geometry before that
-                    // asynchronous resize; uPlot keeps its later sizing pass.
-                    if (!captureUPlot && !legacyGraphPanel) {
-                        captureInnerSizeController = layout?.relaxInlineSizeConstraints(layoutTarget);
                     }
                     window.dispatchEvent(new Event('resize'));
                     await window.DashBridgeGrafanaCaptureOutput?.waitForStableLayout?.(layoutTarget);

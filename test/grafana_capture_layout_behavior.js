@@ -62,6 +62,9 @@ assert(tools.includes('captureLegendBackgroundController.start();')
     && tools.includes('captureLegendBackgroundController.apply();')
     && tools.includes('captureLegendBackgroundController?.restore();'),
     'compact capture must style replacement legend rows after resize and clean them up afterwards');
+assert(tools.indexOf('captureInnerSizeController = layout?.relaxInlineSizeConstraints(layoutTarget);')
+    < tools.indexOf('captureFrame.appendChild(captureNode);'),
+    'native table geometry must be retained while visible, before reparenting invalidates innerText and virtualized rows');
 assert(tools.includes("setTemporaryStyle(element, 'background-color', background)")
     && tools.includes('do not invent a second shade')
     && tools.includes("const background = nativeBackgrounds[index]")

@@ -151,6 +151,9 @@ tableRoot.contains = node => [tableRoot, wrapper, container, grid].includes(node
 wrapper.style.setProperty('width', '1588px');
 container.style.setProperty('height', '803.25px');
 tableRoot.style.setProperty('transform', 'translate(798px, 3686px)');
+grid.style.setProperty('grid-template-columns', '780px 390px');
+grid.matches = selector => selector === '[role="grid"]';
+grid.getAttribute = name => name === 'aria-colcount' ? '2' : null;
 context.window.DashBridgeGrafanaTableReport = {
     collectGrafanaTableData: () => ({ columns: ['Metric', 'Value'], rows: [['request', '100']] }),
 };
@@ -162,17 +165,41 @@ assert(tableConstraints, 'native tables need a temporary compact layout controll
 assert.strictEqual(wrapper.style.getPropertyValue('width'), '100%');
 assert.strictEqual(container.style.getPropertyValue('height'), '100%');
 assert.strictEqual(tableRoot.style.getPropertyValue('transform'), 'none');
+assert.strictEqual(grid.style.getPropertyValue('grid-template-columns'), 'minmax(0px, 780fr) minmax(0px, 390fr)',
+    'compact native grids must fit both columns while preserving their width ratio');
 const tableObserver = mutationObservers.at(-1);
 wrapper.style.setProperty('width', '1588px');
 tableRoot.style.setProperty('transform', 'translate(798px, 3686px)');
+grid.style.setProperty('grid-template-columns', '780px 390px');
 tableObserver.callback();
 assert.strictEqual(wrapper.style.getPropertyValue('width'), '100%', 'native table resize cannot restore stale measured width');
 assert.strictEqual(tableRoot.style.getPropertyValue('transform'), 'none', 'React grid writes cannot move the table outside the capture frame');
+assert.strictEqual(grid.style.getPropertyValue('grid-template-columns'), 'minmax(0px, 780fr) minmax(0px, 390fr)');
+const setGridStyle = grid.style.setProperty;
+let redundantGridWrites = 0;
+grid.style.setProperty = (...args) => { redundantGridWrites++; setGridStyle(...args); };
+tableObserver.callback();
+assert.strictEqual(redundantGridWrites, 0, 'normalized grid tracks must converge without an observer rewrite loop');
+grid.style.setProperty = setGridStyle;
 tableConstraints.restore();
 assert.strictEqual(tableObserver.disconnected, true);
 assert.strictEqual(wrapper.style.getPropertyValue('width'), '1588px');
 assert.strictEqual(container.style.getPropertyValue('height'), '803.25px');
 assert.strictEqual(tableRoot.style.getPropertyValue('transform'), 'translate(798px, 3686px)');
+assert.strictEqual(grid.style.getPropertyValue('grid-template-columns'), '780px 390px');
+for (const tracks of ['780px', 'minmax(100px, 1fr) 390px', '0px 390px']) {
+    grid.style.setProperty('grid-template-columns', tracks);
+    const untouchedTracks = layout.relaxInlineSizeConstraints(tableRoot);
+    assert.strictEqual(grid.style.getPropertyValue('grid-template-columns'), tracks,
+        'partial or non-positive/non-pixel grid tracks must not be guessed');
+    untouchedTracks.restore();
+    assert.strictEqual(grid.style.getPropertyValue('grid-template-columns'), tracks);
+}
+grid.matches = () => false;
+const plainTableConstraints = layout.relaxInlineSizeConstraints(tableRoot);
+assert(plainTableConstraints, 'non-grid native tables must still receive geometry control');
+plainTableConstraints.restore();
+assert.strictEqual(container.style.getPropertyValue('height'), '803.25px');
 grid.closest = () => ({});
 delete tableRoot.__reactFiber$otherChart;
 assert.strictEqual(layout.relaxInlineSizeConstraints(tableRoot), null, 'legend tables must keep the chart path');

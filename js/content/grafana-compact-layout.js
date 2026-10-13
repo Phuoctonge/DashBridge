@@ -168,7 +168,7 @@
             ]) });
             properties.forEach(property => {
                 if (!full && property !== 'min-width') return;
-                element.style.setProperty(property, property.startsWith('min-') ? '0' : '100%', 'important');
+                element.style.setProperty(property, property.startsWith('min-') ? '0px' : '100%', 'important');
             });
         };
         for (let element = common; element; element = element.parentElement) {
@@ -179,17 +179,31 @@
         const originalTransform = table && {
             value: root.style.getPropertyValue('transform'), priority: root.style.getPropertyPriority('transform'),
         };
+        const originalColumns = table?.matches?.('[role="grid"]') ? {
+            value: table.style.getPropertyValue('grid-template-columns'),
+            priority: table.style.getPropertyPriority('grid-template-columns'),
+        } : null;
+        const columnWidths = originalColumns?.value.trim().split(/\s+/) || [];
+        // Native grids can retain measured pixel columns after their panel is
+        // resized. Fit only a complete explicit track list, preserving ratios.
+        const fittedColumns = columnWidths.length === Number(table?.getAttribute?.('aria-colcount'))
+            && columnWidths.every(width => /^\d+(?:\.\d+)?px$/.test(width) && parseFloat(width) > 0)
+            ? columnWidths.map(width => `minmax(0px, ${parseFloat(width)}fr)`).join(' ') : null;
         // React grid and panel measurements can rewrite inline styles after
         // reparenting. Pin only this native table's ancestry until restoration.
         const pinTable = () => {
             snapshots.forEach(({ element }) => properties.forEach(property => {
-                const value = property.startsWith('min-') ? '0' : '100%';
+                const value = property.startsWith('min-') ? '0px' : '100%';
                 if (element.style.getPropertyValue(property) !== value || element.style.getPropertyPriority(property) !== 'important') {
                     element.style.setProperty(property, value, 'important');
                 }
             }));
             if (root.style.getPropertyValue('transform') !== 'none' || root.style.getPropertyPriority('transform') !== 'important') {
                 root.style.setProperty('transform', 'none', 'important');
+            }
+            if (fittedColumns && (table.style.getPropertyValue('grid-template-columns') !== fittedColumns
+                || table.style.getPropertyPriority('grid-template-columns') !== 'important')) {
+                table.style.setProperty('grid-template-columns', fittedColumns, 'important');
             }
         };
         const observer = table && typeof MutationObserver === 'function' ? new MutationObserver(pinTable) : null;
@@ -207,6 +221,9 @@
                 if (originalTransform) {
                     if (originalTransform.value) root.style.setProperty('transform', originalTransform.value, originalTransform.priority);
                     else root.style.removeProperty('transform');
+                }
+                if (fittedColumns) {
+                    table.style.setProperty('grid-template-columns', originalColumns.value, originalColumns.priority);
                 }
             }
         };
