@@ -24,7 +24,7 @@
         const getEffectivePanelSla = panel => {
             const config = reportEngine.normalizePanel(panel.report, panel);
             if (config.sla.source === 'graph') {
-                if (!panel.tools?.thresholdEnabled) return { error: 'Порог на графике выключен.' };
+                if (!panel.tools?.thresholdEnabled) return { error: 'Для сообщения выбран порог графика, но он выключен. Включите и настройте порог графика либо в настройках сообщения панели выберите «Собственный SLA» или «Без SLA - информационная фраза».' };
                 return { source: 'graph', operator: 'gt', evaluation: config.sla.evaluation,
                     value: panel.tools.thresholdValue, rawValue: panel.tools.thresholdRawValue,
                     warningValue: config.sla.warningValue, unit: panel.tools.thresholdUnit || '' };
@@ -52,7 +52,8 @@
             const wrapper = card?.querySelector('.iframe-wrapper');
             if (!wrapper) return;
             wrapper.querySelector('.dashbridge-panel-data-status')?.remove();
-            const parentKinds = new Set(['timeout', 'iframe_unavailable', 'request_error', 'configuration_error']);
+            // SLA configuration belongs to the report UI; it does not mean the graph failed to load.
+            const parentKinds = new Set(['timeout', 'iframe_unavailable', 'request_error']);
             const kind = String(snapshot?.dataStatus || '');
             const message = String(snapshot?.dataStatusText || snapshot?.error || '').trim();
             if (!parentKinds.has(kind) || !message) return;
@@ -127,7 +128,7 @@
                 if (status.isConnected) status.textContent = message;
             }, { requirePanels });
             const { reportPanels, problems } = collected;
-            warnings.textContent = problems.map(item => `${item.panel.title || 'Панель'}: ${item.snapshot.error || 'данные недоступны'}`).join('\n');
+            warnings.textContent = problems.map(item => `${item.snapshot.dataStatus === 'configuration_error' ? 'Настройки сообщения — ' : ''}${item.panel.title || 'Панель'}: ${item.snapshot.error || 'данные недоступны'}`).join('\n');
             warnings.hidden = !problems.length;
             output.value = collected.output;
             status.textContent = `Готово. Обработано панелей: ${reportPanels.length}; предупреждений: ${problems.length}.`;
@@ -155,7 +156,7 @@
                 <div id="reportTextPanel" class="report-text-panel" role="tabpanel" aria-labelledby="reportTextTab">
                 <div class="report-text-body">
                 <div class="report-preview-status" role="status">Подготовка…</div>
-                <div class="report-preview-warnings" hidden></div>
+                <div class="report-preview-warnings" role="status" hidden></div>
                 <textarea class="report-preview-output" aria-label="Сформированное сообщение"></textarea>
                 <details class="report-generated-draft" hidden><summary>Данные обновлены - посмотреть новый текст</summary>
                     <p>Ваши правки сохранены в поле выше. Новый вариант можно применить отдельно.</p>

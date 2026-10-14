@@ -6,9 +6,14 @@ const path = require('path');
 const vm = require('vm');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'pages', 'dashbridge', 'dashbridge-report-controller.js'), 'utf8');
+let panelStatus = null;
+const wrapper = {
+    querySelector: () => panelStatus,
+    appendChild(node) { panelStatus = node; node.remove = () => { panelStatus = null; }; },
+};
 const documentRef = {
     body: { appendChild() {} },
-    querySelector: () => null,
+    querySelector: () => ({ querySelector: () => wrapper }),
     getElementById: id => id === 'timePickerLabel' ? { textContent: 'Последние 15 минут' } : null,
     createElement: () => ({ dataset: {}, setAttribute() {}, appendChild() {} }),
 };
@@ -94,6 +99,34 @@ const controller = context.DashBridgeReportController.create({
     calls.length = 0;
     await liveCollector(null, () => undefined);
     assert.deepStrictEqual(calls.sort(), ['cpu', 'ram'], 'Message Test Runner must reuse the same live collector');
+    const panelBefore = JSON.stringify(panels[0]);
+    const disabledSla = controller.getEffectivePanelSla({ ...panels[0], tools: { thresholdEnabled: false } });
+    assert(disabledSla.error.includes('Для сообщения выбран порог графика, но он выключен.'));
+    assert(disabledSla.error.includes('«Собственный SLA»') && disabledSla.error.includes('«Без SLA - информационная фраза»'),
+        'the disabled graph threshold warning must explain how to configure the report');
+    const configurationError = { state: 'configuration_error', dataStatus: 'configuration_error',
+        error: 'Порог на графике выключен.', series: [] };
+    snapshots.set('cpu', configurationError);
+    controller.setPanelDataStatus(panels[0], { dataStatus: 'timeout', error: 'Timeout' });
+    assert.strictEqual(panelStatus.textContent, 'Timeout', 'transport errors must remain visible on the card');
+    controller.setPanelDataStatus(panels[0], configurationError);
+    assert.strictEqual(panelStatus, null, 'an SLA configuration error alone must clear an old loading overlay');
+    const configurationResult = await liveCollector(null, () => undefined);
+    assert.strictEqual(panelStatus, null, 'report configuration errors must clear stale overlays without covering a healthy graph');
+    assert(configurationResult.problems.some(item => item.panel.id === 'cpu'),
+        'configuration errors must remain report problems, never successful SLA');
+    const warningBox = { textContent: '', hidden: true };
+    await controller.generate({ value: '' }, { isConnected: true }, warningBox);
+    assert.strictEqual(warningBox.hidden, false);
+    assert(warningBox.textContent.includes('Настройки сообщения — CPU: Порог на графике выключен.'),
+        'preview warning must identify the configuration and affected panel');
+    assert.strictEqual(JSON.stringify(panels[0]), panelBefore, 'checking reports must not change panel settings');
+    for (const kind of ['timeout', 'iframe_unavailable', 'request_error']) {
+        controller.setPanelDataStatus(panels[0], { dataStatus: kind, error: kind });
+        assert.strictEqual(panelStatus.textContent, kind, 'real loading errors must retain their card overlay');
+    }
+    controller.setPanelDataStatus(panels[0], null);
+    assert.strictEqual(panelStatus, null, 'a new collection clears stale loading errors');
     assert.throws(() => context.DashBridgeReportController.create({}), /dependencies are incomplete/);
     const request = transport.requestPanelSnapshot;
     transport.requestPanelSnapshot = async panel => {

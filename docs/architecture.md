@@ -741,6 +741,16 @@ RAF у iframe вне viewport. Timer принадлежит конкретном
 вместе с observer/listener при ответе, отмене, deadline и смене MAIN generation.
 Постоянный polling и принудительная прокрутка для чтения данных не добавляются.
 
+Контроллер `dashbridge-report-controller.js` обрабатывает ошибки настройки SLA.
+Ошибка (`dataStatus: configuration_error`), например выбранный выключенный порог графика, показывается
+в результатах проверки сообщения и предупреждениях preview с названием панели
+и причиной. Она не создаёт overlay поверх работающего графика и не меняет
+настройки порога; результат SLA остаётся ошибкой, а не успешной проверкой.
+`setPanelDataStatus` оставляет parent overlay только для timeout, отсутствующего
+iframe и ошибки отправки запроса. Проверки:
+`test/dashbridge_report_controller_behavior.js` и
+`test/dashbridge_report_test_runner_behavior.js`.
+
 Общий запуск «Сформировать текст и скриншоты» принадлежит
 `dashbridge-report-controller.js`. `dashbridge-time-controller.js.beginReport`
 выдаёт временный lease: один момент времени переводит относительные границы в

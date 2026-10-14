@@ -175,6 +175,41 @@ module.exports = async function inspectDashboardVisual(context, extensionId) {
         await page.locator('.report-generated-draft').waitFor({ state: 'visible' });
         assert.equal(await page.locator('.report-preview-output').inputValue(), 'Ручная правка после генерации');
         result.checks.push('slow initial generation and refresh preserve manual text; generated candidate requires explicit apply; empty copy disabled');
+        await page.locator('.report-close').click();
+        await page.evaluate(() => {
+            const panel = { ...panels[0], paused: false, tools: { thresholdEnabled: false },
+                report: { enabled: true, sla: { source: 'graph' } } };
+            const baseline = JSON.stringify(panel);
+            const owner = window.DashBridgeReportController.create({
+                reportEngine: window.DashBridgeReport, transportFactory: window.DashBridgeReportTransport,
+                testRunnerFactory: window.DashBridgeReportTestRunner, auditEngine: window.DashBridgeReportAudit,
+                forceLoadPanel() { throw new Error('Invalid SLA must be caught before loading Grafana'); },
+                postToDashboardFrame() { throw new Error('Invalid SLA must not send a frame request'); },
+                getPanels: () => [panel], getActiveProfile: () => ({ name: 'Report warning', report: {} }),
+                getTimeContext: () => ({ from: 'now-1h', to: 'now' }),
+            });
+            window.reportWarningFixture = { owner, panel, baseline };
+            const wrapper = document.querySelector(`.panel-card[data-panel-id="${panel.id}"] .iframe-wrapper`);
+            if (!wrapper) throw new Error('The report warning fixture requires a real dashboard card');
+            owner.setPanelDataStatus(panel, { dataStatus: 'timeout', error: 'Previous loading error' });
+            if (!wrapper.querySelector('.dashbridge-panel-data-status')) throw new Error('Loading error overlay must be visible before the check');
+            owner.testRunner.open();
+        });
+        await page.locator('.report-audit-status').filter({ hasText: 'Проверка завершена:' }).waitFor();
+        const problem = page.locator('.report-runner-problem').filter({ hasText: 'Проверка сообщения: CPU' });
+        assert.equal(await problem.count(), 1);
+        assert.match(await problem.textContent(), /Собственный SLA/);
+        assert.equal(await page.locator('.dashbridge-panel-data-status').count(), 0);
+        await snapshot('report-configuration-warning');
+        await page.locator('.report-audit-close').click();
+        await page.evaluate(() => window.reportWarningFixture.owner.openPreview());
+        await page.locator('.report-preview-warnings').waitFor({ state: 'visible' });
+        assert.match(await page.locator('.report-preview-warnings').textContent(), /Настройки сообщения — CPU:.*порог графика/);
+        assert.equal(await page.locator('.dashbridge-panel-data-status').count(), 0);
+        assert(await page.evaluate(() => JSON.stringify(window.reportWarningFixture.panel) === window.reportWarningFixture.baseline));
+        await snapshot('report-preview-warning');
+        await page.locator('.report-close').click();
+        result.checks.push('disabled graph SLA stays visible in report check and preview with recovery guidance, without graph overlay or settings mutation');
         assert.deepEqual(errors, []);
     } catch (error) { result.status = 'failed'; result.error = error.stack || String(error); result.storageDiff = await page.evaluate(() => window.preferencesStorageDiff).catch(() => null); await snapshot('failure').catch(() => {}); }
     finally { await page.close(); }

@@ -128,9 +128,9 @@ assert(reportRequestSource.includes("action: 'cancelPanelReportSnapshot'")
     && tools.includes('panelReportSnapshotCancellers.delete(requestId)'),
     'closing a report must release all waiters while panels share one parallel timeout window');
 assert(reportController.includes('const setPanelDataStatus = (panel, snapshot) =>')
-    && reportController.includes("new Set(['timeout', 'iframe_unavailable', 'request_error', 'configuration_error'])")
+    && reportController.includes("new Set(['timeout', 'iframe_unavailable', 'request_error'])")
     && css.includes('.dashbridge-panel-data-status'),
-    'dashboard cards must show failures that happen outside the Grafana iframe');
+    'dashboard cards must show loading failures outside the Grafana iframe; report configuration belongs to report UI');
 assert(reportUi.includes('report-test-header') && reportUi.includes('{{stableLoadDuration}}')
     && reportUi.includes('{{testDuration}}'),
     'report editor must expose the load-test summary context through the automatic header switch');

@@ -130,7 +130,7 @@
 
         for (const panel of audit.panels) {
             const snapshotFailed = ['unavailable', 'timeout', 'no_data', 'error', 'configuration_error'].includes(panel.state);
-            push(`live-snapshot-${panel.key}`, `Данные панели: ${panel.title}`,
+            push(`live-snapshot-${panel.key}`, `${panel.state === 'configuration_error' ? 'Проверка сообщения' : 'Данные панели'}: ${panel.title}`,
                 snapshotFailed ? 'fail' : 'pass', panel.status || `Состояние: ${panel.state || 'не определено'}.`);
             push(`live-render-${panel.key}`, `Фраза панели: ${panel.title}`,
                 !panel.included ? 'skip' : (!panel.text || unresolved(reportEngine, panel.text).length ? 'fail' : 'pass'),

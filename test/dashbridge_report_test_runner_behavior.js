@@ -55,4 +55,13 @@ const failed = runner.evaluateLiveSuite(report, audit, { ...collected, snapshots
 assert(failed.scenarios.some(item => item.id === 'live-snapshot-cpu' && item.status === 'fail'),
     'a real timeout must fail its live scenario');
 
+const configSnapshot = { state: 'configuration_error', dataStatus: 'configuration_error',
+    dataStatusText: 'Выбран порог графика, но он выключен.', series: [] };
+const configRendered = report.renderPanel(panel, configSnapshot, liveContext);
+const invalidConfig = runner.evaluateLiveSuite(report, audit, { ...collected, snapshots: [configSnapshot],
+    panelResults: [{ ...configRendered, key: 'cpu', panel, snapshot: configSnapshot }] });
+const configScenario = invalidConfig.scenarios.find(item => item.id === 'live-snapshot-cpu');
+assert.strictEqual(configScenario.status, 'fail', 'invalid SLA settings must not pass the report check');
+assert.strictEqual(configScenario.name, 'Проверка сообщения: Live CPU');
+assert(configScenario.details.includes(configSnapshot.dataStatusText));
 console.log('PASS Message Test Runner separates deterministic fixtures from one live report audit');
