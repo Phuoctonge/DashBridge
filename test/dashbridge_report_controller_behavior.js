@@ -128,6 +128,34 @@ const controller = context.DashBridgeReportController.create({
     controller.setPanelDataStatus(panels[0], null);
     assert.strictEqual(panelStatus, null, 'a new collection clears stale loading errors');
     assert.throws(() => context.DashBridgeReportController.create({}), /dependencies are incomplete/);
+    const originalRequest = transport.requestPanelSnapshot;
+    let finishSlowPanel;
+    transport.requestPanelSnapshot = panel => panel.id === 'ram'
+        ? new Promise(resolve => { finishSlowPanel = resolve; })
+        : Promise.resolve(configurationError);
+    const updates = [];
+    let collectionFinished = false;
+    const pendingCollection = liveCollector(null, (_message, update) => updates.push(update));
+    pendingCollection.then(() => { collectionFinished = true; });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.strictEqual(collectionFinished, false, 'the slow panel must still be loading');
+    assert(updates[0]?.panels.length === 2 && updates[0].completed === 0,
+        'the runner needs the full pending panel list before responses arrive');
+    assert(updates.some(update => update?.panel?.id === 'cpu' && update.snapshot.state === 'configuration_error'
+        && update.completed === 1 && update.total === 2), 'a known configuration error must be published before another panel loads');
+    finishSlowPanel({ state: 'ok', series: [] });
+    await pendingCollection;
+    assert.strictEqual(updates.at(-1).completed, 2);
+    const cancellation = new AbortController();
+    const cancelledUpdates = [];
+    const cancelledCollection = liveCollector(cancellation.signal, (_message, update) => cancelledUpdates.push(update));
+    await new Promise(resolve => setImmediate(resolve));
+    cancellation.abort();
+    const updatesAtClose = cancelledUpdates.length;
+    finishSlowPanel({ state: 'ok', series: [] });
+    await assert.rejects(cancelledCollection, error => error.name === 'AbortError');
+    assert.strictEqual(cancelledUpdates.length, updatesAtClose, 'late panel completion after closing must not publish progress');
+    transport.requestPanelSnapshot = originalRequest;
     const request = transport.requestPanelSnapshot;
     transport.requestPanelSnapshot = async panel => {
         const result = await request(panel);

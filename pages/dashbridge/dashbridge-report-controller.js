@@ -81,15 +81,20 @@
                 getPanels(), reportEngine.normalizeProfile(profile?.report).panelOrder
             ).filter(panel => reportEngine.normalizePanel(panel.report, panel).enabled);
             if (requirePanels && !reportPanels.length) throw new Error('В настройках сообщения не выбрана ни одна панель.');
-            onProgress(`Получаем данные панелей: ${reportPanels.length}…`);
+            // The optional second argument lets the checker publish settled panels while others load.
+            // Text-only consumers (preview/generate) retain the existing progress contract.
+            onProgress(`Получаем данные панелей: ${reportPanels.length}…`,
+                { panels: reportPanels, completed: 0, total: reportPanels.length });
             reportPanels.forEach(panel => setPanelDataStatus(panel, null));
             let completedPanels = 0;
             const snapshots = await Promise.all(reportPanels.map(async panel => {
                 transport.throwIfAborted(signal);
                 const snapshot = await transport.requestPanelSnapshot(panel, signal);
+                transport.throwIfAborted(signal);
                 completedPanels += 1;
                 setPanelDataStatus(panel, snapshot);
-                onProgress(`Получаем данные панелей: ${completedPanels} из ${reportPanels.length}…`);
+                onProgress(`Получаем данные панелей: ${completedPanels} из ${reportPanels.length}…`,
+                    { panels: reportPanels, panel, snapshot, completed: completedPanels, total: reportPanels.length });
                 return snapshot;
             }));
             transport.throwIfAborted(signal);

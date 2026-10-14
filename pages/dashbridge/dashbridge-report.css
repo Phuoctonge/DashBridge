@@ -168,6 +168,7 @@
 .report-runner-problem { border: 1px solid var(--border-color); border-left: 4px solid var(--text-muted); border-radius: 8px; background: var(--card-bg); }
 .report-runner-problem.is-fail { border-left-color: #e24d42; }
 .report-runner-problem.is-warning { border-left-color: #d98b00; }
+.report-runner-panel.is-pass { border-left-color: #299c46; }
 .report-runner-problem summary { padding: 11px 13px; cursor: pointer; color: var(--text-main); font-size: .84rem; font-weight: 650; }
 .report-runner-technical,
 .report-runner-audit-details { border: 1px solid var(--border-color); border-radius: 9px; background: var(--bg-color); }

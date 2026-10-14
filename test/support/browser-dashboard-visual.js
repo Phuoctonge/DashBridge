@@ -180,29 +180,63 @@ module.exports = async function inspectDashboardVisual(context, extensionId) {
             const panel = { ...panels[0], paused: false, tools: { thresholdEnabled: false },
                 report: { enabled: true, sla: { source: 'graph' } } };
             const baseline = JSON.stringify(panel);
+            const ready = { ...panel, id: 'progress-ready', title: 'Готовая панель', report: { enabled: true, sla: { source: 'none' } } };
+            const slow = { ...ready, id: 'progress-slow', title: 'Медленная панель' };
+            const fixture = { panel, baseline, release: null };
+            const snapshot = { state: 'no_threshold', dataStatusText: 'Данные получены', aggregateValue: 42, series: [{ name: 'test', value: 42 }] };
             const owner = window.DashBridgeReportController.create({
-                reportEngine: window.DashBridgeReport, transportFactory: window.DashBridgeReportTransport,
+                reportEngine: window.DashBridgeReport, transportFactory: { create(options) {
+                    const transport = window.DashBridgeReportTransport.create(options);
+                    return { ...transport, requestPanelSnapshot(panel, signal) {
+                        if (panel.id === ready.id) return Promise.resolve(snapshot);
+                        if (panel.id !== slow.id) return transport.requestPanelSnapshot(panel, signal);
+                        return new Promise((resolve, reject) => {
+                            const abort = () => reject(new DOMException('Aborted', 'AbortError'));
+                            fixture.release = () => { signal?.removeEventListener('abort', abort); resolve(snapshot); };
+                            signal?.addEventListener('abort', abort, { once: true });
+                        });
+                    } };
+                } },
                 testRunnerFactory: window.DashBridgeReportTestRunner, auditEngine: window.DashBridgeReportAudit,
                 forceLoadPanel() { throw new Error('Invalid SLA must be caught before loading Grafana'); },
                 postToDashboardFrame() { throw new Error('Invalid SLA must not send a frame request'); },
-                getPanels: () => [panel], getActiveProfile: () => ({ name: 'Report warning', report: {} }),
+                getPanels: () => [panel, ready, slow], getActiveProfile: () => ({ name: 'Report warning', report: {} }),
                 getTimeContext: () => ({ from: 'now-1h', to: 'now' }),
             });
-            window.reportWarningFixture = { owner, panel, baseline };
+            fixture.owner = owner;
+            window.reportWarningFixture = fixture;
             const wrapper = document.querySelector(`.panel-card[data-panel-id="${panel.id}"] .iframe-wrapper`);
             if (!wrapper) throw new Error('The report warning fixture requires a real dashboard card');
             owner.setPanelDataStatus(panel, { dataStatus: 'timeout', error: 'Previous loading error' });
             if (!wrapper.querySelector('.dashbridge-panel-data-status')) throw new Error('Loading error overlay must be visible before the check');
             owner.testRunner.open();
+            if (document.querySelector('.report-runner-summary').classList.contains('is-pass')) {
+                throw new Error('Fixture success must not be presented as overall success before panel responses');
+            }
+            if (document.querySelectorAll('.report-runner-panel.is-pending').length !== 3) {
+                throw new Error('All panels must initially be shown as awaiting data');
+            }
         });
-        await page.locator('.report-audit-status').filter({ hasText: 'Проверка завершена:' }).waitFor();
+        await page.locator('.report-audit-status').filter({ hasText: '2 из 3' }).waitFor();
         const problem = page.locator('.report-runner-problem').filter({ hasText: 'Проверка сообщения: CPU' });
         assert.equal(await problem.count(), 1);
+        assert.equal(await problem.getAttribute('open'), '', 'a newly received error must reveal its cause while other panels load');
         assert.match(await problem.textContent(), /Собственный SLA/);
+        assert.match(await page.locator('.report-runner-summary').textContent(), /Проверка продолжается/);
+        assert.equal(await page.locator('.report-runner-summary.is-pass').count(), 0);
+        assert.match(await page.locator('.report-runner-panel.is-pass').textContent(), /Готовая панель/);
+        assert.match(await page.locator('.report-runner-panel.is-pending').textContent(), /Медленная панель.*Ожидаем/s);
+        await page.locator('.report-runner-technical > summary').click();
+        await snapshot('report-progress');
+        await page.evaluate(() => window.reportWarningFixture.release());
+        await page.locator('.report-audit-status').filter({ hasText: 'Проверка завершена:' }).waitFor();
+        assert.equal(await page.locator('.report-runner-panel.is-pending').count(), 0);
+        assert.equal(await page.locator('.report-runner-technical').getAttribute('open'), '');
         assert.equal(await page.locator('.dashbridge-panel-data-status').count(), 0);
         await snapshot('report-configuration-warning');
         await page.locator('.report-audit-close').click();
         await page.evaluate(() => window.reportWarningFixture.owner.openPreview());
+        await page.evaluate(() => window.reportWarningFixture.release());
         await page.locator('.report-preview-warnings').waitFor({ state: 'visible' });
         assert.match(await page.locator('.report-preview-warnings').textContent(), /Настройки сообщения — CPU:.*порог графика/);
         assert.equal(await page.locator('.dashbridge-panel-data-status').count(), 0);

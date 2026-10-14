@@ -115,6 +115,14 @@
         return scenarios;
     }
 
+    const panelScenario = ({ key, title, state, status }) => ({
+        id: `live-snapshot-${key}`, name: `${state === 'configuration_error' ? 'Проверка сообщения' : 'Данные панели'}: ${title}`,
+        source: 'live', durationMs: 0,
+        status: state === 'pending' ? 'pending'
+            : ['unavailable', 'timeout', 'no_data', 'error', 'configuration_error'].includes(state) ? 'fail' : 'pass',
+        details: state === 'pending' ? 'Ожидаем загрузку и данные графика.' : status || `Состояние: ${state || 'не определено'}.`,
+    });
+
     function evaluateLiveSuite(reportEngine, auditEngine, collected) {
         const audit = auditEngine.audit(reportEngine, collected);
         const scenarios = [];
@@ -129,9 +137,7 @@
         configurationIssues.length ? configurationIssues.map(item => item.message).join('\n') : 'Ошибок конфигурации не найдено.');
 
         for (const panel of audit.panels) {
-            const snapshotFailed = ['unavailable', 'timeout', 'no_data', 'error', 'configuration_error'].includes(panel.state);
-            push(`live-snapshot-${panel.key}`, `${panel.state === 'configuration_error' ? 'Проверка сообщения' : 'Данные панели'}: ${panel.title}`,
-                snapshotFailed ? 'fail' : 'pass', panel.status || `Состояние: ${panel.state || 'не определено'}.`);
+            scenarios.push(panelScenario(panel));
             push(`live-render-${panel.key}`, `Фраза панели: ${panel.title}`,
                 !panel.included ? 'skip' : (!panel.text || unresolved(reportEngine, panel.text).length ? 'fail' : 'pass'),
                 panel.included ? (panel.text ? 'Фраза сформирована.' : 'Фраза пустая.') : 'Панель исключена её режимом включения.',
@@ -165,46 +171,73 @@
             activeOverlay?.remove();
             activeOverlay = null;
         };
-        const renderScenarios = (host, scenarios) => {
+        const renderScenarios = (host, scenarios, { running = false } = {}) => {
+            const focusedResult = host.contains(document.activeElement)
+                ? document.activeElement.closest('details[data-result-id]')?.dataset.resultId : null;
+            const disclosures = new Map([...host.querySelectorAll('details[data-result-id]')]
+                .map(node => [node.dataset.resultId, node.open]));
+            const previousStates = new Map([...host.querySelectorAll('details[data-result-id]')]
+                .map(node => [node.dataset.resultId, node.dataset.resultStatus]));
             host.textContent = '';
-            const counts = Object.fromEntries(['pass', 'fail', 'warning', 'skip'].map(status => [status,
+            const counts = Object.fromEntries(['pass', 'fail', 'warning', 'skip', 'pending'].map(status => [status,
                 scenarios.filter(item => item.status === status).length]));
-            const summaryTone = counts.fail ? 'is-fail' : counts.warning ? 'is-warning' : 'is-pass';
+            const summaryTone = counts.fail ? 'is-fail' : counts.warning ? 'is-warning' : running ? 'is-running' : 'is-pass';
             const summary = appendText(host, 'section', `report-runner-summary ${summaryTone}`, '');
-            appendText(summary, 'strong', '', counts.fail
+            appendText(summary, 'strong', '', running ? `Проверка продолжается${counts.fail ? ` · ошибок: ${counts.fail}` : ''}` : counts.fail
                 ? `Найдены ошибки: ${counts.fail}`
                 : counts.warning ? `Работает с предупреждениями: ${counts.warning}` : 'Проверка проходит успешно');
-            appendText(summary, 'span', '', `${counts.pass} успешно · ${counts.skip} пропущено · ${scenarios.length} всего`);
+            appendText(summary, 'span', '', `${counts.pass} успешно · ${counts.skip} пропущено · ${scenarios.length - counts.pending} завершено${counts.pending ? ` · ${counts.pending} ожидают` : ''}`);
 
-            const attention = scenarios.filter(item => item.status === 'fail' || item.status === 'warning');
+            const panelResults = scenarios.filter(item => item.id.startsWith('live-snapshot-'));
+            const appendResult = (parent, item, className) => {
+                const details = document.createElement('details');
+                details.className = `${className} is-${item.status}`;
+                details.dataset.resultId = `${className}:${item.id}`;
+                details.dataset.resultStatus = item.status;
+                details.open = previousStates.get(details.dataset.resultId) !== item.status && item.status === 'fail'
+                    || (disclosures.get(details.dataset.resultId) ?? false);
+                parent.appendChild(details);
+                const labels = { pending: 'Ожидание', pass: 'Успешно', fail: 'Ошибка', warning: 'Предупреждение', skip: 'Пропущено' };
+                appendText(details, 'summary', '', `${labels[item.status]} · ${item.name}`);
+                appendText(details, 'pre', 'report-runner-details', item.details || 'Без подробностей.');
+                if (item.evidence) appendText(details, 'pre', 'report-runner-evidence', item.evidence);
+                return details;
+            };
+            if (panelResults.length) {
+                const panels = appendText(host, 'section', 'report-runner-problems report-runner-panels', '');
+                appendText(panels, 'h4', '', 'Панели');
+                panelResults.forEach(item => appendResult(panels, item, 'report-runner-problem report-runner-panel'));
+            }
+
+            const attention = scenarios.filter(item => !panelResults.includes(item)
+                && (item.status === 'fail' || item.status === 'warning'));
             if (attention.length) {
                 const problems = appendText(host, 'section', 'report-runner-problems', '');
                 appendText(problems, 'h4', '', 'Что требует внимания');
                 appendText(problems, 'p', '', 'Ниже показаны только ошибки и предупреждения. Нажмите на пункт, чтобы увидеть результат проверки.');
-                attention.forEach(item => {
-                    const details = document.createElement('details');
-                    details.className = `report-runner-problem is-${item.status}`;
-                    details.open = item.status === 'fail';
-                    problems.appendChild(details);
-                    appendText(details, 'summary', '', `${item.status === 'fail' ? 'Ошибка' : 'Предупреждение'} · ${item.name}`);
-                    appendText(details, 'pre', 'report-runner-details', item.details || 'Без подробностей.');
-                    if (item.evidence) appendText(details, 'pre', 'report-runner-evidence', item.evidence);
-                });
+                attention.forEach(item => appendResult(problems, item, 'report-runner-problem'));
             }
 
             const technical = document.createElement('details');
             technical.className = 'report-runner-technical';
+            technical.dataset.resultId = 'technical';
+            technical.open = disclosures.get('technical') ?? false;
             host.appendChild(technical);
-            appendText(technical, 'summary', '', `Технические проверки (${scenarios.length})`);
+            const completed = scenarios.filter(item => item.status !== 'pending');
+            appendText(technical, 'summary', '', `Технические проверки (${completed.length})`);
             const list = appendText(technical, 'section', 'report-runner-scenarios', '');
-            scenarios.forEach(item => {
+            completed.forEach(item => {
                 const details = document.createElement('details');
                 details.className = `report-runner-scenario is-${item.status}`; list.appendChild(details);
+                details.dataset.resultId = `technical:${item.id}`;
+                details.open = disclosures.get(details.dataset.resultId) ?? false;
                 const source = item.source === 'live' ? 'РЕАЛЬНЫЕ ДАННЫЕ' : 'ТЕСТОВЫЕ ДАННЫЕ';
                 appendText(details, 'summary', '', `${item.status.toUpperCase()} · ${item.name} · ${source} · ${item.durationMs} мс`);
                 appendText(details, 'pre', 'report-runner-details', item.details || 'Без подробностей.');
                 if (item.evidence) appendText(details, 'pre', 'report-runner-evidence', item.evidence);
             });
+            if (focusedResult) [...host.querySelectorAll('details[data-result-id]')]
+                .find(node => node.dataset.resultId === focusedResult)?.querySelector('summary')?.focus({ preventScroll: true });
         };
         const renderAudit = (host, audit) => {
             host.textContent = '';
@@ -260,14 +293,29 @@
             const run = async () => {
                 if (running) return;
                 running = true; rerun.disabled = true; auditHost.textContent = '';
+                scenarioHost.textContent = ''; status.className = 'report-audit-status';
                 const controller = new AbortController(); overlay.controller = controller;
                 const scenarios = runFixtureSuite(reportEngine, auditEngine);
-                renderScenarios(scenarioHost, scenarios);
+                renderScenarios(scenarioHost, scenarios, { running: true });
                 status.textContent = 'Тестовые сценарии завершены. Один раз получаем реальные данные панелей…';
+                const panelResults = new Map();
                 try {
-                    const collected = await collect(controller.signal, message => {
-                        if (status.isConnected) status.textContent = `Реальные данные: ${message}`;
+                    const collected = await collect(controller.signal, (message, update) => {
+                        if (controller.signal.aborted || activeOverlay !== overlay) return;
+                        if (!update) { status.textContent = `Реальные данные: ${message}`; return; }
+                        if (!panelResults.size) update.panels.forEach(panel => {
+                            panelResults.set(panel.id, panelScenario({ key: reportEngine.normalizePanel(panel.report, panel).key,
+                                title: panel.title || 'Панель', state: 'pending' }));
+                        });
+                        if (update.panel) panelResults.set(update.panel.id, panelScenario({
+                            key: reportEngine.normalizePanel(update.panel.report, update.panel).key,
+                            title: update.panel.title || 'Панель', state: update.snapshot?.state,
+                            status: update.snapshot?.dataStatusText || update.snapshot?.error,
+                        }));
+                        status.textContent = `Проверка продолжается · панелей проверено: ${update.completed} из ${update.total}`;
+                        renderScenarios(scenarioHost, [...scenarios, ...panelResults.values()], { running: true });
                     });
+                    if (controller.signal.aborted || activeOverlay !== overlay) return;
                     const live = evaluateLiveSuite(reportEngine, auditEngine, collected);
                     scenarios.push(...live.scenarios); renderScenarios(scenarioHost, scenarios); renderAudit(auditHost, live.audit);
                     const failures = scenarios.filter(item => item.status === 'fail').length;
@@ -282,12 +330,15 @@
                             : 'Проверка завершена: сообщение формируется корректно.';
                 } catch (error) {
                     if (error?.name !== 'AbortError') {
+                        scenarios.push(...[...panelResults.values()].map(item => item.status === 'pending'
+                            ? { ...item, status: 'skip', details: 'Проверка прервана до получения данных панели.' } : item));
                         scenarios.push(result('live-collection', 'Получение реальных данных', 'live', now(), 'fail', error?.message || String(error)));
                         renderScenarios(scenarioHost, scenarios);
                         status.className = 'report-audit-status is-fail';
                         status.textContent = 'Тестовые сценарии завершены, но живой прогон не смог получить данные.';
                     }
                 } finally {
+                    controller.abort();
                     if (overlay.controller === controller) overlay.controller = null;
                     running = false; if (rerun.isConnected) rerun.disabled = false;
                 }
