@@ -12,9 +12,11 @@
             '#cancelDashboardPanelPickerBtn', '#cancelPanelPickerBtn', '#closeModal', '[data-action="cancel"]'
         ].join(',');
         const opened = new Map();
+        const focused = new WeakMap();
         let observer = null;
         let pending = false;
         let running = false;
+        let focusFrame = null;
         let lastFocused = documentRef.activeElement;
         const visible = node => node.isConnected && node.getClientRects().length > 0
             && windowRef.getComputedStyle(node).visibility !== 'hidden';
@@ -57,7 +59,29 @@
         const onFocus = event => {
             const overlay = event.target.closest?.(selector);
             if (overlay && !opened.has(overlay) && visible(overlay)) opened.set(overlay, lastFocused);
+            if (overlay && visible(overlay)) focused.set(overlay, event.target);
+            const dialog = event.target.closest?.('dialog:modal');
+            if (dialog) focused.set(dialog, event.target);
             lastFocused = event.target;
+        };
+        const onWindowBlur = () => {
+            // Cross-origin iframe focus blurs the parent window without focusin
+            // on the parent document. Wait until its focus transition completes;
+            // reclaim only a background frame, never another browser window.
+            // Native dialogs retain their own close/keyboard lifecycle.
+            // No iframe DOM access or focus polling is needed.
+            if (focusFrame !== null) return;
+            focusFrame = windowRef.requestAnimationFrame(() => {
+                focusFrame = null;
+                if (!running) return;
+                const overlay = [...documentRef.querySelectorAll('dialog:modal')].at(-1) || top();
+                const active = documentRef.activeElement;
+                if (!overlay || active?.tagName !== 'IFRAME' || overlay.contains(active)) return;
+                const target = focused.get(overlay);
+                if (target && overlay.contains(target) && visible(target) && !target.disabled) {
+                    target.focus({ preventScroll: true });
+                } else focusInside(overlay);
+            });
         };
         const onKey = event => {
             // Native modal dialogs (variables) own their own focus and Escape contract.
@@ -85,6 +109,7 @@
         };
         const start = () => {
             if (running || !documentRef.body) return;
+            lastFocused = documentRef.activeElement;
             running = true;
             // Ignore table rows, clocks and chart updates: only modal visibility/lifecycle matters.
             const containsModal = node => node.nodeType === 1
@@ -97,13 +122,17 @@
                 attributes: true, attributeFilter: ['style', 'hidden'] });
             documentRef.addEventListener('keydown', onKey, true);
             documentRef.addEventListener('focusin', onFocus, true);
+            windowRef.addEventListener('blur', onWindowBlur);
             sync();
         };
         const stop = () => {
             running = false;
+            if (focusFrame !== null) windowRef.cancelAnimationFrame(focusFrame);
+            focusFrame = null;
             observer?.disconnect(); observer = null;
             documentRef.removeEventListener('keydown', onKey, true);
             documentRef.removeEventListener('focusin', onFocus, true);
+            windowRef.removeEventListener('blur', onWindowBlur);
             opened.clear();
         };
         return Object.freeze({ start, stop });
