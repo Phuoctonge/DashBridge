@@ -1,5 +1,13 @@
 /* global DashBridgeAnalytics, DashBridgeAnalyticsContract */
 globalThis.DashBridgeWorklogMetrics = Object.freeze({
+    parseDate(value) {
+        const match = /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{1,2}))?$/.exec(String(value || '').trim());
+        if (!match) return new Date(NaN);
+        const [, d, m, y, h = 0, min = 0] = match.map((part, index) => index && part !== undefined ? Number(part) : part);
+        const date = new Date(y, m - 1, d, h, min);
+        return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d
+            && date.getHours() === Number(h) && date.getMinutes() === Number(min) ? date : new Date(NaN);
+    },
     calculateTotals(worklogs, now = new Date()) {
         const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const startOfWeek = new Date(startOfDay);
@@ -8,9 +16,8 @@ globalThis.DashBridgeWorklogMetrics = Object.freeze({
         let day = 0; let week = 0;
         for (const log of Array.isArray(worklogs) ? worklogs : []) {
             const hours = parseFloat(String(log?.timeSpent ?? '').replace(',', '.')) || 0;
-            const match = /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{1,2}))?/.exec(String(log?.dateStarted || ''));
-            if (!match) continue;
-            const date = new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1]), Number(match[4]) || 0, Number(match[5]) || 0);
+            const date = globalThis.DashBridgeWorklogMetrics.parseDate(log?.dateStarted);
+            if (isNaN(date.getTime())) continue;
             if (date >= startOfWeek && date < startOfNextWeek) week += hours;
             if (date >= startOfDay && date < new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000)) day += hours;
         }
@@ -171,13 +178,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function parseDate(str) {
-        if (!str || str.trim() === "") return new Date(NaN);
-        try {
-            const [datePart, timePart] = str.split(' ');
-            const [d, m, y] = datePart.split('/').map(Number);
-            const [h, min] = (timePart || "00:00").split(':').map(Number);
-            return new Date(y, m - 1, d, h || 0, min || 0);
-        } catch (e) { return new Date(NaN); }
+        return DashBridgeWorklogMetrics.parseDate(str);
     }
 
     function parseShortDate(s) {
@@ -371,10 +372,14 @@ document.addEventListener("DOMContentLoaded", () => {
             el.onchange = (e) => {
                 const id = e.target.dataset.id; const field = e.target.dataset.field;
                 if (!field || !id) return;
-                saveToHistory();
                 const log = worklogs.find(l => l.id === id);
                 if (!log) return;
                 let val = e.target.value;
+                if (field === 'dateStarted' && isNaN(parseDate(val).getTime())) {
+                    e.target.value = log.dateStarted;
+                    showToast('Введите существующую дату и время: ДД/ММ/ГГГГ ЧЧ:ММ.', { type: 'error' }); return;
+                }
+                saveToHistory();
                 if (field === 'issueId') { val = cleanLink(val); e.target.value = val; log.issueKey = val; }
                 log[field] = val;
                 if (field === 'issueId') fetchIssueTitle(id);
@@ -446,51 +451,60 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // --- Picker & UI ---
     function openPicker(logId, anchor) {
-        if (activePicker) activePicker.remove();
+        if (activePicker) activePicker();
         const log = worklogs.find(l => l.id === logId);
         if (!log) return;
         let current = parseDate(log.dateStarted);
         if (isNaN(current.getTime())) current = new Date();
         const picker = document.createElement('div');
         picker.className = 'custom-picker active';
+        const close = () => {
+            picker.remove(); document.removeEventListener('click', outside, true);
+            document.removeEventListener('keydown', escape); if (activePicker === close) activePicker = null;
+        };
+        // Capture runs before month rendering replaces the clicked DOM node.
+        const outside = event => { if (!picker.contains(event.target)) close(); };
+        const escape = event => { if (event.key === 'Escape') { event.preventDefault(); close(); } };
+        const chooseDate = date => {
+            if (!worklogs.includes(log)) { close(); return; }
+            saveToHistory(); log.dateStarted = formatDate(date);
+            const input = findWorklogInput(logId, 'dateStarted'); if (input) input.value = log.dateStarted;
+            showRefreshIndicator(); saveToStorage(); close();
+        };
+        let hours = String(current.getHours()).padStart(2, '0'), minutes = String(current.getMinutes()).padStart(2, '0');
+        const moveMonth = delta => {
+            hours = picker.querySelector('#pH').value; minutes = picker.querySelector('#pM').value;
+            current.setDate(1); current.setMonth(current.getMonth() + delta); renderPicker();
+        };
         function renderPicker() {
             const year = current.getFullYear(), month = current.getMonth();
             const names = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
             picker.innerHTML = `
                 <div class="picker-header"><div class="picker-title">${names[month]} ${year}</div><div class="picker-nav"><div class="nav-btn" id="prev">‹</div><div class="nav-btn" id="next">›</div></div></div>
                 <div class="picker-grid"><div class="weekday">Пн</div><div class="weekday">Вт</div><div class="weekday">Ср</div><div class="weekday">Чт</div><div class="weekday">Пт</div><div class="weekday">Сб</div><div class="weekday">Вс</div></div>
-                <div class="time-picker"><div class="time-group"><span class="time-label">Время:</span><input type="text" class="time-input" id="pH" value="${String(current.getHours()).padStart(2, '0')}" maxlength="2"><span>:</span><input type="text" class="time-input" id="pM" value="${String(current.getMinutes()).padStart(2, '0')}" maxlength="2"></div><div class="time-label" style="cursor:pointer; color:var(--primary)" id="setNow">Сейчас</div></div>
+                <div class="time-picker"><div class="time-group"><span class="time-label">Время:</span><input type="text" class="time-input" id="pH" aria-label="Часы" value="${escapeHtml(hours)}" maxlength="2"><span>:</span><input type="text" class="time-input" id="pM" aria-label="Минуты" value="${escapeHtml(minutes)}" maxlength="2"></div><div class="time-label" style="cursor:pointer; color:var(--primary)" id="setNow">Сейчас</div></div>
             `;
             const grid = picker.querySelector('.picker-grid'), first = new Date(year, month, 1).getDay(), off = first === 0 ? 6 : first - 1, days = new Date(year, month + 1, 0).getDate(), prev = new Date(year, month, 0).getDate();
             for (let i = off; i > 0; i--) { const d = document.createElement('div'); d.className = 'day prev-month'; d.textContent = prev - i + 1; grid.appendChild(d); }
             for (let d = 1; d <= days; d++) {
                 const div = document.createElement('div'); div.className = 'day'; if (d === new Date().getDate() && month === new Date().getMonth() && year === new Date().getFullYear()) div.classList.add('today');
                 div.textContent = d; div.onclick = () => {
-                    const h = parseInt(picker.querySelector('#pH').value, 10) || 0, m = parseInt(picker.querySelector('#pM').value, 10) || 0;
-                    saveToHistory();
-                    log.dateStarted = formatDate(new Date(year, month, d, h, m));
-                    const input = findWorklogInput(logId, 'dateStarted');
-                    if (input) input.value = log.dateStarted;
-                    showRefreshIndicator();
-                    saveToStorage();
-                    picker.remove();
+                    const h = picker.querySelector('#pH').value, m = picker.querySelector('#pM').value;
+                    if (!/^\d{1,2}$/.test(h) || !/^\d{1,2}$/.test(m) || Number(h) > 23 || Number(m) > 59) {
+                        showToast('Часы: 00–23, минуты: 00–59.', { type: 'error' }); return;
+                    }
+                    chooseDate(new Date(year, month, d, Number(h), Number(m)));
                 }; grid.appendChild(div);
             }
-            picker.querySelector('#prev').onclick = () => { current.setMonth(current.getMonth() - 1); renderPicker(); };
-            picker.querySelector('#next').onclick = () => { current.setMonth(current.getMonth() + 1); renderPicker(); };
-            picker.querySelector('#setNow').onclick = () => {
-                saveToHistory();
-                log.dateStarted = formatDate(new Date());
-                const input = findWorklogInput(logId, 'dateStarted');
-                if (input) input.value = log.dateStarted;
-                showRefreshIndicator(); saveToStorage(); picker.remove();
-            };
+            picker.querySelector('#prev').onclick = () => moveMonth(-1);
+            picker.querySelector('#next').onclick = () => moveMonth(1);
+            picker.querySelector('#setNow').onclick = () => chooseDate(new Date());
         }
         renderPicker(); document.body.appendChild(picker);
         const r = anchor.getBoundingClientRect(); let t = r.bottom + 5, l = r.right - 230;
         if (t + 280 > window.innerHeight - 10) t = r.top - 285; if (l < 10) l = 10;
-        picker.style.top = t + 'px'; picker.style.left = l + 'px'; activePicker = picker;
-        setTimeout(() => { const c = (e) => { if (!picker.contains(e.target)) { picker.remove(); document.removeEventListener('click', c); activePicker = null; } }; document.addEventListener('click', c); }, 10);
+        picker.style.top = t + 'px'; picker.style.left = l + 'px'; activePicker = close;
+        document.addEventListener('click', outside, true); document.addEventListener('keydown', escape);
     }
 
     function showToast(text, options = false) {
