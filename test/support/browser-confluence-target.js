@@ -1,5 +1,5 @@
 'use strict';
-/* global document, DataTransfer */
+/* global chrome, document, DataTransfer, innerWidth, devicePixelRatio */
 const http = require('node:http');
 const assert = require('node:assert/strict');
 const JSZip = require('../../vendor/jszip.min.js');
@@ -50,6 +50,39 @@ module.exports = async function inspectConfluenceTarget(context, extensionId, { 
             'successful scan must make Rescan available');
         await page.locator('#archiveInput').setInputFiles({ name: 'target-fixture.zip', mimeType: 'application/zip', buffer });
         await page.waitForFunction(() => !document.getElementById('mappingBoardCard').hidden);
+        if (!corruptVerification && !cancelDuringUpload) {
+            const viewport = page.viewportSize();
+            const worker = context.serviceWorkers()[0];
+            const tabId = await worker.evaluate(async url => (await chrome.tabs.query({})).find(tab => tab.url === url).id, page.url());
+            const zoom = await worker.evaluate(id => chrome.tabs.getZoom(id), tabId);
+            try {
+                await page.setViewportSize({ width: 600, height: 900 });
+                for (const factor of [1, 1.5]) {
+                    await worker.evaluate(({ id, value }) => chrome.tabs.setZoom(id, value), { id: tabId, value: factor });
+                    assert.equal(await worker.evaluate(id => chrome.tabs.getZoom(id), tabId), factor);
+                    await page.locator('#mappingBoardCard').scrollIntoViewIfNeeded();
+                    const layout = await page.locator('#mappingBoardCard .step-heading').evaluate(heading => {
+                        const range = document.createRange();
+                        range.selectNodeContents(heading.querySelector('p'));
+                        const lines = [...range.getClientRects()];
+                        const buttons = [...heading.querySelectorAll('button')].map(button => button.getBoundingClientRect());
+                        return {
+                            overlaps: lines.some(line => buttons.some(button => line.left < button.right
+                                && line.right > button.left && line.top < button.bottom && line.bottom > button.top)),
+                            controlsFit: buttons.every(button => button.left >= 0 && button.right <= document.documentElement.clientWidth),
+                            viewport: innerWidth, dpr: devicePixelRatio,
+                        };
+                    });
+                    await page.screenshot({ path: `test-results/confluence-target-600-zoom-${factor}.png` });
+                    assert.equal(layout.overlaps, false, `mapping explanation must not overlap actions at zoom ${factor}: ${JSON.stringify(layout)}`);
+                    assert.equal(layout.controlsFit, true, `mapping actions must fit narrow viewport at zoom ${factor}`);
+                    result.checks.push({ check: 'populated-mapping-narrow-browser-zoom', factor, ...layout });
+                }
+            } finally {
+                await worker.evaluate(({ id, value }) => chrome.tabs.setZoom(id, value), { id: tabId, value: zoom });
+                if (viewport) await page.setViewportSize(viewport);
+            }
+        }
         await page.locator('.mapping-range > summary').first().click();
         const source = page.locator('.source-node:not(.aggregate-node)').first();
         const target = page.locator('.target-node.specific-node').filter({ hasText: 'CPU' }).last();
