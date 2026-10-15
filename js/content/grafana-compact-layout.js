@@ -3,6 +3,10 @@
     if (window.DashBridgeGrafanaCompactLayout) return;
     const findUPlot = root => {
         if (!root) return null;
+        // Grafana 12 can keep the plot outside the simple hook/ref chain below.
+        // Reuse the visual engine lookup, but accept only this panel's renderer.
+        const nativePlot = window.DashBridgeGrafanaVisualEngine?.findUPlot(root);
+        if (nativePlot?.root && root.contains(nativePlot.root)) return nativePlot;
         for (const element of [root, ...root.querySelectorAll('*')]) {
             const fiberKey = Object.keys(element).find(key => key.startsWith('__reactFiber$'));
             if (!fiberKey) continue;
@@ -145,7 +149,10 @@
     };
     const relaxInlineSizeConstraints = root => {
         const table = Array.from(root?.querySelectorAll('table, [role="table"], [role="grid"]') || []).find(candidate => {
-            if (candidate.closest('.graph-legend, .u-legend, [class*="legend" i]')) return false;
+            // Modern Grafana gives the table a generated class, while its rows
+            // retain LegendRow. It is chart chrome, not a native Table panel.
+            if (candidate.closest('.graph-legend, .u-legend, [class*="legend" i]')
+                || candidate.querySelector('tr[class*="LegendRow"]')) return false;
             const data = window.DashBridgeGrafanaTableReport?.collectGrafanaTableData?.(candidate);
             return data?.columns?.length >= 2 && data.rows?.length > 0;
         });

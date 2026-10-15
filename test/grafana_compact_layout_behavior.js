@@ -204,3 +204,39 @@ grid.closest = () => ({});
 delete tableRoot.__reactFiber$otherChart;
 assert.strictEqual(layout.relaxInlineSizeConstraints(tableRoot), null, 'legend tables must keep the chart path');
 console.log('PASS compact native tables retain geometry and restore temporary constraints');
+
+// KNS Grafana 12 legend tables use generated table classes; only their rows
+// identify them as legends. Treating one as a data table leaves the 1100x800
+// chart wrapper untouched inside a 1000x520 prepared capture.
+const chartPanel = element(), measuredWrapper = element(), chart = element(), legend = element();
+chart.parentElement = measuredWrapper; legend.parentElement = measuredWrapper;
+measuredWrapper.parentElement = chartPanel;
+measuredWrapper.children = [chart, legend]; chartPanel.children = [measuredWrapper];
+chartPanel.contains = node => [chartPanel, measuredWrapper, chart, legend].includes(node);
+measuredWrapper.contains = node => [measuredWrapper, chart, legend].includes(node);
+chart.contains = node => node === chart;
+measuredWrapper.style.setProperty('width', '1100px');
+measuredWrapper.style.setProperty('height', '800px');
+legend.closest = selector => selector.includes('legend') ? null : chartPanel;
+legend.querySelector = selector => selector.includes('LegendRow') ? {} : null;
+const legendRow = { closest: () => legend };
+chartPanel.querySelectorAll = selector => selector.includes('[role="grid"]') ? [legend] : [];
+chartPanel.querySelector = selector => selector === '.uplot' ? chart : legendRow;
+chartPanel.__reactFiber$chart = { memoizedState: { memoizedState: { current: uplot }, next: null }, return: null };
+const chartConstraints = layout.relaxInlineSizeConstraints(chartPanel);
+assert(chartConstraints);
+assert.strictEqual(measuredWrapper.style.getPropertyValue('height'), '100%',
+    'a generated-class legend table must not bypass relaxation of its measured chart wrapper');
+chartConstraints.restore();
+assert.strictEqual(measuredWrapper.style.getPropertyValue('height'), '800px');
+assert.strictEqual(measuredWrapper.style.getPropertyValue('width'), '1100px');
+
+delete chartPanel.__reactFiber$chart;
+const ownedPlot = { root: chart, setSize() {}, redraw() {} };
+context.window.DashBridgeGrafanaVisualEngine = { findUPlot: () => ownedPlot };
+assert.strictEqual(layout.findUPlot(chartPanel), ownedPlot,
+    'compact capture must reuse the renderer lookup that finds the real Grafana 12 plot');
+context.window.DashBridgeGrafanaVisualEngine.findUPlot = () => ({ ...ownedPlot, root: element() });
+assert.strictEqual(layout.findUPlot(chartPanel), null,
+    'an ancestor lookup must not resize a plot belonging to another panel');
+console.log('PASS compact capture recognizes native legend tables and the owned visual-engine renderer');

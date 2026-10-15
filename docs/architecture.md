@@ -135,6 +135,10 @@ canvas. Проверки: [layout](../test/grafana_capture_layout_behavior.js),
 [compact](../test/grafana_compact_layout_behavior.js),
 [Table](../test/grafana_table_report_behavior.js),
 [browser visual](../test/support/browser-dashboard-visual.js).
+Compact helper переиспользует поиск uPlot из visual engine и принимает только
+renderer с root внутри выбранной панели. У Grafana 12 таблица легенды может иметь
+только generated class, поэтому её `LegendRow` исключает ветку native Table:
+иначе измеренный flex-контейнер сохраняет прежний размер и выносит легенду за PNG.
 Неудовлетворённая полнота возвращает явную ошибку; произвольные internals не
 считаются доверенными только потому, что находятся на странице Grafana.
 
