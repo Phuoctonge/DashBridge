@@ -21,9 +21,9 @@ Chromium 153.0.8010.12, Europe/Moscow. Новый отдельный профи�
 
 | Сценарии | Фактически выполненная часть | Результат |
 |---|---|---|
-| O01 | Remember tab, uiScale, dirty → Save → reload | PASS; отключение всех модулей ещё NOT RUN |
+| O01 | Remember tab, uiScale, dirty → Save → reload; отключить все модули и открыть настоящий Popup | PASS |
 | O03 | RAM Available/Used: зависимые ключевое слово/формула, сохранение своего названия | PASS; renderer-потребитель ещё NOT RUN |
-| O04 | warn > crit не сохраняется, прежняя пара остаётся в storage | PASS; остальные границы ещё NOT RUN |
+| O04 | warn > crit, пустой/отрицательный/>100 порог; коэффициент вне 0,01–10; размер вне 100–4096/дробный; включённые граничные значения и reload | PASS; ошибочный ввод не меняет storage |
 | O07 | Скачать/прочитать JSON schema 3, изменить scale, import и restore backup через UI | PASS |
 | O08 | Повреждённый JSON не меняет настройки | PASS; лимит/остальные отказы ещё NOT RUN |
 | O10 | Раскрыть диагностику доставки, обновить и прочитать состояние | PASS; storage failure ещё NOT RUN |
@@ -40,6 +40,21 @@ Chromium 153.0.8010.12, Europe/Moscow. Новый отдельный профи�
 | R03/R06/R08/R09/R10/X05 | Локальная запись 5 шагов → download .dashflow → manifest/flow/network/HAR/streams/bodies → UI import → replay → сравнение → download XLSX | PASS этого маршрута; счётчик сервера 1 при записи и 2 после replay, Workbook XML открыт; полная матрица сравнения ещё NOT RUN |
 | T01/S02–S04 | Runner отвергает javascript URL; Selector: none, поиск без результата, один checkbox, Save/reopen, all → Escape → reopen | PASS; полный run/diagnostics и standalone ещё NOT RUN |
 | E01/E02 | Валидный файл → два повреждённых → корректный retry; «Очистить» отменяет эффекты, сохраняя фото | FAIL до правки → PASS после restart; clipboard/размерная матрица/закрытие окна ещё NOT RUN |
+| O02/O03 | Адрес с credentials/запрещённой схемой, Jira с query, TDM file URL; одинаковые названия метрик; своё название → Save/reload | PASS перечисленных отказов/сохранения; полная нормализация hosts ещё NOT RUN |
+| B01/B02/B04 | Перевёрнутый период отклонён до создания capture window; live picker: 51 панель, all/none/cancel | PASS на grafanakns |
+| B06/X02 | Две реальные панели × два периода → ZIP v3 → чтение importer Confluence; четыре PNG 1000×520 просмотрены | PASS; поля manifest и две папки периодов сверены; сквозной Popup→Batch здесь не повторялся |
+| B07 | Main→Series переносит URL/периоды без изменения; Series picker выбирает панель и получает query definitions | PASS подготовки; захват Series проверяется отдельно |
+| R02 | Четыре сочетания Disable Cache × Disable Cookies с разрешённым incognito; fixture cookie и два одинаковых cacheable fetch; Stop | PASS: сервер получает 1/2 запроса согласно cache, прежний cookie только в обычной сессии; ephemeral tab закрывается |
+| R06 | Скачанный .dashflow: 5 шагов, 4 запроса; bytes и SHA-256 каждого из четырёх bodies, HAR count, pending=0 | PASS; это не проверка лимитов/stream capture |
+| R07 | Повреждённый ZIP, отсутствующий body и подменённый digest, каждый дважды | PASS: ошибка видна, текущие 5 шагов и доступный Replay сохранены |
+| R10 | Открыты XML всех листов XLSX; пять строк различий и cached totals: 2 unchanged, 1 changed, 1 added, 1 removed | PASS содержимого fixture-отчёта; визуальное открытие в Excel и длинные URL ещё NOT RUN |
+| C08 | Fixture: attachment upload HTTP 500; page PUT HTTP 409 | PASS: ошибка видна, исходный storage сохранён; при upload error PUT отсутствует; timeout/вторая загрузка ещё NOT RUN |
+| D01/D02 | UI create/rename/clone/delete cancel/confirm/reload; вручную 2,3,2 → две новые карточки; Cancel одиночного добавления | PASS; конфликт двух окон/discovery ещё NOT RUN |
+| D03/D05 | Resume→fullscreen→Escape→pause→delete cancel→reload; валидный период → URL iframe, невозможная дата/перевёрнутый период не меняют storage; multi variables сохранены | PASS на локальных HTML fixtures; renderer не проверялся этим сценарием |
+| D11 | UI export JSON прочитан; повреждённый import и Cancel валидного import сохраняют профиль | PASS перечисленных частей; применение импорта/курсор ещё NOT RUN |
+| S01/S05 | Standalone Selector: 20 fast tests, none, один ID→Save; закрыто только созданное окно, выбор сохранён | PASS; отказ storage ещё NOT RUN |
+| T02/T05/T06/X06 | Настоящий Runner: 11 выбранных сценариев на Grafana 12; отдельное окно диагностики; download fallback JSON v4 прочитан | PASS: 11 completed; mon-dc недоступна — ещё 11 честных NOT RUN, итог неполный; native file picker/большой export ещё NOT RUN |
+| T03 | Stop во время подготовки, возврат доступного Run и Clear | PASS этой стадии; Stop в середине сценария ещё NOT RUN |
 
 Подтверждены и исправлены потеря второго значения переменной при переходе по
 ссылке и невидимый новый статус времени после переключения вкладок. Область —
@@ -66,6 +81,26 @@ Worklog фиксирует Date; новый независимый процес�
 Полный прогон текущих исправлений: ESLint, 222 JS, 41 Python, Chromium 24/24;
 evidence `test-results/pages-easter-full-suite.txt`. Независимый code review
 обеих малых правок actionable замечаний не выявил.
+
+Продолжение приёмки: `test-results/pages-recorder-modes-results.json`,
+`pages-batch-native-path-log.txt`, `pages-archive-failures-results.json`,
+`pages-dashboard-ui-results.json`, `pages-options-bounds-results.json`,
+`pages-runner-fallback-log.txt`, `acceptance-runner-report.json`.
+В JSON Runner сверено равенство 22 planned = 11 completed + 11 not-run;
+неработающая сеть mon-dc не записана как успешная проверка Flot.
+Для проверки download fallback в тестовой странице отключён `showSaveFilePicker`;
+прежний запуск ожидал настоящий системный диалог, а не зависший exporter.
+Первоначальный FILE_FAILED Batch возник из-за смешанных разделителей в CDP
+downloadPath тестового скрипта; native Windows path дал полный успешный download.
+Production-код Batch/Recorder/Runner по этим ошибкам окружения не менялся.
+
+Остаток нельзя свести только к VPN: ещё не выполнены полные Popup Jira/TDM/debug
+потоки, часть отказов и потребителей Options, Series/cancel матрица Batch,
+все mapping/add/rescan варианты Confluence, сетевые/locator/lifecycle варианты
+Recorder, auth/storage варианты Worklog, live variables/capture/import DashBridge,
+срединная отмена/большой export Runner, clipboard и общая матрица G01–G10.
+Строки ниже без конкретного результата остаются NOT RUN, даже если соответствующий
+Node/Python-тест прошёл в полном автономном наборе.
 
 ## Границы и правила
 
