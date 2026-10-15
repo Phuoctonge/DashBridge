@@ -240,3 +240,34 @@ context.window.DashBridgeGrafanaVisualEngine.findUPlot = () => ({ ...ownedPlot, 
 assert.strictEqual(layout.findUPlot(chartPanel), null,
     'an ancestor lookup must not resize a plot belonging to another panel');
 console.log('PASS compact capture recognizes native legend tables and the owned visual-engine renderer');
+
+context.window.DashBridgeGrafanaVisualEngine.findUPlot = () => ownedPlot;
+chartPanel.querySelectorAll = () => [];
+chartPanel.querySelector = selector => selector === '.uplot' ? chart
+    : selector.includes('VizLegend series') ? legendRow : null;
+legendRow.closest = selector => selector.includes('ul') ? legend : null;
+chartPanel.style.setProperty('transform', 'translate(563px, 722px)');
+chart.style.setProperty('height', '415px');
+const listConstraints = layout.relaxInlineSizeConstraints(chartPanel);
+assert(listConstraints, 'native list legends must receive the same measured-ancestry preparation as table legends');
+const listObserver = mutationObservers.at(-1);
+assert.strictEqual(measuredWrapper.style.getPropertyValue('height'), '100%');
+measuredWrapper.style.setProperty('height', '800px');
+chartPanel.style.setProperty('transform', 'translate(563px, 722px)');
+listObserver.callback();
+assert.strictEqual(chartPanel.style.getPropertyValue('transform'), 'none',
+    'React grid writes must not move the list-legend panel out of its capture frame');
+assert.strictEqual(measuredWrapper.style.getPropertyValue('height'), '100%');
+assert.strictEqual(chart.style.getPropertyValue('height'), '415px',
+    'ancestry pinning must not overwrite the renderer size on a min-width-only child');
+let listWrites = 0;
+const listSetStyle = measuredWrapper.style.setProperty;
+measuredWrapper.style.setProperty = (...args) => { listWrites++; listSetStyle(...args); };
+listObserver.callback();
+assert.strictEqual(listWrites, 0, 'chart constraints must converge without an observer rewrite loop');
+measuredWrapper.style.setProperty = listSetStyle;
+listConstraints.restore();
+assert.strictEqual(listObserver.disconnected, true);
+assert.strictEqual(measuredWrapper.style.getPropertyValue('height'), '800px');
+assert.strictEqual(chartPanel.style.getPropertyValue('transform'), 'translate(563px, 722px)');
+console.log('PASS compact list legends pin and restore chart ancestry without changing renderer height');

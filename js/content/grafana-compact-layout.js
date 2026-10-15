@@ -157,8 +157,8 @@
             return data?.columns?.length >= 2 && data.rows?.length > 0;
         });
         const uplot = table ? null : findUPlot(root);
-        const legendRow = root?.querySelector('table tbody tr, .u-legend tr, tr[class*="LegendRow"]');
-        const legend = legendRow?.closest('table, [role="table"], .u-legend') || legendRow;
+        const legendRow = root?.querySelector('table tbody tr, .u-legend tr, tr[class*="LegendRow"], [data-testid^="data-testid VizLegend series "]');
+        const legend = legendRow?.closest('table, [role="table"], .u-legend, ul') || legendRow;
         if (!table && (!uplot || !legend)) return null;
         const chart = root.querySelector('.uplot');
         let common = table ? table.closest('section, .panel-container, [data-testid^="data-testid Panel header"]') : chart;
@@ -170,7 +170,7 @@
         const touch = (element, full = true) => {
             if (!element || touched.has(element)) return;
             touched.add(element);
-            snapshots.push({ element, values: properties.map(property => [
+            snapshots.push({ element, full, values: properties.map(property => [
                 property, element.style.getPropertyValue(property), element.style.getPropertyPriority(property)
             ]) });
             properties.forEach(property => {
@@ -183,7 +183,7 @@
             if (element === root) break;
         }
         if (!table) Array.from(common.children).forEach(element => touch(element, false));
-        const originalTransform = table && {
+        const originalTransform = {
             value: root.style.getPropertyValue('transform'), priority: root.style.getPropertyPriority('transform'),
         };
         const originalColumns = table?.matches?.('[role="grid"]') ? {
@@ -197,9 +197,12 @@
             && columnWidths.every(width => /^\d+(?:\.\d+)?px$/.test(width) && parseFloat(width) > 0)
             ? columnWidths.map(width => `minmax(0px, ${parseFloat(width)}fr)`).join(' ') : null;
         // React grid and panel measurements can rewrite inline styles after
-        // reparenting. Pin only this native table's ancestry until restoration.
-        const pinTable = () => {
-            snapshots.forEach(({ element }) => properties.forEach(property => {
+        // reparenting, including transform on the outer grid item. Pin the
+        // selected table/chart ancestry until restoration, leaving renderer
+        // children under the existing min-width-only contract.
+        const pinLayout = () => {
+            snapshots.forEach(({ element, full }) => properties.forEach(property => {
+                if (!full && property !== 'min-width') return;
                 const value = property.startsWith('min-') ? '0px' : '100%';
                 if (element.style.getPropertyValue(property) !== value || element.style.getPropertyPriority(property) !== 'important') {
                     element.style.setProperty(property, value, 'important');
@@ -213,11 +216,9 @@
                 table.style.setProperty('grid-template-columns', fittedColumns, 'important');
             }
         };
-        const observer = table && typeof MutationObserver === 'function' ? new MutationObserver(pinTable) : null;
-        if (table) {
-            pinTable();
-            observer?.observe(root, { subtree: true, attributes: true, attributeFilter: ['style'] });
-        }
+        const observer = typeof MutationObserver === 'function' ? new MutationObserver(pinLayout) : null;
+        pinLayout();
+        observer?.observe(root, { subtree: true, attributes: true, attributeFilter: ['style'] });
         return {
             restore() {
                 observer?.disconnect();
