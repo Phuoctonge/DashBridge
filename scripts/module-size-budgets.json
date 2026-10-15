@@ -4,6 +4,11 @@
     "maxBytes": 65536
   },
   "exceptions": {
+    "pages/confluence-report/confluence-report.js": {
+      "maxLines": 700,
+      "maxBytes": 66560,
+      "reason": "Single Confluence page mapping/scan/apply lifecycle; the existing controller was already near 64 KiB. Keep button readiness and rescan with their state owner rather than split a lifecycle for a small UI fix. Pure ZIP, mapping, storage and apply helpers are already separate."
+    },
     "js/content/grafana-panel-tools.js": {
       "maxLines": 2400,
       "maxBytes": 143360,

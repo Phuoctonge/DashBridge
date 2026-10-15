@@ -1428,6 +1428,11 @@ attachments в сессии открытой страницы, без запис
 Read-only live client остаётся владельцем чтения, requestTab page controller —
 владельцем записи. Они исполняют запросы в origin выбранной HTTP(S) страницы
 без credentials в URL; настройки wiki editor не ограничивают этот отдельный UI.
+«Очистить связи» отключает Apply до нового сопоставления. Прямое соединение
+и добавление графика/группы/раздела через `refreshMappingAfterAdd` восстанавливают
+доступность кнопки. Этот UI lifecycle проверяет
+[`browser-confluence-target.js`](../test/support/browser-confluence-target.js)
+на локальном стенде, без записи в рабочую Confluence.
 
 Точечная замена несёт offset изображения из исходного storage scan, а не
 локальный occurrence группы. Все replacement selectors разрешаются на одной

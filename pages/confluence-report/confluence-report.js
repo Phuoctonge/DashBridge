@@ -279,7 +279,7 @@
         }
         return mappingLinks.querySelector('#mapping-arrow-group') && mappingLinks.querySelector('#mapping-arrow-specific');
     }
-    function refreshMappingAfterAdd(sourceKey) { renderMappingBoard(); const source = root.DashBridgeConfluenceReportMappingBoard.findNode(mappingSources.querySelectorAll('[data-source-key]'), 'sourceKey', sourceKey); const parent = source?.closest('details'); if (parent) parent.open = true; drawMappingLinks(); }
+    function refreshMappingAfterAdd(sourceKey) { applyConfluenceButton.disabled = connections.length === 0; renderMappingBoard(); const source = root.DashBridgeConfluenceReportMappingBoard.findNode(mappingSources.querySelectorAll('[data-source-key]'), 'sourceKey', sourceKey); const parent = source?.closest('details'); if (parent) parent.open = true; drawMappingLinks(); }
     function createInlineGraph(dropzone, test, group) { if (!draggedSourceKey) return; if (draggedSourceKey.startsWith('aggregate\0')) { createInlineCriteriaGraph(dropzone, group.title); return; } const sourceKey = draggedSourceKey; const targetKey = `added-graph\0${test.testKey}\0${group.title}\0${Date.now()}`; customGraphs = [...customGraphs, { testKey: test.testKey, groupTitle: group.title, targetKey, sourceKey, caption: sourceKey.split('\0').at(-1) || 'Новый график' }]; connections = [...connections, root.DashBridgeConfluenceReportMappingBoard.createConnection({ sourceKey, targetKey, mode: 'specific' })]; refreshMappingAfterAdd(sourceKey); }
     function createInlineSection(dropzone, test) { if (!draggedSourceKey) return; const sourceKey = draggedSourceKey; const targetKey = `added-section\0${test.testKey}\0${Date.now()}`; const item = { targetKey, sourceKey, caption: sourceKey.split('\0').at(-1) || 'Новый график' }; const section = { testKey: test.testKey, groupTitle: null, title: 'Новый раздел', items: [item] }; customSections = [...customSections, section]; pendingSectionFocus = section; connections = [...connections, root.DashBridgeConfluenceReportMappingBoard.createConnection({ sourceKey, targetKey, mode: 'specific' })]; refreshMappingAfterAdd(sourceKey); }
     function createInlineGroup(dropzone, test, group) { if (!draggedSourceKey) return; const sourceKey = draggedSourceKey; const targetKey = `added-group\0${test.testKey}\0${Date.now()}`; const item = { targetKey, sourceKey, caption: sourceKey.split('\0').at(-1) || 'Новый график' }; const section = { testKey: test.testKey, groupTitle: group.title, title: 'Новая группа', items: [item] }; customSections = [...customSections, section]; pendingSectionFocus = section; connections = [...connections, root.DashBridgeConfluenceReportMappingBoard.createConnection({ sourceKey, targetKey, mode: 'specific' })]; refreshMappingAfterAdd(sourceKey); }
@@ -412,7 +412,7 @@
         targetCount.textContent = String(selectedTargets.size);
         renderOperations(); renderPreview();
     });
-    clearConnectionsButton.addEventListener('click', () => { connections = []; drawMappingLinks(); mappingBoardStatus.textContent = 'Связи очищены.'; });
+    clearConnectionsButton.addEventListener('click', () => { connections = []; drawMappingLinks(); applyConfluenceButton.disabled = true; mappingBoardStatus.textContent = 'Связи очищены.'; });
     applyConfluenceButton.addEventListener('click', async () => {
         if (!liveResult || !archive || !connections.length) return;
         applyConfluenceButton.disabled = true;

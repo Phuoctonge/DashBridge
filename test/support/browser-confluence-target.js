@@ -48,6 +48,32 @@ module.exports = async function inspectConfluenceTarget(context, extensionId, { 
         await target.dispatchEvent('dragover', { dataTransfer: transfer });
         await target.dispatchEvent('drop', { dataTransfer: transfer });
         await source.dispatchEvent('dragend', { dataTransfer: transfer });
+        await page.locator('#clearConnectionsButton').click();
+        assert.equal(await page.locator('#applyConfluenceButton').isDisabled(), true,
+            'clearing all connections must disable Apply');
+        assert.equal(uploads, 0); assert.equal(puts, 0);
+        for (const [selector, aggregate] of [
+            ['.mapping-group > .mapping-add-graph', false],
+            ['.mapping-test > .mapping-add-section', false],
+            ['.mapping-add-group', false],
+            ['.mapping-criteria-add-graph', true],
+            ['.mapping-criteria-add', true],
+            ['.mapping-section-dropzone', false]
+        ]) {
+            const addedSource = aggregate ? page.locator('.source-node.aggregate-node').first() : source;
+            await addedSource.dispatchEvent('dragstart', { dataTransfer: transfer });
+            await page.locator(selector).first().dispatchEvent('drop', { dataTransfer: transfer });
+            await addedSource.dispatchEvent('dragend', { dataTransfer: transfer });
+            assert.equal(await page.locator('#applyConfluenceButton').isEnabled(), true,
+                `adding via ${selector} must enable Apply after Clear`);
+            await page.locator('#clearConnectionsButton').click();
+            assert.equal(await page.locator('#applyConfluenceButton').isDisabled(), true);
+            assert.equal(uploads, 0); assert.equal(puts, 0);
+        }
+        await source.dispatchEvent('dragstart', { dataTransfer: transfer });
+        await target.dispatchEvent('drop', { dataTransfer: transfer });
+        await source.dispatchEvent('dragend', { dataTransfer: transfer });
+        assert.equal(await page.locator('#applyConfluenceButton').isEnabled(), true);
         await page.locator('#applyConfluenceButton').click();
         await page.waitForFunction(() => /Готово:|verification failed|Нет применимых|Attachment not found/.test(document.getElementById('mappingBoardStatus').textContent), {}, { timeout: 40000 });
         const status = await page.locator('#mappingBoardStatus').textContent();
