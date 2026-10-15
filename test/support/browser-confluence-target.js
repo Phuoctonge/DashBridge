@@ -120,14 +120,26 @@ module.exports = async function inspectConfluenceTarget(context, extensionId, { 
                 await test.locator('.mapping-added-graph input').nth(1).fill('Added B');
                 await test.locator('.mapping-added-graph input').nth(1).blur();
             }
+            const movingRow = test.locator('.mapping-added-graph').last();
+            const reorderTransfer = await page.evaluateHandle(() => new DataTransfer());
+            await movingRow.locator('.mapping-target-grip').dispatchEvent('dragstart', { dataTransfer: reorderTransfer });
+            const reorderTarget = kind === 'graph' ? test.locator('.mapping-group > .mapping-reorder-dropzone').nth(1)
+                : test.locator('.mapping-added-graph').first();
+            await reorderTarget.dispatchEvent('drop', { dataTransfer: reorderTransfer });
+            await test.locator('.mapping-added-graph').first().locator('.mapping-target-grip')
+                .dispatchEvent('dragend', { dataTransfer: reorderTransfer });
+            assert.match(await page.locator('#mappingBoardStatus').textContent(), /Панель перемещена/,
+                `single added ${kind} must move through its real drop handler`);
             await page.locator('#applyConfluenceButton').click();
             await page.waitForFunction(() => /Готово:|verification failed/.test(document.getElementById('mappingBoardStatus').textContent), {}, { timeout: 40000 });
             assert.match(await page.locator('#mappingBoardStatus').textContent(), /Готово:/);
             const tests = await page.evaluate(value => globalThis.DashBridgeConfluenceReportScanner.fromStorageHtml(value).tests, html);
             const groups = tests[0].groups.map(group => [group.headingPath, group.images.map(item => item.imageReference.filename)]);
-            assert.deepEqual(groups, kind === 'graph' ? [[['G'], ['old.png', 'old.png', 'new.png']]] : [
+            assert.deepEqual(groups, kind === 'graph' ? [[['G'], ['old.png', 'new.png', 'old.png']]] : [
                 [['G'], ['old.png', 'old.png']], [kind === 'group' ? ['G', 'Extra'] : ['Extra'], ['new.png', 'new.png']],
             ]);
+            if (kind !== 'graph') assert(html.indexOf('Added B') < html.indexOf('Added A'),
+                'saved section must preserve the reordered captions');
             assert.equal(html.slice(html.indexOf('<h3>T2')), initialHtml.slice(initialHtml.indexOf('<h3>T2')));
             assert.equal(uploads, 1); assert.equal(puts, 1);
             result.checks.push({ check: `saved-${kind}-hierarchy-and-order` });
