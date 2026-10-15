@@ -70,18 +70,41 @@ window.BatchPanelRules = (() => {
         return normalizeRules(profiles[key] ?? profiles[legacyDashboardKey(url)]);
     };
 
-    const save = async (url, rules) => {
+    const save = async (url, rules, options = {}) => {
         // Web Locks serialize writers across Batch documents of this extension.
         // Do not silently fall back to a page-local queue: it loses other tabs' writes.
         if (!globalThis.navigator?.locks?.request) throw new Error('Браузер не поддерживает безопасное сохранение Batch rules');
-        return navigator.locks.request(STORAGE_KEY, () => saveLocked(url, rules));
+        return navigator.locks.request(STORAGE_KEY, () => saveLocked(url, rules, options));
     };
-    const saveLocked = async (url, rules) => {
+    const saveLocked = async (url, rules, { baseRules, reset = false }) => {
         const key = dashboardKey(url);
         if (!key) throw new Error('Введите корректный URL дашборда Grafana');
         const stored = await chrome.storage.local.get(STORAGE_KEY);
         const profiles = { ...(stored[STORAGE_KEY] || {}) };
-        const normalized = normalizeRules(rules);
+        let normalized = normalizeRules(rules);
+        if (baseRules !== undefined) {
+            const base = normalizeRules(baseRules);
+            const current = normalizeRules(profiles[key] ?? profiles[legacyDashboardKey(url)]);
+            const equal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+            const changed = [...new Set([...Object.keys(base), ...Object.keys(normalized)])]
+                .filter(id => !equal(base[id], normalized[id]));
+            const conflicts = changed.filter(id => !equal(current[id], base[id]) && !equal(current[id], normalized[id]));
+            // The lock serializes storage writes, while the baseline prevents stale
+            // editors from replacing another window's rules. Reset owns the whole set.
+            if (conflicts.length || (reset && !equal(current, base) && !equal(current, normalized))) {
+                const error = new Error(conflicts.length
+                    ? `Правила панелей ${conflicts.join(', ')} изменены в другом окне. Ваши изменения не сохранены.`
+                    : 'Правила изменены в другом окне. Сброс не выполнен.');
+                error.code = 'batch-rules-conflict';
+                throw error;
+            }
+            const merged = { ...current };
+            for (const id of changed) {
+                if (normalized[id]) merged[id] = normalized[id];
+                else delete merged[id];
+            }
+            normalized = merged;
+        }
         if (Object.keys(normalized).length) profiles[key] = normalized;
         // Keep an empty org-specific tombstone so clearing migrated legacy
         // rules does not make the old unscoped profile appear again.

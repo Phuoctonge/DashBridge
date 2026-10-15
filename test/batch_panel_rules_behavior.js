@@ -106,6 +106,15 @@ async function main() {
     await context.BatchPanelRules.save(concurrentUrl, { 1: fresh[1] }, { baseRules: fresh });
     assert.deepStrictEqual(Object.keys(await context.BatchPanelRules.load(concurrentUrl)), ['1', '4'],
         'deleting an unchanged panel must preserve an unrelated concurrent addition');
+    const stable = await context.BatchPanelRules.load(concurrentUrl);
+    await context.BatchPanelRules.save(concurrentUrl, { ...stable, 1: { invertLegend: true } }, { baseRules: stable });
+    await context.BatchPanelRules.save(concurrentUrl, { ...stable, 4: { invertIdle: true } }, { baseRules: stable });
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(await context.BatchPanelRules.load(concurrentUrl))), {
+        1: { invertLegend: true }, 4: { invertIdle: true }
+    }, 'editing another panel must preserve an unseen concurrent change');
+    await context.BatchPanelRules.save(concurrentUrl, { ...stable, 4: { invertIdle: true } }, { baseRules: stable });
+    assert.strictEqual((await context.BatchPanelRules.load(concurrentUrl))[1].invertLegend, true,
+        'an identical concurrent result is safe to retry without restoring stale unchanged rules');
     console.log('[OK] Batch panel rules behavior');
 }
 

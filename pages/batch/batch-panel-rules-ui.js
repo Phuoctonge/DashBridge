@@ -8,7 +8,8 @@
         ['cpuCapacityFilterEnabled', 'Фильтр Load Average по vCPU'], ['thresholdEnabled', 'Порог на графике']];
     const allLabels = [...visualLabels, ...transformLabels, ...filterLabels];
     function create({ dashboardUrl, container, status, store, parseUrl }) {
-        let loadVersion = 0; let saveTimer = null;
+        let loadVersion = 0; let saveTimer = null; let baseRules = null;
+        let saveQueue = Promise.resolve(); let conflicted = false; let resetVersion = 0; let savedResetVersion = 0;
         const setStatus = value => { status.textContent = value; };
         const option = (key, label, checked) => {
             const node = document.createElement('label'); const input = document.createElement('input');
@@ -150,33 +151,59 @@
             }); return rules;
         };
         const load = async () => {
+            clearTimeout(saveTimer);
             const url = dashboardUrl.value.trim(); const version = ++loadVersion;
+            baseRules = null; conflicted = false; resetVersion = 0; savedResetVersion = 0;
             if (!parseUrl(url)) { render(); setStatus('Введите URL Grafana, чтобы загрузить правила этого дашборда.'); return; }
             try {
                 const rules = await store.load(url); if (version !== loadVersion || url !== dashboardUrl.value.trim()) return;
+                baseRules = rules;
                 render(rules); document.getElementById('resetBatchPanelRulesBtn').hidden = !Object.keys(rules).length;
                 setStatus(Object.keys(rules).length ? `Загружено правил: ${Object.keys(rules).length}.` : 'Для этого дашборда правил пока нет.');
-            } catch (error) { setStatus(`Не удалось загрузить правила: ${error.message}`); }
+            } catch (error) { if (version === loadVersion && url === dashboardUrl.value.trim()) setStatus(`Не удалось загрузить правила: ${error.message}`); }
         };
         const incomplete = () => Array.from(container.querySelectorAll('.batch-panel-rule')).some(row => {
             const id = row.querySelector('.batch-panel-rule-id-input')?.value.trim();
             return !id || !/^\d+$/.test(id) || Number(id) < 1 || !Array.from(row.querySelectorAll('input[type="checkbox"]')).some(input => input.checked);
         });
         function scheduleSave() {
-            clearTimeout(saveTimer); const url = dashboardUrl.value.trim(); setStatus('Сохранение…');
-            saveTimer = setTimeout(async () => {
+            clearTimeout(saveTimer); const url = dashboardUrl.value.trim(); const version = loadVersion;
+            if (conflicted) return;
+            if (baseRules === null) return setStatus('Сначала загрузите правила дашборда.');
+            setStatus('Сохранение…');
+            saveTimer = setTimeout(() => {
                 if (url !== dashboardUrl.value.trim()) return;
                 if (!parseUrl(url)) return setStatus('Введите URL Grafana, чтобы сохранить правила.');
                 if (incomplete()) return setStatus('Укажите корректный ID панели и выберите хотя бы одну настройку.');
-                try {
-                    const rules = await store.save(url, collect()); if (url !== dashboardUrl.value.trim()) return;
-                    document.getElementById('resetBatchPanelRulesBtn').hidden = !Object.keys(rules).length;
-                    setStatus(Object.keys(rules).length ? `Сохранено правил: ${Object.keys(rules).length}.` : 'Нет сохранённых правил для этого дашборда.');
-                } catch (error) { setStatus(`Не удалось сохранить правила: ${error.message}`); }
+                let draft;
+                try { draft = collect(); } catch (error) { return setStatus(error.message); }
+                const reset = resetVersion;
+                // Serialize this editor's drafts as well as cross-document storage writes.
+                // Keep the visible draft as baseline: remote rules absent from the DOM
+                // must not become deletions on the next local edit.
+                saveQueue = saveQueue.then(async () => {
+                    if (version !== loadVersion || url !== dashboardUrl.value.trim() || conflicted) return;
+                    try {
+                        const rules = await store.save(url, draft, { baseRules, reset: reset > savedResetVersion });
+                        if (version !== loadVersion || url !== dashboardUrl.value.trim()) return;
+                        baseRules = draft; savedResetVersion = reset;
+                        document.getElementById('resetBatchPanelRulesBtn').hidden = !Object.keys(rules).length;
+                        setStatus(Object.keys(rules).length ? `Сохранено правил: ${Object.keys(rules).length}.` : 'Нет сохранённых правил для этого дашборда.');
+                    } catch (error) {
+                        if (version !== loadVersion || url !== dashboardUrl.value.trim()) return;
+                        setStatus(`Не удалось сохранить правила: ${error.message}`);
+                        if (error.code === 'batch-rules-conflict') {
+                            conflicted = true;
+                            const reload = document.createElement('button'); reload.type = 'button'; reload.className = 'btn btn-secondary';
+                            reload.textContent = 'Загрузить сохранённые правила';
+                            reload.addEventListener('click', () => { void load(); }); status.append(' ', reload);
+                        }
+                    }
+                });
             }, 350);
         }
         document.getElementById('addBatchPanelRuleBtn').addEventListener('click', () => { addRow(); scheduleSave(); });
-        document.getElementById('resetBatchPanelRulesBtn').addEventListener('click', () => { render(); scheduleSave(); });
+        document.getElementById('resetBatchPanelRulesBtn').addEventListener('click', () => { render(); resetVersion++; scheduleSave(); });
         dashboardUrl.addEventListener('change', () => { clearTimeout(saveTimer); void load(); });
         return Object.freeze({ load, render, collect, addRow, scheduleSave });
     }

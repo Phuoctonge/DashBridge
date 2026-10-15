@@ -44,6 +44,8 @@ module.exports = async function inspectAuditFixes(context, extensionId) {
         assert(stored.includes('audit-added.test')); assert(!stored.includes('audit-local.test'));
         result.checks.push('stale Options preserves new connection; explicit stale edit returns conflict without overwriting');
         await batch.goto(`chrome-extension://${extensionId}/pages/batch/batch.html`);
+        await inspectPanelRuleConflicts(context, extensionId);
+        result.checks.push('two Batch editors merge unrelated panels and preserve drafts on conflicts');
         const windowId = await batch.evaluate(async () => {
             const runner = createBatchCaptureWindowRunner();
             const first = await runner.acquire({ focused: false });
@@ -65,3 +67,73 @@ module.exports = async function inspectAuditFixes(context, extensionId) {
     finally { await options.close(); await dashboard.close(); if (!batch.isClosed()) await batch.close(); }
     return result;
 };
+
+async function inspectPanelRuleConflicts(context, extensionId) {
+    const pages = [await context.newPage(), await context.newPage()];
+    const url = 'https://batch-conflict.test/d/rules?orgId=1';
+    const read = () => pages[0].evaluate(async url => window.BatchPanelRules.load(url), url);
+    const wait = async (page, text) => page.locator('#batchPanelRulesStatus').filter({ hasText: text }).waitFor();
+    const open = async page => {
+        await page.goto(`chrome-extension://${extensionId}/pages/batch/batch.html`);
+        await page.locator('#dashUrl').fill(url); await page.locator('#dashUrl').press('Tab');
+        await wait(page, 'правил');
+    };
+    const add = async (page, id, field) => {
+        await page.locator('#addBatchPanelRuleBtn').click();
+        const row = page.locator('.batch-panel-rule').last();
+        await row.locator('.batch-panel-rule-id-input').fill(id);
+        await row.locator(`[data-rule-field="${field}"]`).check();
+        await wait(page, 'Сохранено');
+    };
+    try {
+        await pages[0].goto(`chrome-extension://${extensionId}/pages/batch/batch.html`);
+        await pages[0].evaluate(url => window.BatchPanelRules.save(url, {}), url);
+        await open(pages[0]); await open(pages[1]);
+        await add(pages[0], '1', 'removeFill');
+        await add(pages[1], '2', 'invertLegend');
+        assert.deepEqual(await read(), { 1: { removeFill: true }, 2: { invertLegend: true } });
+        await open(pages[0]); await open(pages[1]);
+        // IDs are live input properties, so find the first row in sorted panel order.
+        await pages[0].locator('.batch-panel-rule').first().locator('[data-rule-field="invertIdle"]').check();
+        await wait(pages[0], 'Сохранено');
+        await pages[1].locator('.batch-panel-rule').first().locator('[data-rule-field="invertLegend"]').check();
+        await wait(pages[1], 'другом окне');
+        assert.equal(await pages[1].locator('.batch-panel-rule').first().locator('[data-rule-field="invertLegend"]').isChecked(), true);
+        assert.equal((await read())[1].invertLegend, undefined, 'conflicting draft must not overwrite stored rule');
+        await pages[1].getByRole('button', { name: 'Загрузить сохранённые правила' }).click();
+        await wait(pages[1], 'Загружено');
+        assert.equal(await pages[1].locator('.batch-panel-rule').first().locator('[data-rule-field="invertIdle"]').isChecked(), true);
+        await pages[1].locator('.batch-panel-rule').first().locator('[data-rule-field="invertLegend"]').check();
+        await wait(pages[1], 'Сохранено');
+        await pages[0].locator('#resetBatchPanelRulesBtn').click();
+        await wait(pages[0], 'другом окне');
+        assert.deepEqual(Object.keys(await read()), ['1', '2'], 'stale reset must preserve stored rules');
+        await pages[0].getByRole('button', { name: 'Загрузить сохранённые правила' }).click();
+        await wait(pages[0], 'Загружено');
+        await pages[0].evaluate(() => {
+            const original = window.BatchPanelRules.save;
+            let first = true;
+            window.BatchPanelRules.save = async (...args) => {
+                if (first) {
+                    first = false; window.batchSaveStarted = true;
+                    await new Promise(resolve => { window.releaseBatchSave = resolve; });
+                }
+                return original(...args);
+            };
+        });
+        await pages[0].locator('.batch-panel-rule').first().locator('[data-rule-field="thickenLines"]').check();
+        await pages[0].waitForFunction(() => window.batchSaveStarted);
+        await pages[0].locator('.batch-panel-rule').first().locator('[data-rule-field="invertLegend"]').uncheck();
+        // Let the second debounce enqueue while the first real save is held.
+        await pages[0].waitForTimeout(450);
+        await pages[0].evaluate(() => window.releaseBatchSave());
+        await pages[0].waitForFunction(async url => {
+            const rule = (await window.BatchPanelRules.load(url))[1];
+            return rule.thickenLines && !rule.invertLegend;
+        }, url);
+        assert.equal((await read())[1].invertIdle, true, 'queued local saves preserve the other settings');
+    } finally {
+        for (const page of pages) await page.close();
+    }
+}
+module.exports.inspectPanelRuleConflicts = inspectPanelRuleConflicts;
