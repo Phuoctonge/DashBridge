@@ -55,6 +55,22 @@ PNG 1198×518 и compact 1000×520, просмотрены изображени�
 на direct d-solo и с расширением, и при `--disable-extensions`; оно не считается
 подтверждённым дефектом DashBridge. Данные CPU при этом отображаются.
 
+Дополнительная проверка качества 2026-10-15: при DPR 2 на живых uPlot и Flot
+получены обычные PNG 2396×1036 и compact 1000×520, изображения просмотрены.
+Контролируемые исключение и AbortError на шаге ожидания данных восстанавливают
+CSS с priorities, размеры iframe и scroll; следующий захват успешен.
+Это проверка restoration boundary, а не имитация всех возможных отказов Chrome.
+В отдельном KNS iframe с включённым числовым фильтром подмена ответа запроса
+на пустой даёт `no_data/empty_source`, обрыв — `error/network_error`, штатный
+ответ снова даёт шесть серий. При всех OFF transport намеренно сохраняет fast
+path без диагностики запросов; этот негативный прогон не подтверждает данный режим.
+На mon-dc Load Average helper получил vCPU для всех 12 серверов: max/last при
+коэффициенте 0.8 дают `filtered_empty`; тестовый 0.001 оставляет 12 превышающих
+серий с 12 capacity entries, без пропущенной ёмкости. Коэффициенты менялись
+только в тестовых URL. Повторно прошли профильные тесты report snapshot,
+capture selection/readiness, panel data runtime, Table, network и vCPU.
+Новых дефектов для правки production-кода эти проверки не подтвердили.
+
 ## 1. Подтверждённое поведение, требующее исправления
 
 В текущем перечне нет подтверждённых дефектов, для которых ещё не внесено
@@ -107,9 +123,13 @@ restart. Это не вся матрица продукта. Перед заяв
 
 - Подтвердить текущий MAIN-runtime в отдельном профиле по
   [development guide](development-guide.md#ранние-transport-wrappers).
-- Проверить недостающее: DPR и длинные легенды, копирование PNG в целевые приложения,
-  capture error/cancel и restore, legacy Series definition context,
-  latest/SLA `[80, null]`, no_data `[null, null]`, network failure и vCPU.
+- Проверить недостающее: дробный DPR/browser zoom и длинные легенды, копирование
+  PNG в целевые приложения, реальные отказы Chrome capture и legacy Series
+  definition context. DPR 1/2 и контролируемые error/cancel restore проверены выше.
+  Latest/SLA `[80, null]` и пустые значения уже покрыты модульными тестами;
+  при появлении таких реальных данных сверить renderer. Network failure с
+  активным фильтром и обычные vCPU max/last проверены; режим всех OFF и сложная
+  корреляция vCPU из раздела 2 остаются отдельными сценариями.
 - Пройти авторизованные Jira, TDM и Recorder record/save/import/replay в обоих
   режимах cache/session. Реальные отправки выполнять в согласованном тестовом контексте.
 - Для Confluence E05 проверить deadline/AbortSignal, double-click, partial upload
