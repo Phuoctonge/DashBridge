@@ -150,6 +150,10 @@ Restore отключает observer и возвращает значения и 
 список мог закрыть график. Ветка общая для direct Grafana и DashBridge iframe,
 возврат OFF и resize-контракт проверяет
 [legend resize](../test/grafana_legend_resize_behavior.js).
+При восстановлении layout сохраняются текущие width/height обычного priority:
+ими владеет Grafana и React может изменить их при View/возврате на dashboard.
+Собственные размерные overrides используют `!important` и снимаются по snapshot;
+возврат всего старого style без этой границы восстанавливал ширину маленькой панели.
 Неудовлетворённая полнота возвращает явную ошибку; произвольные internals не
 считаются доверенными только потому, что находятся на странице Grafana.
 

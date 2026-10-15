@@ -244,8 +244,16 @@
                 const restoreLegendLayout = element => {
                     if (!element || !Object.prototype.hasOwnProperty.call(element, legendLayoutSnapshotKey)) return;
                     const savedStyle = element[legendLayoutSnapshotKey];
+                    // Native View sizes use normal priority; our overrides use !important.
+                    const nativeSizes = ['width', 'height'].filter(property =>
+                        !element.style.getPropertyPriority(property)
+                    ).map(property => [property, element.style.getPropertyValue(property)]);
                     if (savedStyle === null) element.removeAttribute('style');
                     else element.setAttribute('style', savedStyle);
+                    nativeSizes.forEach(([property, value]) => {
+                        if (value) element.style.setProperty(property, value);
+                        else element.style.removeProperty(property);
+                    });
                     if (!invertLegendArg) delete element[legendLayoutSnapshotKey];
                 };
                 const layoutElements = [flexContainer, chartBranch, legendBranch, chartHost, legendElement];

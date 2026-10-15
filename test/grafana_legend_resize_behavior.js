@@ -8,12 +8,16 @@ function fixture(name, { listLegend = false } = {}) {
     const frames = new Map(); let frameId = 0;
     const resizeObservers = [];
     const element = () => {
-        const styles = new Map(); const classes = new Set();
+        const styles = new Map(); const priorities = new Map(); const classes = new Set();
         return {
             isConnected: true, parentElement: null, className: '',
             classList: { contains: key => classes.has(key), add: key => classes.add(key), remove: key => classes.delete(key) },
-            style: { getPropertyValue: key => styles.get(key) || '', setProperty: (key, value) => styles.set(key, value), removeProperty: key => styles.delete(key) },
-            getAttribute: () => null, setAttribute() {}, removeAttribute() {}, contains(item) { return item === this; },
+            style: { getPropertyValue: key => styles.get(key) || '', getPropertyPriority: key => priorities.get(key) || '',
+                setProperty(key, value, priority = '') { styles.set(key, value); priorities.set(key, priority); },
+                removeProperty(key) { styles.delete(key); priorities.delete(key); } },
+            getAttribute: () => styles.size ? JSON.stringify([...styles].map(([key, value]) => [key, value, priorities.get(key)])) : null,
+            setAttribute(key, value) { if (key === 'style') { styles.clear(); priorities.clear(); JSON.parse(value).forEach(([k, v, p]) => { styles.set(k, v); priorities.set(k, p); }); } },
+            removeAttribute(key) { if (key === 'style') { styles.clear(); priorities.clear(); } }, contains(item) { return item === this; },
             querySelector: () => null, querySelectorAll: () => [],
             getBoundingClientRect() { return this.bounds || { width: 0, height: 0 }; },
         };
@@ -65,10 +69,28 @@ function fixture(name, { listLegend = false } = {}) {
         vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'content', file), 'utf8'), context);
     }
     const flush = () => { const batch = [...frames.values()]; frames.clear(); batch.forEach(fn => fn()); };
-    return { root, branch, legend, plot, calls, resizeObservers, frames, flush, api: window.DashBridgeGrafanaLegendVisuals.create({ debugLog() {} }) };
+    return { root, flex, branch, legend, plot, calls, resizeObservers, frames, flush, api: window.DashBridgeGrafanaLegendVisuals.create({ debugLog() {} }) };
 }
 
 (async () => {
+    for (const name of ['', 'dashbridge-iframe']) {
+        const f = fixture(name, { listLegend: true });
+        f.flex.style.setProperty('width', '530px'); f.flex.style.setProperty('height', '284px');
+        const on = f.api.applyPopupLegendAndVisuals('resized-panel', null, 'fast_click_toggle', false, false, 1.5, true);
+        for (let i = 0; i < 8; i++) { f.flush(); await Promise.resolve(); }
+        await on;
+        // Native React resize writes new dimensions while the relocation is ON.
+        f.flex.style.setProperty('width', '1085px'); f.flex.style.setProperty('height', '800px');
+        const off = f.api.applyPopupLegendAndVisuals('resized-panel', null, 'fast_click_toggle', false, false, 1.5, false);
+        for (let i = 0; i < 8; i++) { f.flush(); await Promise.resolve(); }
+        await off;
+        assert.strictEqual(f.flex.style.getPropertyValue('width'), '1085px', 'OFF must keep the current native View width');
+        assert.strictEqual(f.flex.style.getPropertyValue('height'), '800px', 'OFF must keep the current native View height');
+        assert.strictEqual(f.flex.style.getPropertyPriority('height'), '');
+        assert.strictEqual(f.flex.style.getPropertyValue('flex-direction'), 'row', 'OFF restores the original layout properties');
+        assert.strictEqual(f.flex.style.getPropertyValue('overflow'), '', 'OFF removes its own layout overrides');
+        f.api.stopLegacyVisualObservers(f.root);
+    }
     for (const name of ['', 'dashbridge-iframe']) {
         const f = fixture(name, { listLegend: true });
         const applying = f.api.applyPopupLegendAndVisuals('test-list', null, 'fast_click_toggle', false, false, 1.5, true);

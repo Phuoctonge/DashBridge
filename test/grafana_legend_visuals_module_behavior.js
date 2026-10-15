@@ -50,7 +50,7 @@ console.log('PASS Grafana legend visuals preserve renderer lookup and controller
         };
         let series = { color: '#123456', label: 'CPU', lines: { fill: 0.2, lineWidth: 2 } };
         const plot = { getData: () => [series], setupGrid() {}, draw() {}, resize() {} };
-        const style = { getPropertyValue: () => '', setProperty() {}, removeProperty() {} };
+        const style = { getPropertyValue: () => '', getPropertyPriority: () => '', setProperty() {}, removeProperty() {} };
         const flex = { parentElement: root, querySelector: () => null, style, getAttribute: () => null, removeAttribute() {} };
         const chart = { parentElement: flex, style, getAttribute: () => null, removeAttribute() {} };
         root.querySelector = selector => selector === '.graph-panel__chart, .uplot' ? chart : null;
