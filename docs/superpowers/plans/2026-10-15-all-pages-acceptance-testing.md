@@ -55,6 +55,12 @@ Chromium 153.0.8010.12, Europe/Moscow. Новый отдельный профи�
 | S01/S05 | Standalone Selector: 20 fast tests, none, один ID→Save; закрыто только созданное окно, выбор сохранён | PASS; отказ storage ещё NOT RUN |
 | O08 | 15 неверных импортов конфигурации и 5 проверок UI дважды, Cancel; отказы backup/sync/local write | PASS перечисленных отказов и сохранения прежнего состояния при validation/Cancel; storage write поэтапный, при последнем отказе уже записанная sync-часть остаётся с backup, атомарный rollback не заявляется |
 | S05 | Отказ сохранения выбора в embedded и standalone по два раза | FAIL пустого статуса до правки → PASS: ошибка видна, прежний выбор и draft сохранены; retry закрывает окно и сохраняет выбор; финальные четыре повтора без pageerror |
+| C05/C07/C08 | Создание графика, вложенной группы и раздела: Apply → локальный POST/PUT/GET → scanner; по два повтора | FAIL порядка/принадлежности до правки → PASS: график в конце группы, новая группа сохраняет прежние изображения, раздел принадлежит выбранному тесту |
+| C05/C07 | Несколько изображений в одной новой группе/разделе; повтор файла с разными подписями | FAIL planner/verification → PASS: один заголовок, правильная иерархия; постоянная Chromium-регрессия проверяет результат после сохранения |
+| S02/S03/S04/G04 | Embedded FAIL/NOT RUN presets с явной историей дважды; Save/reopen/Cancel; основные Tab/Escape Options, actual Popup и Selector | PASS перечисленного; полный Tab trap и вся keyboard-матрица не заявляются; standalone Escape не закрывает обычную страницу, Cancel закрывает |
+| D09 | Живые uPlot/Flot: настоящая кнопка карточки Save → PNG, ordinary и compact, восстановление style и исходного URL | PASS четырёх файлов: ordinary 1390×618, compact 1000×520; файлы compact просмотрены; clipboard/collage/ZIP этим не проверены |
+| O01/O02/O03/X01 | Actual Options Save → exact-port runtime/direct/iframe, revoke/re-add; CPU/RAM названия и режимы, коэффициент, showAll; отказ Save и retry дважды | PASS локальных fixtures; analysis использует DOM fallback, а не транспортное преобразование; compact 900×480 подтверждён только до dataset |
+| B03/B05 | All/white/black/empty/unknown ID, rules autosave/max/last/reload/remove/reset, разные dashboards в двух редакторах | PASS перечисленных путей; захват заменён noncapturing boundary, PNG этим не проверены |
 | T02/T05/T06/X06 | Настоящий Runner: 11 выбранных сценариев на Grafana 12; отдельное окно диагностики; download fallback JSON v4 прочитан | PASS: 11 completed; mon-dc недоступна — ещё 11 честных NOT RUN, итог неполный; native file picker/большой export ещё NOT RUN |
 | T03 | Stop во время подготовки, возврат доступного Run и Clear | PASS этой стадии; Stop в середине сценария ещё NOT RUN |
 | C05 | Clear отключает Apply; новое соединение и шесть путей добавления снова включают Apply; затем точечная замена на локальном стенде | FAIL до правки → PASS targeted Chromium; повторное сканирование ещё не проверено успешно |
@@ -506,6 +512,40 @@ git diff --check
 - [ ] В roadmap остаётся только незавершённое; доказательства и повторяемые команды привязаны к результату. Сам этот план не помечается выполненным до реального обхода.
 
 Цель — обоснованное решение о готовности страниц и списке оставшихся работ. Формулировка «багов вообще нет» не является критерием приёмки.
+
+Confluence additions: checkpoint `54c85cc`, отдельные RED/GREEN для порядка
+графиков, владения новой группы и принадлежности раздела выбранному тесту.
+Регрессия нескольких изображений использует настоящий `buildApplyPlan`;
+независимое ревью дополнительно проверило 720 перестановок смешанного плана
+с заменой исходного якоря. Повторное ревью существенных замечаний не выявило.
+UI evidence: `test-results/pages-confluence-additions-final-results.json`,
+`pages-confluence-additions-browser-targeted.txt`. Создание выполнялось настоящим
+`dragTo`; второй источник в существующий раздел — через его drag/drop handlers,
+нативное второе перетаскивание этим PASS не заявляется. Скриншоты настроенной
+группы/раздела просмотрены; рабочая Confluence не изменялась.
+Общий smoke первоначально не создал строку через native dragTo; постоянный
+fixture использует существующие drag/drop handlers, а отдельный native-прогон
+остаётся самостоятельным доказательством. Следующий прогон выявил одинаковые
+временные ключи двух жестов из-за часов, зафиксированных стендом Worklog.
+Fixture явно разделяет время жестов; production-ключи по этой причине не менялись.
+Оба прогона 23/24 не объявляются PASS.
+После корректировки fixture свежий полный
+`pages-confluence-additions-clock-suite.txt`: ESLint, 222 JS, 41 Python,
+Chromium 24/24 — PASS. Module/dependency guards, ссылки и diff проверены.
+
+Дополнительные evidence: `test-results/pages-general-remaining-presets-keyboard/results.json`
+закрывает прежний PARTIAL embedded history presets; остальные ранние ограничения
+сохраняются. `pages-dashboard-native-save/results.json` фиксирует четыре настоящих
+сохранения PNG на обеих Grafana. Первый harness ошибочно принял прежний download
+за новый компактный; итоговый повтор сверяет новые Chrome download IDs.
+На Flot PNG виден прежний native Templating/system Failed to fetch, уже сверенный
+с выключенным расширением; это не новый дефект capture.
+Options consumer evidence: `test-results/pages-options-consumers-results.json`.
+Copy-list template проверен до page-local clipboard stub, без системного буфера.
+Batch rules evidence: `test-results/pages-batch-rules-results.json`; правила
+редактируются inline и сохраняются автоматически, отдельных Apply/Cancel у них
+нет. Нажатия Apply/Cancel/reopen относятся к picker. Stale URL discovery отдельно
+воспроизведён дважды и требует самостоятельного исправления.
 
 Проверка исправления S05: целевая Chromium-регрессия RED → GREEN,
 затем свежий канонический прогон `pages-selector-save-suite.txt`:

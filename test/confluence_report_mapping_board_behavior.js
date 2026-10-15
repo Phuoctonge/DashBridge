@@ -93,3 +93,22 @@ context.customGraphs = [{ targetKey: addedKey, testKey: 'test-01', groupTitle: '
 context.connections = [specificLink, { mode: 'specific', sourceKey: 'r1\0' + '1\0Panel', targetKey: addedKey }];
 assert.strictEqual(context.buildApplyPlan().additions[0].insertion.beforeSourceOffset, context.customGraphs[0].insertionBeforeSourceOffset);
 console.log('PASS Confluence report apply planner target identity and precedence');
+
+for (const groupTitle of ['G', null]) {
+    const firstKey = `${groupTitle ? 'added-group' : 'added-section'}\0test-01\0first`;
+    const secondKey = 'added-section\0test-01\0second';
+    context.customGraphs = [];
+    context.customSections = [{ testKey: 'test-01', groupTitle, title: 'Extra', items: [
+        { targetKey: firstKey, caption: 'A' }, { targetKey: secondKey, caption: 'B' },
+    ] }];
+    context.connections = [firstKey, secondKey].map((targetKey, index) => ({ mode: 'specific', targetKey, sourceKey: `r1\0${index + 1}\0${index ? 'Specific' : 'Panel'}` }));
+    const plan = context.buildApplyPlan();
+    const output = context.DashBridgeConfluenceReportStorage.transform(targetHtml, plan).html;
+    const tests = JSON.parse(JSON.stringify(context.DashBridgeConfluenceReportScanner.fromStorageHtml(output).tests));
+    assert.deepStrictEqual(tests[0].groups.map(group => [group.headingPath, group.images.map(image => image.imageReference.filename)]), [
+        [['G'], ['old.png', 'old.png']], [groupTitle ? ['G', 'Extra'] : ['Extra'], ['group.png', 'specific.png']],
+    ], 'Both UI items must belong to one new section/group');
+    assert.strictEqual(tests[1].groups[0].images[0].imageReference.filename, 'old.png');
+    assert(context.DashBridgeConfluenceReportStorage.verifyPlan(output, { ...plan, expectedStorageHtml: output }));
+}
+console.log('PASS Confluence multiple images in one added section/group');

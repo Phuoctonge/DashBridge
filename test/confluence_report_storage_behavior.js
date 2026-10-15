@@ -64,3 +64,36 @@ assert.strictEqual(storage.verifyPlan(anchored.html.replace('ri:filename="new.pn
 assert.strictEqual(storage.verifyPlan(anchored.html.replace('ri:filename="old.png"', 'ri:filename="new.png"'), { expectedStorageHtml: anchored.html }), false);
 assert(storage.verifyPlan(anchored.html.replaceAll('ri:filename="', "ri:filename='" ).replace(/\.png"/g, ".png'"), { expectedStorageHtml: anchored.html }));
 console.log('PASS Confluence report original target identity and verification');
+
+const additionsHtml = '<h3>T1</h3><h4>G</h4><p>CPU</p>' + imageBlock('cpu.png') + '<p>Memory</p>' + imageBlock('memory.png') + '<h3>T2</h3><h4>G</h4><p>CPU</p>' + imageBlock('second.png');
+const appendPlan = { additions: ['Disk', 'Network'].map(caption => ({ newFilename: `${caption.toLowerCase()}.png`, caption, insertion: { kind: 'group-item', testTitle: 'T1', groupTitle: 'G' } })) };
+const appended = storage.transform(additionsHtml, appendPlan).html;
+assert.deepStrictEqual(filenames(appended), ['cpu.png', 'memory.png', 'disk.png', 'network.png', 'second.png'], 'Unanchored graphs must follow existing graphs in submitted order');
+assert.strictEqual(appended.slice(appended.indexOf('<h3>T2')), additionsHtml.slice(additionsHtml.indexOf('<h3>T2')));
+assert(storage.verifyPlan(appended, appendPlan));
+console.log('PASS Confluence graph append order');
+
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'pages', 'confluence-report', 'confluence-report-scanner.js'), 'utf8'), context);
+const scan = value => JSON.parse(JSON.stringify(context.DashBridgeConfluenceReportScanner.fromStorageHtml(value).tests));
+const groupPlan = { additions: [{ newFilename: 'disk.png', caption: 'Disk', insertion: { kind: 'group', testTitle: 'T1', groupTitle: 'G', sectionTitle: 'Extra' } }] };
+const grouped = storage.transform(additionsHtml, groupPlan).html;
+const groups = scan(grouped)[0].groups;
+assert.deepStrictEqual(groups.map(group => [group.headingPath, group.images.map(image => image.imageReference.filename)]), [
+    [['G'], ['cpu.png', 'memory.png']], [['G', 'Extra'], ['disk.png']],
+], 'New nested group must not take ownership of existing images');
+assert.strictEqual(grouped.slice(grouped.indexOf('<h3>T2')), additionsHtml.slice(additionsHtml.indexOf('<h3>T2')));
+assert(storage.verifyPlan(grouped, groupPlan));
+assert.strictEqual(storage.verifyPlan(grouped.replace('<h5>Extra</h5>', '<h4>Extra</h4>'), { ...groupPlan, expectedStorageHtml: grouped }), false, 'Verification must reject a group moved outside its parent with the same image sequence');
+assert.throws(() => storage.transform('<h3>T1</h3><h6>G</h6>', groupPlan), /вложенную группу/);
+console.log('PASS Confluence nested group ownership');
+
+const sectionPlan = { additions: [{ newFilename: 'disk.png', caption: 'Disk', insertion: { kind: 'section', testTitle: 'T1', sectionTitle: 'Extra' } }] };
+const sectioned = storage.transform(additionsHtml, sectionPlan).html;
+assert.deepStrictEqual(scan(sectioned).map(test => test.groups.map(group => [group.title, group.images.map(image => image.imageReference.filename)])), [
+    [['G', ['cpu.png', 'memory.png']], ['Extra', ['disk.png']]], [['G', ['second.png']]],
+], 'A section belongs to the selected test, before the next h3');
+assert(storage.verifyPlan(sectioned, sectionPlan));
+const misplacedSection = additionsHtml + '<h4>Extra</h4><p>Disk</p>' + imageBlock('disk.png');
+assert.strictEqual(storage.verifyPlan(misplacedSection, sectionPlan), false, 'Verification must reject a section saved under another test');
+assert.throws(() => storage.transform(additionsHtml, { additions: [{ ...sectionPlan.additions[0], insertion: { ...sectionPlan.additions[0].insertion, testTitle: 'Missing' } }] }), /Target test not found/);
+console.log('PASS Confluence selected test section placement and verification');

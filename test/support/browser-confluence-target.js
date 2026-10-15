@@ -88,6 +88,50 @@ module.exports = async function inspectConfluenceTarget(context, extensionId, { 
         assert.match(status, corruptVerification ? /post-save verification failed/ : /Готово:/);
         assert.deepEqual(filenames, ['old.png', 'old.png', 'new.png']);
         assert.equal(uploads, 1); assert.equal(puts, 1);
+        if (!corruptVerification) for (const kind of ['graph', 'group', 'section']) {
+            html = initialHtml; version = 3; uploads = 0; puts = 0;
+            await page.reload();
+            await page.locator('#pageUrlInput').fill(origin + '/pages/viewpage.action?pageId=42');
+            await page.locator('#scanLiveButton').click();
+            await page.waitForFunction(() => !document.getElementById('scanLiveButton').disabled
+                && /версия 3/.test(document.getElementById('liveStatus').textContent), {}, { timeout: 40000 });
+            await page.locator('#archiveInput').setInputFiles({ name: 'additions.zip', mimeType: 'application/zip', buffer });
+            await page.locator('#mappingBoardCard').waitFor({ state: 'visible' });
+            await page.locator('.mapping-range > summary').first().click();
+            const test = page.locator('.mapping-test').first();
+            const zone = kind === 'section' ? test.locator(':scope > .mapping-add-section')
+                : test.locator(kind === 'group' ? '.mapping-group > .mapping-add-group' : '.mapping-group > .mapping-add-graph');
+            const additionTransfer = await page.evaluateHandle(() => new DataTransfer());
+            await source.dispatchEvent('dragstart', { dataTransfer: additionTransfer });
+            await zone.first().dispatchEvent('drop', { dataTransfer: additionTransfer });
+            await source.dispatchEvent('dragend', { dataTransfer: additionTransfer });
+            await test.locator('.mapping-added-graph input').first().fill('Added A');
+            await test.locator('.mapping-added-graph input').first().blur();
+            if (kind !== 'graph') {
+                await test.locator('.mapping-added-section > summary input').fill('Extra');
+                // Worklog fixes the shared context clock; these are separate user gestures.
+                await page.clock.setFixedTime(new Date(Date.now() + 1000));
+                const sectionTransfer = await page.evaluateHandle(() => new DataTransfer());
+                await source.dispatchEvent('dragstart', { dataTransfer: sectionTransfer });
+                await test.locator('.mapping-section-dropzone').dispatchEvent('drop', { dataTransfer: sectionTransfer });
+                await source.dispatchEvent('dragend', { dataTransfer: sectionTransfer });
+                assert.equal(await test.locator('.mapping-added-section').count(), 1);
+                assert.equal(await test.locator('.mapping-added-graph').count(), 2);
+                await test.locator('.mapping-added-graph input').nth(1).fill('Added B');
+                await test.locator('.mapping-added-graph input').nth(1).blur();
+            }
+            await page.locator('#applyConfluenceButton').click();
+            await page.waitForFunction(() => /Готово:|verification failed/.test(document.getElementById('mappingBoardStatus').textContent), {}, { timeout: 40000 });
+            assert.match(await page.locator('#mappingBoardStatus').textContent(), /Готово:/);
+            const tests = await page.evaluate(value => globalThis.DashBridgeConfluenceReportScanner.fromStorageHtml(value).tests, html);
+            const groups = tests[0].groups.map(group => [group.headingPath, group.images.map(item => item.imageReference.filename)]);
+            assert.deepEqual(groups, kind === 'graph' ? [[['G'], ['old.png', 'old.png', 'new.png']]] : [
+                [['G'], ['old.png', 'old.png']], [kind === 'group' ? ['G', 'Extra'] : ['Extra'], ['new.png', 'new.png']],
+            ]);
+            assert.equal(html.slice(html.indexOf('<h3>T2')), initialHtml.slice(initialHtml.indexOf('<h3>T2')));
+            assert.equal(uploads, 1); assert.equal(puts, 1);
+            result.checks.push({ check: `saved-${kind}-hierarchy-and-order` });
+        }
         await page.locator('#rescanButton').click();
         await page.waitForFunction(() => !document.getElementById('scanLiveButton').disabled
             && /версия 4/.test(document.getElementById('liveStatus').textContent), {}, { timeout: 40000 });

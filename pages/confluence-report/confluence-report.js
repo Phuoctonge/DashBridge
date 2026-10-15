@@ -163,14 +163,14 @@
             const item = [...customGraphs, ...customSections.flatMap(section => section.items)].find(entry => entry.targetKey === link.targetKey);
             if (!item) continue;
             const groupTitle = section?.groupTitle || item.groupTitle || (link.targetKey.startsWith('added-wide\0') ? parts[1] : null);
-            const isNewGroup = link.targetKey.startsWith('added-group');
+            const isNewGroup = Boolean(section?.groupTitle) || link.targetKey.startsWith('added-group');
             const tests = item.testKey === '*' ? liveResult.snapshot.tests.filter(test => test.groups.some(group => group.title === groupTitle)) : [liveResult.snapshot.tests.find(test => test.testKey === (parts[1] || item.testKey))].filter(Boolean);
             for (const targetTest of tests) {
                 const targetFilename = findSourceForTarget(link.sourceKey, targetTest);
                 if (!targetFilename) continue;
                 const scoped = targets.filter(entry => entry.test.testKey === targetTest.testKey && entry.group.title === groupTitle);
                 const anchor = item.insertionBeforeMetric ? scoped.find(entry => metric(entry.image) === item.insertionBeforeMetric) : (item.insertionBeforeSourceOffset != null ? scoped.find(entry => entry.image.sourceLocation?.offset === item.insertionBeforeSourceOffset) : scoped.find(entry => entry.image.imageReference.filename === item.insertionBeforeFilename));
-                additions.push({ newFilename: targetFilename, caption: item.caption, insertion: { kind: isNewGroup ? 'group' : (groupTitle ? 'group-item' : 'section'), testKey: targetTest.testKey, testTitle: targetTest.title, groupTitle, beforeFilename: item.insertionBeforeFilename || anchor?.image.imageReference.filename || null, beforeSourceOffset: item.insertionBeforeSourceOffset ?? anchor?.image.sourceLocation?.offset ?? null, sectionTitle: section?.title || (isNewGroup ? 'Новая группа' : 'Новый раздел') } });
+                additions.push({ newFilename: targetFilename, caption: item.caption, insertion: { kind: isNewGroup ? 'group' : (groupTitle ? 'group-item' : 'section'), sectionKey: section ? String(customSections.indexOf(section)) : null, testKey: targetTest.testKey, testTitle: targetTest.title, groupTitle, beforeFilename: item.insertionBeforeFilename || anchor?.image.imageReference.filename || null, beforeSourceOffset: item.insertionBeforeSourceOffset ?? anchor?.image.sourceLocation?.offset ?? null, sectionTitle: section?.title || (isNewGroup ? 'Новая группа' : 'Новый раздел') } });
             }
         }
         return { replacements, additions };
