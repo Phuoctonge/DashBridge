@@ -10,7 +10,7 @@
 
 **Spec:** запрос пользователя от 2026-10-15 о проверке всех страниц; runtime-контракты в [архитектуре](../../architecture.md), границы в [карте разрешений](../../permission-map.md), правила проверки в [development guide](../../development-guide.md), формат Recorder в [DashFlow v2](../../dashflow-v2.md).
 
-**Статус:** выполняется с 2026-10-15; полный обход ещё не завершён. Фактически выполненные проверки указаны ниже. План не является перечнем уже найденных багов.
+**Статус:** обход выполняется с 2026-10-15; все 10 страниц охвачены сценарными проверками. Итоговая сверка 2026-10-16 в конце документа отделяет выполненные ветки от оставшихся комбинаций. Полная матрица не объявляется PASS. План не является перечнем уже найденных багов.
 
 ### Ход исполнения 2026-10-15
 
@@ -892,3 +892,143 @@ iframe внутри dialog и два скрытых opener. Независимы
 также profile fallback, обычный opener, внешнее поле и удалённую карточку.
 Evidence: `test-results/acceptance-20261016-ui/dashbridge-modal-targeted-green.txt`,
 `test-results/acceptance-20261016-modal-independent-review.md`.
+
+### C09: сопоставление Confluence на узком экране, 2026-10-16
+
+Два read-only прогона с настоящим ZIP/REST fixture подтвердили наложение Apply
+на пояснение при ширине окна 600 и browser zoom 150% (CSS viewport 400, DPR 1.5).
+Checkpoint `605877f` добавил геометрическую RED-регрессию в существующий
+`inspectConfluenceTarget`; она проверяет строки текста через DOM Range и границы
+всех кнопок, а не только родительские прямоугольники. Исправление `2c8ac12`
+добавляет одну scoped строку flex-wrap. Targeted workflow и независимое review
+прошли, PNG просмотрен; реальные рабочие POST/PUT не выполнялись.
+
+При этом исходный C09 предлагал проверить old/new изображения и image errors.
+В текущем UI изображений/dialog preview нет: видимая доска показывает имена,
+подписи и периоды, legacy previewCard скрыт. Это неприменимая к существующему UI
+ветка плана, а не новый проверенный image preview или автоматически одобренная
+функция для добавления. Клавиатурного создания drag/drop связей также нет;
+Tab по существующим Clear/Apply работает. Evidence:
+`test-results/acceptance-20261016-confluence-c09-report.md`.
+
+### X03: живая проверка времени, 2026-10-16
+
+Свежий GET `/api/user`: mon-dc 200, grafanakns 401. Проверка выполнена на
+доступной legacy Grafana, без сохранения её dashboard и с восстановлением
+предыдущего тестового профиля/настройки после завершения. Ввод ISO с `+03:00`
+и миллисекундами преобразован в точные epoch-ms: iframe URL, три запроса
+`/api/ds/query` (включая report lease), сохранённый период и открываемая Grafana
+ссылка имеют одинаковые from/to; `timezone=Europe/Moscow` сохранён.
+Настоящий PNG 1000×520, текст без предупреждений и коллаж 1032×600 созданы;
+после закрытия сообщения период и исходный сохранённый panel.src восстановлены.
+PNG просмотрен. Проверка доказывает время и lifecycle, а не полное размещение
+всех многочисленных легенд: снимок также содержит известный нативный Templating
+toast mon-dc, ранее воспроизведённый без расширения.
+
+Evidence: `test-results/acceptance-20261016-live-time/results.json`.
+Первые два harness-отказа относились к Downloads temp path и ожиданию локального
+названия вместо нативного CPU Usage; после исправления теста production не менялся.
+Свежая modern-проверка требует повторного входа; прежние live KNS результаты
+сохраняют свою дату. Ветка DashBridge ZIP из исходного плана неприменима:
+текущие `captureSelection`/report attachments создают изображения коллажа,
+кнопки и сборщика ZIP на этой странице нет. Ошибочное обещание ZIP профиля
+удалено из README/архитектуры; Batch ZIP остаётся отдельной функцией.
+
+Отдельный O05-повтор той же живой цепочки сохранил через Options Save ширину
+900 и высоту 480: фактический одиночный PNG имеет ровно 900×480. После проверки
+оба значения и прежний prepared preference восстановлены. Коллаж сообщения
+продолжает использовать собственный формат панелей 1000×520 и итог 1032×600;
+это отдельный существующий контракт, а не ошибка сохранения custom dimensions.
+
+### O01/G04: раскрытие Grafana в Options, 2026-10-16
+
+Два UI-повтора подтвердили недостижимый с клавиатуры div-заголовок и Tab в
+визуально закрытые subcontrols. Checkpoint `25abfea` закрепил RED в существующем
+`inspectAuditFixes`. Заголовок теперь native button с aria-expanded/controls;
+родительский switch остаётся соседним элементом и не раскрывает секцию.
+Текущий handler меняет hidden вместе с прежним maxHeight, исключая закрытые
+поля из Tab order. Владелец dirty/save/dependent states не изменён.
+
+Два полных targeted-повтора disclosure прошли, существующий audit workflow
+прошёл 5/5, включая прежние Options conflict и Batch lease/rules сценарии.
+Независимый browser review проверил Enter/Space без двойного toggle, pointer
+по заголовку, отдельный switch, Tab, reload и hidden/aria. Скриншоты 100/150%
+просмотрены. Evidence: `test-results/acceptance-20261016-ui/options-audit-passed.json`,
+`test-results/acceptance-20261016-options-independent-review.md`.
+
+### Итоговая сверка всех страниц, 2026-10-16
+
+Это сверка фактического покрытия, а не утверждение о прохождении каждой
+комбинации исходного плана. Исторические FAIL/NOT RUN выше сохраняются с датой;
+новые проверки заменяют их только для прямо названного сценария.
+
+| Страница | Проверенное поведение | Остаток и границы |
+|---|---|---|
+| Options | Save/reload, импорт/backup, validation/conflict/quota/retry, тема/масштаб, exact-port runtime; клавиатурное раскрытие; Wiki consumer; реальный custom PNG 900×480 | Не все сочетания host normalization, CPU/RAM keywords, templates и модулей; screen reader не проверен |
+| Popup | Настоящий action popup, вкладки/launchers, CRUD ссылок, перенос URL/времени, диагностика и реальные файлы; локальные Jira/TDM/update маршруты | Рабочие Jira/TDM особенности и полный watchdog; дополнительные отказы перечислены в отдельном evidence |
+| DashBridge | Профили/карточки/переменные/время, modal/save/retry/focus; discovery all/none и delayed A→B; живой PNG/сообщение/коллаж/внешняя ссылка с точным периодом | Свежий KNS требует входа; не все renderer/variable/visibility/cursor комбинации. ZIP профиля отсутствует в текущем UI |
+| Batch | Main и оба режима Series, несколько периодов, ZIP/manifest/importer, rules/conflict, ошибки/retry/cancel/ownership/logging | Native multi-series/duplicate labels и некоторые Series стадии отмены покрыты частично; cap проверен сниженным тестовым лимитом. Stat/Multistat достижимы и имеют открытое обрезание |
+| Confluence Report | Чтение/scan/import, mapping/порядок/вставка, local Apply/verification, conflict/partial upload/retry, отмена устаревшего владельца; узкая доска | Рабочие записи исключены. Видимая доска текстовая: image preview отсутствует; keyboard mapping и собственный REST deadline не реализованы |
+| Worklog | Строки/clone/delete/Undo/Redo/sort, день/неделя, calendar/leap year/time, lookup races/auth, storage failure/retry, полный restart | Рабочая отправка исключена; ACK контракт проверяется отдельно behavior-тестами |
+| Recorder | Record/save/import/replay/compare/XLSX, все пять статусов, keyboard/navigation/iframe, cache/session, HTTP/WS/SSE limits и recovery | Только loopback replay; native Excel не открывался. Crash registry/incognito cleanup, конкурирующий incognito и максимальные stress-наборы полностью не подтверждены |
+| Test Runner | URL validation, Run/Stop/owner, диагностика, JSON small/large Unicode, OPFS failures/retry/cleanup, preference, живой базовый run на обеих Grafana ранее | Synthetic diagnostic snapshots не являются свежим исполнением всех renderer suites; прямое сохранение в native picker и crash/stress комбинации частичны |
+| Scenario Selector | Search ID/title/function, presets, пустая история, Save/Cancel/outside/Escape/focus/storage retry, fast/full каталоги | Standalone full и некоторые комбинации окна/профиля отдельно не повторялись |
+| Easter | Файл/clipboard, неверный файл/retry, portrait/landscape/zoom, эффект/Clear, замена фото во время эффекта, Close | Все Blob URL и побочные эффекты не инструментированы исчерпывающе; это не stress-тест |
+
+Дополнение D02/D04/E02: восемь свежих групп прошли. All/none/add/reload
+сохраняют orgId и повторяющиеся variables; Cancel/reopen исключает поздний ответ
+прежнего dashboard. Cross-profile stale draft отклонён через существующий UI
+handler; обычный modal блокирует pointer/Tab к фоновому переключателю. Замена
+фото при летящем эффекте дважды очищает эффекты без позднего возврата через 750 мс.
+Evidence: `test-results/acceptance-20261016-ui/finalflows.json`.
+
+Дополнение W/S: 12 сценарных групп прошли, включая leap February, неверное время,
+Now для sent, A→B→A/delete lookup, границы недели, Selector presets и возврат
+фокуса. Полное закрытие/relaunch Chromium сохраняет дробный Worklog draft.
+Строгий глобальный wrapper при этом зафиксировал один заблокированный POST без
+URL: его нельзя объявлять полностью GREEN или ретроспективно приписать Jira.
+Все non-GET были прерваны до сети, Send All не запускался; последующая startup
+диагностика без запросов не классифицирует исходный POST. Индивидуальные проверки
+и этот предел разделены в
+`test-results/acceptance-20261016-worklog-selector-remaining-report.md`.
+
+Остатки Popup/O06 проверены в настоящем action popup: неподходящая вкладка,
+отказ clipboard обеих границ и retry, чужой origin/Jira context path, Options
+TDM defaults и remember ON/OFF. Два экспорта JSON+photo ZIP подтверждены байтами:
+«Я» исключает собственные фото, сохраняя сообщения; чужое фото сохранено.
+Настройки Jira context path/timezone проверены настоящим Worklog Send All,
+но только с loopback URL и interception до сети: запрос содержит `+0500`.
+Это не рабочая отправка, запрещённая пользователем.
+
+P06: два injected capture failures сохраняют точную ошибку в worker, закрывают
+своё окно и позволяют открыть Popup снова. Первоначальная дополнительная проверка
+текста после переключения tabs/subtabs упала: эти действия очищают статус;
+первичный 7 PASS/1 FAIL отчёт сохранён. Узкий повтор проверяет durable error,
+cleanup и доступную кнопку, а не постоянство inline текста.
+
+P09: stalled photo с сокращением только deadline 10 мин → 500 мс дважды завершает
+экспорт, восстанавливает scroll/button и не создаёт download. При этом UI выдаёт
+общую «Ошибка парсинга. Обновите чат.» вместо причины timeout. Это подтверждённая
+неточность объяснения ошибки; улучшение текста ещё не внесено. Реальные 10 минут
+ожидания не проверялись. P10 cache-reopen/timeout отдельно не закрыты.
+Evidence: `test-results/acceptance-20261016-popup-leftovers/report.md`,
+`results.json` и отдельный `capture-results.json` в том же каталоге.
+
+За это продолжение исправлены семь подтверждённых дефектов: временный файл
+Runner при I/O error; поздний Batch ZIP после Cancel; метаданные старого Batch run;
+клавиатурный календарь Worklog; фокус после скрытого меню DashBridge; наложение
+Confluence actions при 150%; недоступное раскрытие/скрытые Tab-поля Options.
+Каждый получил RED→GREEN проверку; изменения не зависят от panel ID.
+
+Финальный полный `npm run test:all` после заморозки production-файлов завершился
+с exit 0: ESLint, 223 JavaScript test files, 41 Python check, Chromium 27/27.
+Evidence: `test-results/acceptance-20261016-final-full-suite.txt`.
+Options зафиксирован отдельным commit `b6593f3`; остальные checkpoints и fixes
+указаны выше. Последующая редактура этих итогов не меняет runtime.
+
+Перед релизом остаётся принять решение по подтверждённому обрезанию compact
+Stat/Multistat: исправить renderer либо явно ограничить доступный захват.
+Скрытых hover-кнопок недостаточно: Main/manual и Series picker достигают пути.
+Остальные перечисленные непроверенные комбинации являются пробелами покрытия
+или ограничениями продукта, а не списком новых подтверждённых ошибок. Отдельно
+остаётся описанная выше точность сообщения TDM timeout; cleanup этого пути прошёл.
