@@ -1762,6 +1762,11 @@ UI Test Runner координирует запуск и таблицу в `test-
 `test-runner-diagnostic-viewer.js` владеет отдельными окнами описания/diagnostics,
 theme listener и Blob URL одного теста; `test-runner-export-controller.js` владеет
 Markdown/clipboard и потоковой записью полного OPFS diagnostic export.
+При ошибке открытия writer, записи или чтения готового файла export controller
+удаляет только созданный им временный OPFS export; прямой выбранный пользователем
+файл не удаляется. Успешный disk-backed download сохраняет прежний 30-минутный
+grace period. Контракт и повтор после ошибки проверяет
+`test/test_runner_export_cleanup_behavior.js`.
 Clipboard helper возвращает подтверждённый boolean: отказ `writeText` допускает
 textarea fallback, но `execCommand('copy') === false` и исключение показывают
 ошибку без «Скопировано». Временный textarea удаляется в `finally`; compact notice

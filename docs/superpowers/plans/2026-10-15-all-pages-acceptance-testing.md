@@ -712,3 +712,45 @@ Scan/error/retry. Module/dependency guards, документационные с�
 прежнее advisory `dashbridgeInspectLocation` сохраняется. GitNexus impact/context
 и detect-changes дополнены поиском потребителей и строковых контрактов.
 Остальная незавершённая матрица приёмки этим исправлением не закрывается.
+
+### Продолжение приёмки 2026-10-16: Runner и Confluence
+
+Новые проверки выполнены в отдельных CFT156-профилях с локальными fixture,
+без рабочих Jira/Confluence-записей. Исторические NOT RUN выше сохраняют дату;
+следующие результаты уточняют только перечисленные варианты.
+
+- T05/T06: через реальные кнопки Runner экспортированы и прочитаны JSON
+  19 КиБ и 12 МБ с Unicode. Сырой JSON сохраняет диагностический payload и
+  четыре результата PASS/FAIL/SKIP/NOT RUN, reconciliation valid, таблица содержит
+  четыре теста и строку URL. Входной snapshot синтетический и записан настоящим
+  DiagnosticSpool; это проверка экспорта/представления, не новый Grafana-прогон.
+- T03/T06/T07: два повтора picker AbortError, отказа OPFS, отказа write;
+  двойной export, блокировка Run/Clear при открытом picker, успешный прямой OPFS
+  export. Два реальных документа с Web Locks: чужой live spool переживает cleanup,
+  reload освобождает собственный lease, stale cleanup удаляет только закрытый spool.
+  Startup OPFS failure не открывает Grafana и освобождает Run.
+- Подтверждённая ошибка T06: отказ createWritable оставлял пустой временный export
+  в OPFS, хотя UI честно сообщал ошибку. Два Chromium-прогона и Node RED это
+  воспроизвели. После checkpoint `4c65145` cleanup перенесён в общий error path,
+  покрывающий open/write/read; прямой файл пользователя не удаляется, успешный
+  временный файл сохраняет 30-минутный grace period. Node-регрессия и Chromium
+  GREEN, соседние ownership/clipboard/streaming тесты прошли.
+- C01: HTTP 401/403/404/500 и разрыв соединения, каждый дважды, затем успешный
+  Scan с контролем числа изображений и закрытия своего окна. Forbidden scheme,
+  credentials и отсутствие pageId отклонены до запроса. POST/PUT на стенде: 0.
+- C03: битый ZIP, плохой manifest JSON, отсутствующий PNG, неверный SHA-256 и
+  >2000 entries отклонены, каждый дважды; после каждого загружен валидный архив.
+- C01/C08: удержанный REST и 120 секунд виртуального времени родителя не дают
+  автоматического timeout; смена URL отменяет старого владельца, retry работает.
+  Виртуальное время родителя не имитирует сетевой timeout дочернего fetch.
+  Это подтверждение описанного отсутствия REST deadline, не требование SLA
+  и не заявление нового таймера. Отмена Apply проверяется постоянным browser smoke.
+
+Evidence: `test-results/acceptance-20261016-runner{,-repeat,-green}.log`,
+`acceptance-20261016-runner/results.json`, `acceptance-20261016-confluence-final.log`,
+`acceptance-20261016-confluence-results.json`. Первый Confluence harness пропустил
+обязательный `storage.representation`: отказ принадлежал fixture, после исправления
+тестовых данных все перечисленные сценарии прошли без production-правки.
+
+Свежий канонический `acceptance-20261016-runner-full-suite.txt`: ESLint,
+223 JS, 41 Python, Chromium 27/27 PASS после Runner runtime-правки.

@@ -118,6 +118,8 @@ async function exportDiagnostics() {
     const exportDate = new Date();
     const filename = `dashbridge-e2e-diagnostics-${localExportTimestamp(exportDate)}.json`;
     let fileHandle = null;
+    let temporaryRoot = null;
+    let temporaryName = null;
     try {
         if (typeof window.showSaveFilePicker === 'function') {
             try {
@@ -151,8 +153,6 @@ async function exportDiagnostics() {
                 ? `JSON собран частями: ${sizeMb} МБ`
                 : `Сборка JSON частями: ${sizeMb} МБ, узлов ${progress.nodes.toLocaleString('ru-RU')}`;
         };
-        let temporaryRoot = null;
-        let temporaryName = null;
         if (!fileHandle) {
             if (typeof navigator.storage?.getDirectory !== 'function') {
                 throw new Error('Браузер не предоставляет потоковую запись на диск; Blob-экспорт отключён для защиты вкладки от Out of Memory');
@@ -169,7 +169,6 @@ async function exportDiagnostics() {
             await writable.close();
         } catch (error) {
             await writable.abort?.(error).catch?.(() => { });
-            if (temporaryRoot && temporaryName) await temporaryRoot.removeEntry(temporaryName).catch(() => { });
             throw error;
         }
         if (temporaryRoot && temporaryName) {
@@ -197,6 +196,8 @@ async function exportDiagnostics() {
             }
         }
     } catch (error) {
+        // Opening the writer or reading the completed file can fail too.
+        if (temporaryRoot && temporaryName) await temporaryRoot.removeEntry(temporaryName).catch(() => { });
         console.error('[TestRunner] Diagnostic export failed', error);
         if (elStatusLine) {
             elStatusLine.textContent = `Не удалось экспортировать диагностику: ${error?.message || String(error)}`;
