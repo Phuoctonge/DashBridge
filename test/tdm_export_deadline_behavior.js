@@ -19,7 +19,10 @@ async function runExport(mode) {
     const message = { id: 'message-1', querySelector: () => null, querySelectorAll: selector => selector === 'img' ? [image] : [] };
     const chat = { scrollHeight: 1000, get scrollTop() { return top; }, set scrollTop(value) { top = value; if (value === 600) restored++; } };
     const context = { console, Date: Clock, AbortController, ...clock,
-        document: { querySelector: () => chat, querySelectorAll: () => [message], createElement: () => ({
+        document: { querySelector: () => chat, querySelectorAll: () => {
+            if (mode === 'parse-error') throw new Error('Fixture parse failure');
+            return [message];
+        }, createElement: () => ({
             getContext: () => ({ drawImage() { canvasDraws++; } }), toDataURL: () => 'data:image/png;base64,' + 'A'.repeat(120),
         }) },
         fetch: async (url, options) => {
@@ -70,4 +73,10 @@ test('Successful image fetch still exports photo bytes and clears the watchdog',
     const result = await runExport('success');
     assert.equal(result.outcome?.value?.success, true); assert.equal(result.outcome.value.photoCount, 1);
     assert.equal(result.canvasDraws, 0); assert.equal(result.top, 600); assert.equal(result.timers, 0);
+});
+test('Non-timeout export failures preserve their reason without being classified as timeout', async () => {
+    const result = await runExport('parse-error');
+    assert.equal(result.outcome?.value?.errorCode, 'export_error');
+    assert.equal(result.outcome.value.error, 'Fixture parse failure');
+    assert.equal(result.top, 600); assert.equal(result.timers, 0);
 });

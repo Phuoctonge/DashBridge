@@ -287,6 +287,15 @@
         };
         const prepareNativePanelCapture = async (panel, prepared, dimensions = panelCaptureDimensions()) => {
             const outer = window.DashBridgeGrafanaDom?.outerPanel(panel) || panel;
+            if (prepared) {
+                const pluginId = window.DashBridgeGrafanaDom?.getPanelPluginId(panel)
+                    || window.DashBridgeGrafanaDom?.getPanelPluginId(outer);
+                // These renderers retain their old inner dimensions when reparented.
+                // Reject at the shared owner before layout changes; ordinary capture stays available.
+                if (pluginId === 'stat' || pluginId === 'michaeldmoore-multistat-panel') {
+                    throw new Error('Компактный снимок Stat/Multistat не поддерживается. Выключите компактный режим и повторите снимок.');
+                }
+            }
             const captureVisualState = readPanelCaptureState(panel);
             // Grafana 10 can still render legacy Graph/Flot panels. Their plot and
             // right-side legend are sized by .graph-panel, independently from the

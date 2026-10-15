@@ -224,7 +224,7 @@ async function tdmExport() {
                     } else if (results[0].result && results[0].result.error) {
                         statusEl.textContent = "Ошибка: " + results[0].result.error;
                         finishAnalytics(/нет сообщений/i.test(results[0].result.error) ? 'no_data'
-                            : (/10 минут/i.test(results[0].result.error) ? 'timeout' : 'error'));
+                            : (results[0].result.errorCode === 'timeout' ? 'timeout' : 'error'));
                     } else {
                         const payload = results[0].result;
                         if (options.format === 'html' || options.format === 'both') {

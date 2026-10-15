@@ -382,6 +382,12 @@ async function _tdmExportScriptInternal(options) {
     };
 
     return { success: true, messages, html: generateHTML(messages), datePrefix, photoCount };
+    } catch (error) {
+        // executeScript loses a rejected page promise's useful error on some Chromium versions.
+        // Return a plain payload so Popup can distinguish the total deadline from parse errors.
+        return error === timeoutError
+            ? { errorCode: 'timeout', error: 'Превышено время ожидания экспорта TDM (10 минут). Повторите экспорт.' }
+            : { errorCode: 'export_error', error: error?.message || 'Не удалось выполнить экспорт. Повторите экспорт.' };
     } finally {
         clearTimeout(watchdog);
         chatContainer.scrollTop = Math.max(0, chatContainer.scrollHeight - originalDistanceFromBottom);

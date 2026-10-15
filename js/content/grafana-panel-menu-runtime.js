@@ -22,36 +22,7 @@
         };
         let placePanelMenus = null;
         const panelMenuExcludedPluginIds = new Set(['stat', 'michaeldmoore-multistat-panel']);
-        const getPanelPluginId = (panel, header = null) => {
-            const candidates = [
-                panel,
-                header,
-                ...Array.from(header?.querySelectorAll?.('button,[data-testid],h1,h2,h6') || []).slice(0, 40)
-            ].filter(Boolean);
-            const pluginIds = [];
-            const add = value => {
-                const id = typeof value === 'string' ? value.trim().toLowerCase() : '';
-                if (id && !pluginIds.includes(id)) pluginIds.push(id);
-            };
-    
-            for (const element of candidates) {
-                const fiberKey = Object.getOwnPropertyNames(element).find(key =>
-                    key.startsWith('__reactFiber$') || key.startsWith('__reactInternalInstance$')
-                );
-                for (let fiber = fiberKey && element[fiberKey], depth = 0;
-                    fiber && depth < 40; depth += 1, fiber = fiber.return) {
-                    const props = fiber.memoizedProps || fiber.pendingProps;
-                    if (!props || typeof props !== 'object') continue;
-                    add(props.panel?.type);
-                    add(props.panel?.pluginId);
-                    add(props.plugin?.meta?.id);
-                    add(props.panelPlugin?.meta?.id);
-                    add(props.model?.type);
-                    add(props.pluginId);
-                }
-            }
-            return pluginIds.find(id => panelMenuExcludedPluginIds.has(id)) || pluginIds[0] || '';
-        };
+        const getPanelPluginId = (panel, header) => window.DashBridgeGrafanaDom.getPanelPluginId(panel, header);
         const getPanelAnalysisTitle = (panel, header) => {
             const selector = '[data-testid="panel title"], .panel-title-text, [class*="panel-title" i], h6[title], h2[title], h6, h2';
             const title = header?.querySelector?.(selector) || panel?.querySelector?.(selector);

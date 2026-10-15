@@ -16,6 +16,40 @@
         return value.startsWith('panel-') ? value : `panel-${value}`;
     };
 
+    // Share bounded plugin discovery between hover controls and capture policy.
+    const getPanelPluginId = (panel, header = null) => {
+        header ||= panel?.querySelector?.('.panel-header, [data-testid*="Panel header"]');
+        const panelMenuExcludedPluginIds = new Set(['stat', 'michaeldmoore-multistat-panel']);
+        const candidates = [
+            panel,
+            header,
+            ...Array.from(header?.querySelectorAll?.('button,[data-testid],h1,h2,h6') || []).slice(0, 40)
+        ].filter(Boolean);
+        const pluginIds = [];
+        const add = value => {
+            const id = typeof value === 'string' ? value.trim().toLowerCase() : '';
+            if (id && !pluginIds.includes(id)) pluginIds.push(id);
+        };
+
+        for (const element of candidates) {
+            const fiberKey = Object.getOwnPropertyNames(element).find(key =>
+                key.startsWith('__reactFiber$') || key.startsWith('__reactInternalInstance$')
+            );
+            for (let fiber = fiberKey && element[fiberKey], depth = 0;
+                fiber && depth < 40; depth += 1, fiber = fiber.return) {
+                const props = fiber.memoizedProps || fiber.pendingProps;
+                if (!props || typeof props !== 'object') continue;
+                add(props.panel?.type);
+                add(props.panel?.pluginId);
+                add(props.plugin?.meta?.id);
+                add(props.panelPlugin?.meta?.id);
+                add(props.model?.type);
+                add(props.pluginId);
+            }
+        }
+        return pluginIds.find(id => panelMenuExcludedPluginIds.has(id)) || pluginIds[0] || '';
+    };
+
     const findPanelById = panelId => {
         if (panelId === null || panelId === undefined || panelId === '') return null;
         const escape = window.CSS?.escape || (value => String(value).replace(/["\\]/g, '\\$&'));
@@ -150,5 +184,5 @@
         };
         return Object.freeze({ update, stop });
     };
-    window.DashBridgeGrafanaDom = { panelSelectors, visiblePanels, panelKey, findPanelById, findPanel, outerPanel, legendItems, legendLabel, legendSeriesNames, createNativeNoDataVisibility };
+    window.DashBridgeGrafanaDom = { panelSelectors, visiblePanels, panelKey, getPanelPluginId, findPanelById, findPanel, outerPanel, legendItems, legendLabel, legendSeriesNames, createNativeNoDataVisibility };
 })();
