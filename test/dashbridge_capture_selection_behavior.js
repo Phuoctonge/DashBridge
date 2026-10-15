@@ -17,6 +17,7 @@ let onCapture = async () => ({ ok: true, dataUrl: 'png' });
 let downloads = 0;
 let copies = 0;
 let compactError = '';
+let onInspect = () => {};
 let controlDisabled = false;
 const control = { get disabled() { return controlDisabled; }, set disabled(value) { controlDisabled = value; } };
 const scope = {
@@ -41,7 +42,7 @@ const capture = scope.DashBridgeCapture.create({ getPanels: () => panels,
     getDefaultCapturePrepared: () => true,
     setDefaultCapturePrepared() {}, getCompactCaptureDimensions: () => ({ width: 1000, height: 520 }),
     forceLoadPanel: () => frame, postToDashboardFrame() {},
-    inspectCompactCapture: async () => compactError,
+    inspectCompactCapture: async () => { onInspect(); return compactError; },
     documentRef: scope.document
 });
 const restored = () => {
@@ -61,12 +62,14 @@ const restored = () => {
     assert.equal(offscreen.images.length, 1, 'prepared report capture may move an unrendered offscreen iframe into the viewport first');
     frame.dataset.dashbridgeRendered = 'true'; restored();
     let dataReady = false;
+    onInspect = () => assert(dataReady, 'report inspection must wait until the offscreen Grafana runtime and data have loaded');
     onCapture = async () => { assert(dataReady, 'PNG must wait for selected panel data'); return { ok: true, dataUrl: 'png' }; };
     const ready = await capture.captureSelection([panels[0]], { allowUnrendered: true, waitForData: async panel => {
         assert.equal(panel.id, 'a'); assert.equal(styles.get('position').value, 'fixed');
         await new Promise(resolve => setTimeout(resolve, 5)); dataReady = true;
     } });
     assert.equal(ready.images.length, 1); restored();
+    onInspect = () => {};
     onCapture = async () => { throw new Error('must not capture a panel whose data timed out'); };
     const timeout = await capture.captureSelection([panels[0]], { waitForData: async () => { throw new Error('data timeout'); } });
     assert.equal(timeout.images.length, 0); assert.match(timeout.errors[0].error, /data timeout/); restored();
