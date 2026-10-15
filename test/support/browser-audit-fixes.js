@@ -10,6 +10,36 @@ module.exports = async function inspectAuditFixes(context, extensionId) {
         await dashboard.goto(`chrome-extension://${extensionId}/pages/dashbridge/dashbridge.html`);
         await options.goto(`chrome-extension://${extensionId}/pages/options/options.html`);
         await options.waitForFunction(() => document.getElementById('settingGrafanaIframeDomains').value.length > 0);
+        const disclosure = options.locator('.collapsible-header-title');
+        const submodules = options.locator('.collapsible-content');
+        const parentModule = options.locator('#settingModuleGrafana');
+        await disclosure.focus();
+        assert.equal(await disclosure.evaluate(node => node === document.activeElement), true,
+            'Grafana disclosure must be keyboard focusable');
+        assert.equal(await disclosure.getAttribute('aria-expanded'), 'false');
+        await options.keyboard.press('Space');
+        assert.equal(await submodules.isVisible(), true);
+        assert.equal(await disclosure.getAttribute('aria-expanded'), 'true');
+        await options.keyboard.press('Tab');
+        assert.equal(await parentModule.evaluate(node => node === document.activeElement), true,
+            'parent switch remains separate from the disclosure');
+        const parentEnabled = await parentModule.isChecked();
+        await options.locator('.collapsible-header .switch').click();
+        assert.equal(await disclosure.getAttribute('aria-expanded'), 'true', 'switch click must not collapse submodules');
+        assert.equal(await options.locator('#settingModuleGrafanaLinks').isDisabled(), parentEnabled);
+        await options.locator('.collapsible-header .switch').click();
+        assert.equal(await parentModule.isChecked(), parentEnabled);
+        await disclosure.focus(); await options.keyboard.press('Enter');
+        assert.equal(await submodules.isHidden(), true);
+        assert.equal(await disclosure.getAttribute('aria-expanded'), 'false');
+        await options.keyboard.press('Tab'); await options.keyboard.press('Tab');
+        assert.equal(await options.locator('#settingModuleRecorder').evaluate(node => node === document.activeElement), true,
+            'Tab must skip collapsed subcontrols');
+        await disclosure.click(); assert.equal(await submodules.isVisible(), true);
+        await disclosure.click(); assert.equal(await submodules.isHidden(), true);
+        await options.reload();
+        await options.waitForFunction(() => document.getElementById('settingGrafanaIframeDomains').value.length > 0);
+        result.checks.push('Options Grafana disclosure supports Space/Enter and excludes collapsed subcontrols from Tab');
         assert.equal(await options.locator('#restoreImportBackupBtn').isHidden(), true,
             'Restore must stay hidden when no import backup exists');
         const initialViewport = options.viewportSize();
