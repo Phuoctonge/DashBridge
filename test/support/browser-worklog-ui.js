@@ -42,6 +42,33 @@ module.exports = async function inspectWorklogUi(context, extensionId) {
         }));
         await worker.evaluate(() => chrome.storage.sync.set({ jiraBaseUrl: 'https://worklog-ui.invalid' }));
         await page.goto(url); await page.waitForSelector('.task-row');
+        await check('calendar trigger and Escape are keyboard accessible', async () => {
+            await seed([entry('keyboard-trigger')]);
+            await input('dateStarted').focus(); await page.keyboard.press('Tab');
+            assert.equal(await page.locator('.calendar-btn').evaluate(node => node === document.activeElement), true,
+                'Tab from the date must reach its calendar button');
+            await page.keyboard.press('Enter');
+            assert.equal(await page.locator('.custom-picker').count(), 1);
+            await page.locator('#pH').focus(); await page.keyboard.press('Escape');
+            assert.equal(await page.locator('.custom-picker').count(), 0);
+            assert.equal(await page.locator('.calendar-btn').evaluate(node => node === document.activeElement), true,
+                'Escape must restore focus to the calendar button');
+        });
+        await check('calendar month, day and Now actions work from the keyboard', async () => {
+            await seed([entry('keyboard-actions', { dateStarted: '31/01/2026 10:30' })]);
+            await page.locator('.calendar-btn').click();
+            await page.locator('#next').focus(); await page.keyboard.press('Enter');
+            assert.equal(await page.locator('.picker-title').innerText(), 'Февраль 2026');
+            await page.locator('#prev').focus(); await page.keyboard.press('Space');
+            assert.equal(await page.locator('.picker-title').innerText(), 'Январь 2026');
+            const day = page.locator('.day:not(.prev-month)').filter({ hasText: /^15$/ });
+            await day.focus(); await page.keyboard.press('Space');
+            assert.equal((await saved())[0].dateStarted, '15/01/2026 10:30');
+            await page.locator('.calendar-btn').click();
+            await page.locator('#setNow').focus(); await page.keyboard.press('Enter');
+            assert.equal((await saved())[0].dateStarted, '15/10/2026 12:00');
+            assert.equal(await page.locator('.custom-picker').count(), 0);
+        });
         await check('calendar navigates adjacent months, retains time, closes on Escape', async () => {
             await seed([entry('calendar', { dateStarted: '31/01/2026 10:30' })]);
             await page.locator('.calendar-btn').click();
