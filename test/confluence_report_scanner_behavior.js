@@ -19,3 +19,16 @@ assert.strictEqual(richImage.captionLead, 'рост времени ответа'
 assert.strictEqual(richImage.captionDetails, 'Сравнение выполнено после прогрева.');
 assert.strictEqual(rich.tests[0].groups[0].normalizedGroupFamily, 'метрики сервера приложения демо');
 console.log('PASS report snapshot scanner');
+
+for (const [paragraph, expectedCaption] of [
+    ['<p class="wrapped"><ac:image><ri:attachment ri:filename="wrapped.png" /></ac:image></p>', 'CPU'],
+    ['<p><strong>Memory</strong><ac:image><ri:attachment ri:filename="wrapped.png" /></ac:image></p>', 'Memory'],
+    ['<p><img src="/wrapped.png"></p>', 'CPU'],
+]) {
+    const storage = '<h3>Test</h3><h4>Group</h4><p>CPU</p>' + paragraph;
+    const images = scanner.fromStorageHtml(storage).tests[0].groups[0].images;
+    assert.strictEqual(images.length, 1, 'paragraph wrapper must not hide an image');
+    assert.strictEqual(images[0].caption, expectedCaption);
+    assert.strictEqual(images[0].sourceLocation.offset, storage.indexOf(paragraph.includes('<ac:image') ? '<ac:image' : '<img'));
+}
+console.log('PASS report scanner sees paragraph-wrapped images and preserves source offsets');

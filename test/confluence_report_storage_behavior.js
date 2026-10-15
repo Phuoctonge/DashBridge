@@ -65,6 +65,19 @@ assert.strictEqual(storage.verifyPlan(anchored.html.replace('ri:filename="old.pn
 assert(storage.verifyPlan(anchored.html.replaceAll('ri:filename="', "ri:filename='" ).replace(/\.png"/g, ".png'"), { expectedStorageHtml: anchored.html }));
 console.log('PASS Confluence report original target identity and verification');
 
+for (const wrapped of [
+    '<p>CPU' + imageBlock('old.png') + '</p><p>Memory' + imageBlock('old.png') + '</p>',
+    '<p>' + imageBlock('old.png') + '</p><p>' + imageBlock('old.png') + '</p>',
+]) {
+    const source = '<h3>T1</h3><h4>G</h4>' + wrapped;
+    const beforeSourceOffset = [...source.matchAll(/<ac:image\b/g)][1].index;
+    const output = storage.transform(source, { additions: [{ newFilename: 'insert.png', caption: 'Insert',
+        insertion: { testTitle: 'T1', groupTitle: 'G', beforeFilename: 'old.png', beforeSourceOffset } }] }).html;
+    assert.deepStrictEqual(filenames(output), ['old.png', 'insert.png', 'old.png'],
+        'paragraph-contained anchor must not select a previous image paragraph');
+    assert(output.includes('</p><p>Insert</p>'), 'insertion must keep paragraph boundaries');
+}
+
 const additionsHtml = '<h3>T1</h3><h4>G</h4><p>CPU</p>' + imageBlock('cpu.png') + '<p>Memory</p>' + imageBlock('memory.png') + '<h3>T2</h3><h4>G</h4><p>CPU</p>' + imageBlock('second.png');
 const appendPlan = { additions: ['Disk', 'Network'].map(caption => ({ newFilename: `${caption.toLowerCase()}.png`, caption, insertion: { kind: 'group-item', testTitle: 'T1', groupTitle: 'G' } })) };
 const appended = storage.transform(additionsHtml, appendPlan).html;

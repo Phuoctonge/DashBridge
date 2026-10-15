@@ -3,7 +3,7 @@
 const http = require('node:http');
 const assert = require('node:assert/strict');
 const JSZip = require('../../vendor/jszip.min.js');
-const image = filename => `<ac:image><ri:attachment ri:filename="${filename}" /></ac:image>`;
+const image = filename => `<p><ac:image><ri:attachment ri:filename="${filename}" /></ac:image></p>`;
 const initialHtml = '<h3>T1</h3><h4>G</h4><p>CPU</p>' + image('old.png') + '<p>Memory</p>' + image('old.png')
     + '<h3>T2</h3><h4>G</h4><p>CPU</p>' + image('old.png');
 module.exports = async function inspectConfluenceTarget(context, extensionId, { corruptVerification = false } = {}) {

@@ -110,5 +110,39 @@ for (const groupTitle of ['G', null]) {
     ], 'Both UI items must belong to one new section/group');
     assert.strictEqual(tests[1].groups[0].images[0].imageReference.filename, 'old.png');
     assert(context.DashBridgeConfluenceReportStorage.verifyPlan(output, { ...plan, expectedStorageHtml: output }));
+    context.customSections[0].items.reverse();
+    for (const links of [context.connections, [...context.connections].reverse()]) {
+        context.connections = links;
+        const movedPlan = context.buildApplyPlan();
+        assert.deepStrictEqual(Array.from(movedPlan.additions, item => item.caption), ['B', 'A'],
+            'Apply must follow the visible section order, not connection creation order');
+    }
 }
 console.log('PASS Confluence multiple images in one added section/group');
+
+const movedKey = 'added-graph\0test-01\0G\0moved';
+context.customSections = [];
+context.customGraphs = [{ targetKey: movedKey, testKey: 'test-02', groupTitle: 'G', caption: 'Moved' }];
+context.connections = [{ mode: 'specific', targetKey: movedKey, sourceKey: 'r1\0' + '1\0Panel' }];
+assert.strictEqual(context.buildApplyPlan().additions[0].insertion.testKey, 'test-02',
+    'Apply must use the current owner after a cross-test move');
+vm.runInContext(reportSource.slice(reportSource.indexOf('    function moveAddedItem('),
+    reportSource.indexOf('    function bindCriteriaGroupDropFallback(')), context);
+Object.assign(context, {
+    mappingBoard: { classList: { remove() {} } }, mappingBoardStatus: {}, applyConfluenceButton: {},
+    renderMappingBoard() {}, restoreMappingScroll() {}, requestAnimationFrame(callback) { callback(); },
+    draggedMappingScroll: null,
+});
+const anchor = { targetKey: 'added-graph\0test-01\0G\0A', testKey: 'test-01', groupTitle: 'G', caption: 'A',
+    insertionBeforeFilename: 'old.png', insertionBeforeSourceOffset: context.liveResult.snapshot.tests[0].groups[0].images[1].sourceLocation.offset };
+const moving = { targetKey: 'added-graph\0test-01\0G\0B', testKey: 'test-01', groupTitle: 'G', caption: 'B' };
+context.customGraphs = [anchor, moving];
+context.connections = [anchor, moving].map(item => ({ mode: 'specific', targetKey: item.targetKey, sourceKey: 'r1\0' + '1\0Panel' }));
+context.draggedAddedItem = { item: moving, ownerSection: null, batchItems: null };
+context.moveAddedItem({ kind: 'group', testKey: 'test-01', groupTitle: 'G', beforeItem: anchor });
+const reorderedPlan = context.buildApplyPlan();
+assert.deepStrictEqual(Array.from(reorderedPlan.additions, item => item.insertion.beforeSourceOffset),
+    [anchor.insertionBeforeSourceOffset, anchor.insertionBeforeSourceOffset],
+    'moving before an added row must inherit its exact original-image anchor');
+const reorderedHtml = context.DashBridgeConfluenceReportStorage.transform(targetHtml, reorderedPlan).html;
+assert(reorderedHtml.indexOf('<p>B</p>') < reorderedHtml.indexOf('<p>A</p>'));

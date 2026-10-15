@@ -35,8 +35,16 @@
         return null;
     }
     function captionStartBefore(html, imageIndex) {
+        const before = String(html).slice(0, imageIndex);
         let candidate = null;
-        for (const match of String(html).slice(0, imageIndex).matchAll(/<p\b[^>]*>[\s\S]*?<\/p>/gi)) candidate = match.index;
+        for (const match of before.matchAll(/<p\b[^>]*>[\s\S]*?<\/p>/gi)) candidate = match.index;
+        const opening = [...before.matchAll(/<p\b[^>]*>/gi)].at(-1);
+        // A wrapped image can have its caption inside the still-open paragraph.
+        // An earlier image paragraph cannot become this image's caption anchor.
+        if (opening && opening.index > before.toLowerCase().lastIndexOf('</p>')) {
+            const inlineText = before.slice(opening.index + opening[0].length).replace(/<[^>]*>/g, '').trim();
+            if (inlineText || candidate == null || /<ac:image\b|<img\b/i.test(before.slice(candidate))) return opening.index;
+        }
         return candidate;
     }
     function captionedImageAt(html, item) {

@@ -16,11 +16,13 @@
     }
     function fromStorageHtml(html, context = {}) {
         const tests = []; let currentTest = null; let currentGroup = null; let pendingCaption = null; const headingStack = [];
-        const pattern = /<h([1-6])\b[^>]*>[\s\S]*?<\/h\1>|<p\b[^>]*>[\s\S]*?<\/p>|<ac:image\b[^>]*>[\s\S]*?<\/ac:image>|<img\b[^>]*>/gi;
+        // Confluence wraps images in paragraphs: stop the caption before the image,
+        // keeping its original storage offset for exact replacement and insertion.
+        const pattern = /<h([1-6])\b[^>]*>[\s\S]*?<\/h\1>|<p\b[^>]*>(?:(?!<\/p>|<ac:image\b|<img\b)[\s\S])*(?:<\/p>|(?=<ac:image\b|<img\b))|<ac:image\b[^>]*>[\s\S]*?<\/ac:image>|<img\b[^>]*>/gi;
         for (const match of String(html ?? '').matchAll(pattern)) {
             const token = match[0]; const heading = token.match(/^<h([1-6])\b/i);
             if (heading) { const level = Number(heading[1]); const title = normalize(token.replace(/^<h[1-6]\b[^>]*>|<\/h[1-6]>$/gi, '')); headingStack.splice(level - 1); headingStack[level - 1] = title; if (level === 3) { currentTest = { title, groups: [] }; tests.push(currentTest); currentGroup = null; } else if (level >= 4 && currentTest) { currentGroup = { title, headingPath: headingStack.slice(3).filter(Boolean), images: [] }; currentTest.groups.push(currentGroup); } pendingCaption = null; continue; }
-            if (/^<p\b/i.test(token)) { pendingCaption = normalize(token.replace(/^<p\b[^>]*>|<\/p>$/gi, '')); continue; }
+            if (/^<p\b/i.test(token)) { const caption = normalize(token.replace(/^<p\b[^>]*>|<\/p>$/gi, '')); if (caption || /<\/p>$/i.test(token)) pendingCaption = caption; continue; }
             if (!currentTest) continue; if (!currentGroup) { currentGroup = { title: '', headingPath: [], images: [] }; currentTest.groups.push(currentGroup); }
             const ref = imageReference(token); if (!ref) continue; const caption = extractCaptionParts(pendingCaption || ''); const explicitKey = attr(token, 'data-dashbridge-key') || attr(token, 'data-dashbridge-metric') || null;
             currentGroup.images.push({ occurrence: currentGroup.images.length, caption: caption.original, captionOriginal: caption.original, captionLead: caption.lead, captionDetails: caption.details, captionConfidence: caption.confidence, captionFingerprint: fingerprint(lower(caption.lead)), explicitKey, headingPath: currentGroup.headingPath.slice(), imageReference: ref, sourceLocation: { offset: match.index } }); pendingCaption = null;
