@@ -144,6 +144,12 @@ renderer с root внутри выбранной панели. У Grafana 12 т�
 React grid может переписать смещение уже после reparenting. Дочерние renderer
 элементы получают только min-width, их высотой продолжает владеть uPlot.
 Restore отключает observer и возвращает значения и priorities inline-стилей.
+Перенос легенды в `grafana-legend-visuals.js` также распознаёт native элементы
+`VizLegend series`, когда общие legacy-селекторы не нашли записей. Их общий
+предок определяет контейнер легенды до изменения flex direction; без этого
+список мог закрыть график. Ветка общая для direct Grafana и DashBridge iframe,
+возврат OFF и resize-контракт проверяет
+[legend resize](../test/grafana_legend_resize_behavior.js).
 Неудовлетворённая полнота возвращает явную ошибку; произвольные internals не
 считаются доверенными только потому, что находятся на странице Grafana.
 

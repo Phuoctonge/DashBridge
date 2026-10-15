@@ -199,6 +199,12 @@
                 const legendRow = flexContainer.querySelector('tr[class*="LegendRow"], .u-legend tr, .u-legend-row')
                     || outerPanel.querySelector('tr[class*="LegendRow"], .u-legend tr, .u-legend-row');
                 const legendItems = Array.from(window.DashBridgeGrafanaDom?.legendItems?.(outerPanel) || []);
+                // Native list legends use VizLegend wrappers rather than table
+                // rows/role=button. Without entries the shared container is lost
+                // and switching the flex direction can cover the chart entirely.
+                if (!legendItems.length) {
+                    legendItems.push(...outerPanel.querySelectorAll('[data-testid^="data-testid VizLegend series "]'));
+                }
                 const legendItem = legendItems[0];
                 const legendSelectors = '.graph-legend, .legend-container, .u-legend, [class*="legend-container" i], [class*="LegendTable" i]';
                 const containsAllLegendItems = candidate => candidate

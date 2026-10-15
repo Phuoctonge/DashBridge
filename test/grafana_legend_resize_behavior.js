@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-function fixture(name) {
+function fixture(name, { listLegend = false } = {}) {
     const frames = new Map(); let frameId = 0;
     const resizeObservers = [];
     const element = () => {
@@ -37,6 +37,15 @@ function fixture(name) {
     root.plot = plot;
     const document = { querySelector: () => root, querySelectorAll: () => [], getElementById: () => ({}), removeEventListener() {} };
     const window = { name, document, DashBridgeGrafanaDom: { outerPanel: () => root, legendItems: () => [legend] }, dispatchEvent() {} };
+    if (listLegend) {
+        const entries = [element(), element()];
+        entries.forEach(entry => { entry.parentElement = legend; entry.closest = () => null; });
+        legend.contains = entry => entries.includes(entry) || entry === legend;
+        flex.querySelector = () => null;
+        root.querySelectorAll = selector => selector.includes('VizLegend series') ? entries : [];
+        window.DashBridgeGrafanaDom.legendItems = () => [];
+        delete root.__dashBridgeLegendAppliedLayout;
+    }
     window.parent = name ? {} : window;
     const context = {
         window, document, console, Event: class Event {},
@@ -56,10 +65,24 @@ function fixture(name) {
         vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'content', file), 'utf8'), context);
     }
     const flush = () => { const batch = [...frames.values()]; frames.clear(); batch.forEach(fn => fn()); };
-    return { root, branch, plot, calls, resizeObservers, frames, flush, api: window.DashBridgeGrafanaLegendVisuals.create({ debugLog() {} }) };
+    return { root, branch, legend, plot, calls, resizeObservers, frames, flush, api: window.DashBridgeGrafanaLegendVisuals.create({ debugLog() {} }) };
 }
 
 (async () => {
+    for (const name of ['', 'dashbridge-iframe']) {
+        const f = fixture(name, { listLegend: true });
+        const applying = f.api.applyPopupLegendAndVisuals('test-list', null, 'fast_click_toggle', false, false, 1.5, true);
+        for (let i = 0; i < 8; i++) { f.flush(); await Promise.resolve(); }
+        await applying;
+        assert.strictEqual(f.root.__dashBridgeLegendAppliedLayout.legendElement, f.legend,
+            'native VizLegend list items must resolve their common legend container before relocation');
+        assert.strictEqual(f.plot.width, 380);
+        const restoring = f.api.applyPopupLegendAndVisuals('test-list', null, 'fast_click_toggle', false, false, 1.5, false);
+        for (let i = 0; i < 8; i++) { f.flush(); await Promise.resolve(); }
+        await restoring;
+        assert.strictEqual(f.root.__dashBridgeLegendAppliedLayout, undefined);
+        f.api.stopLegacyVisualObservers(f.root);
+    }
     for (const name of ['', 'dashbridge-iframe']) {
         const f = fixture(name);
         await f.api.applyPopupLegendAndVisuals('137', null, 'fast_click_toggle', false, false, 1.5, true);
