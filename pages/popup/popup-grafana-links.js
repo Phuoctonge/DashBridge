@@ -59,6 +59,8 @@ function setupGrafanaTimestampTool() {
 
     const showStatus = (message, isError = false) => {
         status.textContent = message;
+        // Tab switching hides old statuses; a new result restores CSS ownership.
+        status.style.removeProperty('display');
         status.classList.toggle('error', isError);
     };
     const showRange = (range, message) => {
@@ -179,8 +181,11 @@ function openGrafana(baseUrl) {
                 const current = new URL(currentTab.url);
 
                 keepList.forEach(p => {
-                    const val = current.searchParams.get(p);
-                    if (val) url.searchParams.set(p, val);
+                    const values = current.searchParams.getAll(p);
+                    if (!values.length) return;
+                    // Grafana multi-select variables use repeated keys, not one joined value.
+                    url.searchParams.delete(p);
+                    values.forEach(value => url.searchParams.append(p, value));
                 });
 
                 chrome.tabs.update(currentTab.id, { url: url.toString() });

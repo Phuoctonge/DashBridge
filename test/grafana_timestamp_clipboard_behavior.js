@@ -57,3 +57,53 @@ for (const value of ['2026-02-30T12:00:00+0300', '2026-02-30 12:00:00 GMT+0300']
 for (const value of ['2024-02-29T12:00:00+0300', '2024-02-29 12:00:00 GMT+0300']) {
     assert.strictEqual(context.parseGrafanaAbsoluteTime(value), Date.parse(value));
 }
+
+async function popupRegression() {
+    const elements = new Map();
+    for (const id of ['grafanaTimestampReadBtn', 'grafanaTimestampResult', 'grafanaTimestampFrom',
+        'grafanaTimestampTo', 'grafanaTimestampStatus']) {
+        elements.set(id, { textContent: '', hidden: true, handlers: {},
+            style: { display: '', removeProperty(name) { delete this[name]; } },
+            classList: { toggle() {} }, addEventListener(name, handler) { this.handlers[name] = handler; } });
+    }
+    const activeUrl = 'https://grafana.example/d/source?from=1787774400000&to=1787777280000'
+        + '&var-instance=one&var-instance=two&timezone=Europe%2FMoscow&secret=private';
+    const opened = [];
+    const popup = { URL, Date, Number, String, RegExp, console, DashBridgeAnalytics: undefined,
+        document: { addEventListener() {}, getElementById: id => elements.get(id) },
+        window: { close() {} },
+        chrome: { runtime: {}, tabs: {
+            query(options, callback) {
+                assert.deepStrictEqual(JSON.parse(JSON.stringify(options)), { active: true, currentWindow: true });
+                const tabs = [{ id: 42, url: activeUrl }];
+                if (callback) callback(tabs);
+                else return Promise.resolve(tabs);
+            },
+            update(id, options) { assert.strictEqual(id, 42); opened.push(new URL(options.url)); }
+        }, storage: {
+            sync: { get(keys, callback) { callback({ grafanaKeepParams: 'from, to, var-instance, timezone' }); } },
+            session: { get(keys, callback) { callback({}); }, set() {}, remove() {} }
+        } }
+    };
+    vm.createContext(popup);
+    vm.runInContext(fs.readFileSync('js/shared/grafana-time.js', 'utf8'), popup);
+    vm.runInContext(source, popup);
+    popup.setupGrafanaTimestampTool();
+    const status = elements.get('grafanaTimestampStatus');
+    // Reproduce popup-core's tab-change cleanup before the next user action.
+    status.style.display = 'none';
+    await elements.get('grafanaTimestampReadBtn').handlers.click();
+    assert(status.textContent.includes('Готово.'), 'a fresh result must be produced');
+    assert.notStrictEqual(status.style.display, 'none', 'a fresh status must be visible after tab switching');
+    popup.openGrafana('https://grafana.example/d/target?var-instance=old&orgId=7&refresh=10s');
+    assert.deepStrictEqual(opened[0].searchParams.getAll('var-instance'), ['one', 'two'],
+        'all selected instances must replace the target default in source order');
+    assert.strictEqual(opened[0].searchParams.get('from'), '1787774400000');
+    assert.strictEqual(opened[0].searchParams.get('to'), '1787777280000');
+    assert.strictEqual(opened[0].searchParams.get('timezone'), 'Europe/Moscow');
+    assert.strictEqual(opened[0].searchParams.get('orgId'), '7');
+    assert.strictEqual(opened[0].searchParams.get('refresh'), '10s');
+    assert.strictEqual(opened[0].searchParams.has('secret'), false, 'unlisted parameters must not leak');
+    console.log('PASS Popup tab-switch status and multi-value Grafana link transfer');
+}
+popupRegression().catch(error => { console.error(error); process.exitCode = 1; });

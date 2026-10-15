@@ -1259,6 +1259,14 @@ copy fail-open сохраняет тот же PNG через Downloads. MAIN cap
 
 ### Popup CPU/RAM
 
+Сохранённые ссылки Popup переносят только параметры из `grafanaKeepParams`.
+`openGrafana` заменяет каждый присутствующий параметр всеми его значениями
+в исходном порядке: многозначная переменная Grafana кодируется повторяющимися
+ключами. Отсутствующий параметр сохраняет значение целевой ссылки.
+После очистки статусов при переключении вкладок `setupGrafanaTimestampTool`
+снимает inline-скрытие перед новым результатом, оставляя отображение CSS.
+Регрессии: [передача параметров и статус времени](../test/grafana_timestamp_clipboard_behavior.js).
+
 ```text
 Popup → panel-tools bridge → command → ensure runtime + MAIN executeScript
       → общий transport → idle→load либо Total/Available→% Used
