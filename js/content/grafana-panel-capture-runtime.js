@@ -288,13 +288,11 @@
         const prepareNativePanelCapture = async (panel, prepared, dimensions = panelCaptureDimensions()) => {
             const outer = window.DashBridgeGrafanaDom?.outerPanel(panel) || panel;
             if (prepared) {
-                const pluginId = window.DashBridgeGrafanaDom?.getPanelPluginId(panel)
-                    || window.DashBridgeGrafanaDom?.getPanelPluginId(outer);
                 // These renderers retain their old inner dimensions when reparented.
                 // Reject at the shared owner before layout changes; ordinary capture stays available.
-                if (pluginId === 'stat' || pluginId === 'michaeldmoore-multistat-panel') {
-                    throw new Error('Компактный снимок Stat/Multistat не поддерживается. Выключите компактный режим и повторите снимок.');
-                }
+                const reason = window.DashBridgeGrafanaDom?.getCompactCaptureError(panel)
+                    || window.DashBridgeGrafanaDom?.getCompactCaptureError(outer);
+                if (reason) throw new Error(reason);
             }
             const captureVisualState = readPanelCaptureState(panel);
             // Grafana 10 can still render legacy Graph/Flot panels. Their plot and
@@ -492,6 +490,18 @@
                 throw error;
             }
         };
+        // DashBridge sizes its own card, so it must ask MAIN before that separate layout path.
+        const onCompactCaptureCheck = event => {
+            if (!isDashboardIframe || event.source !== window.parent || event.origin !== extensionOrigin
+                || event.data?.action !== 'dashbridgeCompactCaptureCheck'
+                || typeof event.data.requestId !== 'string' || event.data.requestId.length > 128) return;
+            const dom = window.DashBridgeGrafanaDom;
+            const panel = dom?.findPanel({ panelId: new URLSearchParams(location.search).get('panelId') });
+            window.parent.postMessage({ action: 'dashbridgeCompactCaptureSupport', requestId: event.data.requestId,
+                error: panel ? dom.getCompactCaptureError(panel) : 'Панель ещё не загрузилась. Повторите снимок.' }, extensionOrigin);
+        };
+        window.addEventListener('message', onCompactCaptureCheck);
+        registerRuntimeCleanup(() => window.removeEventListener('message', onCompactCaptureCheck));
         let activeBatchCaptureSession = null;
         const batchCaptureApi = Object.freeze({
             async prepare({ panelId, sessionId, outputWidth, outputHeight }) {

@@ -50,6 +50,13 @@
         return pluginIds.find(id => panelMenuExcludedPluginIds.has(id)) || pluginIds[0] || '';
     };
 
+    const getCompactCaptureError = panel => {
+        const pluginId = getPanelPluginId(panel);
+        return pluginId === 'stat' || pluginId === 'michaeldmoore-multistat-panel'
+            ? 'Компактный снимок Stat/Multistat не поддерживается. Выключите компактный режим и повторите снимок.'
+            : '';
+    };
+
     const findPanelById = panelId => {
         if (panelId === null || panelId === undefined || panelId === '') return null;
         const escape = window.CSS?.escape || (value => String(value).replace(/["\\]/g, '\\$&'));
@@ -184,5 +191,5 @@
         };
         return Object.freeze({ update, stop });
     };
-    window.DashBridgeGrafanaDom = { panelSelectors, visiblePanels, panelKey, getPanelPluginId, findPanelById, findPanel, outerPanel, legendItems, legendLabel, legendSeriesNames, createNativeNoDataVisibility };
+    window.DashBridgeGrafanaDom = { panelSelectors, visiblePanels, panelKey, getPanelPluginId, getCompactCaptureError, findPanelById, findPanel, outerPanel, legendItems, legendLabel, legendSeriesNames, createNativeNoDataVisibility };
 })();

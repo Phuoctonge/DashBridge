@@ -156,6 +156,26 @@ Restore отключает observer и возвращает значения и 
 возврат всего старого style без этой границы восстанавливал ширину маленькой панели.
 Неудовлетворённая полнота возвращает явную ошибку; произвольные internals не
 считаются доверенными только потому, что находятся на странице Grafana.
+Compact-захват не поддерживает plugin IDs `stat` и
+`michaeldmoore-multistat-panel`: их внутренняя раскладка может сохранить прежний
+размер и обрезаться. `prepareNativePanelCapture` отказывает с понятной
+причиной до изменения layout для direct capture и Batch Main/Series.
+Отдельный [контроллер карточки](../pages/dashbridge/dashbridge-capture.js)
+DashBridge перед PNG запрашивает у MAIN `dashbridgeCompactCaptureCheck`:
+MAIN принимает только extension parent с точным origin и возвращает
+`dashbridgeCompactCaptureSupport`. Родитель проверяет source, origin и requestId,
+ждёт не более пяти секунд и удаляет listener/timer при завершении.
+В отчёте запрос идёт после `waitForData`: невидимый iframe сначала нужно загрузить
+и разместить в viewport. Отказ проходит обычный finally восстановления карточки;
+toolbar показывает причину через существующий alert, отчёт включает её в ошибки.
+Обычный захват остаётся доступным.
+Тип определяет общий `getPanelPluginId` в [DOM owner](../js/content/grafana-dom.js)
+тем же ограниченным обходом React fibers, который использует hover menu; неизвестный
+plugin ID не считается Stat по названию или panel ID. Это ограничение поддержки,
+а не исправление renderer Stat. Проверка:
+[capture policy](../test/grafana_compact_capture_policy_behavior.js),
+[card inspection](../test/dashbridge_compact_inspection_behavior.js) и
+[report readiness/restore](../test/dashbridge_capture_selection_behavior.js).
 
 ### Refresh Off и временный период отчёта
 
@@ -1475,6 +1495,11 @@ Preview использует метаданные manifest. Распознава
   deadline; timeout прерывает загрузку/чтение и проходит восстановление scroll
   в `finally`. Обычная ошибка загрузки сохраняет canvas fallback, timeout не
   маскируется этим fallback. Таймеры и abort listeners освобождаются владельцем.
+  Экспортер возвращает ошибку plain payload через `executeScript`: `errorCode:
+  timeout` и текст с предложением повтора либо `export_error` с причиной другой
+  ошибки. Rejected page promise могла приходить в Popup как null и ошибочно
+  показываться как «Ошибка парсинга». Popup выводит текст через `textContent`,
+  классифицирует timeout по коду, а cleanup по-прежнему выполняет экспортер.
 - Confluence активен только для настроенных wiki-доменов. Его синхронный
   observer предотвращает скачок редактора и намеренно не debounce-ится.
 - Внешние строки назначаются через DOM API/`textContent` либо экранируются.

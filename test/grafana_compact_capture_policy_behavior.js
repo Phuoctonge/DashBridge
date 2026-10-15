@@ -15,9 +15,14 @@ function fixture(type, { iframe = false, prepared = true, headerOnly = false } =
     const document = { documentElement: { dataset: {}, classList: classes() },
         addEventListener() {}, removeEventListener() {}, dispatchEvent() {},
         querySelector: () => panel, querySelectorAll: () => [], getElementById: () => null };
-    const window = { CSS: { escape: value => value }, innerWidth: 1400, innerHeight: 900 };
+    const listeners = new Map(), replies = [], cleanup = [];
+    const window = { CSS: { escape: value => value }, innerWidth: 1400, innerHeight: 900,
+        parent: { postMessage: message => replies.push(message) },
+        addEventListener: (type, callback) => listeners.set(type, callback),
+        removeEventListener: (type, callback) => { if (listeners.get(type) === callback) listeners.delete(type); } };
     const context = { window, document, console: { error() {} },
-        navigator: {}, requestAnimationFrame: cb => cb(), setTimeout: () => 0, clearTimeout() {},
+        navigator: {}, location: { search: '?panelId=arbitrary-panel' }, URLSearchParams,
+        requestAnimationFrame: cb => cb(), setTimeout: () => 0, clearTimeout() {},
         CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options.detail; } } };
     vm.createContext(context);
     for (const file of ['grafana-dom.js', 'grafana-panel-capture-runtime.js']) {
@@ -25,9 +30,10 @@ function fixture(type, { iframe = false, prepared = true, headerOnly = false } =
     }
     const runtime = window.DashBridgeGrafanaPanelCaptureRuntime.create({ isDashboardIframe: iframe,
         tools: { capturePrepared: prepared }, panelVisualState: new Map(),
-        getPanelStateKey: () => 'arbitrary-panel', registerRuntimeCleanup() {}, syncThresholdHighlightState() {} });
+        extensionOrigin: 'https://extension.test', getPanelStateKey: () => 'arbitrary-panel',
+        registerRuntimeCleanup: fn => cleanup.push(fn), syncThresholdHighlightState() {} });
     document.documentElement.dataset.dashbridgeCapturePrepared = String(prepared);
-    return { window, panel, classes, runtime };
+    return { window, panel, classes, runtime, listeners, replies, cleanup };
 }
 
 for (const type of ['stat', 'michaeldmoore-multistat-panel']) {
@@ -41,6 +47,18 @@ for (const type of ['stat', 'michaeldmoore-multistat-panel']) {
         }
     });
 }
+test('MAIN compact inspection only answers the extension parent and removes its listener on cleanup', () => {
+    const { window, listeners, replies, cleanup } = fixture('stat', { iframe: true });
+    const receive = listeners.get('message');
+    const event = { source: window.parent, origin: 'https://extension.test',
+        data: { action: 'dashbridgeCompactCaptureCheck', requestId: 'inspection' } };
+    receive({ ...event, source: {} }); receive({ ...event, origin: 'https://other.test' });
+    assert.equal(replies.length, 0);
+    receive(event);
+    assert.match(replies[0].error, /не поддерживается/);
+    assert.equal(replies[0].requestId, 'inspection');
+    cleanup.forEach(fn => fn()); assert.equal(listeners.size, 0);
+});
 for (const type of ['timeseries', 'graph', 'table', 'custom-plugin', '']) {
     test(`${type || 'unknown'} retains its existing compact layout path`, async () => {
         const { window } = fixture(type);

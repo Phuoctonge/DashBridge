@@ -10,6 +10,8 @@ globalThis.DashBridgeCapture = (() => {
         getCompactCaptureDimensions,
         forceLoadPanel,
         postToDashboardFrame,
+        inspectCompactCapture = null,
+        showAlert,
         storage = chrome.storage.sync,
         documentRef = document,
     }) {
@@ -60,6 +62,27 @@ globalThis.DashBridgeCapture = (() => {
             return prepared;
         };
 
+        const checkCompactCapture = inspectCompactCapture || ((iframe, requestId) => new Promise((resolve, reject) => {
+            const origin = new URL(iframe.src).origin;
+            const finish = (error, reason) => {
+                clearTimeout(timer); window.removeEventListener('message', receive);
+                error ? reject(error) : resolve(reason);
+            };
+            const receive = event => {
+                if (event.source !== iframe.contentWindow || event.origin !== origin
+                    || event.data?.requestId !== requestId) return;
+                if (event.data.action === 'dashbridgeCompactCaptureSupport') {
+                    finish(null, typeof event.data.error === 'string' ? event.data.error.slice(0, 500) : 'Не удалось проверить тип панели.');
+                }
+            };
+            const timer = setTimeout(() => finish(new Error('Панель не ответила на проверку компактного снимка. Повторите снимок.')), 5000);
+            window.addEventListener('message', receive);
+            try {
+                if (!postToDashboardFrame(iframe, { action: 'dashbridgeCompactCaptureCheck', requestId })) {
+                    finish(new Error('Панель ещё не загрузилась. Повторите снимок.'));
+                }
+            } catch (error) { finish(error); }
+        }));
         const capturePanel = async (sourceIframe, panel, request, owner = null) => {
             if (panelCaptureInProgress || (selectionOwner && owner !== selectionOwner)) {
                 const busyResult = {
@@ -85,10 +108,20 @@ globalThis.DashBridgeCapture = (() => {
                 action: 'dashbridgePanelCaptureResult', requestId: request.requestId,
                 ok: false, error: 'capture-failed'
             };
+            const inspectPrepared = async () => {
+                const sourceUrl = sourceIframe.src;
+                const reason = await checkCompactCapture(sourceIframe, request.requestId);
+                request.assertCurrent?.();
+                if (!sourceIframe.isConnected || sourceIframe.src !== sourceUrl) throw new Error('Панель перезагружена.');
+                if (reason) throw Object.assign(new Error(reason), { code: 'compact-unsupported' });
+            };
             try {
                 request.assertCurrent?.();
                 if (!card) throw new Error('capture-card-not-found');
                 if (prepared) {
+                    // Reports load offscreen Grafana after moving the card into view.
+                    // Their inspection must wait for that runtime; toolbar capture is already loaded.
+                    if (!request.waitForData) await inspectPrepared();
                     const fitted = window.DashBridgeGrafanaCaptureOutput.fitPreparedSize({
                         viewportWidth: window.innerWidth, viewportHeight: window.innerHeight,
                         outputWidth: Number(request.outputWidth) || 1000,
@@ -116,6 +149,7 @@ globalThis.DashBridgeCapture = (() => {
                 postToDashboardFrame(sourceIframe, { action: 'dashbridgeCaptureLayoutChanged' });
                 await request.waitForData?.();
                 request.assertCurrent?.();
+                if (prepared && request.waitForData) await inspectPrepared();
                 await waitForLayout();
                 await window.DashBridgeGrafanaCaptureOutput?.waitForStableLayout?.(card || sourceIframe);
                 const rect = sourceIframe.getBoundingClientRect();
@@ -170,7 +204,7 @@ globalThis.DashBridgeCapture = (() => {
             } catch (error) {
                 result = {
                     action: 'dashbridgePanelCaptureResult', requestId: request.requestId,
-                    ok: false, error: error?.message || String(error)
+                    ok: false, error: error?.message || String(error), errorCode: error?.code || null
                 };
             } finally {
                 try {
@@ -292,7 +326,10 @@ globalThis.DashBridgeCapture = (() => {
                     outputHeight: dimensions.height,
                     title: panel?.title
                 });
-                if (!result?.ok) throw new Error(result?.error || 'capture-failed');
+                if (!result?.ok) {
+                    if (result?.errorCode === 'compact-unsupported') await showAlert?.(result.error);
+                    throw new Error(result?.error || 'capture-failed');
+                }
                 globalThis.DashBridgeAnalytics?.outcome(outputAction === 'copy'
                     ? 'dashbridge.capture_panel_copy' : 'dashbridge.capture_panel_download', 'success', {
                     prepared: getDefaultCapturePrepared(), format: 'png'

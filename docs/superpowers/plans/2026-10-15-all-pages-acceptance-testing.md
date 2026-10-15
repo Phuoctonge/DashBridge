@@ -1032,3 +1032,42 @@ Stat/Multistat: исправить renderer либо явно ограничит
 Остальные перечисленные непроверенные комбинации являются пробелами покрытия
 или ограничениями продукта, а не списком новых подтверждённых ошибок. Отдельно
 остаётся описанная выше точность сообщения TDM timeout; cleanup этого пути прошёл.
+
+### Закрытие compact policy и причины TDM timeout, 2026-10-16
+
+Предыдущие findings оставлены как результаты того прогона. После согласования
+пользователем Stat/Multistat исключены из compact capture по plugin type,
+без специальных panel IDs. Native prepare отклоняет их до изменения layout.
+Batch Main picker/manual и Series group/standalone дважды отказали без ZIP;
+обычные снимки обеих карточек и следующий compact Timeseries создали ZIP.
+Отдельный DashBridge card/report controller проверяет тип через MAIN RPC;
+отчёт ждёт загрузки невидимого iframe до проверки. Контракт и ограничения
+описаны в [архитектуре](../../architecture.md#внутренние-rendererreact-объекты-и-временный-layout).
+
+Живой mon-dc direct View дважды отклонил Stat/Multistat; Flot prepare/restore
+прошёл дважды. Последующая проверка нового DashBridge RPC на живом сайте
+остановилась на HTTP 401 и не считается PASS. На локальном HTTP fixture
+реальные кнопки DashBridge включили compact, Save показал причину для обоих
+plugin types, затем после выключения режима были получены обычные PNG.
+В fixture MAIN загружен явно из текущих production-файлов; это проверка
+межоконного протокола и UI, а не настоящей раскладки Grafana.
+Подменённый source/origin/requestId, timeout, неудачная отправка и навигация
+iframe проверены отдельно; listener/timer и layout восстанавливаются.
+
+TDM возвращает сериализуемый errorCode/error при timeout вместо потери причины
+через rejected executeScript. Actual Popup дважды показал точную причину,
+восстановил кнопку/scroll и не создал download. Успешные JSON и photo ZIP
+повторены дважды с проверкой содержимого. Browser deadline сокращён до 500 мс;
+полный десятиминутный deadline проверен fake clock, реальное ожидание не заявляется.
+
+Evidence: игнорируемые `test-results/release-compact-policy-browser-results.json`,
+`release-card-policy-browser/results.json`, `release-tdm-timeout-browser/results.json`,
+`release-card-readiness-red.txt`. Воспроизведение обрезания renderer не устранено
+новым адаптером: теперь неподдерживаемый compact путь явно отклоняется.
+
+Окончательный `npm run test:all` после последней production-правки завершился
+с exit 0: ESLint, 225 JavaScript test files, 41 Python check и Chromium 27/27.
+Лог: `test-results/release-capture-tdm-frozen-all.txt`. Module budget и dependency
+guard прошли; прежнее advisory `dashbridgeInspectLocation` не относится к этому
+изменению. GitNexus и точный поиск подтвердили потребителей capture controller;
+статический граф не заменяет межоконные проверки.
