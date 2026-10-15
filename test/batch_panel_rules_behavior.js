@@ -82,6 +82,30 @@ async function main() {
     const exclusive = await context.BatchPanelRules.load(url);
     assert.strictEqual(exclusive[9].forceMemByteUnit, undefined);
     assert.strictEqual(exclusive[9].cpuCapacityFilterEnabled, undefined);
+    const concurrentUrl = 'https://grafana.example.test/d/concurrent?orgId=1';
+    const initial = await context.BatchPanelRules.load(concurrentUrl);
+    await context.BatchPanelRules.save(concurrentUrl, { 1: { removeFill: true } }, { baseRules: initial });
+    await context.BatchPanelRules.save(concurrentUrl, { 2: { invertLegend: true } }, { baseRules: initial });
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(await context.BatchPanelRules.load(concurrentUrl))), {
+        1: { removeFill: true }, 2: { invertLegend: true }
+    }, 'stale editors adding different panels must preserve both rules');
+    const base = await context.BatchPanelRules.load(concurrentUrl);
+    await context.BatchPanelRules.save(concurrentUrl, { ...base, 1: { invertIdle: true } }, { baseRules: base });
+    await assert.rejects(context.BatchPanelRules.save(concurrentUrl,
+        { ...base, 1: { thickenLines: true }, 3: { removeFill: true } }, { baseRules: base }),
+    error => error.code === 'batch-rules-conflict', 'same-panel conflict must reject the entire save');
+    assert.strictEqual((await context.BatchPanelRules.load(concurrentUrl))[3], undefined);
+    await assert.rejects(context.BatchPanelRules.save(concurrentUrl, { 2: base[2] }, { baseRules: base }),
+        error => error.code === 'batch-rules-conflict', 'deleting a concurrently edited panel must conflict');
+    await assert.rejects(context.BatchPanelRules.save(concurrentUrl, {}, { baseRules: base, reset: true }),
+        error => error.code === 'batch-rules-conflict', 'reset must not erase concurrent edits');
+    const fresh = await context.BatchPanelRules.load(concurrentUrl);
+    await context.BatchPanelRules.save(concurrentUrl, { ...fresh, 4: { removeFill: true } }, { baseRules: fresh });
+    await assert.rejects(context.BatchPanelRules.save(concurrentUrl, {}, { baseRules: fresh, reset: true }),
+        error => error.code === 'batch-rules-conflict', 'reset must not erase newly added panels');
+    await context.BatchPanelRules.save(concurrentUrl, { 1: fresh[1] }, { baseRules: fresh });
+    assert.deepStrictEqual(Object.keys(await context.BatchPanelRules.load(concurrentUrl)), ['1', '4'],
+        'deleting an unchanged panel must preserve an unrelated concurrent addition');
     console.log('[OK] Batch panel rules behavior');
 }
 
