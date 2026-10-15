@@ -41,3 +41,25 @@ async function verifyTargetedApply() {
     console.log('PASS Confluence report targeted apply and post-save verification');
 }
 verifyTargetedApply().catch(error => { console.error(error); process.exitCode = 1; });
+
+async function verifyCancellation() {
+    for (const stage of ['before-start', 'upload', 'save', 'verify']) {
+        const controller = new AbortController(); const calls = []; const uploaded = new Map();
+        const stop = () => controller.abort();
+        const runner = context.DashBridgeConfluenceReportApply.create({
+            uploadAttachment: async () => { calls.push('upload'); if (stage === 'upload') stop(); return {}; },
+            updatePage: async () => { calls.push('save'); if (stage === 'save') stop(); return { version: 4 }; },
+            verifyPage: async () => { calls.push('verify'); if (stage === 'verify') stop(); return true; },
+        });
+        if (stage === 'before-start') stop();
+        await assert.rejects(runner.apply({ page: { pageIdentity: { pageId: '42', version: 3 }, storageHtml: '<h3>T1</h3>' },
+            additions: [{ newFilename: 'a.png', caption: 'A' }, { newFilename: 'b.png', caption: 'B' }],
+            sources: new Map(['a.png', 'b.png'].map(name => [name, { blob: new Blob(['png']) }])),
+            signal: controller.signal, uploaded }), error => error.name === 'AbortError');
+        assert.deepStrictEqual(calls, stage === 'before-start' ? [] : stage === 'upload' ? ['upload']
+            : stage === 'save' ? ['upload', 'upload', 'save'] : ['upload', 'upload', 'save', 'verify']);
+        if (stage === 'upload') assert.strictEqual(uploaded.size, 0, 'late upload must not populate a reusable cache');
+    }
+    console.log('PASS Confluence cancellation prevents later upload/save/verify and false success');
+}
+verifyCancellation().catch(error => { console.error(error); process.exitCode = 1; });
