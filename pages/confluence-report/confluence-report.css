@@ -24,6 +24,7 @@ p { margin: 0; color: var(--text-muted); }
 .step-number { position: absolute; top: 1.2rem; left: 1.25rem; display: grid; place-items: center; width: 2.15rem; height: 2.15rem; border-radius: 50%; background: var(--tab-active-bg); color: var(--primary); font-weight: 800; }
 .step-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
 .step-heading p { font-size: .8rem; }
+.mapping-board-card .step-heading { flex-wrap: wrap; }
 .mapping-board-card .step-heading > div:first-child { min-width: 0; flex: 1 1 28rem; }
 .mapping-board-card .step-heading > div:last-child { display: flex; flex: 0 1 auto; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .5rem; }
 .mapping-board-card .step-heading > div:last-child button { white-space: nowrap; }
