@@ -1704,6 +1704,11 @@ textarea fallback, но `execCommand('copy') === false` и исключение 
 ограничения по Fast/Full и URL, а `test-selector.html` позволяет выбрать весь
 профиль, быстрые сценарии, последние FAIL, последние NOT RUN или произвольный
 набор. Выбор хранится в `storage.local`; пустой набор не запускается.
+Оба варианта окна используют `test-selector.js.saveSelection`: отказ записи
+показывается в существующей строке `selectorStatus`, прежний сохранённый выбор
+и открытый черновик остаются доступны. Повтор закрывает окно только после
+успешной записи. Chromium-регрессия `inspectTestSelectionWorkflow` в
+`test/run-extension-browser-smoke.js` проверяет отказ, сохранность и retry.
 
 `test-runner-spool.js` владеет OPFS lifecycle и дедупликацией evidence, а
 `test-runner-artifact-serialization.js` — потоковой JSON-сериализацией без

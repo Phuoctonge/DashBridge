@@ -53,6 +53,8 @@ Chromium 153.0.8010.12, Europe/Moscow. Новый отдельный профи�
 | D03/D05 | Resume→fullscreen→Escape→pause→delete cancel→reload; валидный период → URL iframe, невозможная дата/перевёрнутый период не меняют storage; multi variables сохранены | PASS на локальных HTML fixtures; renderer не проверялся этим сценарием |
 | D11 | UI export JSON прочитан; повреждённый import и Cancel валидного import сохраняют профиль | PASS перечисленных частей; применение импорта/курсор ещё NOT RUN |
 | S01/S05 | Standalone Selector: 20 fast tests, none, один ID→Save; закрыто только созданное окно, выбор сохранён | PASS; отказ storage ещё NOT RUN |
+| O08 | 15 неверных импортов конфигурации и 5 проверок UI дважды, Cancel; отказы backup/sync/local write | PASS перечисленных отказов и сохранения прежнего состояния при validation/Cancel; storage write поэтапный, при последнем отказе уже записанная sync-часть остаётся с backup, атомарный rollback не заявляется |
+| S05 | Отказ сохранения выбора в embedded и standalone по два раза | FAIL пустого статуса до правки → PASS: ошибка видна, прежний выбор и draft сохранены; retry закрывает окно и сохраняет выбор; финальные четыре повтора без pageerror |
 | T02/T05/T06/X06 | Настоящий Runner: 11 выбранных сценариев на Grafana 12; отдельное окно диагностики; download fallback JSON v4 прочитан | PASS: 11 completed; mon-dc недоступна — ещё 11 честных NOT RUN, итог неполный; native file picker/большой export ещё NOT RUN |
 | T03 | Stop во время подготовки, возврат доступного Run и Clear | PASS этой стадии; Stop в середине сценария ещё NOT RUN |
 | C05 | Clear отключает Apply; новое соединение и шесть путей добавления снова включают Apply; затем точечная замена на локальном стенде | FAIL до правки → PASS targeted Chromium; повторное сканирование ещё не проверено успешно |
@@ -135,6 +137,13 @@ guard: ESLint, 222 JS, 41 Python, Chromium24/24 — PASS
 `pages-batch-cancel-results.json`, `pages-header-refresh-red.txt`,
 `pages-header-refresh-nonce-green.txt`, `pages-header-refresh-live-nonce-log.txt`,
 `pages-recorder-delayed-cancel-results.json`.
+Selector/Options evidence: `test-results/pages-general-remaining-import-selector/results.json`,
+`pages-general-remaining-selector-final/results.json`, `pages-selector-save-red.txt`,
+`pages-selector-save-green.txt`. Selector исправлен отдельно после checkpoint
+`3a21b35`; оба контекста используют один обработчик `saveSelection`.
+Постоянная регрессия в `inspectTestSelectionWorkflow` проверяет реальную кнопку,
+отказ Chrome API и успешный повтор. Исторический NOT RUN в ранней строке выше
+заменён этим результатом; embedded history presets остаются PARTIAL.
 Первый debug harness искал неэкранированное `[present]` в URL; фактическая
 маска корректно сериализована как `%5Bpresent%5D`, продукт не менялся.
 Первый live refresh harness проверял первый сохранённый профиль вместо своего
@@ -497,3 +506,8 @@ git diff --check
 - [ ] В roadmap остаётся только незавершённое; доказательства и повторяемые команды привязаны к результату. Сам этот план не помечается выполненным до реального обхода.
 
 Цель — обоснованное решение о готовности страниц и списке оставшихся работ. Формулировка «багов вообще нет» не является критерием приёмки.
+
+Проверка исправления S05: целевая Chromium-регрессия RED → GREEN,
+затем свежий канонический прогон `pages-selector-save-suite.txt`:
+ESLint, 222 JS, 41 Python, Chromium 24/24 — PASS. Независимое ревью
+не выявило замечаний. Этот прогон не закрывает оставшиеся строки приёмки.

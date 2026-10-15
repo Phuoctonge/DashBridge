@@ -425,6 +425,26 @@ async function inspectTestSelectionWorkflow(context, extensionId) {
         const firstCheckbox = selector.locator('.selector-test input[type="checkbox"]').first();
         await firstCheckbox.uncheck();
         const expectedSelected = total - 1;
+        const previousSelection = await runner.evaluate(async () => (await chrome.storage.local.get('trTestSelection')).trTestSelection);
+        await runner.evaluate(() => {
+            globalThis.selectorOriginalSet = chrome.storage.local.set;
+            chrome.storage.local.set = async value => {
+                if (Object.hasOwn(value, 'trTestSelection')) throw new Error('Fixture selector storage failure');
+                return globalThis.selectorOriginalSet(value);
+            };
+        });
+        try {
+            await selector.locator('#selectorApply').click();
+            await selector.locator('#selectorStatus').filter({ hasText: 'Не удалось сохранить выбор' }).waitFor({ timeout: 4000 });
+            if (!await selector.locator('#testSelectorDialog').isVisible() || await firstCheckbox.isChecked()) {
+                throw new Error('A failed save must preserve the open selection draft');
+            }
+            const stored = await runner.evaluate(async () => (await chrome.storage.local.get('trTestSelection')).trTestSelection);
+            if (JSON.stringify(stored) !== JSON.stringify(previousSelection)) throw new Error('A failed save changed the stored selection');
+        } finally {
+            await runner.evaluate(() => { chrome.storage.local.set = globalThis.selectorOriginalSet; });
+        }
+        result.checks.push({ check: 'failed-save-visible-and-draft-preserved' });
         await selector.locator('#selectorApply').click();
         await selector.locator('#testSelectorDialog').waitFor({ state: 'hidden' });
         await runner.locator('#trSelectionSummary').waitFor({

@@ -137,9 +137,15 @@ async function closeSelector() {
 async function saveSelection() {
         const ids = selectionForProfile().map(test => test.id);
         const allSelected = ids.length === profileTests.length;
-        await chrome.storage.local.set({
-            trTestSelection: allSelected ? { scope: 'all', ids: [] } : { scope: 'selected', ids },
-        });
+        query('#selectorStatus').textContent = '';
+        try {
+            await chrome.storage.local.set({
+                trTestSelection: allSelected ? { scope: 'all', ids: [] } : { scope: 'selected', ids },
+            });
+        } catch (error) {
+            query('#selectorStatus').textContent = `Не удалось сохранить выбор: ${error?.message || error}`;
+            return;
+        }
         await closeSelector();
 }
 
