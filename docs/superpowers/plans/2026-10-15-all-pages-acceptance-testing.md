@@ -61,6 +61,7 @@ Chromium 153.0.8010.12, Europe/Moscow. Новый отдельный профи�
 | D09 | Живые uPlot/Flot: настоящая кнопка карточки Save → PNG, ordinary и compact, восстановление style и исходного URL | PASS четырёх файлов: ordinary 1390×618, compact 1000×520; файлы compact просмотрены; clipboard/collage/ZIP этим не проверены |
 | O01/O02/O03/X01 | Actual Options Save → exact-port runtime/direct/iframe, revoke/re-add; CPU/RAM названия и режимы, коэффициент, showAll; отказ Save и retry дважды | PASS локальных fixtures; analysis использует DOM fallback, а не транспортное преобразование; compact 900×480 подтверждён только до dataset |
 | B03/B05 | All/white/black/empty/unknown ID, rules autosave/max/last/reload/remove/reset, разные dashboards в двух редакторах | PASS перечисленных путей; захват заменён noncapturing boundary, PNG этим не проверены |
+| B02 | Delayed A → сменить URL B; новое открытие B/Apply/Cancel/reopen; программная смена URL перед Apply; Main и Series по два повтора | FAIL старых ID до правки → PASS восьми локальных UI сценариев; нынешние ID сохранены, старый ответ не открывает picker |
 | T02/T05/T06/X06 | Настоящий Runner: 11 выбранных сценариев на Grafana 12; отдельное окно диагностики; download fallback JSON v4 прочитан | PASS: 11 completed; mon-dc недоступна — ещё 11 честных NOT RUN, итог неполный; native file picker/большой export ещё NOT RUN |
 | T03 | Stop во время подготовки, возврат доступного Run и Clear | PASS этой стадии; Stop в середине сценария ещё NOT RUN |
 | C05 | Clear отключает Apply; новое соединение и шесть путей добавления снова включают Apply; затем точечная замена на локальном стенде | FAIL до правки → PASS targeted Chromium; повторное сканирование ещё не проверено успешно |
@@ -545,7 +546,23 @@ Copy-list template проверен до page-local clipboard stub, без си�
 Batch rules evidence: `test-results/pages-batch-rules-results.json`; правила
 редактируются inline и сохраняются автоматически, отдельных Apply/Cancel у них
 нет. Нажатия Apply/Cancel/reopen относятся к picker. Stale URL discovery отдельно
-воспроизведён дважды и требует самостоятельного исправления.
+воспроизведён дважды и исправлен после checkpoint `e85557f`.
+Постоянная регрессия actual owner в `test/batch_dashboard_picker_behavior.js`
+наблюдалась RED → GREEN и проверяет оба режима, Apply без input, новое открытие,
+Cancel и позднюю ошибку. Отдельный RED → GREEN закрывает запоздалый 401:
+он не должен открывать старую вкладку авторизации после смены URL.
+Независимая UI-проверка: `test-results/pages-batch-picker-fixed-results.json`.
+Поздний 401 отдельно проверен в настоящем UI Main/Series по два раза:
+`pages-batch-picker-fixed-401-results.json`, новых tabs/windows/toast нет,
+повторный запрос нового URL показывает правильные ID. Независимое ревью
+guard и совместимости MainRun recovery замечаний не выявило.
+Свежий полный прогон после auth guard:
+`pages-batch-picker-final-suite.txt` — ESLint, 222 JS, 41 Python,
+Chromium 24/24 PASS; ссылки, module/dependency guards и diff проверены.
+Два редактора правил одного дашборда имеют наблюдаемый last-write-wins:
+второй полный snapshot убирает правило первого редактора, первый UI остаётся
+прежним. Это отдельно зафиксированное наблюдение B05, а не PASS согласования
+редакторов; контракт предотвращения такого конфликта ещё не определён.
 
 Проверка исправления S05: целевая Chromium-регрессия RED → GREEN,
 затем свежий канонический прогон `pages-selector-save-suite.txt`:

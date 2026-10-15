@@ -15,6 +15,8 @@ globalThis.BatchPanelPicker = (() => {
         const applyPanelPickerBtn = document.getElementById('applyPanelPickerBtn');
         let panelPickerState = null;
         let seriesSelectedPanelIds = [];
+        let generation = 0;
+        let ownerInput = null;
 
         const recoverGrafanaDashboardSession = async dashboardUrl => {
             const batchTab = await chrome.tabs.getCurrent();
@@ -63,17 +65,19 @@ globalThis.BatchPanelPicker = (() => {
             });
         };
 
-        const getDashboardPanelsWithRecovery = async dashboardUrl => {
+        const getDashboardPanelsWithRecovery = async (dashboardUrl, { isCurrent = () => true } = {}) => {
             try {
                 return await fetchGrafanaDashboardPanels(dashboardUrl);
             } catch (error) {
-                if (!isUnauthorizedError(error)) throw error;
+                if (!isUnauthorizedError(error) || !isCurrent()) throw error;
                 showToast('Открываю Grafana для авторизации. После входа список панелей загрузится автоматически.', 'info');
                 return recoverGrafanaDashboardSession(dashboardUrl);
             }
         };
 
         const close = () => {
+            generation++;
+            ownerInput = null;
             panelsModal.style.display = 'none';
             panelPickerState = null;
             panelsListContainer.replaceChildren();
@@ -124,17 +128,24 @@ globalThis.BatchPanelPicker = (() => {
         };
 
         const open = async ({ dashboardUrl, context }) => {
+            close();
             const info = parseGrafanaDashboardUrl(dashboardUrl);
             if (!info) return showToast('Введите корректный URL дашборда Grafana', 'error');
+            const requestGeneration = generation;
+            const input = document.getElementById(context === 'main' ? 'dashUrl' : 'seriesDashUrl');
+            ownerInput = input;
+            const isCurrent = () => generation === requestGeneration && input.value.trim() === dashboardUrl;
             const selectedIds = context === 'main'
                 ? new Set(document.getElementById('userPanels').value.split(',').map(id => id.trim()).filter(Boolean))
                 : new Set(seriesSelectedPanelIds);
             try {
                 logMessage(`Запрашиваем панели для ${info.uid}...`);
-                const { panels, panelList } = await getDashboardPanelsWithRecovery(dashboardUrl);
-                panelPickerState = { context, selectedIds };
+                const { panels, panelList } = await getDashboardPanelsWithRecovery(dashboardUrl, { isCurrent });
+                if (!isCurrent()) return;
+                panelPickerState = { context, selectedIds, isCurrent };
                 render(panelList?.length ? panelList : panels);
             } catch (error) {
+                if (!isCurrent()) return;
                 logMessage(`Ошибка: ${error.message}`, true);
                 showToast(`Не удалось получить панели: ${error.message}`, 'error');
             }
@@ -142,6 +153,10 @@ globalThis.BatchPanelPicker = (() => {
 
         const applySelection = () => {
             if (!panelPickerState) return;
+            if (!panelPickerState.isCurrent()) {
+                close();
+                return showToast('URL дашборда изменился. Загрузите список панелей заново.', 'info');
+            }
             const selectedIds = [...panelsListContainer.querySelectorAll('.panel-picker-checkbox:checked')]
                 .map(input => input.value);
             if (!selectedIds.length) return showToast('Выберите хотя бы одну панель', 'error');
@@ -166,6 +181,12 @@ globalThis.BatchPanelPicker = (() => {
         };
 
         applyPanelPickerBtn.addEventListener('click', applySelection);
+        for (const id of ['dashUrl', 'seriesDashUrl']) {
+            const input = document.getElementById(id);
+            const invalidate = () => { if (ownerInput === input) close(); };
+            input.addEventListener('input', invalidate);
+            input.addEventListener('change', invalidate);
+        }
         document.getElementById('closePanelsModal').addEventListener('click', close);
         document.getElementById('cancelPanelPickerBtn').addEventListener('click', close);
         document.getElementById('selectAllPanelPickerBtn').addEventListener('click', () => {
