@@ -438,7 +438,7 @@ classifier. Полный режим только показывает controls �
 | Аудит сводного отчёта | `dashbridge-report-audit.js` | Чистый анализ переменных, `panel:key`, семантической применимости живых значений по каждой включённой панели и итогового текста без UI и записей. |
 | Message Test Runner | `dashbridge-report-test-runner.js` | Детерминированные сценарии всех ветвей рендера и один живой интеграционный прогон активного профиля через общий collector `dashbridge.js`. |
 | TDM export | `popup-tdm.js`, `popup-tdm-page-export.js` | Popup владеет пользовательским действием, настройками и download lifecycle; отдельная самодостаточная функция исполняется через `chrome.scripting.executeScript` внутри активной TDM-страницы. |
-| Снимки DashBridge | `dashbridge-capture.js` | Общий prepared-toggle, broadcast размеров, одиночный save/copy, последовательный ZIP, throttling и восстановление карточки. |
+| Снимки DashBridge | `dashbridge-capture.js` | Общий prepared-toggle, broadcast размеров, одиночный save/copy, последовательный сбор изображений для коллажа, throttling и восстановление карточки. |
 | Версия данных DashBridge | `dashbridge-data-migration.js` | Startup `dashbridge.js`. |
 | Import/recovery | `local-state-schema.js` | Options, Worklog, profiles. |
 | Options config transfer | `options-config-transfer.js` | Options: allowlist/schema, validation, backup, FileReader/Blob URL и import/export lifecycle. |
@@ -614,8 +614,9 @@ profile commit перед закрытием формы и success. При ош�
 
 Поддерживаются профили, drag-and-drop, ширина 33/50/100%, высота, fullscreen,
 тема iframe `follow`/light/dark, пауза, общий период/refresh, копирование и
-вставка диапазона, курсор `line`/`off`, настройки, одиночные снимки и ZIP всех
-активных панелей текущего профиля.
+вставка диапазона, курсор `line`/`off`, настройки, одиночные PNG и коллаж
+выбранных панелей в сообщении. Отдельной кнопки ZIP всех панелей профиля
+в текущем DashBridge UI нет; пакетный PNG/ZIP экспорт принадлежит Batch.
 Абсолютный диапазон в header отображается компактно до минут; редактор и tooltip
 сохраняют секунды. DashBridge не вводит собственный timezone профиля и не
 удаляет существующий параметр `timezone` из URL панелей.
@@ -1182,15 +1183,15 @@ fetch по-прежнему проходит нативно без чтения 
 для layout и захватом. Используются source:none и evaluation:latest: проверка
 готовности не зависит от порога SLA и не требует согласования Max смешанных осей.
 Ошибка snapshot становится ошибкой конкретного снимка; AbortSignal проходит через
-существующий транспорт с его таймаутом и cleanup. Одиночный снимок и ZIP не задают
-этот callback и сохраняют прежний путь подготовки.
+существующий транспорт с его таймаутом и cleanup. Одиночный снимок не задаёт
+этот callback и сохраняет свой путь подготовки.
 Живая проверка Grafana KNS 2026-09-10: задержка datasource на 15 секунд,
 третья обязательная панель вне viewport и отключена от текста, PNG 1032×1768
 содержит все три графика, scroll восстановлен в 0.
 
 `DashBridgeCapture.captureSelection` также принимает
 проверку контекста и callbacks прогресса/видимости. Lease принадлежит capture
-controller и блокирует одиночный захват и ZIP до окончания восстановления.
+controller и блокирует одиночный и повторный групповой захват до окончания восстановления.
 Новая внутренняя output action `image` возвращает PNG только вызывающей
 extension page; iframe получает прежний короткий результат без изображения.
 Панели снимаются последовательно в prepared размере 1000×520 без изменения
@@ -1718,7 +1719,8 @@ Fallback нельзя удалять по результату одной Grafan
 3. Threshold watcher принадлежит панели и удаляется с runtime/menu.
 4. Панель на паузе не создаёт iframe; активные панели используют eager iframe
    после ограниченного начального ожидания первой панели своего origin.
-5. ZIP-снимки выполняются последовательно и не конкурируют за viewport.
+5. Снимки выбранных панелей коллажа и задания Batch выполняются последовательно
+   внутри своего владельца и не конкурируют за его viewport.
 6. vCPU helper входит в текущий запрос и не создаёт polling.
 7. Network wrapper не оборачивает собственный wrapper повторно.
 8. Diagnostics bounded; response bodies не копятся без лимита.
@@ -2052,6 +2054,9 @@ request-complete; прежние ответы не подтверждают пр
   редактор, но не откатывает этот draft и смежные изменения.
 - Fullscreen-карточка находится выше page header и ниже settings/confirm/report
   overlays (100/150/200+); общая modal accessibility сохраняет focus/Escape lifecycle.
+  Если opener из `.panel-extra-inline` скрыт при закрытии меню карточки, возврат
+  фокуса использует видимую `.btn-more` этой же карточки. Удалённая карточка и
+  уже выбранное внешнее поле не перехватываются; fallback профиля сохраняется.
 - URL из переменных ограничен теми же 4096 символами, что persisted panel.src.
   Все разрешённые Grafana dependent values проверяются до замены snapshot и
   изменения панели. Превышение оставляет прежний принятый snapshot и возвращает

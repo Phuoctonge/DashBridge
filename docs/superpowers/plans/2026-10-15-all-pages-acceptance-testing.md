@@ -875,3 +875,20 @@ Evidence: `test-results/acceptance-20261016-ui/worklog-{keyboard-red,targeted-re
 `test-results/acceptance-20261016-worklog-independent.json` подтверждает внешнее
 поле, смену владельца строки, Now и естественный Tab focus. Jira POST отсутствуют.
 Это не полная проверка screen reader или новая схема хранения Worklog.
+
+### D04/G04: скрытый opener настроек карточки, 2026-10-16
+
+Два UI-повтора подтвердили BODY вместо возвращённого фокуса после Escape:
+настоящая страница скрывает inline-меню, когда фокус входит в настройки.
+Checkpoint `5ab9367` фиксирует регрессию. Постоянный fixture уточнён так,
+чтобы скрытие происходило после получения фокуса диалогом, как в реальной
+странице; первоначальный тест скрывал opener слишком рано и не моделировал
+этот lifecycle. Уточнённый тест прошёл RED на прежней реализации и GREEN после
+минимального same-card fallback в общем helper. Native/profile guards сохранены.
+
+Полный targeted workflow прошёл: fullscreen, Tab/Escape, три активных iframe
+навигации с вводом/курсорoм, nested/native dialogs, pagehide/pageshow, интерактивный
+iframe внутри dialog и два скрытых opener. Независимый browser probe проверил
+также profile fallback, обычный opener, внешнее поле и удалённую карточку.
+Evidence: `test-results/acceptance-20261016-ui/dashbridge-modal-targeted-green.txt`,
+`test-results/acceptance-20261016-modal-independent-review.md`.

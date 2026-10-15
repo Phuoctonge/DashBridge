@@ -37,8 +37,11 @@
             for (const [overlay, opener] of [...opened].reverse()) {
                 if (visible(overlay)) continue;
                 opened.delete(overlay);
-                const target = opener?.closest?.('#profileDropdown') && !visible(opener)
-                    ? documentRef.getElementById('profilePickerBtn') : opener;
+                let target = opener;
+                if (opener && !visible(opener)) {
+                    if (opener.closest?.('#profileDropdown')) target = documentRef.getElementById('profilePickerBtn');
+                    else if (opener.matches?.('.panel-extra-inline')) target = opener.closest('.panel-card')?.querySelector('.btn-more');
+                }
                 if (target?.isConnected && visible(target)
                     && (documentRef.activeElement === documentRef.body
                         || overlay.contains(documentRef.activeElement))) target.focus({ preventScroll: true });

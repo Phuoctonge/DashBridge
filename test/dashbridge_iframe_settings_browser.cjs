@@ -38,7 +38,6 @@ async function inspectIframeSettings(executablePath) {
                 actions.querySelector('.btn-iframe-settings').hidden = false;
             };
             actions.querySelector('.btn-iframe-settings').onclick = () => {
-                actions.querySelector('.btn-iframe-settings').hidden = true;
                 controller.openIframeSettings(panel);
             };
             // The page's Escape handler is downstream of the shared modal trap.
@@ -170,6 +169,9 @@ async function inspectIframeSettings(executablePath) {
             await page.locator('.btn-more').focus(); await page.keyboard.press('Enter');
             await page.locator('.btn-iframe-settings').focus(); await page.keyboard.press('Enter');
             await page.locator('#iframeSettingsUrl').waitFor();
+            await page.waitForFunction(() => document.activeElement.id === 'iframeSettingsUrl');
+            // The real page closes the card actions as focus enters the modal.
+            await page.locator('.btn-iframe-settings').evaluate(node => { node.hidden = true; });
             await page.keyboard.press('Escape');
             await page.waitForFunction(() => !document.querySelector('.iframe-settings-modal'));
             assert.equal(await page.locator('.btn-more').evaluate(node => node === document.activeElement), true,
