@@ -199,6 +199,37 @@ async function inspectPage(context, extensionId, relativePath) {
         }
         await page.goto(url, { waitUntil: 'load', timeout: 20_000 });
         await page.waitForTimeout(settleMs);
+        if (relativePath === 'pages/debug-easter-egg/debug-easter-egg.html') {
+            const image = Buffer.from(await page.evaluate(() => {
+                const canvas = document.createElement('canvas');
+                canvas.width = 320; canvas.height = 200;
+                const drawing = canvas.getContext('2d');
+                drawing.fillStyle = '#4567ab'; drawing.fillRect(0, 0, 320, 200);
+                return canvas.toDataURL('image/png').split(',')[1];
+            }), 'base64');
+            const input = page.locator('#debugEasterEggFile');
+            const portrait = page.locator('#debugEasterEggPortrait');
+            await input.setInputFiles({ name: 'valid.png', mimeType: 'image/png', buffer: image });
+            await page.waitForFunction(() => document.getElementById('debugEasterEggPortrait').naturalWidth === 320);
+            await page.waitForFunction(() => document.getElementById('debugEasterEggFile').value === '');
+            const previous = await portrait.getAttribute('src');
+            for (let attempt = 0; attempt < 2; attempt++) {
+                await input.setInputFiles({ name: 'broken.png', mimeType: 'image/png', buffer: Buffer.from('broken') });
+                await page.waitForFunction(() => document.getElementById('debugEasterEggFile').value === '');
+                const hint = await page.locator('#debugEasterEggHint').innerText();
+                if (!hint.includes('Не удалось') || await portrait.getAttribute('src') !== previous
+                    || !await portrait.evaluate(element => element.naturalWidth === 320)) {
+                    throw new Error('Invalid image must explain failure and preserve the previous decoded portrait');
+                }
+            }
+            await input.setInputFiles({ name: 'retry.png', mimeType: 'image/png', buffer: image });
+            await page.waitForFunction(() => document.getElementById('debugEasterEggHint').textContent === 'Нажимайте по фото.');
+            await portrait.click();
+            await page.locator('#debugEasterEggClear').click();
+            await page.waitForTimeout(500);
+            if (await page.locator('.debug-easter-egg-effect').count() !== 0) throw new Error('Clear must cancel pending effects');
+            result.imageInputRegression = 'invalid replacement preserves image; retry and effect cleanup pass';
+        }
         if (isWorklog) {
             await page.waitForFunction(name => document.getElementById('authText')?.textContent
                 === `Авторизован: ${name}` && document.getElementById('authDot')?.classList.contains('auth-ok'),

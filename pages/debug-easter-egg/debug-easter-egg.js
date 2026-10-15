@@ -166,12 +166,17 @@ document.addEventListener('DOMContentLoaded', () => {
         loadingPhoto = true;
         const nextUrl = URL.createObjectURL(file);
         try {
+            // Decode before replacing the visible portrait: a bad file must not destroy it.
+            const candidate = new Image();
+            candidate.src = nextUrl;
+            await candidate.decode();
             await showImage(nextUrl);
             if (selectedFileUrl) URL.revokeObjectURL(selectedFileUrl);
             selectedFileUrl = nextUrl;
             resetSplats();
         } catch {
             URL.revokeObjectURL(nextUrl);
+            hint.textContent = 'Не удалось открыть изображение. Выберите другой файл.';
         } finally {
             loadingPhoto = false;
             fileInput.value = '';

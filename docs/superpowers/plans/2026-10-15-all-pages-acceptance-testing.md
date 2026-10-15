@@ -27,10 +27,19 @@ Chromium 153.0.8010.12, Europe/Moscow. Новый отдельный профи�
 | O07 | Скачать/прочитать JSON schema 3, изменить scale, import и restore backup через UI | PASS |
 | O08 | Повреждённый JSON не меняет настройки | PASS; лимит/остальные отказы ещё NOT RUN |
 | O10 | Раскрыть диагностику доставки, обновить и прочитать состояние | PASS; storage failure ещё NOT RUN |
-| P01 | Все четыре вкладки и три подвкладки Grafana, reopen с восстановлением выбора | PASS; module fallback ещё NOT RUN |
+| P01 | Все четыре вкладки и три подвкладки Grafana, reopen; все модули OFF через Options показывают fallback настроек | PASS |
 | P02 | Создать/редактировать/отменить/удалить ссылку, HTML-подобное имя показано текстом | PASS; длинный список/невалидный URL ещё NOT RUN |
 | P03 | Настроенный перенос двух `var-instance`, from/to/timezone, сохранение целевого URL | FAIL до правки → PASS после restart, два повторения |
-| P04 | Повторное чтение времени после переключения вкладок показывает новый статус | FAIL до правки → PASS после restart, два повторения; TTL/clipboard ещё NOT RUN |
+| P04 | Повторное чтение после переключения вкладок; epoch/ISO, отказ для relative/reversed, истечение session TTL | FAIL статуса до правки → PASS после restart, два повторения; clipboard ещё NOT RUN |
+| P05 | Штатные кнопки настоящего Popup открывают DashBridge/Batch/Confluence/Recorder/Worklog/Runner/Options | PASS |
+| O09/B09 | Устаревшая Options не затирает новое подключение; Batch lease живёт дольше idle worker и освобождается при закрытии владельца | PASS; остальные стадии cancel ещё NOT RUN |
+| C04/C07 | ZIP, drag/drop на последнюю из одноимённых целей, локальные attachment POST/page PUT и контрольное чтение | PASS; рабочая Confluence не изменялась |
+| C08 | Сервер сохранил неверную цель: UI отвергает результат post-save verification | PASS; conflict/частичные загрузки ещё NOT RUN |
+| W01–W05 | 10 групп расширенной локальной Worklog-регрессии: календарь/год/время, clone/delete, суммы, sent/edit, гонки lookup, focus, native Undo, pending lookup и clear/reload | PASS перечисленных частей; реальные Jira-записи исключены, auth-матрица ещё NOT RUN |
+| D10 | Настоящие меню/редакторы: неправильный SLA, фразы/шаблон, хранение черновика, ручной порядок/выбор, переключение профиля, slow refresh и warning без overlay | PASS на локальных fixtures; дополнительные live-панели ещё NOT RUN |
+| R03/R06/R08/R09/R10/X05 | Локальная запись 5 шагов → download .dashflow → manifest/flow/network/HAR/streams/bodies → UI import → replay → сравнение → download XLSX | PASS этого маршрута; счётчик сервера 1 при записи и 2 после replay, Workbook XML открыт; полная матрица сравнения ещё NOT RUN |
+| T01/S02–S04 | Runner отвергает javascript URL; Selector: none, поиск без результата, один checkbox, Save/reopen, all → Escape → reopen | PASS; полный run/diagnostics и standalone ещё NOT RUN |
+| E01/E02 | Валидный файл → два повреждённых → корректный retry; «Очистить» отменяет эффекты, сохраняя фото | FAIL до правки → PASS после restart; clipboard/размерная матрица/закрытие окна ещё NOT RUN |
 
 Подтверждены и исправлены потеря второго значения переменной при переходе по
 ссылке и невидимый новый статус времени после переключения вкладок. Область —
@@ -41,6 +50,22 @@ Evidence: `test-results/pages-options-popup-red.json`,
 `pages-options-popup-export-log.txt`, `popup-multivalue-evidence.json`,
 `popup-status-evidence.json`, `popup-status-after-switch.png`.
 Неперечисленные сценарии нового обхода остаются NOT RUN.
+
+Дополнительные evidence: `test-results/pages-local-workflows-log.txt`,
+`pages-recorder-independent-log.txt`, `acceptance-recording.dashflow`,
+`acceptance-comparison.xlsx`, `pages-popup-expanded2-log.txt`.
+Первоначальный Recorder timeout оказался загрязнением тестового контекста:
+Worklog фиксирует Date; новый независимый процесс подтвердил replay с обычными
+часами. Исправления Recorder по этому timeout не делались.
+
+Для E01 дважды подтверждено: повреждённый файл терял прежнее фото (naturalWidth 0)
+и оставлял прежнюю подсказку. `loadPhoto` теперь сначала декодирует кандидата;
+неудача сохраняет фото и показывает причину. Потребители — только file input
+и paste этой страницы; GitNexus и точный поиск проверены. Постоянная регрессия
+в существующем browser smoke наблюдалась RED 23/24, затем GREEN 24/24.
+Полный прогон текущих исправлений: ESLint, 222 JS, 41 Python, Chromium 24/24;
+evidence `test-results/pages-easter-full-suite.txt`. Независимый code review
+обеих малых правок actionable замечаний не выявил.
 
 ## Границы и правила
 
