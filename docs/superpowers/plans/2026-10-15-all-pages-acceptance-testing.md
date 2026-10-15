@@ -61,14 +61,40 @@ Chromium 153.0.8010.12, Europe/Moscow. Новый отдельный профи�
 | W01/W04 | Auth 401/403/network → retry; lookup 404/401/network → retry | PASS; все non-GET заблокированы тестом |
 | E01/E03 | Настоящая PNG-вставка из clipboard: portrait/landscape при 150%; Close закрывает только созданное окно | PASS; исходный clipboard восстановлен |
 | T02/T03/T05 | После VPN и повторного входа KNS: 11 базовых сценариев × две Grafana, просмотр диагностики, Stop startup/Clear | PASS 22/22, без экспорта; не является проверкой всех Flot/uPlot transforms |
+| B07/B08/B09 | Реальные query definitions → group и standalone Total → два PNG 1000×520 с правильным периодом/manifest; немедленная отмена | PASS на CFT156; оба PNG просмотрены; это не полная матрица отмены |
+| T06/X06 | Повтор реального fallback экспорта legacy-прогона на CFT156 | PASS: JSON v4 открыт, 11 planned = 11 completed + 0 not-run |
+| O07/G03 | Restore при отсутствии backup; три служебные кнопки в 600px/150% | FAIL до CSS-правки → PASS targeted и независимый Chromium; исправленный экран просмотрен |
+| D11 | Валидный JSON → заменить текущий / создать новый → reload, сверены URL и время | PASS на локальном fixture |
+| D01 | Одновременное переименование разных профилей в двух вкладках → storage → reload обеих | PASS: обе правки сохранены, выбор профиля каждой вкладки сохранён |
 
 Свежие evidence: `test-results/pages-confluence-rescan-suite.txt`,
 `pages-confluence-controls-results.json`, `pages-worklog-auth-results.json`,
 `pages-layout-clipboard-results.json`, `pages-runner-both-vpn-results.json`.
-Повторный экспорт Runner в текущем Chromium закрывает тестовый браузер; причина
-ещё выясняется. Прежний успешный fallback экспорт остаётся историческим результатом,
-а не доказательством успешности этого нового прогона. Первый вывод о засыпании
-MV3 worker как единственной причине не подтвердился после обращения через страницу.
+Первый повтор экспорта Runner аварийно закрыл тестовый Chromium153. Прежний
+успешный fallback экспорт остаётся историческим результатом; результат нового
+сравнения runtime описан ниже. Первый вывод о засыпании MV3 worker как единственной
+причине не подтвердился после обращения через страницу.
+Сравнение runtime без изменений расширения: Chromium 153 аварийно завершался
+при Series (native exit 0xC0000005) и экспорте Runner. Тот же тестовый профиль
+и те же сценарии на отдельном официальном CFT156 прошли, включая native PiP.
+Это ограничение воспроизведённой тестовой среды; причину на уровне Chromium
+не установили, расширение для обхода аварии не менялось. Штатный Chrome155
+не загрузил unpacked через CLI в чистом профиле; рабочие cookies не переносились.
+Evidence: `test-results/pages-batch-series-cft156-log.txt`,
+`pages-runner-cft156-log.txt`, `acceptance-runner-legacy-vpn-report.json`.
+
+Options: `.btn { display:flex }` перебивал нативное скрытие кнопки Restore,
+а три служебные кнопки не переносились в узком окне. Исправления ограничены
+maintenance Options; постоянная регрессия — `test/support/browser-audit-fixes.js`.
+Независимый targeted-прогон подтвердил hidden/backup, геометрию 600px/150%,
+а также прежние conflict/lease проверки. Скриншот
+`test-results/acceptance-options-maintenance-fixed.png` просмотрен: все три
+кнопки внутри окна. Канонический полный `test:all` без override и с отдельным
+smoke-профилем прошёл: ESLint, 222 JS, 41 Python, Chromium24/24
+(`test-results/pages-options-layout-canonical-suite.txt`). Предшествующий запуск
+с override CFT156 остановился на unit-проверке штатного пути Chromium;
+он не выдаётся за PASS.
+Новые DashBridge evidence: `test-results/pages-dashboard-transfer-results.json`.
 
 В C05 подтверждена активная кнопка Apply без связей: нажатие ничего не делало.
 После исправления отдельно обнаружен и закрыт пропущенный путь повторного

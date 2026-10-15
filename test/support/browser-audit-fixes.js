@@ -1,5 +1,5 @@
 'use strict';
-/* global chrome, document, createBatchCaptureWindowRunner */
+/* global chrome, document, window, createBatchCaptureWindowRunner */
 const assert = require('node:assert/strict');
 module.exports = async function inspectAuditFixes(context, extensionId) {
     const result = { name: 'Audit fixes: Options conflicts and Batch owner teardown', status: 'passed', checks: [] };
@@ -10,6 +10,26 @@ module.exports = async function inspectAuditFixes(context, extensionId) {
         await dashboard.goto(`chrome-extension://${extensionId}/pages/dashbridge/dashbridge.html`);
         await options.goto(`chrome-extension://${extensionId}/pages/options/options.html`);
         await options.waitForFunction(() => document.getElementById('settingGrafanaIframeDomains').value.length > 0);
+        assert.equal(await options.locator('#restoreImportBackupBtn').isHidden(), true,
+            'Restore must stay hidden when no import backup exists');
+        const initialViewport = options.viewportSize();
+        try {
+            await options.evaluate(() => chrome.storage.local.set({ dashbridge_import_backup: { sync: {}, local: {} } }));
+            await options.reload();
+            await options.waitForFunction(() => !document.getElementById('restoreImportBackupBtn').hidden);
+            await options.setViewportSize({ width: 600, height: 900 });
+            await options.evaluate(() => { document.documentElement.dataset.uiScale = '150'; });
+            const bounds = await options.evaluate(() => ({ width: window.innerWidth, content: document.documentElement.scrollWidth,
+                buttons: [...document.querySelectorAll('.maintenance-actions button')].map(button => button.getBoundingClientRect().right) }));
+            assert(bounds.content <= bounds.width && bounds.buttons.every(right => right <= bounds.width),
+                `Maintenance actions must fit a 600px viewport at 150%: ${JSON.stringify(bounds)}`);
+        } finally {
+            await options.evaluate(() => chrome.storage.local.remove('dashbridge_import_backup'));
+            await options.setViewportSize(initialViewport);
+            await options.reload();
+            await options.waitForFunction(() => document.getElementById('settingGrafanaIframeDomains').value.length > 0);
+        }
+        result.checks.push('restore visibility follows backup availability; maintenance actions fit 600px at 150%');
         const initial = await options.locator('#settingGrafanaIframeDomains').inputValue();
         const response = await dashboard.evaluate(() => chrome.runtime.sendMessage({
             type: 'dashbridge-grafana-connection', url: 'https://audit-added.test/d/a', add: true,

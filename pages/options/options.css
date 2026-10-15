@@ -256,15 +256,20 @@
 
 .maintenance-actions {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
     margin-top: 8px;
     gap: 12px;
 }
 
+.maintenance-actions button[hidden] {
+    display: none;
+}
+
 .btn-secondary-flex {
     background: #64748b;
-    flex: 1;
+    flex: 1 1 12rem;
     font-size: 0.8125rem;
 }
 
