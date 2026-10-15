@@ -1679,6 +1679,12 @@ UI Test Runner координирует запуск и таблицу в `test-
 `test-runner-diagnostic-viewer.js` владеет отдельными окнами описания/diagnostics,
 theme listener и Blob URL одного теста; `test-runner-export-controller.js` владеет
 Markdown/clipboard и потоковой записью полного OPFS diagnostic export.
+Clipboard helper возвращает подтверждённый boolean: отказ `writeText` допускает
+textarea fallback, но `execCommand('copy') === false` и исключение показывают
+ошибку без «Скопировано». Временный textarea удаляется в `finally`; compact notice
+при заблокированном окне diagnostics также ждёт результата копирования.
+Отложенный feedback не заменяет уже изменившийся текст/класс общей строки статуса.
+Регрессия: `test/test_runner_ui_controllers_behavior.js`.
 `test-runner-visual-audit.js` владеет чистой классификацией outcome/reason и
 проверкой полноты visual/semantic evidence; `test-runner-report-analysis.js`
 агрегирует health, failure clusters и рекомендации; `test-runner-report.js`

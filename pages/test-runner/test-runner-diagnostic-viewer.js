@@ -102,8 +102,14 @@ function showDiagnostic(test, urlResult) {
             test: { id: test.id, name: test.name, details: test.details },
             notice: 'Полный объект слишком велик для буфера обмена; используйте экспорт JSON.',
         }, null, 2);
-        void copyTextToClipboard(compactNotice, null);
-        setStatus('Диагностика скопирована в буфер: браузер заблокировал окно просмотра', 'tr-status tr-status-warn');
+        const statusLine = document.getElementById('trStatusLine');
+        const statusText = statusLine?.textContent;
+        const statusClass = statusLine?.className;
+        void copyTextToClipboard(compactNotice, null).then(copied => {
+            if (copied && (!statusLine || (statusLine.textContent === statusText && statusLine.className === statusClass))) {
+                setStatus('Диагностика скопирована в буфер: браузер заблокировал окно просмотра', 'tr-status tr-status-warn');
+            }
+        });
         return;
     }
 

@@ -54,4 +54,69 @@ assert(Object.isFrozen(viewer));
 assert.equal(typeof viewer.showDiagnostic, 'function');
 assert.equal(typeof viewer.showTestDescription, 'function');
 
-console.log('PASS test runner UI controllers preserve report and viewer contracts');
+(async () => {
+    for (const mode of ['native', 'fallback', 'refused', 'throws', 'stale']) {
+        let appended = 0;
+        let removed = 0;
+        let fallbackCalls = 0;
+        const labels = [];
+        const button = { set textContent(value) { labels.push(value); }, get textContent() { return 'Копировать'; } };
+        const status = { textContent: '', className: '' };
+        context.setTimeout = callback => callback();
+        context.navigator = { clipboard: { async writeText() {
+            if (mode === 'stale') status.textContent = `New operation ${fallbackCalls}`;
+            if (mode !== 'native') throw new Error('denied');
+        } } };
+        context.document = {
+            createElement: () => ({ style: {}, select() {} }),
+            body: { appendChild() { appended++; }, removeChild() { removed++; } },
+            execCommand() {
+                fallbackCalls++;
+                if (mode === 'throws') throw new Error('fallback denied');
+                return mode === 'fallback';
+            },
+        };
+        const controller = context.DashBridgeTestExportController.create({
+            getSnapshot: () => snapshot, getSpool: () => null,
+            elCopyBtn: button, elCopyFailBtn: button, elStatusLine: status,
+            categoryLabel: value => value, formatDuration: String,
+            serializeSpoolArtifact: async () => ({}), localExportTimestamp: () => '', localIsoTimestamp: () => '',
+        });
+        for (const [index, copy] of [controller.copyReport, controller.copyFailureReport,
+            () => controller.copyTextToClipboard('diagnostic notice', null)].entries()) {
+            labels.length = 0;
+            await copy();
+            const failed = mode === 'refused' || mode === 'throws' || mode === 'stale';
+            assert.equal(labels.some(label => label.includes('Скопировано')), !failed && index < 2,
+                `${mode}: unsuccessful clipboard must not show copied`);
+            if (mode === 'stale') {
+                assert.match(status.textContent, /^New operation/, 'delayed failure must preserve newer progress');
+            } else if (failed) {
+                assert.match(status.textContent, /Не удалось скопировать/);
+                assert.match(status.className, /tr-status-fail/);
+            }
+            assert.equal(removed, appended, 'fallback textarea must be removed after success or error');
+        }
+        assert.equal(fallbackCalls, mode === 'native' ? 0 : 3);
+    }
+    for (const [copied, newerStatus] of [[false, false], [true, false], [true, true]]) {
+        const statuses = [];
+        const status = { textContent: 'Completed', className: 'tr-status' };
+        context.document.getElementById = () => status;
+        let finishCopy;
+        context.window = { open: () => null };
+        const blockedViewer = context.DashBridgeTestDiagnosticViewer.create({
+            report: { buildVisualAudit: () => ({}) }, createChunkedJsonBlob: async () => ({}),
+            copyTextToClipboard: () => new Promise(resolve => { finishCopy = resolve; }),
+            setStatus: (...args) => statuses.push(args), esc: String, formatDuration: String,
+        });
+        blockedViewer.showDiagnostic(snapshot.results[0].tests[0], snapshot.results[0]);
+        assert.equal(statuses.length, 0, 'blocked viewer must await confirmed clipboard completion');
+        if (newerStatus) status.textContent = 'A new operation is running';
+        finishCopy(copied);
+        await Promise.resolve();
+        assert.equal(statuses.length, copied && !newerStatus ? 1 : 0,
+            'blocked viewer must not announce a refused copy or overwrite a newer operation');
+    }
+    console.log('PASS test runner UI controllers preserve report, clipboard and viewer contracts');
+})().catch(error => { console.error(error); process.exitCode = 1; });

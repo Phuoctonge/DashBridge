@@ -66,6 +66,18 @@ Chromium 153.0.8010.12, Europe/Moscow. Новый отдельный профи�
 | O07/G03 | Restore при отсутствии backup; три служебные кнопки в 600px/150% | FAIL до CSS-правки → PASS targeted и независимый Chromium; исправленный экран просмотрен |
 | D11 | Валидный JSON → заменить текущий / создать новый → reload, сверены URL и время | PASS на локальном fixture |
 | D01 | Одновременное переименование разных профилей в двух вкладках → storage → reload обеих | PASS: обе правки сохранены, выбор профиля каждой вкладки сохранён |
+| D06 | Живой KNS: поиск/Escape, два значения station → All, URL двух iframe и storage | PASS; точный период сохранён, это не доказательство отрисовки обеих панелей после каждого выбора |
+| C08 | Локальный REST: первая загрузка успешна, вторая HTTP500 → повтор Apply, два прогона | PASS: до повтора PUT нет; повтор не дублирует первую загрузку, затем один PUT и verification |
+| T03/T05/T06 | Stop после завершения 6 из 60 тестов → JSON, затем короткий restart | PASS: 60 = 6 completed + 54 NOT RUN, reconciliation valid; restart 3/3 |
+| T06 | Настоящее копирование полного отчёта и ошибок; контролируемый отказ native и fallback | Copy PASS; двойной отказ выявил ложное «Скопировано», регрессия RED → GREEN; live-повтор исправления PASS, отказ повторён дважды |
+| P07 | Настоящий action Popup: Cancel/Escape, copy/move, второй POST500 и DELETE500, каждый дважды | PASS только на локальных синтетических worklogs; после неуспешного копирования DELETE нет |
+| P08 | TDM fixture: HTML/JSON/both, даты, исключение фото автора, ZIP с фото | PASS: скачанные файлы прочитаны, фото побайтово совпадает с fixture |
+| P09 | Закрыть настоящий Popup во время извлечения; фото off/delay5s/404, каждый дважды | PASS восстановления scroll700; после закрытия Popup download не создаётся — ограничение lifecycle, а не фоновое выполнение |
+| P06 | GUI ZIP через настоящий Popup на экране допустимых размеров | PASS: завершённый ZIP 713312 байт, десять PNG, preview просмотрен; полный debug clipboard ещё NOT RUN |
+| R01 | Пустой/неверный/запрещённый URL, URL без схемы, двойной Start | PASS в отдельном профиле; URL без схемы нормализуется в HTTPS, fixture служит HTTP; delayed-start cancel ещё NOT RUN |
+| R04/R05 | Известные 302/200/503/204/slow ответы, URL/method/status/type filters, reset/details | PASS: статусы и содержимое тел сверены с архивом, reset7/7 |
+| R08/R11 | Отсутствующий locator → ограниченный отказ → retry; закрыть target; reload Recorder → restart | PASS: locator назван, retry успешен; проверен detach именно расширения, обычное окно намеренно сохраняется |
+| B09 | Main: Cancel при задержке dashboard definition и query в native View | PASS: собственные окна закрыты, поздний ответ не создаёт ZIP; следующий успешный захват проверяется отдельно |
 
 Свежие evidence: `test-results/pages-confluence-rescan-suite.txt`,
 `pages-confluence-controls-results.json`, `pages-worklog-auth-results.json`,
@@ -95,6 +107,20 @@ smoke-профилем прошёл: ESLint, 222 JS, 41 Python, Chromium24/24
 с override CFT156 остановился на unit-проверке штатного пути Chromium;
 он не выдаётся за PASS.
 Новые DashBridge evidence: `test-results/pages-dashboard-transfer-results.json`.
+Дополнительные evidence: `test-results/pages-dashboard-variables-results.json`,
+`pages-confluence-partial-results.json`, `pages-runner-midrun-fixed-log.txt`,
+`pages-popup-remaining-artifacts/actual-exports-verified.json`,
+`pages-popup-remaining-artifacts/gui-zip-verified.json`,
+`pages-recorder-remaining-results.json`. Первичные P08 FAIL по числу downloads
+оказались особенностью тестового подключения CDP; итоговые PASS основаны на
+чтении файлов с путей завершённых Chrome Downloads, а не статусе UI.
+Runner clipboard: `copyTextToClipboard` проверяет boolean fallback и удаляет
+textarea в `finally`; blocked diagnostics ждёт подтверждённого успеха.
+GitNexus и точный поиск подтвердили трёх потребителей: полный отчёт, ошибки,
+compact notice viewer. Отложенный feedback не перезаписывает более новый статус.
+Targeted RED/GREEN и независимый review прошли; финальный полный прогон после
+guard: ESLint, 222 JS, 41 Python, Chromium24/24 — PASS
+(`test-results/pages-runner-clipboard-final-suite.txt`).
 
 В C05 подтверждена активная кнопка Apply без связей: нажатие ничего не делало.
 После исправления отдельно обнаружен и закрыт пропущенный путь повторного
@@ -148,11 +174,11 @@ evidence `test-results/pages-easter-full-suite.txt`. Независимый code
 downloadPath тестового скрипта; native Windows path дал полный успешный download.
 Production-код Batch/Recorder/Runner по этим ошибкам окружения не менялся.
 
-Остаток нельзя свести только к VPN: ещё не выполнены полные Popup Jira/TDM/debug
-потоки, часть отказов и потребителей Options, Series/cancel матрица Batch,
-все mapping/add/rescan варианты Confluence, сетевые/locator/lifecycle варианты
-Recorder, auth/storage варианты Worklog, live variables/capture/import DashBridge,
-срединная отмена/большой export Runner, clipboard и общая матрица G01–G10.
+Остаток нельзя свести только к VPN: ещё не выполнены debug clipboard и полный
+TDM watchdog, часть отказов и потребителей Options, полная Series/cancel матрица
+Batch, все ordering/addition варианты Confluence, streams/limits и delayed-start
+cancel Recorder, storage failure Worklog, полный capture/clipboard DashBridge,
+большой export и native file picker Runner, общая матрица G01–G10.
 Строки ниже без конкретного результата остаются NOT RUN, даже если соответствующий
 Node/Python-тест прошёл в полном автономном наборе.
 

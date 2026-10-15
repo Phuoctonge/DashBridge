@@ -210,6 +210,8 @@ async function exportDiagnostics() {
 }
 
 async function copyTextToClipboard(text, button) {
+    const statusText = elStatusLine?.textContent;
+    const statusClass = elStatusLine?.className;
     try {
         await navigator.clipboard.writeText(text);
     } catch (_) {
@@ -217,9 +219,18 @@ async function copyTextToClipboard(text, button) {
         textarea.value = text;
         textarea.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
         document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
+        try {
+            textarea.select();
+            if (!document.execCommand('copy')) throw new Error('Clipboard copy was refused');
+        } catch (_) {
+            if (elStatusLine && elStatusLine.textContent === statusText && elStatusLine.className === statusClass) {
+                elStatusLine.textContent = 'Не удалось скопировать текст. Повторите попытку.';
+                elStatusLine.className = 'tr-status tr-status-fail';
+            }
+            return false;
+        } finally {
+            document.body.removeChild(textarea);
+        }
     }
 
     if (button) {
@@ -227,6 +238,7 @@ async function copyTextToClipboard(text, button) {
         button.textContent = '✓ Скопировано';
         setTimeout(() => { button.textContent = label; }, 1800);
     }
+    return true;
 }
 
     return Object.freeze({
