@@ -639,3 +639,39 @@ Module/dependency guards, документационные ссылки и diff 
 GitNexus context/impact и detect-changes дополнены точным поиском вызовов
 `BatchPanelRules` и ключа `batchPanelToolRules`. Options продолжает экспортировать
 и импортировать прежний формат; Main/Series только читают правила перед захватом.
+
+### Сверка оставшихся проверок 2026-10-15
+
+Общие формулировки «ещё проверить Series / экспорт / восстановление» не означают,
+что эти функции целиком не проверены. Повторно запущены 21 профильный Node-набор:
+Series controller/preparation/selection, Main controller, manifest и ZIP→Confluence;
+Confluence apply/live client; Runner chunked export/ownership/spool/visual reuse/diff;
+Recorder startup/session/DashFlow controller/network/view; DashFlow compare/I/O/XLSX.
+Все прошли. Они проверяют фактических владельцев с подменёнными границами,
+а не заменяют оставшиеся живые варианты.
+
+Существующие UI evidence также уже подтверждают Series group и standalone с
+настоящим PNG (`pages-batch-series-vpn-results.json`), Recorder controlled-tab
+close/reload/restart (`pages-recorder-remaining-results.json`) и два delayed-start
+cancel/restart (`pages-recorder-delayed-cancel-results.json`). Runner midrun Stop,
+частичный export и restart подтверждены `pages-runner-midrun-results.json`.
+Основные Tab/Escape Options/Popup/Selector и история presets подтверждены
+`pages-general-remaining-presets-keyboard/results.json`. Это прежние результаты,
+не новые live-прогоны на текущем коммите; их пределы в исходных строках сохраняются.
+
+Свежая настоящая Chromium-проверка C07/C08 на loopback REST-стенде:
+`test-results/confluence-failure-acceptance.json`. Double-click даёт один PUT;
+HTTP 409 не меняет storage и не объявляется успехом; ошибка второго вложения
+сохраняет первое загруженное вложение, PUT не выполняется. Retry в обоих случаях
+успешен с контрольным GET и без повторной загрузки первого вложения. Эти сценарии
+повторены в двух прогонах, без рабочей Confluence.
+
+**Новая подтверждённая ошибка C06/C08:** первый upload задержан, затем нажат
+Rescan. После успешного нового scan (версия 3) старый ответ освобождён сервером;
+старый Apply продолжает цепочку и выполняет PUT версии 4 прежнего плана.
+Причина в текущем controller: `runner.apply` не получает abort signal и не
+проверяет актуальность владельца Apply между стадиями. Это не ошибка источника.
+Сам по себе ожидающий запрос после 32 секунд отмечен как наблюдение отсутствия
+REST deadline, а не доказательство конкретного пользовательского SLA.
+Второй независимый повтор гонки сохраняется в `confluence-pending-repeat.json`.
+Production-файлы в рамках этой проверки не исправлялись; задача внесена в roadmap.
