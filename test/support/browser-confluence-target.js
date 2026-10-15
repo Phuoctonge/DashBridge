@@ -6,10 +6,13 @@ const JSZip = require('../../vendor/jszip.min.js');
 const image = filename => `<p><ac:image><ri:attachment ri:filename="${filename}" /></ac:image></p>`;
 const initialHtml = '<h3>T1</h3><h4>G</h4><p>CPU</p>' + image('old.png') + '<p>Memory</p>' + image('old.png')
     + '<h3>T2</h3><h4>G</h4><p>CPU</p>' + image('old.png');
-module.exports = async function inspectConfluenceTarget(context, extensionId, { corruptVerification = false } = {}) {
-    const result = { name: corruptVerification ? 'Confluence rejects wrong-target verification' : 'Confluence selected target replacement', status: 'passed', checks: [] };
+module.exports = async function inspectConfluenceTarget(context, extensionId, { corruptVerification = false, cancelDuringUpload = false } = {}) {
+    const result = { name: corruptVerification ? 'Confluence rejects wrong-target verification'
+        : cancelDuringUpload ? `Confluence cancels Apply on ${cancelDuringUpload === true ? 'Rescan' : cancelDuringUpload}`
+            : 'Confluence selected target replacement', status: 'passed', checks: [] };
     let html = initialHtml; let version = 3; let uploads = 0; let puts = 0;
     let failScan = false;
+    let releaseUpload;
     const requests = [];
     const server = http.createServer(async (request, response) => {
         requests.push({ method: request.method, path: request.url });
@@ -21,6 +24,7 @@ module.exports = async function inspectConfluenceTarget(context, extensionId, { 
             response.writeHead(500); response.end(JSON.stringify({ message: 'Local scan failure' })); return;
         }
         if (request.method === 'POST') { for await (const chunk of request) { void chunk; } uploads++;
+            if (cancelDuringUpload && uploads === 1) await new Promise(resolve => { releaseUpload = resolve; });
             response.end(JSON.stringify({ results: [{ id: '44', title: 'new.png', version: { number: 1 } }] })); return; }
         if (request.method === 'PUT') { let body = ''; for await (const chunk of request) body += chunk;
             const data = JSON.parse(body); html = data.body.storage.value; version = data.version.number; puts++;
@@ -81,13 +85,44 @@ module.exports = async function inspectConfluenceTarget(context, extensionId, { 
         await source.dispatchEvent('dragend', { dataTransfer: transfer });
         assert.equal(await page.locator('#applyConfluenceButton').isEnabled(), true);
         await page.locator('#applyConfluenceButton').click();
+        if (cancelDuringUpload) {
+            await page.waitForFunction(() => document.getElementById('mappingBoardStatus').textContent.includes('Загрузка'));
+            const uploadDeadline = Date.now() + 10000;
+            while (!releaseUpload && Date.now() < uploadDeadline) await new Promise(resolve => setTimeout(resolve, 10));
+            assert(releaseUpload, 'fixture must receive the first upload');
+            if (cancelDuringUpload === 'archive') {
+                await page.locator('#archiveInput').setInputFiles({ name: 'changed.zip', mimeType: 'application/zip', buffer });
+                await page.locator('#archiveStatus').filter({ hasText: 'Архив прочитан' }).waitFor();
+            } else {
+                if (cancelDuringUpload === 'url') await page.locator('#pageUrlInput').fill(origin + '/pages/viewpage.action?pageId=42&changed=1');
+                await page.locator(cancelDuringUpload === 'url' ? '#scanLiveButton' : '#rescanButton').click();
+            }
+            await page.waitForFunction(() => !document.getElementById('scanLiveButton').disabled
+                && document.getElementById('liveStatus').textContent.includes('версия 3'), {}, { timeout: 15000 });
+            releaseUpload();
+            await page.waitForTimeout(500);
+            assert.equal(puts, 0, 'old Apply must not PUT after Rescan');
+            assert.equal(html, initialHtml);
+            if (cancelDuringUpload !== 'archive') assert.equal(await page.locator('#mappingBoardCard').isHidden(), true);
+            assert(!/Готово:|failed/.test(await page.locator('#mappingBoardStatus').textContent()), 'stale operation must not report success/error');
+            await page.locator('#archiveInput').setInputFiles({ name: 'retry.zip', mimeType: 'application/zip', buffer });
+            await page.locator('#mappingBoardCard').waitFor({ state: 'visible' });
+            await page.locator('.mapping-range > summary').first().click();
+            const retrySource = page.locator('.source-node:not(.aggregate-node)').first();
+            const retryTarget = page.locator('.target-node.specific-node').filter({ hasText: 'CPU' }).last();
+            await retrySource.dispatchEvent('dragstart', { dataTransfer: transfer });
+            await retryTarget.dispatchEvent('drop', { dataTransfer: transfer });
+            await retrySource.dispatchEvent('dragend', { dataTransfer: transfer });
+            await page.locator('#applyConfluenceButton').click();
+        }
         await page.waitForFunction(() => /Готово:|verification failed|Нет применимых|Attachment not found/.test(document.getElementById('mappingBoardStatus').textContent), {}, { timeout: 40000 });
         const status = await page.locator('#mappingBoardStatus').textContent();
         const filenames = [...html.matchAll(/ri:filename="([^"]+)"/g)].map(match => match[1]);
         result.checks.push({ status, filenames, uploads, puts, requests });
         assert.match(status, corruptVerification ? /post-save verification failed/ : /Готово:/);
         assert.deepEqual(filenames, ['old.png', 'old.png', 'new.png']);
-        assert.equal(uploads, 1); assert.equal(puts, 1);
+        assert.equal(uploads, cancelDuringUpload ? 2 : 1); assert.equal(puts, 1);
+        if (cancelDuringUpload) return result;
         if (!corruptVerification) for (const kind of ['graph', 'group', 'section']) {
             html = initialHtml; version = 3; uploads = 0; puts = 0;
             await page.reload();
@@ -165,8 +200,10 @@ module.exports = async function inspectConfluenceTarget(context, extensionId, { 
         assert.equal(uploads, 1); assert.equal(puts, 1);
     } catch (error) { result.status = 'failed'; result.error = error.stack || String(error); }
     finally {
+        releaseUpload?.();
         if (!page.isClosed()) await page.close();
         for (const candidate of context.pages()) if (candidate.url().startsWith(origin)) await candidate.close();
+        server.closeAllConnections();
         await new Promise(resolve => server.close(resolve));
     }
     return result;

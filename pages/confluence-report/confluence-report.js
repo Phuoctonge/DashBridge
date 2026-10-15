@@ -52,13 +52,14 @@
     let draggedSourceKey = null;
     let draggedAddedItem = null;
     let draggedMappingScroll = null;
-    let createdWindowId = null;
+    let applyOperation = null;
     let customSections = [];
     let customGraphs = [];
     let pendingSectionFocus = null;
     const uploadedAttachments = new Map();
 
     function invalidateSources() {
+        uploadedAttachments.clear();
         archive = null;
         archiveAnalysisData = null; archivePanelMappings.clear();
         archiveInput.value = '';
@@ -88,30 +89,45 @@
         return url;
     }
 
-    async function openVisibleConfluenceWindow(url, signal) {
-        createdWindowId = null;
+    const isCurrent = operation => controller === operation && !operation.signal.aborted;
+    function cancelCurrentOperation() {
+        controller?.abort();
+        if (controller) void closeCreatedConfluenceWindow(controller);
+    }
+    function beginOperation() {
+        cancelCurrentOperation();
+        controller = new AbortController();
+        return controller;
+    }
+
+    async function openVisibleConfluenceWindow(url, operation) {
+        const signal = operation.signal;
+        signal.throwIfAborted();
         const created = await chrome.windows.create({ url: url.href, type: 'normal', focused: true });
+        operation.createdWindowId = created?.id ?? null;
+        if (signal.aborted) { await closeCreatedConfluenceWindow(operation); signal.throwIfAborted(); }
         const tab = created?.tabs?.[0];
         if (!tab?.id) throw new Error('Не удалось открыть отдельное окно Confluence');
-        createdWindowId = created.id ?? null;
         const deadline = Date.now() + 30_000;
         while (Date.now() < deadline) {
             if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
             const current = await chrome.tabs.get(tab.id).catch(() => null);
+            signal.throwIfAborted();
             if (current?.status === 'complete') return current;
             await new Promise(resolve => setTimeout(resolve, 250));
         }
         throw new Error('Confluence не завершил загрузку за 30 секунд');
     }
 
-    async function closeCreatedConfluenceWindow() {
-        const windowId = createdWindowId;
-        createdWindowId = null;
+    async function closeCreatedConfluenceWindow(operation) {
+        const windowId = operation.createdWindowId;
+        operation.createdWindowId = null;
         if (windowId == null) return;
         await chrome.windows.remove(windowId).catch(() => undefined);
     }
 
     async function fetchFromTab(tabId, url, signal) {
+        signal?.throwIfAborted();
         const [execution] = await chrome.scripting.executeScript({
             target: { tabId },
             func: async requestUrl => {
@@ -129,6 +145,7 @@
     }
 
     async function requestTab(tabId, request, signal) {
+        signal?.throwIfAborted();
         // chrome.scripting arguments use structured-clone serialization, but
         // ArrayBuffer is rejected by some Chromium builds. Send attachment
         // bytes as a bounded plain array and rebuild the buffer in MAIN.
@@ -385,21 +402,24 @@
     archiveInput.addEventListener('change', async () => {
         const file = archiveInput.files?.[0];
         if (!file) return;
-        controller?.abort();
-        controller = new AbortController();
+        const operation = beginOperation();
+        uploadedAttachments.clear();
+        applyConfluenceButton.disabled = true;
         try {
             setStatus(archiveStatus, 'Чтение архива…');
             archivePanelMappings.clear();
             operations = []; operationList.replaceChildren();
             const zip = root.DashBridgeConfluenceReportZip.create({ JSZip: root.JSZip, schema: root.DashBridgeConfluenceReportSchema });
-            archive = await zip.load(file, controller.signal);
+            const loaded = await zip.load(file, operation.signal);
+            if (!isCurrent(operation)) return;
+            archive = loaded;
             archiveAnalysisData = root.DashBridgeConfluenceReportArchive.analyze(archive);
             setStatus(archiveStatus, `Архив прочитан: ${archive.sources.size} источников.`);
             pageStatus.textContent = liveResult ? 'Архив сопоставлен с текущей страницей.' : 'Теперь можно просканировать страницу Confluence.';
             renderPreview();
             renderArchiveAnalysis();
         } catch (error) {
-            if (error?.name !== 'AbortError') setStatus(archiveStatus, error?.message || 'Не удалось прочитать архив.', true);
+            if (isCurrent(operation) && error?.name !== 'AbortError') setStatus(archiveStatus, error?.message || 'Не удалось прочитать архив.', true);
         }
     });
 
@@ -416,21 +436,26 @@
     });
     clearConnectionsButton.addEventListener('click', () => { connections = []; drawMappingLinks(); applyConfluenceButton.disabled = true; mappingBoardStatus.textContent = 'Связи очищены.'; });
     applyConfluenceButton.addEventListener('click', async () => {
-        if (!liveResult || !archive || !connections.length) return;
+        if (!liveResult || !archive || !connections.length || (applyOperation && isCurrent(applyOperation))) return;
+        const operation = beginOperation();
+        applyOperation = operation;
+        const page = liveResult.page; const sourceArchive = archive;
+        const origin = liveResult.source.origin; const pageId = page.pageIdentity.pageId;
         applyConfluenceButton.disabled = true;
         try {
             const plan = buildApplyPlan();
             if (!plan.replacements.length && !plan.additions.length) throw new Error('Нет применимых операций.');
-            const origin = liveResult.source.origin; const pageId = liveResult.page.pageIdentity.pageId; const tab = await openVisibleConfluenceWindow(new URL(`${origin}/pages/viewpage.action?pageId=${pageId}`), controller?.signal); const applyTabId = tab.id;
+            const tab = await openVisibleConfluenceWindow(new URL(`${origin}/pages/viewpage.action?pageId=${pageId}`), operation); const applyTabId = tab.id;
             const runner = root.DashBridgeConfluenceReportApply.create({
                 uploadAttachment: async ({ filename, blob, existing, signal }) => { const bytes = await blob.arrayBuffer(); const endpoint = existing?.id ? `${origin}/rest/api/content/${pageId}/child/attachment/${existing.id}/data` : `${origin}/rest/api/content/${pageId}/child/attachment`; const data = await requestTab(applyTabId, { url: endpoint, method: 'POST', headers: { 'X-Atlassian-Token': 'no-check' }, filename, bytes, contentType: blob.type }, signal); return data?.results?.[0] || data || { title: filename }; },
                 updatePage: async ({ page, storageHtml, signal }) => requestTab(applyTabId, { url: `${origin}/rest/api/content/${pageId}`, method: 'PUT', json: { id: pageId, type: 'page', title: page.pageIdentity.title, version: { number: page.pageIdentity.version + 1 }, body: { storage: { value: storageHtml, representation: 'storage' } } } }, signal),
                  verifyPage: async ({ expectedVersion, expectedStorageHtml, additions, signal }) => { const data = await requestTab(applyTabId, { url: `${origin}/rest/api/content/${pageId}?expand=body.storage,version`, method: 'GET' }, signal); const html = data?.body?.storage?.value || ''; return Number(data?.version?.number) === Number(expectedVersion) && root.DashBridgeConfluenceReportStorage.verifyPlan(html, { additions, expectedStorageHtml }); },
             });
-            const result = await runner.apply({ page: liveResult.page, replacements: plan.replacements, additions: plan.additions, sources: new Map([...archive.sources.entries()].map(([key, value]) => [key.split('/').at(-1), value])), uploaded: uploadedAttachments, onProgress: progress => { mappingBoardStatus.textContent = progress.stage === 'upload' ? `Загрузка ${progress.filename}…` : 'Сохранение страницы Confluence…'; } });
-            mappingBoardStatus.textContent = `Готово: загружено ${result.attachments.length}, страница проверена.`;
-            await closeCreatedConfluenceWindow();
-        } catch (error) { await closeCreatedConfluenceWindow(); mappingBoardStatus.textContent = error?.message || 'Не удалось применить изменения.'; mappingBoardStatus.toggleAttribute('data-error', true); applyConfluenceButton.disabled = false; }
+            const result = await runner.apply({ page, replacements: plan.replacements, additions: plan.additions, sources: new Map([...sourceArchive.sources.entries()].map(([key, value]) => [key.split('/').at(-1), value])), uploaded: uploadedAttachments, signal: operation.signal, onProgress: progress => { if (isCurrent(operation)) setStatus(mappingBoardStatus, progress.stage === 'upload' ? `Загрузка ${progress.filename}…` : 'Сохранение страницы Confluence…'); } });
+            if (isCurrent(operation)) setStatus(mappingBoardStatus, `Готово: загружено ${result.attachments.length}, страница проверена.`);
+        } catch (error) {
+            if (isCurrent(operation) && error?.name !== 'AbortError') { setStatus(mappingBoardStatus, error?.message || 'Не удалось применить изменения.', true); applyConfluenceButton.disabled = !connections.length; }
+        } finally { await closeCreatedConfluenceWindow(operation); if (applyOperation === operation) applyOperation = null; }
     });
     mappingTargets.addEventListener('scroll', drawMappingLinks);
     mappingSources.addEventListener('scroll', drawMappingLinks);
@@ -438,29 +463,37 @@
 
     rescanButton.addEventListener('click', () => scanLiveButton.click());
     scanLiveButton.addEventListener('click', async () => {
-        controller?.abort();
-        controller = new AbortController();
+        const canRescan = !rescanButton.disabled;
+        const operation = beginOperation();
         invalidateSources();
+        liveResult = null;
         scanLiveButton.disabled = true;
         rescanButton.disabled = true;
         try {
             setStatus(liveStatus, 'Сканирование страницы…');
             const url = validatePageUrl(pageUrlInput.value);
             setStatus(liveStatus, 'Открываю отдельное окно Confluence…');
-            const tab = await openVisibleConfluenceWindow(url, controller.signal);
+            const tab = await openVisibleConfluenceWindow(url, operation);
             setStatus(liveStatus, 'Окно открыто, читаю данные страницы…');
             const pageId = pageIdFromUrl(url.href);
-            liveResult = await createLiveClient(tab.id).scan({ baseUrl: url.origin, pageId, signal: controller.signal });
-            await closeCreatedConfluenceWindow();
+            const result = await createLiveClient(tab.id).scan({ baseUrl: url.origin, pageId, signal: operation.signal });
+            // Publish usable sources only after cleanup; choosing ZIP changes the operation owner.
+            await closeCreatedConfluenceWindow(operation);
+            if (!isCurrent(operation)) return;
+            liveResult = result;
             setStatus(liveStatus, `Страница: ${liveResult.page.pageIdentity.title} · версия ${liveResult.page.pageIdentity.version || 'неизвестна'}`);
             pageStatus.textContent = 'Структура прочитана. Изменения не применяются.';
             refreshSummary();
         } catch (error) {
-            await closeCreatedConfluenceWindow();
-            if (error?.name !== 'AbortError') setStatus(liveStatus, error?.message || 'Не удалось просканировать страницу.', true);
+            if (isCurrent(operation) && error?.name !== 'AbortError') setStatus(liveStatus, error?.message || 'Не удалось просканировать страницу.', true);
         } finally {
-            scanLiveButton.disabled = false;
-            rescanButton.disabled = !liveResult;
+            await closeCreatedConfluenceWindow(operation);
+            if (isCurrent(operation)) { scanLiveButton.disabled = false; rescanButton.disabled = !liveResult && !canRescan; }
         }
     });
+    pageUrlInput.addEventListener('input', () => {
+        cancelCurrentOperation(); liveResult = null; invalidateSources(); summaryCard.hidden = true;
+        scanLiveButton.disabled = false; rescanButton.disabled = true;
+    });
+    window.addEventListener('pagehide', cancelCurrentOperation);
 })(globalThis);

@@ -675,3 +675,40 @@ Rescan. После успешного нового scan (версия 3) ста�
 REST deadline, а не доказательство конкретного пользовательского SLA.
 Второй независимый повтор гонки сохраняется в `confluence-pending-repeat.json`.
 Production-файлы в рамках этой проверки не исправлялись; задача внесена в roadmap.
+
+### C06/C08: отмена устаревшего Apply, исправление 2026-10-15
+
+Историческая гонка выше исправлена после checkpoint `a3b990b`. До правки
+Node-регрессия и настоящий Chromium UI со стендом воспроизвели продолжение
+Apply после отмены. Теперь Scan, загрузка ZIP и Apply имеют отдельных владельцев;
+смена URL/ZIP, Rescan и pagehide отменяют прежнюю операцию. Проверки между
+стадиями запрещают следующий upload/PUT/verification и запись позднего upload
+в cache; устаревшие callbacks не меняют новый UI. Окно принадлежит именно
+создавшей его операции, включая завершение создания после отмены.
+
+В постоянный `inspectConfluenceTarget` добавлены задержанный upload и отмена
+через Rescan, смену ZIP и URL. Каждый сценарий проверяет отсутствие старого PUT,
+неизменность исходного storage и успешный новый Apply. Node launcher дополнительно
+проверяет задержанные windows.create/tabs.get и cleanup без закрытия нового окна.
+При review воспроизведена и исправлена блокировка Scan/Rescan, если пользователь
+выбирает ZIP до завершения закрытия окна сканирования: snapshot и ZIP теперь
+публикуются после cleanup. Regression test прошёл RED до этой правки и GREEN после.
+
+Обычные сценарии повторены на локальном REST-стенде: double-click даёт один PUT;
+HTTP 409 сохраняет исходную страницу; ошибка второго upload не вызывает PUT,
+retry переиспользует первое вложение и сохраняет оба графика. Evidence:
+`test-results/confluence-cancel-double-click.json`,
+`confluence-cancel-version-conflict.json`, `confluence-cancel-partial-upload.json`.
+Независимое финальное review блокирующих замечаний не выявило.
+
+Это отмена продолжения, а не транзакционный rollback уже отправленных POST/PUT.
+Собственный REST deadline остаётся непроверенным направлением; наблюдение
+32 секунд выше не задаёт пользовательский SLA. Рабочая Confluence не изменялась.
+
+Свежий полный прогон после финальной runtime-правки:
+`test-results/confluence-apply-cancel-final-suite.txt` — ESLint, 222 JS,
+41 Python и Chromium 27/27 PASS, включая три варианта отмены Apply и обычный
+Scan/error/retry. Module/dependency guards, документационные ссылки и diff прошли;
+прежнее advisory `dashbridgeInspectLocation` сохраняется. GitNexus impact/context
+и detect-changes дополнены поиском потребителей и строковых контрактов.
+Остальная незавершённая матрица приёмки этим исправлением не закрывается.

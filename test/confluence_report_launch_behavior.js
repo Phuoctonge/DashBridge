@@ -34,5 +34,84 @@ assert(reportHtml.includes('id="archiveCard"') && reportHtml.includes('disabled'
 assert(reportScript.includes('invalidateSources') && reportScript.includes('archiveInput.disabled = !enabled'));
 assert(reportHtml.includes('id="applyConfluenceButton"') && reportHtml.includes('confluence-report-apply.js') && reportHtml.includes('confluence-report-storage.js'));
 assert(reportScript.includes('chrome.windows.remove') && reportScript.includes('createdWindowId'));
-assert(reportScript.includes('await closeCreatedConfluenceWindow();'));
+assert(reportScript.includes('await closeCreatedConfluenceWindow(operation)'));
 console.log('PASS report replacement launcher wiring');
+
+async function verifyWindowOwnership() {
+    const vm = require('vm'); const removed = []; let resolveOld;
+    const state = { controller: null, AbortController, DOMException, Date, setTimeout,
+        chrome: { windows: {
+            create: async ({ url }) => url.endsWith('/old') ? new Promise(resolve => { resolveOld = resolve; })
+                : { id: 22, tabs: [{ id: 222 }] },
+            remove: async id => { removed.push(id); },
+        }, tabs: { get: async () => ({ status: 'complete' }) } },
+    };
+    vm.createContext(state);
+    vm.runInContext(reportScript.slice(reportScript.indexOf('    const isCurrent ='),
+        reportScript.indexOf('    async function fetchFromTab(')), state);
+    const old = state.beginOperation();
+    const oldResult = assert.rejects(state.openVisibleConfluenceWindow({ href: 'https://wiki.test/old' }, old),
+        error => error.name === 'AbortError');
+    const current = state.beginOperation();
+    await state.openVisibleConfluenceWindow({ href: 'https://wiki.test/new' }, current);
+    resolveOld({ id: 11, tabs: [{ id: 111 }] }); await oldResult;
+    assert.deepStrictEqual(removed, [11], 'late creation must close its own window, preserving the new one');
+    await state.closeCreatedConfluenceWindow(old);
+    assert.deepStrictEqual(removed, [11], 'old cleanup is idempotent');
+    await state.closeCreatedConfluenceWindow(current);
+    assert.deepStrictEqual(removed, [11, 22]);
+    let resolveTab; let tabStarted;
+    const tabRead = new Promise(resolve => { tabStarted = resolve; });
+    state.chrome.tabs.get = () => new Promise(resolve => { resolveTab = resolve; tabStarted(); });
+    const delayed = state.beginOperation();
+    const delayedResult = assert.rejects(state.openVisibleConfluenceWindow({ href: 'https://wiki.test/new' }, delayed),
+        error => error.name === 'AbortError');
+    await tabRead;
+    state.beginOperation();
+    resolveTab({ id: 222, status: 'complete' });
+    await delayedResult;
+    console.log('PASS Confluence late window creation and cleanup preserve the new owner');
+}
+verifyWindowOwnership().catch(error => { console.error(error); process.exitCode = 1; });
+
+async function verifyScanPublishesAfterWindowCleanup() {
+    const vm = require('vm'); let scan; let finishClose; let notifyClose;
+    const closeStarted = new Promise(resolve => { notifyClose = resolve; });
+    const state = {
+        controller: null, liveResult: null, AbortController, DOMException, Date, setTimeout,
+        scanLiveButton: { disabled: false, addEventListener: (_, listener) => { scan = listener; } },
+        rescanButton: { disabled: false }, liveStatus: {}, pageStatus: {},
+        pageUrlInput: { value: 'https://wiki.test/pages/viewpage.action?pageId=42' },
+        archiveInput: { disabled: true },
+        invalidateSources() { state.archiveInput.disabled = true; },
+        setStatus() {}, validatePageUrl: value => new URL(value), pageIdFromUrl: () => '42',
+        refreshSummary() { state.archiveInput.disabled = false; },
+        createLiveClient: () => ({ scan: async () => ({ page: { pageIdentity: { title: 'P', version: 3 } } }) }),
+        chrome: {
+            windows: {
+                create: async () => ({ id: 11, tabs: [{ id: 111 }] }),
+                remove: () => new Promise(resolve => { finishClose = resolve; notifyClose(); }),
+            },
+            tabs: { get: async () => ({ id: 111, status: 'complete' }) },
+        },
+    };
+    vm.createContext(state);
+    vm.runInContext(reportScript.slice(reportScript.indexOf('    const isCurrent ='),
+        reportScript.indexOf('    async function fetchFromTab(')), state);
+    vm.runInContext(reportScript.slice(reportScript.indexOf("    scanLiveButton.addEventListener('click'"),
+        reportScript.indexOf("    pageUrlInput.addEventListener('input'")), state);
+    const pending = scan();
+    await closeStarted;
+    try {
+        assert.strictEqual(state.archiveInput.disabled, true,
+            'Scan must not allow ZIP to supersede its owner before window cleanup releases Scan/Rescan');
+        assert.strictEqual(state.liveResult, null, 'scan snapshot must remain unpublished during cleanup');
+    } finally { finishClose(); await pending; }
+    assert.strictEqual(state.archiveInput.disabled, false);
+    assert.strictEqual(state.scanLiveButton.disabled, false);
+    assert.strictEqual(state.rescanButton.disabled, false);
+    state.beginOperation(); // A newly enabled ZIP action may now replace the completed scan.
+    assert.strictEqual(state.scanLiveButton.disabled, false);
+    console.log('PASS Confluence scan publishes ZIP availability after window cleanup');
+}
+verifyScanPublishesAfterWindowCleanup().catch(error => { console.error(error); process.exitCode = 1; });
