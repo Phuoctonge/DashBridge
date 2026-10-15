@@ -52,7 +52,9 @@ async function runExport(mode) {
 for (const mode of ['headers', 'body', 'reader', 'photo-transfer']) test(`TDM aborts ${mode} wait at the total deadline and restores scroll`, async () => {
     const result = await runExport(mode);
     assert(result.outcome, `${mode} must settle instead of waiting forever`);
-    assert.match(result.outcome.error?.message || '', /10 минут/);
+    assert.equal(result.outcome.error, undefined, 'executeScript must receive a serializable result instead of a rejected promise');
+    assert.equal(result.outcome.value?.errorCode, 'timeout');
+    assert.match(result.outcome.value?.error || '', /Превышено время ожидания.*Повторите экспорт/);
     assert.equal(result.top, 600); assert.equal(result.restored, 1); assert.equal(result.timers, 0);
     assert(result.now <= 600_000, 'no fallback may restart work after the total deadline');
     if (mode === 'headers' || mode === 'body') assert.equal(result.fetchSignal?.aborted, true);
