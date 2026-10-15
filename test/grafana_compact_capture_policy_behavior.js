@@ -7,7 +7,7 @@ const { test } = require('node:test');
 function fixture(type, { iframe = false, prepared = true, headerOnly = false } = {}) {
     const classes = () => ({ add() {}, remove() {}, toggle() {} });
     const header = { querySelectorAll: () => [] };
-    const panel = { closest() { return this; }, querySelector: () => header,
+    const panel = { closest() { return this; }, querySelector: selector => /header/i.test(selector) ? header : null,
         scrollIntoView() { throw new Error('native-layout-reached'); } };
     (headerOnly ? header : panel).__reactFiber$fixture = {
         memoizedProps: { panel: { type } }, return: null
