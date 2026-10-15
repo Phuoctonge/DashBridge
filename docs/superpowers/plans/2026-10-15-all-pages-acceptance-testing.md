@@ -754,3 +754,88 @@ Evidence: `test-results/acceptance-20261016-runner{,-repeat,-green}.log`,
 
 Свежий канонический `acceptance-20261016-runner-full-suite.txt`: ESLint,
 223 JS, 41 Python, Chromium 27/27 PASS после Runner runtime-правки.
+
+### B06–B10: продолжение приёмки и отмена упаковки, 2026-10-16
+
+В отдельном CFT156-профиле настоящий Batch UI прошёл 13 групп проверок на
+loopback fixture: Main PNG/ZIP, group и standalone Series по два периода,
+пустой include и retry, ошибка capture API и retry, естественный readiness
+timeout пустого renderer и retry, допустимый `No data`, отмена после первого
+PNG, закрытие страницы-владельца и сохранение чужого окна. PNG 1000×520 и
+manifest с точными периодами просмотрены/прочитаны. Canvas fixture проверяет
+захват и lifecycle, но не доказывает native uPlot/Flot repaint; прежние live
+результаты выше сохраняют свой scope.
+
+Подтверждены и исправлены два нарушения отмены:
+
+- После Cancel во время `JSZip.generateAsync` Main и Series всё ещё
+  регистрировали ZIP download. Воспроизведено дважды с контролем новых файлов,
+  а затем закреплено четырьмя RED assertions, checkpoint `8d7ddd8`.
+  Проверка существующего run ID передаётся в общий archive helper; после
+  упаковки и rollover отменённый владелец не начинает download/следующий add.
+- Ожидающий rollover старого `capturePanelToZip` после начала нового run
+  добавлял старый PNG в новый manifest. Отдельный RED checkpoint `f51b10c`
+  воспроизводит загрязнение нового captures. Проверка после `archive.add`
+  запрещает позднюю запись метаданных и успешного journal event.
+
+После правки отмена упаковки повторена дважды для Main и дважды для Series,
+каждый раз без позднего ZIP и с успешным следующим запуском. Уже зарегистрированные
+браузером загрузки не отзываются; вычисление JSZip не прерывается. Default-путь
+TDM, part naming, обычный download и Blob URL cleanup проверены соседними
+регрессиями. Независимое review actionable findings не выявило.
+
+Evidence: `test-results/acceptance-20261016-batch-report.md`,
+`acceptance-20261016-batch-verified-results.json`,
+`acceptance-20261016-batch-rollover-metadata-red.txt`,
+`acceptance-20261016-batch-independent-review.md`.
+
+Ещё четыре browser-группы прошли на финальном четырёхфайловом diff: relative
+и равный absolute диапазоны сохраняют точные границы; detailed logging OFF/ON
+исключает/добавляет `batch-debug.jsonl`; три неверных периода отклоняются до
+окна захвата; закрытие capture window и превышение archive budget завершаются
+без ZIP, затем retry успешен. Для ошибки budget тестовый adapter уменьшил cap
+до одного байта; реальное выделение 300 МиБ не заявляется. Итого 17/17 групп,
+evidence `acceptance-20261016-batch-extra-results.json`.
+
+### Recorder и дополнительные проверки Runner, 2026-10-16
+
+Recorder проверен в отдельном профиле на HTTP/WS/SSE loopback, без рабочего replay.
+Свежая цепочка record → save → import → replay → compare дала все пять статусов
+сравнения. Фильтр меняет строки, общий обзор сохраняет полные счётчики; скачанный
+XLSX соответствует выбранному фильтру, сохраняет Unicode и URL длиной 6000 символов.
+XML всех трёх листов разобран независимо; открытие в установленном Excel не выполнено.
+
+Дополнительная цепочка из 20 шагов проверила Enter/Escape/Tab, implicit/explicit
+submit без лишнего повторения, одинаковые labels с разными ID, SPA/full navigation
+и same/cross-origin iframe. Серверные счётчики подтвердили однократное выполнение
+каждого действия записи и replay. Secret reveal/hide, точный request URL в настоящем
+clipboard и step/all requests прошли; прежний clipboard восстановлен. Для сравнения
+дублей проверено совпадение по occurrence. Ready-empty presentation проверено через
+production view factory с пустыми maps, а не объявлено пользовательским no-network replay.
+
+Пять дополнительных повреждённых архивов импортированы дважды каждый: слишком
+большой manifest/body, duplicate requestId, небезопасный body path и неизвестное
+действие; текущая запись и Replay сохраняются. Реальные 6-МиБ ответы явно неполны,
+WS/SSE сохраняют Unicode. Отдельные 26×4-МиБ HTTP и 22×1-МиБ WS подтвердили aggregate
+caps: лишние данные отмечены как dropped/skipped, Stop pending=0. Для такой сессии
+Save честно отказывает по preflight working set; успешный архив для неё не заявляется.
+50k events/requests и 20k steps проверены на Node-границе, не browser stress.
+
+Проверены закрытие Recorder, extension-owned debugger detach и повторный Start;
+recovery draft через два reload; best-effort settings write failure; точная остановка
+worker, явный Stop и новый Record. Это не обещание восстановления crash registry
+или очистки брошенного incognito после одновременной гибели Recorder/worker.
+В свежем профиле permission OFF даёт инструкцию и не открывает controlled target.
+Нового production-дефекта эти проверки не подтвердили. Подробное сопоставление
+R01–R11/X05 и остаточные варианты: `test-results/acceptance-20261016-recorder-report.md`.
+
+Runner дополнительно прошёл четыре browser-группы: невалидные URL до навигации;
+двойной Run/Stop при ожидающем storage, по два повтора без позднего target;
+сохранение screenshot preference OFF/ON через reload; повторные открытия/закрытия
+диагностики четырёх исходов и Clear. Preference UI не доказывает производство PNG:
+режимы изображений отдельно покрывает canonical Node regression.
+Evidence: `test-results/acceptance-20261016-runner-extras-final.log`.
+
+После финального Batch runtime diff полный `test:all` прошёл: ESLint, 223 JS,
+41 Python, Chromium 27/27. Лог: `acceptance-20261016-batch-full-suite.txt`.
+Последующие UI-исправления требуют своего нового прогона.

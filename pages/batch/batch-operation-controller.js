@@ -70,6 +70,7 @@
             const bytes = BatchCaptureUtils.base64ToUint8Array(captured.dataUrl.split(',')[1]);
             if (!isActive()) return null;
             await archive.add(filename, bytes, bytes.byteLength);
+            if (!isActive()) return null;
             diagnosticJournal.record({ stage: 'archive', event: 'png-added', jobId: filename,
                 panelId: String(panelId), details: { bytes: bytes.byteLength } });
             // Metadata belongs to the captured job, not to the readable PNG name.

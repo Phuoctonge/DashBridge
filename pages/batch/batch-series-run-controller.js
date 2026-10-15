@@ -90,6 +90,7 @@
                 const archive = createArchive({
                     filename: `grafana_series_${new Date().toISOString().slice(0, 10)}.zip`,
                     maxBytes: 300 * 1024 * 1024,
+                    isActive: () => operation.isActive(runId),
                 });
                 const captureWindow = await operation.acquireWindow();
                 if (!operation.isActive(runId)) {

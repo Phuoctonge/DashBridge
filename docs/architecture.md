@@ -1358,6 +1358,17 @@ Batch использует отдельное окно, ждёт нужную п
 освобождает Blob URL. Перед удалением массового iframe он переводится на
 `about:blank`, чтобы освободить контекст.
 
+Main и Series передают в `createRollingZipArchive` проверку текущего run ID.
+`downloadZipArchive` повторяет её после асинхронной упаковки, до создания Blob URL
+и регистрации download; rollover также проверяет владельца до добавления файла.
+Отмена не останавливает вычисление JSZip и не отзывает уже зарегистрированные
+браузером загрузки, но запрещает новые загрузки от отменённого запуска.
+`capturePanelToZip` после `archive.add` ещё раз проверяет владельца, прежде чем
+добавить capture metadata: rollover может завершиться уже после начала нового run.
+Остальные потребители archive helper без callback сохраняют прежнее поведение.
+Регрессии — `archive_budget_behavior.js` и
+`batch_operation_controller_behavior.js`.
+
 Окном захвата владеет `js/background-batch-capture.js` в service worker.
 `batch-capture-runner.js` сохраняет facade acquire/release/id, но запрашивает
 окно через порт `dashbridge-batch-capture` с exact sender страницы Batch.
