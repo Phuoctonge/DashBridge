@@ -49,6 +49,11 @@ module.exports = async function inspectWorklogUi(context, extensionId) {
                 'Tab from the date must reach its calendar button');
             await page.keyboard.press('Enter');
             assert.equal(await page.locator('.custom-picker').count(), 1);
+            assert.equal(await page.locator('#prev').evaluate(node => node === document.activeElement), true);
+            await page.keyboard.press('Tab');
+            assert.equal(await page.locator('#next').evaluate(node => node === document.activeElement), true);
+            await page.keyboard.press('Tab');
+            assert.equal(await page.locator('.day:not(.prev-month)').first().evaluate(node => node === document.activeElement), true);
             await page.locator('#pH').focus(); await page.keyboard.press('Escape');
             assert.equal(await page.locator('.custom-picker').count(), 0);
             assert.equal(await page.locator('.calendar-btn').evaluate(node => node === document.activeElement), true,
@@ -59,11 +64,14 @@ module.exports = async function inspectWorklogUi(context, extensionId) {
             await page.locator('.calendar-btn').click();
             await page.locator('#next').focus(); await page.keyboard.press('Enter');
             assert.equal(await page.locator('.picker-title').innerText(), 'Февраль 2026');
+            assert.equal(await page.locator('#next').evaluate(node => node === document.activeElement), true);
             await page.locator('#prev').focus(); await page.keyboard.press('Space');
             assert.equal(await page.locator('.picker-title').innerText(), 'Январь 2026');
+            assert.equal(await page.locator('#prev').evaluate(node => node === document.activeElement), true);
             const day = page.locator('.day:not(.prev-month)').filter({ hasText: /^15$/ });
             await day.focus(); await page.keyboard.press('Space');
             assert.equal((await saved())[0].dateStarted, '15/01/2026 10:30');
+            assert.equal(await page.locator('.calendar-btn').evaluate(node => node === document.activeElement), true);
             await page.locator('.calendar-btn').click();
             await page.locator('#setNow').focus(); await page.keyboard.press('Enter');
             assert.equal((await saved())[0].dateStarted, '15/10/2026 12:00');

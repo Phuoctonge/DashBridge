@@ -839,3 +839,39 @@ Evidence: `test-results/acceptance-20261016-runner-extras-final.log`.
 После финального Batch runtime diff полный `test:all` прошёл: ESLint, 223 JS,
 41 Python, Chromium 27/27. Лог: `acceptance-20261016-batch-full-suite.txt`.
 Последующие UI-исправления требуют своего нового прогона.
+
+### O06/X08: Options → Wiki editor, 2026-10-16
+
+В отдельном CFT156-профиле настоящий Options Save настроил loopback hostname,
+один editor iframe ID и включил scroll fix. Штатные isolated `content.js` и MAIN
+`inject.js` загрузились без ручной инъекции. В заданном iframe focus нижнего поля
+сохраняет scroll, options object не изменяется. Соседний iframe с другим ID и
+другой hostname остаются без исправления. Два цикла Options OFF/ON без reload:
+OFF снимает style и возвращает native focus scrolling, ON снова удерживает scroll.
+Page errors: 0; production-файлы не менялись, рабочая Confluence не открывалась
+в режиме редактирования. Это browser fixture потребителя, не доказательство всех
+версий реального Wiki editor. Evidence: `test-results/acceptance-20261016-wiki.json`.
+Первый harness пытался нажать скрытый checkbox вместо видимого switch; после
+исправления селектора два поведенческих сценария прошли без правки продукта.
+
+### W02/G04: клавиатурный календарь Worklog, 2026-10-16
+
+Два независимых UI-повтора подтвердили: `.calendar-btn` был div вне Tab order;
+месяцы, дни и «Сейчас» также не выполняли свои действия по Enter/Space.
+Checkpoint `f6b2ce9` содержит две RED-регрессии в существующем Worklog browser
+workflow; десять прежних сценариев при этом проходили.
+
+Минимальная правка сохраняет прежнего владельца календаря и обработчики click,
+но использует native buttons с именами. Открытие фокусирует навигацию, смена
+месяца восстанавливает фокус на новой кнопке, выбор/Escape возвращают его
+к opener. Удаление по внешнему клику не отбирает фокус у выбранного поля.
+Scoped CSS сохраняет прежнюю геометрию вместо browser button defaults.
+После правки все 12 сценариев прошли, включая прежние pointer/date/time/Undo/
+lookup/storage проверки. На 100% и настоящем 150% browser zoom календарь
+230×279 помещается в viewport, pointer-действия сохранены; снимки просмотрены.
+
+Evidence: `test-results/acceptance-20261016-ui/worklog-{keyboard-red,targeted-red,targeted-green}.json`,
+`worklog-buttons-visual.json`; независимый browser probe
+`test-results/acceptance-20261016-worklog-independent.json` подтверждает внешнее
+поле, смену владельца строки, Now и естественный Tab focus. Jira POST отсутствуют.
+Это не полная проверка screen reader или новая схема хранения Worklog.

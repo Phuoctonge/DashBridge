@@ -373,6 +373,8 @@
         }
 
         .calendar-btn {
+            border: 0;
+            background: transparent;
             position: absolute;
             right: 0px;
             cursor: pointer;
@@ -447,6 +449,9 @@
         }
 
         .nav-btn {
+            border: 0;
+            padding: 0;
+            background: transparent;
             width: 22px;
             height: 22px;
             display: flex;
@@ -480,6 +485,9 @@
         }
 
         .day {
+            border: 0;
+            background: transparent;
+            font-family: inherit;
             font-size: 0.75rem;
             padding: 5px 0;
             border-radius: 6px;
@@ -512,6 +520,15 @@
         .day.prev-month,
         .day.next-month {
             color: #cbd5e1;
+        }
+
+        #setNow {
+            border: 0;
+            padding: 0;
+            background: transparent;
+            color: var(--primary);
+            cursor: pointer;
+            font-family: inherit;
         }
 
         .time-picker {

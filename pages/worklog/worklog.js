@@ -304,7 +304,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 <div class="summary-display ${!hasSummary ? 'summary-empty' : ''}" title="${escapeHtml(log.summary)}">${escapeHtml(log.summary || 'Введите ключ задачи...')}</div>
             </td>
             <td class="col-time cell-center"><input type="text" data-id="${escapeHtml(log.id)}" data-field="timeSpent" aria-label="Затраченное время" value="${escapeHtml(log.timeSpent)}" class="${isErr && !log.timeSpent ? 'error-field' : ''}" placeholder="0"></td>
-            <td class="col-date cell-center"><div class="date-input-group"><input type="text" data-id="${escapeHtml(log.id)}" data-field="dateStarted" aria-label="Дата работы" value="${escapeHtml(log.dateStarted)}" class="${isErr && !log.dateStarted ? 'error-field' : ''}"><div class="calendar-btn" data-id="${escapeHtml(log.id)}"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div></div></td>
+            <td class="col-date cell-center"><div class="date-input-group"><input type="text" data-id="${escapeHtml(log.id)}" data-field="dateStarted" aria-label="Дата работы" value="${escapeHtml(log.dateStarted)}" class="${isErr && !log.dateStarted ? 'error-field' : ''}"><button type="button" class="calendar-btn" aria-label="Выбрать дату работы" data-id="${escapeHtml(log.id)}"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></button></div></td>
             <td class="col-desc"><textarea data-id="${escapeHtml(log.id)}" data-field="description" aria-label="Описание работы" placeholder="Описание..." style="min-height:32px;">${escapeHtml(log.description)}</textarea></td>
             <td class="col-status cell-center"><span class="status-badge status-${safeStatus}">${getStatusText(safeStatus)}</span></td>
             <td class="col-actions"><div class="actions"><button class="btn btn-clone clone-row" data-id="${escapeHtml(log.id)}" title="Дублировать"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px; height:13px; margin:0;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button><button class="btn btn-danger delete-row" data-id="${escapeHtml(log.id)}" title="Удалить">✕</button></div></td>
@@ -476,9 +476,12 @@ document.addEventListener("DOMContentLoaded", () => {
         if (isNaN(current.getTime())) current = new Date();
         const picker = document.createElement('div');
         picker.className = 'custom-picker active';
+        const opener = anchor.querySelector('.calendar-btn');
         const close = () => {
+            const restoreFocus = picker.contains(document.activeElement);
             picker.remove(); document.removeEventListener('click', outside, true);
             document.removeEventListener('keydown', escape); if (activePicker === close) activePicker = null;
+            if (restoreFocus && opener?.isConnected) opener.focus();
         };
         // Capture runs before month rendering replaces the clicked DOM node.
         const outside = event => { if (!picker.contains(event.target)) close(); };
@@ -491,21 +494,25 @@ document.addEventListener("DOMContentLoaded", () => {
         };
         let hours = String(current.getHours()).padStart(2, '0'), minutes = String(current.getMinutes()).padStart(2, '0');
         const moveMonth = delta => {
+            const focusedId = picker.contains(document.activeElement) ? document.activeElement.id : '';
             hours = picker.querySelector('#pH').value; minutes = picker.querySelector('#pM').value;
             current.setDate(1); current.setMonth(current.getMonth() + delta); renderPicker();
+            if (focusedId === 'prev' || focusedId === 'next') picker.querySelector(`#${focusedId}`).focus();
         };
         function renderPicker() {
             const year = current.getFullYear(), month = current.getMonth();
             const names = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
             picker.innerHTML = `
-                <div class="picker-header"><div class="picker-title">${names[month]} ${year}</div><div class="picker-nav"><div class="nav-btn" id="prev">‹</div><div class="nav-btn" id="next">›</div></div></div>
+                <div class="picker-header"><div class="picker-title">${names[month]} ${year}</div><div class="picker-nav"><button type="button" class="nav-btn" id="prev" aria-label="Предыдущий месяц">‹</button><button type="button" class="nav-btn" id="next" aria-label="Следующий месяц">›</button></div></div>
                 <div class="picker-grid"><div class="weekday">Пн</div><div class="weekday">Вт</div><div class="weekday">Ср</div><div class="weekday">Чт</div><div class="weekday">Пт</div><div class="weekday">Сб</div><div class="weekday">Вс</div></div>
-                <div class="time-picker"><div class="time-group"><span class="time-label">Время:</span><input type="text" class="time-input" id="pH" aria-label="Часы" value="${escapeHtml(hours)}" maxlength="2"><span>:</span><input type="text" class="time-input" id="pM" aria-label="Минуты" value="${escapeHtml(minutes)}" maxlength="2"></div><div class="time-label" style="cursor:pointer; color:var(--primary)" id="setNow">Сейчас</div></div>
+                <div class="time-picker"><div class="time-group"><span class="time-label">Время:</span><input type="text" class="time-input" id="pH" aria-label="Часы" value="${escapeHtml(hours)}" maxlength="2"><span>:</span><input type="text" class="time-input" id="pM" aria-label="Минуты" value="${escapeHtml(minutes)}" maxlength="2"></div><button type="button" class="time-label" id="setNow">Сейчас</button></div>
             `;
             const grid = picker.querySelector('.picker-grid'), first = new Date(year, month, 1).getDay(), off = first === 0 ? 6 : first - 1, days = new Date(year, month + 1, 0).getDate(), prev = new Date(year, month, 0).getDate();
             for (let i = off; i > 0; i--) { const d = document.createElement('div'); d.className = 'day prev-month'; d.textContent = prev - i + 1; grid.appendChild(d); }
             for (let d = 1; d <= days; d++) {
-                const div = document.createElement('div'); div.className = 'day'; if (d === new Date().getDate() && month === new Date().getMonth() && year === new Date().getFullYear()) div.classList.add('today');
+                const div = document.createElement('button'); div.type = 'button'; div.className = 'day';
+                div.setAttribute('aria-label', `${d} ${names[month]} ${year}`);
+                if (d === new Date().getDate() && month === new Date().getMonth() && year === new Date().getFullYear()) div.classList.add('today');
                 div.textContent = d; div.onclick = () => {
                     const h = picker.querySelector('#pH').value, m = picker.querySelector('#pM').value;
                     if (!/^\d{1,2}$/.test(h) || !/^\d{1,2}$/.test(m) || Number(h) > 23 || Number(m) > 59) {
@@ -523,6 +530,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (t + 280 > window.innerHeight - 10) t = r.top - 285; if (l < 10) l = 10;
         picker.style.top = t + 'px'; picker.style.left = l + 'px'; activePicker = close;
         document.addEventListener('click', outside, true); document.addEventListener('keydown', escape);
+        picker.querySelector('#prev').focus();
     }
 
     function showToast(text, options = false) {
