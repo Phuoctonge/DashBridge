@@ -79,19 +79,19 @@
             <!-- Модуль Grafana (Раскрывающийся) -->
             <div class="collapsible-group">
                 <div class="collapsible-header">
-                    <div class="collapsible-header-title">
+                    <button type="button" class="collapsible-header-title" aria-expanded="false" aria-controls="grafanaSubmodules">
                         <svg class="arrow-icon ic" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="9 18 15 12 9 6" />
                         </svg>
                         <span>Вкладка Grafana</span>
-                    </div>
+                    </button>
                     <label class="switch" data-stop-propagation>
                         <input type="checkbox" id="settingModuleGrafana">
                         <span class="slider"></span>
                     </label>
                 </div>
-                <div class="collapsible-content">
+                <div class="collapsible-content" id="grafanaSubmodules" hidden>
                     <div class="form-group form-row form-row-divider">
                         <label for="settingModuleGrafanaLinks" class="form-label form-label-row-sm">Дашборды</label>
                         <label class="switch">

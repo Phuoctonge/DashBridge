@@ -226,6 +226,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const content = group.querySelector(".collapsible-content");
                 const arrow = group.querySelector(".arrow-icon");
                 const isOpen = group.classList.contains("open");
+                content.hidden = isOpen;
+                collapsibleHeader.querySelector('.collapsible-header-title').setAttribute('aria-expanded', String(!isOpen));
 
                 if (isOpen) {
                     group.classList.remove("open");

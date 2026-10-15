@@ -18,6 +18,7 @@ module.exports = async function inspectAuditFixes(context, extensionId) {
             'Grafana disclosure must be keyboard focusable');
         assert.equal(await disclosure.getAttribute('aria-expanded'), 'false');
         await options.keyboard.press('Space');
+        await submodules.waitFor({ state: 'visible' });
         assert.equal(await submodules.isVisible(), true);
         assert.equal(await disclosure.getAttribute('aria-expanded'), 'true');
         await options.keyboard.press('Tab');
@@ -35,7 +36,7 @@ module.exports = async function inspectAuditFixes(context, extensionId) {
         await options.keyboard.press('Tab'); await options.keyboard.press('Tab');
         assert.equal(await options.locator('#settingModuleRecorder').evaluate(node => node === document.activeElement), true,
             'Tab must skip collapsed subcontrols');
-        await disclosure.click(); assert.equal(await submodules.isVisible(), true);
+        await disclosure.click(); await submodules.waitFor({ state: 'visible' });
         await disclosure.click(); assert.equal(await submodules.isHidden(), true);
         await options.reload();
         await options.waitForFunction(() => document.getElementById('settingGrafanaIframeDomains').value.length > 0);
