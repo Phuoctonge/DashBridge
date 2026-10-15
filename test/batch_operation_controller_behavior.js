@@ -90,6 +90,26 @@ const operation = context.BatchOperationController.create({
     assert.equal(cancelledReport, false);
     assert.deepEqual(reportWrites, ['manifest.json'], 'cancellation must prevent a later archive report write');
 
+    let previousOwnerActive = true;
+    let releaseRollover;
+    let rolloverStarted;
+    const rolloverGate = new Promise(resolve => { releaseRollover = resolve; });
+    const rolloverEntered = new Promise(resolve => { rolloverStarted = resolve; });
+    const previousCapture = operation.capturePanelToZip({ id: 1 }, 2, '7', 'old.png', {
+        async add() { rolloverStarted(); await rolloverGate; },
+    }, {}, () => previousOwnerActive);
+    await rolloverEntered;
+    previousOwnerActive = false;
+    // A new run clears the shared capture list while the old rollover settles.
+    await operation.begin({ title: 'New run', phase: 'Preparing' });
+    releaseRollover();
+    await previousCapture;
+    let newManifest;
+    await operation.addArchiveReport({ async add(name, bytes) {
+        if (name === 'manifest.json') newManifest = JSON.parse(Buffer.from(bytes).toString('utf8'));
+    } }, { errors: [] });
+    assert.deepEqual(newManifest.captures, [], 'cancelled rollover must not append old capture metadata into a new run');
+
     console.log('batch operation controller cancellation behavior tests passed');
 })().catch(error => {
     console.error(error);
