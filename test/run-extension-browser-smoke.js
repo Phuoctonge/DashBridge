@@ -15,6 +15,7 @@ const inspectDashboardVisual = require('./support/browser-dashboard-visual');
 const inspectRuntimePortScope = require('./support/browser-runtime-port-scope');
 const inspectConfluenceTarget = require('./support/browser-confluence-target');
 const inspectIframeSettings = require('./dashbridge_iframe_settings_browser.cjs');
+const inspectWorklogUi = require('./support/browser-worklog-ui');
 
 const projectRoot = path.resolve(__dirname, '..');
 const resultsRoot = path.join(projectRoot, 'test-results');
@@ -649,6 +650,7 @@ async function main() {
             pages.push(await inspectPage(context, extensionId, htmlPath));
         }
         const workflows = [
+            await inspectWorklogUi(context, extensionId),
             await inspectGrafanaConnection(context, extensionId, analyticsSink.endpoint),
             await inspectFrameStartup(context, extensionId, analyticsSink.endpoint),
             await inspectReportCollage(context, extensionId),

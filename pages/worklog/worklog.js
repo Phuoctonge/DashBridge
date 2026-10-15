@@ -44,6 +44,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }, true);
     }
     let issueCache = {};
+    const issueRequests = new WeakMap();
     let sortOrder = 'desc';
     let historyStack = [];
     let redoStack = [];
@@ -217,7 +218,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const log = worklogs.find(l => l.id === logId);
         if (!log) return;
         const key = log.issueKey || log.issueId;
-        if (!key || key.length < 3) return;
+        const request = Symbol(); issueRequests.set(log, request);
+        if (!key || key.length < 3) { log.summary = ''; updateRowUI(logId); return; }
 
         if (issueCache[key]) {
             log.summary = issueCache[key];
@@ -229,6 +231,8 @@ document.addEventListener("DOMContentLoaded", () => {
         updateRowUI(logId);
 
         const result = await jiraClient.fetchIssueTitle(key);
+        // A response belongs to this object and edit, including an A -> B -> A edit.
+        if (!worklogs.includes(log) || issueRequests.get(log) !== request || (log.issueKey || log.issueId) !== key) return;
         if (result.ok) {
             log.summary = result.title;
             issueCache[key] = result.title;
@@ -246,11 +250,13 @@ document.addEventListener("DOMContentLoaded", () => {
         const log = worklogs.find(l => l.id === logId);
         if (!log) return;
 
-        // Маленький хак: временно запоминаем originalIndex для getRowHtml
-        const indexInArray = worklogs.indexOf(log);
-        log.originalIndex = indexInArray;
-        row.innerHTML = getRowHtml(log);
-        attachListeners();
+        // Title lookup must not replace live input nodes or their native undo stack.
+        const summary = row.querySelector('.summary-display');
+        summary.textContent = log.summary || 'Введите ключ задачи...'; summary.title = log.summary || '';
+        summary.classList.toggle('summary-empty', !log.summary?.trim());
+        const template = document.createElement('template'); template.innerHTML = getRowHtml(log);
+        const link = template.content.querySelector('a'); row.querySelector('.col-key a')?.remove();
+        if (link) row.querySelector('.col-key input').parentElement.appendChild(link);
     }
 
     // --- Rendering ---
@@ -319,11 +325,13 @@ document.addEventListener("DOMContentLoaded", () => {
         const width = Math.min((sum / 8) * 100, 100);
         const tr = document.createElement("tr");
         tr.className = "day-header";
+        tr.dataset.date = date;
         tr.innerHTML = `<td colspan="7"><div style="display:flex; align-items:center; justify-content:space-between;"><div style="display:flex; align-items:center; gap:6px;"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px; color:var(--text-muted);"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> ${escapeHtml(display)} <span class="day-total" style="background: ${color}15; color: ${color}; border: 2px solid ${color};">${sum.toFixed(1)} ч.</span></div><div class="progress-container"><div class="progress-bar" style="width: ${width}%; background: ${color}"></div></div></div></td>`;
         return tr;
     }
 
     function renderTable() {
+        if (activePicker) activePicker();
         if (worklogs.length === 0) {
             tableBody.innerHTML = '<tr><td colspan="7"><div class="worklog-empty-state" role="status"><strong>Нет записей Worklog</strong><span>Добавьте первую запись, чтобы начать учёт времени.</span><button type="button" class="btn btn-primary" id="emptyAddRow">Добавить запись</button></div></td></tr>';
             document.getElementById('emptyAddRow')?.addEventListener('click', () => addRowBtn.click());
@@ -360,6 +368,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function attachListeners() {
         document.onkeydown = (e) => {
+            if (e.target.closest('input, textarea, [contenteditable="true"]')) return;
             if (e.ctrlKey && (e.key === 'z' || e.key === 'я')) { e.preventDefault(); undo(); }
             if (e.ctrlKey && (e.key === 'y' || e.key === 'н' || (e.shiftKey && (e.key === 'Z' || e.key === 'Я')))) { e.preventDefault(); redo(); }
         };
@@ -385,7 +394,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (field === 'issueId') fetchIssueTitle(id);
                 if (field === 'dateStarted') showRefreshIndicator();
                 if (field === 'timeSpent') { updateStats(); showRefreshIndicator(); }
-                if (log.status === 'sent') log.status = 'new';
+                markEdited(log);
                 saveToStorage();
             };
         });
@@ -394,19 +403,9 @@ document.addEventListener("DOMContentLoaded", () => {
             const id = row.dataset.id;
             saveToHistory();
 
-            // Проверяем, есть ли другие задачи в этой же группе (между двумя заголовками)
-            const prevHeader = row.previousElementSibling;
-            const nextElem = row.nextElementSibling;
-            const isLastInGroup = (prevHeader && prevHeader.classList.contains('day-header')) &&
-                (!nextElem || nextElem.classList.contains('day-header'));
-
             worklogs = worklogs.filter(l => l.id !== id);
+            updateDayHeader(row);
             row.remove();
-
-            // Если это была последняя задача дня, удаляем и заголовок дня
-            if (isLastInGroup && prevHeader) {
-                prevHeader.remove();
-            }
 
             if (worklogs.length === 0) addNewRow();
 
@@ -441,12 +440,31 @@ document.addEventListener("DOMContentLoaded", () => {
             newTr.innerHTML = getRowHtml(newLog);
 
             currentRow.after(newTr);
+            updateDayHeader(newTr);
 
             saveToStorage();
             updateStats();
             attachListeners();
             DashBridgeAnalytics?.opened('jira.row_cloned');
         });
+    }
+
+    function markEdited(log) {
+        if (log.status === 'sent') log.status = 'new';
+        const badge = findWorklogRow(log.id)?.querySelector('.status-badge');
+        if (badge) { badge.className = `status-badge status-${getSafeStatus(log.status)}`; badge.textContent = getStatusText(log.status); }
+    }
+
+    function updateDayHeader(row) {
+        let header = row.previousElementSibling;
+        while (header && !header.classList.contains('day-header')) header = header.previousElementSibling;
+        if (!header) return;
+        let sum = 0, count = 0;
+        for (let next = header.nextElementSibling; next && !next.classList.contains('day-header'); next = next.nextElementSibling) {
+            const log = worklogs.find(item => item.id === next.dataset.id);
+            if (log) { sum += parseFloat(String(log.timeSpent).replace(',', '.')) || 0; count++; }
+        }
+        if (count) header.replaceWith(createDayHeader(header.dataset.date, sum)); else header.remove();
     }
 
     // --- Picker & UI ---
@@ -467,7 +485,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const escape = event => { if (event.key === 'Escape') { event.preventDefault(); close(); } };
         const chooseDate = date => {
             if (!worklogs.includes(log)) { close(); return; }
-            saveToHistory(); log.dateStarted = formatDate(date);
+            saveToHistory(); log.dateStarted = formatDate(date); markEdited(log);
             const input = findWorklogInput(logId, 'dateStarted'); if (input) input.value = log.dateStarted;
             showRefreshIndicator(); saveToStorage(); close();
         };
