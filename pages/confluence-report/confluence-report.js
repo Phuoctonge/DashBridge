@@ -6,6 +6,7 @@
     const liveStatus = document.getElementById('liveStatus');
     const pageUrlInput = document.getElementById('pageUrlInput');
     const scanLiveButton = document.getElementById('scanLiveButton');
+    const rescanButton = document.getElementById('rescanButton');
     const summaryCard = document.getElementById('summaryCard');
     const previewCard = document.getElementById('previewCard');
     const archiveCard = document.getElementById('archiveCard');
@@ -434,11 +435,13 @@
     mappingSources.addEventListener('scroll', drawMappingLinks);
     window.addEventListener('resize', drawMappingLinks);
 
+    rescanButton.addEventListener('click', () => scanLiveButton.click());
     scanLiveButton.addEventListener('click', async () => {
         controller?.abort();
         controller = new AbortController();
         invalidateSources();
         scanLiveButton.disabled = true;
+        rescanButton.disabled = true;
         try {
             setStatus(liveStatus, 'Сканирование страницы…');
             const url = validatePageUrl(pageUrlInput.value);
@@ -452,9 +455,11 @@
             pageStatus.textContent = 'Структура прочитана. Изменения не применяются.';
             refreshSummary();
         } catch (error) {
+            await closeCreatedConfluenceWindow();
             if (error?.name !== 'AbortError') setStatus(liveStatus, error?.message || 'Не удалось просканировать страницу.', true);
         } finally {
             scanLiveButton.disabled = false;
+            rescanButton.disabled = !liveResult;
         }
     });
 })(globalThis);

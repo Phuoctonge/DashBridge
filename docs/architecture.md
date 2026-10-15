@@ -1433,6 +1433,10 @@ Read-only live client остаётся владельцем чтения, reques
 доступность кнопки. Этот UI lifecycle проверяет
 [`browser-confluence-target.js`](../test/support/browser-confluence-target.js)
 на локальном стенде, без записи в рабочую Confluence.
+«Сканировать заново» вызывает тот же Scan handler; обе кнопки блокируются
+на время чтения, прежние ZIP/связи сбрасываются через `invalidateSources`.
+При ошибке handler закрывает только своё созданное окно и разрешает повторный
+запуск. Эти success/error/retry пути также проверяет локальный browser fixture.
 
 Точечная замена несёт offset изображения из исходного storage scan, а не
 локальный occurrence группы. Все replacement selectors разрешаются на одной

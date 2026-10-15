@@ -9,6 +9,7 @@ const initialHtml = '<h3>T1</h3><h4>G</h4><p>CPU</p>' + image('old.png') + '<p>M
 module.exports = async function inspectConfluenceTarget(context, extensionId, { corruptVerification = false } = {}) {
     const result = { name: corruptVerification ? 'Confluence rejects wrong-target verification' : 'Confluence selected target replacement', status: 'passed', checks: [] };
     let html = initialHtml; let version = 3; let uploads = 0; let puts = 0;
+    let failScan = false;
     const requests = [];
     const server = http.createServer(async (request, response) => {
         requests.push({ method: request.method, path: request.url });
@@ -16,6 +17,9 @@ module.exports = async function inspectConfluenceTarget(context, extensionId, { 
             response.writeHead(200, { 'content-type': 'text/html' }); response.end('<html><body>Local Confluence test page</body></html>'); return;
         }
         response.setHeader('content-type', 'application/json');
+        if (failScan && request.method === 'GET' && request.url.startsWith('/rest/api/content/42?')) {
+            response.writeHead(500); response.end(JSON.stringify({ message: 'Local scan failure' })); return;
+        }
         if (request.method === 'POST') { for await (const chunk of request) { void chunk; } uploads++;
             response.end(JSON.stringify({ results: [{ id: '44', title: 'new.png', version: { number: 1 } }] })); return; }
         if (request.method === 'PUT') { let body = ''; for await (const chunk of request) body += chunk;
@@ -38,6 +42,8 @@ module.exports = async function inspectConfluenceTarget(context, extensionId, { 
         await page.locator('#pageUrlInput').fill(origin + '/pages/viewpage.action?pageId=42');
         await page.locator('#scanLiveButton').click();
         await page.waitForFunction(() => document.getElementById('imageCount').textContent === '3', {}, { timeout: 40000 });
+        assert.equal(await page.locator('#rescanButton').isEnabled(), true,
+            'successful scan must make Rescan available');
         await page.locator('#archiveInput').setInputFiles({ name: 'target-fixture.zip', mimeType: 'application/zip', buffer });
         await page.waitForFunction(() => !document.getElementById('mappingBoardCard').hidden);
         await page.locator('.mapping-range > summary').first().click();
@@ -81,6 +87,25 @@ module.exports = async function inspectConfluenceTarget(context, extensionId, { 
         result.checks.push({ status, filenames, uploads, puts, requests });
         assert.match(status, corruptVerification ? /post-save verification failed/ : /Готово:/);
         assert.deepEqual(filenames, ['old.png', 'old.png', 'new.png']);
+        assert.equal(uploads, 1); assert.equal(puts, 1);
+        await page.locator('#rescanButton').click();
+        await page.waitForFunction(() => !document.getElementById('scanLiveButton').disabled
+            && /версия 4/.test(document.getElementById('liveStatus').textContent), {}, { timeout: 40000 });
+        assert.equal(await page.locator('#archiveInput').inputValue(), '');
+        assert.equal(await page.locator('#mappingBoardCard').isHidden(), true);
+        assert.equal(await page.locator('#rescanButton').isEnabled(), true);
+        assert.equal(uploads, 1); assert.equal(puts, 1);
+        failScan = true;
+        await page.locator('#rescanButton').click();
+        await page.waitForFunction(() => !document.getElementById('scanLiveButton').disabled
+            && document.getElementById('liveStatus').hasAttribute('data-error'), {}, { timeout: 40000 });
+        assert.equal(context.pages().filter(candidate => candidate.url().startsWith(origin)).length, 0,
+            'failed scan must close its own Confluence window');
+        assert.equal(await page.locator('#rescanButton').isEnabled(), true);
+        failScan = false;
+        await page.locator('#rescanButton').click();
+        await page.waitForFunction(() => !document.getElementById('scanLiveButton').disabled
+            && !document.getElementById('liveStatus').hasAttribute('data-error'), {}, { timeout: 40000 });
         assert.equal(uploads, 1); assert.equal(puts, 1);
     } catch (error) { result.status = 'failed'; result.error = error.stack || String(error); }
     finally {

@@ -56,13 +56,28 @@ Chromium 153.0.8010.12, Europe/Moscow. Новый отдельный профи�
 | T02/T05/T06/X06 | Настоящий Runner: 11 выбранных сценариев на Grafana 12; отдельное окно диагностики; download fallback JSON v4 прочитан | PASS: 11 completed; mon-dc недоступна — ещё 11 честных NOT RUN, итог неполный; native file picker/большой export ещё NOT RUN |
 | T03 | Stop во время подготовки, возврат доступного Run и Clear | PASS этой стадии; Stop в середине сценария ещё NOT RUN |
 | C05 | Clear отключает Apply; новое соединение и шесть путей добавления снова включают Apply; затем точечная замена на локальном стенде | FAIL до правки → PASS targeted Chromium; повторное сканирование ещё не проверено успешно |
+| C01/C06 | Повторный Scan: свежая версия 4, сброс ZIP/mapping, HTTP 500 закрывает своё окно, retry успешен | FAIL до правки → PASS; общий suite ESLint/222 JS/41 Python/Chromium 24/24 |
+| C04 | Повреждённый ZIP, отсутствие manifest/PNG/границ периода; прежний валидный архив остаётся доступен | PASS локального UI fixture |
+| W01/W04 | Auth 401/403/network → retry; lookup 404/401/network → retry | PASS; все non-GET заблокированы тестом |
+| E01/E03 | Настоящая PNG-вставка из clipboard: portrait/landscape при 150%; Close закрывает только созданное окно | PASS; исходный clipboard восстановлен |
+| T02/T03/T05 | После VPN и повторного входа KNS: 11 базовых сценариев × две Grafana, просмотр диагностики, Stop startup/Clear | PASS 22/22, без экспорта; не является проверкой всех Flot/uPlot transforms |
+
+Свежие evidence: `test-results/pages-confluence-rescan-suite.txt`,
+`pages-confluence-controls-results.json`, `pages-worklog-auth-results.json`,
+`pages-layout-clipboard-results.json`, `pages-runner-both-vpn-results.json`.
+Повторный экспорт Runner в текущем Chromium закрывает тестовый браузер; причина
+ещё выясняется. Прежний успешный fallback экспорт остаётся историческим результатом,
+а не доказательством успешности этого нового прогона. Первый вывод о засыпании
+MV3 worker как единственной причине не подтвердился после обращения через страницу.
 
 В C05 подтверждена активная кнопка Apply без связей: нажатие ничего не делало.
 После исправления отдельно обнаружен и закрыт пропущенный путь повторного
 включения через добавление графика/раздела/группы. Регрессии находятся в
 `test/support/browser-confluence-target.js`; внешний Confluence не изменялся.
-Отдельно обнаружена постоянно отключённая кнопка «Сканировать заново» без
-обработчика; исправление и повторная проверка ещё не выполнены.
+Отдельно подтверждены постоянно отключённая кнопка «Сканировать заново» без
+обработчика и незакрытое созданное окно после ошибки чтения. Повторная кнопка
+подключена к существующему Scan; error cleanup закрывает своё окно. Постоянный
+browser fixture прошёл targeted success/error/retry, без дополнительных записей.
 Полный прогон после C05: ESLint, Node/Python и Chromium 24/24 — PASS
 (`test-results/pages-confluence-clear-verified-suite.txt`). Независимый reviewer
 повторил успешную замену и отказ verification с шестью путями добавления.
