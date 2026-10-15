@@ -31,6 +31,16 @@ async function inspectIframeSettings(executablePath) {
                     runToolbarCapture: noop, openPanelReportEditor: noop, openPanelTools: noop, openPanelAnalysis: noop },
             });
             document.getElementById('opener').onclick = () => controller.openIframeSettings(panel);
+            const actions = document.createElement('div'); actions.className = 'panel-actions';
+            actions.innerHTML = '<button class="btn-more">More</button><button class="panel-extra-inline btn-iframe-settings" hidden>Iframe settings</button>';
+            document.querySelector('.panel-card').append(actions);
+            actions.querySelector('.btn-more').onclick = () => {
+                actions.querySelector('.btn-iframe-settings').hidden = false;
+            };
+            actions.querySelector('.btn-iframe-settings').onclick = () => {
+                actions.querySelector('.btn-iframe-settings').hidden = true;
+                controller.openIframeSettings(panel);
+            };
             // The page's Escape handler is downstream of the shared modal trap.
             document.addEventListener('keydown', event => {
                 if (event.key === 'Escape') document.querySelector('.fullscreen')?.classList.remove('fullscreen');
@@ -156,11 +166,21 @@ async function inspectIframeSettings(executablePath) {
         await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
         assert.equal(await page.evaluate(() => document.activeElement.id), 'focus-frame', 'iframe within the modal keeps focus');
         await page.locator('.modal-cancel').click();
-        console.log('PASS fullscreen layers, Tab/Escape, cross-origin iframe focus, caret, nested/native dialogs and stop/start');
+        for (let attempt = 0; attempt < 2; attempt++) {
+            await page.locator('.btn-more').focus(); await page.keyboard.press('Enter');
+            await page.locator('.btn-iframe-settings').focus(); await page.keyboard.press('Enter');
+            await page.locator('#iframeSettingsUrl').waitFor();
+            await page.keyboard.press('Escape');
+            await page.waitForFunction(() => !document.querySelector('.iframe-settings-modal'));
+            assert.equal(await page.locator('.btn-more').evaluate(node => node === document.activeElement), true,
+                'closing settings from a hidden card action returns focus to its visible menu button');
+        }
+        console.log('PASS fullscreen layers, Tab/Escape, cross-origin iframe focus, caret, nested/native dialogs, stop/start and hidden card opener');
         return { name: 'iframe-settings-fullscreen-accessibility', status: 'passed',
             checks: ['fullscreen layers and Tab/Escape', 'three active iframe navigations preserve input/caret',
                 'nested and native modal focus', 'edited settings field', 'opener and iframe focus after close',
-                'pagehide cancellation and pageshow restart', 'iframe inside dialog remains interactive'] };
+                'pagehide cancellation and pageshow restart', 'iframe inside dialog remains interactive',
+                'hidden card action restores the visible card menu button twice'] };
     } finally { await browser.close(); }
 }
 module.exports = inspectIframeSettings;
