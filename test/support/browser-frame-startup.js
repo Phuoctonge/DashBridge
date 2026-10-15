@@ -19,6 +19,9 @@ module.exports = async function inspectFrameStartup(context, extensionId) {
             const key = mode + ':' + id;
             counts.set(key, (counts.get(key) || 0) + 1);
             visits.push(key);
+            if (mode === 'refresh') {
+                await route.fulfill({ contentType: 'text/html', body: '<title>Refresh - Grafana</title><div class="panel-content"><canvas width="300" height="100"></canvas></div>' }); return;
+            }
             if (id === '1' && mode === 'slow') {
                 await route.fulfill({ contentType: 'text/html', body: '<title>Panel - Grafana</title><h2>Waiting for data</h2>' }); return;
             }
@@ -52,16 +55,45 @@ module.exports = async function inspectFrameStartup(context, extensionId) {
         await runner.goto(`chrome-extension://${extensionId}/pages/test-runner/test-runner.html`);
         backup = await runner.evaluate(() => chrome.storage.local.get(['dashbridge_profiles', 'dashbridge_activeProfileId']));
         syncBackup = await runner.evaluate(() => chrome.storage.sync.get('grafanaIframeDomains'));
-        for (const mode of ['slow', 'recover', 'repeat', 'login']) {
-            const profile = { id: 'startup-' + mode, name: 'Startup ' + mode, panels: [1, 2].map(id => ({
+        for (const mode of ['slow', 'recover', 'repeat', 'login', 'refresh']) {
+            const profile = { id: 'startup-' + mode, name: 'Startup ' + mode,
+                timeState: { from: '1787774259463', to: '1787791648851', refresh: '' },
+                panels: (mode === 'refresh' ? [1, 2, 3] : [1, 2]).map(id => ({
                 id: 'startup-' + id, title: 'Graph ' + id, width: '50%', height: '350px',
-                src: `${origin}/startup/${mode}/d-solo/uid/name?panelId=${id}`
+                paused: id === 3,
+                src: `${origin}/startup/${mode}/d-solo/uid/name?panelId=${id}&var-host=one&var-host=two`
             })) };
             await runner.evaluate(p => chrome.storage.local.set({ dashbridge_profiles: [p], dashbridge_activeProfileId: p.id }), profile);
             page = await context.newPage();
             await page.goto(`chrome-extension://${extensionId}/pages/dashbridge/dashbridge.html`);
             await page.locator('#iframe-startup-2').waitFor();
-            if (mode === 'slow') {
+            if (mode === 'refresh') {
+                await page.frameLocator('#iframe-startup-1').locator('canvas').waitFor();
+                await page.frameLocator('#iframe-startup-2').locator('canvas').waitFor();
+                for (let attempt = 0; attempt < 2; attempt++) {
+                    const expected = [1, 2].map(id => (counts.get('refresh:' + id) || 0) + 1);
+                    await Promise.all([
+                        ...[1, 2].map(id => page.waitForResponse(response =>
+                            response.request().isNavigationRequest() && new URL(response.url()).searchParams.get('panelId') === String(id),
+                        { timeout: 4000 })),
+                        page.locator('#forceRefreshBtn').click(),
+                    ]);
+                    assert.deepEqual([1, 2].map(id => counts.get('refresh:' + id)), expected,
+                        'each header refresh must load exactly one document per active panel');
+                    for (const id of [1, 2]) {
+                        const url = new URL(await page.locator('#iframe-startup-' + id).getAttribute('src'));
+                        assert.equal(url.searchParams.get('from'), profile.timeState.from);
+                        assert.equal(url.searchParams.get('to'), profile.timeState.to);
+                        assert.deepEqual(url.searchParams.getAll('var-host'), ['one', 'two']);
+                        assert.match(url.hash, /dashbridgeRefresh=off/);
+                    }
+                }
+                assert.equal(counts.get('refresh:3'), undefined, 'paused panels stay unloaded');
+                const saved = await runner.evaluate(async () => (await chrome.storage.local.get('dashbridge_profiles')).dashbridge_profiles[0]);
+                assert(saved.panels.every(panel => !new URL(panel.src).searchParams.has('_t')),
+                    'refresh navigation tokens must not be saved in panel URLs');
+                result.checks.push('repeated header refresh reloads each active document once, preserves period/variables/Off and excludes paused panels');
+            } else if (mode === 'slow') {
                 await page.frameLocator('#iframe-startup-2').locator('canvas').waitFor({ timeout: 5000 });
                 assert.equal(await page.frameLocator('#iframe-startup-1').locator('canvas,table,.panel-content').count(), 0);
                 result.checks.push('completed document releases followers within five seconds even without any first-panel renderer');

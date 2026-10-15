@@ -73,11 +73,19 @@ Chromium 153.0.8010.12, Europe/Moscow. Новый отдельный профи�
 | P07 | Настоящий action Popup: Cancel/Escape, copy/move, второй POST500 и DELETE500, каждый дважды | PASS только на локальных синтетических worklogs; после неуспешного копирования DELETE нет |
 | P08 | TDM fixture: HTML/JSON/both, даты, исключение фото автора, ZIP с фото | PASS: скачанные файлы прочитаны, фото побайтово совпадает с fixture |
 | P09 | Закрыть настоящий Popup во время извлечения; фото off/delay5s/404, каждый дважды | PASS восстановления scroll700; после закрытия Popup download не создаётся — ограничение lifecycle, а не фоновое выполнение |
-| P06 | GUI ZIP через настоящий Popup на экране допустимых размеров | PASS: завершённый ZIP 713312 байт, десять PNG, preview просмотрен; полный debug clipboard ещё NOT RUN |
+| P06 | GUI ZIP через настоящий Popup на экране допустимых размеров | PASS: завершённый ZIP 713312 байт, десять PNG, preview просмотрен |
+| P06 | Полный debug → настоящий clipboard JSON; отказ записи; неподходящая активная вкладка | PASS: JSON прочитан, URL-переменные замаскированы; отказ виден, кнопка доступна для повтора; неподходящая вкладка не меняет clipboard; исходный буфер восстановлен |
 | R01 | Пустой/неверный/запрещённый URL, URL без схемы, двойной Start | PASS в отдельном профиле; URL без схемы нормализуется в HTTPS, fixture служит HTTP; delayed-start cancel ещё NOT RUN |
 | R04/R05 | Известные 302/200/503/204/slow ответы, URL/method/status/type filters, reset/details | PASS: статусы и содержимое тел сверены с архивом, reset7/7 |
 | R08/R11 | Отсутствующий locator → ограниченный отказ → retry; закрыть target; reload Recorder → restart | PASS: locator назван, retry успешен; проверен detach именно расширения, обычное окно намеренно сохраняется |
-| B09 | Main: Cancel при задержке dashboard definition и query в native View | PASS: собственные окна закрыты, поздний ответ не создаёт ZIP; следующий успешный захват проверяется отдельно |
+| R01 | Stop при контролируемой задержке Chrome API создания окна, затем retry, два раза | PASS этой fault-injection границы: нет навигации к сайту, debugger расширения отключён, следующий Record/Stop успешен; естественная задержка старта и остальные его фазы этим не проверены |
+| B09 | Main: Cancel при задержке dashboard definition и query в native View; новый захват после обеих отмен | PASS: собственные окна закрыты, поздний ответ не создаёт ZIP; следующий ZIP содержит PNG 1000×520 с точным периодом, файл просмотрен |
+| G01/G02/X01 | Настоящие Popup theme toggle и Options Save для auto/90/100/110/125/150; восемь открытых потребителей и reload | PASS темы/масштаба; служебное Easter-окно отдельно получает 150% через настоящий launcher |
+| G03/G04 | Стартовые/пустые страницы при 600/1024/1440 и 100/150%; выборочные Tab/Enter | Геометрия PASS в указанном scope; клавиатура PARTIAL, browser zoom NOT RUN |
+| D03/D04 | Iframe settings Save/Cancel, URL/theme/width/height → reload; устаревший draft после изменения во второй вкладке; drag → reload | PASS локального UI; cross-profile draft и нативный календарь отдельно NOT RUN |
+| D05/D11 | Поиск quick range, relative Apply, absolute history/replay; меню курсора и толщина → reload | PASS сохранения и UI на локальном HTML; живое отображение курсора этим не доказано |
+| D07 | Общее Refresh now дважды при absolute/Off, две активные панели и одна paused | FAIL до правки → PASS постоянной Chromium-регрессии; по одному новому документу на активную панель, paused исключена, период/variables/Off сохранены, token не пишется в panel.src |
+| D07 | После restart: кнопка Refresh now дважды в живых KNS и mon-dc | PASS: для каждой Grafana по одному новому документу на клик, запросы datasource и canvas присутствуют; скриншоты просмотрены |
 
 Свежие evidence: `test-results/pages-confluence-rescan-suite.txt`,
 `pages-confluence-controls-results.json`, `pages-worklog-auth-results.json`,
@@ -121,6 +129,28 @@ compact notice viewer. Отложенный feedback не перезаписыв
 Targeted RED/GREEN и независимый review прошли; финальный полный прогон после
 guard: ESLint, 222 JS, 41 Python, Chromium24/24 — PASS
 (`test-results/pages-runner-clipboard-final-suite.txt`).
+
+Дополнительные evidence: `test-results/pages-general-remaining-artifacts/results.json`,
+`pages-dashboard-remaining-results.json`, `pages-popup-debug-clipboard-results.json`,
+`pages-batch-cancel-results.json`, `pages-header-refresh-red.txt`,
+`pages-header-refresh-nonce-green.txt`, `pages-header-refresh-live-nonce-log.txt`,
+`pages-recorder-delayed-cancel-results.json`.
+Первый debug harness искал неэкранированное `[present]` в URL; фактическая
+маска корректно сериализована как `%5Bpresent%5D`, продукт не менялся.
+Первый live refresh harness проверял первый сохранённый профиль вместо своего
+ID; повтор исправил утверждение. Новые документы уже были в первом прогоне.
+mon-dc показывает прежнее Templating/system Failed to fetch, ранее повторённое
+без расширения; это не новый дефект DashBridge и не скрытый PASS переменных.
+Общее обновление исправлено после checkpoint `9e4962b`; GitNexus дополнен
+точным поиском обоих потребителей — явной кнопки и смены refresh interval.
+Постоянная регрессия находится в `test/support/browser-frame-startup.js`.
+Итоговый token — `crypto.randomUUID()`: он гарантирует новый URL независимо
+от фиксированных часов стенда Worklog. Первый общий прогон с timestamp прошёл
+23/24, повторный клик не навигировал из-за одинакового времени; этот результат
+не объявлялся PASS. Финальный nonce прошёл отдельную регрессию, повторный live
+на обеих Grafana и канонический suite: ESLint, 222 JS, 41 Python,
+Chromium24/24 (`test-results/pages-header-refresh-final-suite.txt`).
+Независимый reviewer не нашёл замечаний ни к контракту, ни к замене token.
 
 В C05 подтверждена активная кнопка Apply без связей: нажатие ничего не делало.
 После исправления отдельно обнаружен и закрыт пропущенный путь повторного

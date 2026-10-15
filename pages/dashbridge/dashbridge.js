@@ -408,8 +408,12 @@ async function refreshAllPanels() {
     document.querySelectorAll('iframe[name="dashbridge-iframe"]').forEach(iframe => {
         const panel = getPanelForIframe(iframe);
         if (!panel || panel.paused) return;
-        if (iframe.src) navigateDashboardFrame(iframe, applyPanelParamsToUrl(panel));
-        else if (iframe.dataset.src) iframe.dataset.src = applyPanelParamsToUrl(panel);
+        const url = new URL(applyPanelParamsToUrl(panel));
+        // An identical URL with the Off fragment can keep the old document.
+        // Match card refresh: this token belongs to navigation, never storage.
+        url.searchParams.set('_t', crypto.randomUUID());
+        if (iframe.src) navigateDashboardFrame(iframe, url.toString());
+        else if (iframe.dataset.src) iframe.dataset.src = url.toString();
     });
 }
 
