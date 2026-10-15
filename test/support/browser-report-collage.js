@@ -183,7 +183,8 @@ module.exports = async function inspectReportCollage(context, extensionId) {
                 getPanels: () => panels, getActiveProfile: () => ({ id: 'fixture' }),
                 getDefaultCapturePrepared: () => false, setDefaultCapturePrepared() {},
                 getCompactCaptureDimensions: () => ({ width: 1000, height: 520 }),
-                forceLoadPanel: () => frame, postToDashboardFrame() {}, showAlert() {}
+                forceLoadPanel: () => frame, postToDashboardFrame() {}, showAlert() {},
+                inspectCompactCapture: async () => '' // Synthetic solid-colour frame has no Grafana MAIN runtime.
             });
             try {
                 const output = await capture.captureSelection(panels);

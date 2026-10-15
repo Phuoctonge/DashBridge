@@ -16,6 +16,8 @@ const panels = ['a', 'b'].map(id => ({ id, title: id }));
 let onCapture = async () => ({ ok: true, dataUrl: 'png' });
 let downloads = 0;
 let copies = 0;
+let compactError = '';
+let compactError = '';
 let controlDisabled = false;
 const control = { get disabled() { return controlDisabled; }, set disabled(value) { controlDisabled = value; } };
 const scope = {
@@ -40,6 +42,8 @@ const capture = scope.DashBridgeCapture.create({ getPanels: () => panels,
     getDefaultCapturePrepared: () => true,
     setDefaultCapturePrepared() {}, getCompactCaptureDimensions: () => ({ width: 1000, height: 520 }),
     forceLoadPanel: () => frame, postToDashboardFrame() {},
+    inspectCompactCapture: async () => compactError,
+    inspectCompactCapture: async () => compactError,
     documentRef: scope.document
 });
 const restored = () => {
@@ -48,6 +52,18 @@ const restored = () => {
     assert.equal(classes.size, 0);
 };
 (async () => {
+    compactError = 'Компактный снимок Stat/Multistat не поддерживается.';
+    const denied = await capture.capturePanel(frame, panels[0], { requestId: 'denied', prepared: true });
+    assert.equal(denied.ok, false, 'card capture must reject unsupported compact renderers before changing layout or downloading');
+    assert.equal(denied.errorCode, 'compact-unsupported');
+    assert.equal(downloads, 0); restored();
+    compactError = '';
+    compactError = 'Компактный снимок Stat/Multistat не поддерживается.';
+    const denied = await capture.capturePanel(frame, panels[0], { requestId: 'denied', prepared: true });
+    assert.equal(denied.ok, false, 'card capture must reject unsupported compact renderers before changing layout or downloading');
+    assert.equal(denied.errorCode, 'compact-unsupported');
+    assert.equal(downloads, 0); restored();
+    compactError = '';
     frame.dataset.dashbridgeRendered = 'false';
     const offscreen = await capture.captureSelection([panels[0]], { allowUnrendered: true });
     assert.equal(offscreen.images.length, 1, 'prepared report capture may move an unrendered offscreen iframe into the viewport first');
