@@ -67,6 +67,34 @@ assert.strictEqual(context.attachCapacity({ state: 'no_threshold', series: [
     { name: 'unknown', value: 8 }
 ] }, cpuSla).state, 'no_data');
 
+for (const reverse of [false, true]) {
+    const entries = [
+        { value: 2, sourceNames: ['same:9182', 'Shared Load'] },
+        { value: 8, sourceNames: ['same:9182', 'Shared Load'] }
+    ];
+    if (reverse) entries.reverse();
+    context.setEntries(entries);
+    for (const name of ['Shared Load', 'same:9182 Load 1m']) {
+        const report = context.attachCapacity({ state: 'no_threshold', series: [{ name, value: 2 }] }, cpuSla);
+        assert.strictEqual(report.series[0].cpuCapacity, undefined,
+            'an ambiguous alias/instance across scopes must not choose the first capacity');
+        assert.strictEqual(report.series[0].level, 'unknown');
+        assert.strictEqual(report.state, 'no_data', 'uncertain identity must not declare SLA success or violation');
+    }
+}
+context.setEntries([
+    { value: 2, sourceNames: ['Shared Load', 'host-one:9182'] },
+    { value: 8, sourceNames: ['Shared Load', 'host-two:9182'] }
+]);
+assert.strictEqual(context.attachCapacity({ series: [{ name: 'host-two:9182 Shared Load' }] }).series[0].cpuCapacity, 8,
+    'a stronger unique match must still resolve capacity after a weaker shared alias');
+context.setEntries([
+    { value: 4, sourceNames: ['Shared Load', 'host-one:9182'] },
+    { value: 4, sourceNames: ['Shared Load', 'host-two:9182'] }
+]);
+assert.strictEqual(context.attachCapacity({ series: [{ name: 'Shared Load' }] }).series[0].cpuCapacity, 4,
+    'duplicate aliases with the same capacity remain numerically unambiguous');
+
 assert(moduleSource.includes("insertCell(headerRow, headerAnchor, 'vCPU', true)"),
     'table legend must receive a vCPU header after the name column');
 assert(moduleSource.includes('if (tableCell?.parentElement === row) tableCell.after(cell);'),

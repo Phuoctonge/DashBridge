@@ -1485,3 +1485,17 @@ Evidence: `test-results/prerelease-vcpu-red.log`,
 могут содержать последний GREEN; исходный RED сохранён отдельно в логах.
 Остались рабочие редакторы PNG, расширенная accessibility/screen-reader матрица,
 прочая Series/identity корреляция, особенности настоящих Jira/TDM и Grafana 9.
+
+#### Следующий блок: неоднозначные vCPU-подписи, 2026-10-16
+
+Контролируемая цепочка filter → metadata → report дважды подтвердила зависимость
+SLA от порядка metadata: одинаковые alias/instance в двух datasource, capacities
+2/8, Last 2 после общего пика 9. Фильтр правильно сохраняет обе серии, но
+`matchEntry` назначает обеим первое vCPU; перестановка entries меняет critical
+на ok. На рабочих endpoints этот случай не обнаружен. Постоянная регрессия
+`grafana_vcpu_legend_behavior.js` RED: actual 2, expected undefined.
+Ограниченное исправление в существующем владельце: равные лучшие совпадения с
+разными capacity возвращают unknown; более точное уникальное совпадение и равные
+capacity сохраняют прежний результат. Legend/report используют общий matcher;
+filter, Series selection, storage и permissions не меняются. Вставка PNG в
+рабочие редакторы исключена пользователем из дальнейшей приёмки.
