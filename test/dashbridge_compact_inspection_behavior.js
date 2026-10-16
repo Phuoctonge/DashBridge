@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const { test } = require('node:test');
 
-function fixture({ post = true } = {}) {
+function fixture({ post = true, autoLayout = true } = {}) {
     const listeners = new Set(), timers = new Map(), styles = new Map();
     let timerId = 0, captures = 0;
     const card = { style: {
@@ -26,7 +26,13 @@ function fixture({ post = true } = {}) {
     vm.runInContext(fs.readFileSync('pages/dashbridge/dashbridge-capture.js', 'utf8'), scope);
     const capture = scope.DashBridgeCapture.create({ getPanels: () => [], getDefaultCapturePrepared: () => true,
         setDefaultCapturePrepared() {}, getCompactCaptureDimensions: () => ({ width: 1000, height: 520 }),
-        forceLoadPanel() {}, postToDashboardFrame: (_frame, message) => message.action === 'dashbridgeCompactCaptureCheck' ? post : true });
+        forceLoadPanel() {}, postToDashboardFrame: (_frame, message) => {
+            if (message.action === 'dashbridgeCompactCaptureCheck') return post;
+            if (message.action === 'dashbridgeCaptureLayoutCheck' && autoLayout) queueMicrotask(() => reply({
+                data: { action: 'dashbridgeCaptureLayoutReady', requestId: message.requestId, error: '' }
+            }));
+            return true;
+        } });
     const start = () => capture.capturePanel(frame, {}, { prepared: true, requestId: 'check', outputAction: 'image' });
     const reply = (overrides = {}) => { for (const fn of [...listeners]) fn({ source: frame.contentWindow,
         origin: 'https://grafana.test', data: { action: 'dashbridgeCompactCaptureSupport', requestId: 'check', error: '' }, ...overrides }); };
@@ -41,6 +47,32 @@ test('card inspection ignores forged and unrelated replies, then captures after 
     f.reply({ data: { action: 'other', requestId: 'check', error: '' } });
     assert.equal(f.captures, 0); assert.equal(f.styles.size, 0); assert.equal(f.timers.size, 1);
     f.reply(); assert.equal((await pending).ok, true); assert.equal(f.captures, 1); f.restored();
+});
+test('compact screenshot waits for the matching iframe renderer acknowledgement', async () => {
+    const f = fixture({ autoLayout: false }), pending = f.start();
+    f.reply();
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+    assert.equal(f.captures, 0, 'stable parent bounds do not prove the iframe renderer has resized');
+    const data = { action: 'dashbridgeCaptureLayoutReady', requestId: 'check', error: '' };
+    f.reply({ source: {}, data }); f.reply({ origin: 'https://other.test', data });
+    f.reply({ data: { ...data, requestId: 'old-capture' } });
+    assert.equal(f.captures, 0);
+    f.reply({ data });
+    assert.equal((await pending).ok, true); assert.equal(f.captures, 1); f.restored();
+});
+test('renderer timeout or iframe navigation prevents capture and restores the card', async () => {
+    for (const navigate of [false, true]) {
+        const f = fixture({ autoLayout: false }), pending = f.start(); f.reply();
+        for (let i = 0; i < 20; i++) await Promise.resolve();
+        assert.equal(f.captures, 0);
+        if (navigate) {
+            f.frame.src += '&navigation=1';
+            f.reply({ data: { action: 'dashbridgeCaptureLayoutReady', requestId: 'check', error: '' } });
+        } else {
+            const timer = [...f.timers.values()][0]; assert(timer); timer.fn();
+        }
+        assert.equal((await pending).ok, false); assert.equal(f.captures, 0); f.restored();
+    }
 });
 test('card inspection refusal produces no screenshot and releases its listener', async () => {
     const f = fixture(), pending = f.start();
