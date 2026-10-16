@@ -7,7 +7,12 @@ const manifest = JSON.parse(fs.readFileSync('manifest.json', 'utf8'));
 const workflow = fs.readFileSync('.github/workflows/release.yml', 'utf8');
 const builder = fs.readFileSync('scripts/build-release.ps1', 'utf8');
 
-assert.strictEqual(manifest.version, '2.4.4');
+const packageInfo = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+const packageLock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+assert.match(manifest.version, /^\d+\.\d+\.\d+$/);
+assert.strictEqual(manifest.version, packageInfo.version);
+assert.strictEqual(manifest.version, packageLock.version);
+assert.strictEqual(manifest.version, packageLock.packages[''].version);
 assert(workflow.includes("- 'v*'")
     && workflow.includes('run: npm ci')
     && workflow.indexOf('run: npm ci') < workflow.indexOf('node test/run-all-tests.js')

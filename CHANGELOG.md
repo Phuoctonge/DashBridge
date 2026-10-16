@@ -1,6 +1,17 @@
 # Changelog
 
-## Unreleased
+## 2.5.0 — 2026-10-16
+
+- Added Batch ZIP → Confluence report scanning, mapping, preview, graph insertion/reordering and explicit attachment replacement.
+- Expanded Batch panel rules and prevented concurrent editors from silently overwriting each other's changes.
+- Standardized capture manifest periods and metadata across Batch export and Confluence import; rejected invalid dates and reversed absolute ranges.
+- Preserved distinct vCPU endpoints when shortening names and rejected ambiguous capacity matches in legends and SLA reports.
+- Waited for iframe renderer resize before compact captures and preserved empty modern panels; explicitly rejected unsupported compact Stat/Multistat captures.
+- Preserved partial summary results during loading and kept SLA configuration warnings off working charts.
+- Corrected Worklog calendar navigation, keyboard actions, local draft updates, and Options/report dialog focus behavior.
+- Recovered Recorder debugger ownership after service worker restart and detached recordings whose owner disappeared.
+- Prevented cancelled Batch runs from producing late downloads or stale metadata; cleaned up failed Runner exports and stale Confluence operations.
+- Preserved TDM photo timeout causes and verified cleanup and retry paths.
 
 - Sent DashBridge absolute time ranges as epoch milliseconds so Grafana solo panels query the selected period even when the saved source URL uses ISO dates.
 - Preserved exact Confluence image targets and insertion anchors from the original storage scan through Apply, then verified page version and the full image-reference sequence after save.

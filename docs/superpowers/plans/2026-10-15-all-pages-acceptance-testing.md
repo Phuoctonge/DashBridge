@@ -1519,3 +1519,30 @@ Evidence: `test-results/prerelease-alias-red.log`,
 `prerelease-capacity-scope-matrix.json`, `prerelease-alias-live-renderers.json`,
 `prerelease-alias-live-normal.log`, `prerelease-alias-test-all.log`,
 `prerelease-dependency-audit.json`, `prerelease-dependency-signatures.log`.
+
+#### Подготовка релиза 2.5.0, 2026-10-16
+
+Версия синхронизирована в manifest/package/lock и документации. Проверка
+release workflow теперь сверяет эти три источника вместо фиксированного номера
+2.4.4. Финальный browser-прогон выявил проблему стенда: окно запускалось в
+`-32000,-32000`, а `chrome.windows.update` страницы фото отвергал resize с
+`Invalid value for bounds`. Диагностические повторы подтвердили отказ вне
+экрана и отсутствие этой ошибки в четырёх повторах при `0,0` (ошибки decode
+повреждённых PNG в этом probe намеренно логировались). В каноническом smoke
+исправлена только стартовая позиция окна; production-код фото не менялся.
+
+Локальный ZIP 2.5.0 содержит ровно 220 production-файлов, 1 258 987 байт;
+все байты соответствуют рабочим исходникам. SHA-256
+`3b149583418ec379d9491ab6faf879cf91ee0445a097e1975bb77bc4bdc4cf88`.
+Installer и его checksum также сверены. Evidence:
+`test-results/release-2.5.0-package/verification.json`,
+`release-2.5.0-offscreen-failure.json`, `probe-photo-smoke.log`,
+`probe-photo-smoke-visible.log`. Полный итоговый прогон после изменения стенда
+фиксируется ниже отдельно; эти результаты не доказывают публикацию.
+
+Итоговый прогон версии 2.5.0 после исправления стенда:
+`test-results/release-2.5.0-test-all.log` — exit 0, ESLint, 226 JavaScript,
+41 Python, Chromium 27/27. Документационные ссылки, module/dependency guards
+и diff проверены. Подтверждённые дефекты данного прохода закрыты; расширенная
+accessibility-матрица, Grafana 9 и особенности рабочих Jira/TDM не объявляются
+проверенными. Вставку PNG в рабочие редакторы пользователь исключил.

@@ -691,7 +691,9 @@ async function main() {
                 `--load-extension=${extensionRoot}`,
                 '--no-first-run',
                 '--no-default-browser-check',
-                '--window-position=-32000,-32000'
+                // The photo page uses chrome.windows.update to fit its image.
+                // Chromium rejects resize bounds outside visible screen space.
+                '--window-position=0,0'
             ]
         });
 

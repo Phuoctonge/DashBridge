@@ -1,6 +1,6 @@
 # DashBridge: ориентир для дальнейшей разработки
 
-> Для версии 2.4.4. Команды и описание проверок сверены 2026-10-13. Архитектурный источник
+> Для версии 2.5.0. Команды и описание проверок сверены 2026-10-16. Архитектурный источник
 > истины — [`architecture.md`](architecture.md), карта
 > разрешений — [`permission-map.md`](permission-map.md), незавершённые
 > направления — [`roadmap.md`](roadmap.md). История не описывает
@@ -375,7 +375,7 @@ foreach ($file in $files) { node --check $file }
 в extension ZIP:
 
 ```powershell
-./scripts/build-release.ps1 -ExpectedTag 'v2.4.4'
+./scripts/build-release.ps1 -ExpectedTag 'v2.5.0'
 ```
 
 Push тега `vX.Y.Z` запускает `.github/workflows/release.yml`: полный набор
