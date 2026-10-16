@@ -28,3 +28,20 @@ deploy/dashbridge-analytics/.dev-data/
 deploy/dashbridge-analytics/.dev-data-*/
 .deploy-keys/
 .analytics-deploy.json
+
+# Keep only maintained project documentation in Git. Draft plans and audit
+# journals may remain locally, but require an explicit allowlist change to publish.
+/docs/*
+!/docs/README.md
+!/docs/architecture.md
+!/docs/development-guide.md
+!/docs/module-design.md
+!/docs/permission-map.md
+!/docs/dashflow-v2.md
+!/docs/installer.md
+!/docs/analytics.md
+!/docs/roadmap.md
+!/docs/testing.md
+!/docs/history/
+/docs/history/*
+!/docs/history/architecture-decisions.md
