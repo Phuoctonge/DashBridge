@@ -1071,3 +1071,32 @@ Evidence: игнорируемые `test-results/release-compact-policy-browser-
 guard прошли; прежнее advisory `dashbridgeInspectLocation` не относится к этому
 изменению. GitNexus и точный поиск подтвердили потребителей capture controller;
 статический граф не заменяет межоконные проверки.
+
+### Живая проверка после восстановления входа, 2026-10-16
+
+Chrome 155, расширение вручную подключено пользователем из текущей папки.
+В обеих Grafana `/api/user` вернул 200. Блокировка предыдущего прогона по 401
+снята; это дополнение не переписывает прежний результат окружения.
+
+- mon-dc direct: Stat/Multistat дважды отклонены до layout, Flot дважды прошёл
+  prepare/restore, временных capture frames не осталось.
+- DashBridge iframe: реальная кнопка Save показала причину отказа Stat/Multistat;
+  после OFF обычные PNG 1380×618 сохранились. После ожидания данных Stat видна
+  целиком, Multistat соответствует native отображению. Первую пустую Stat нельзя
+  считать PASS: этот снимок сделан до окончания отрисовки.
+- KNS: direct prepare/restore Timeseries и Table повторены дважды; реальные
+  DashBridge compact PNG 1000×520 просмотрены, содержимое и подписи видны.
+- **Новый подтверждённый дефект:** mon-dc Flot compact через DashBridge card capture
+  дважды сохранил прежний canvas под переместившейся легендой, с обрезанной нижней
+  осью. Исходный renderer уже отрисован; ожидание перед нажатием Save не помогает.
+  Диагностическая задержка 1200 мс только перед Chrome capture даёт правильный PNG.
+  Требуется ожидание готовности renderer внутри iframe после resize, а не ещё одна
+  пауза до начала операции. Production-правка в этом продолжении не вносилась.
+
+Evidence в игнорируемых каталогах `test-results/release-compact-live-settled/`,
+`release-compact-live-delayed/`, `release-compact-live-modern/` (PNG, baseline,
+results.json). В settled raw `status: PASS` отражает API/UI/download assertions;
+визуальная проверка Flot его опровергла. Для итоговой оценки использовать
+`visualReview` и это дополнение, а не один факт скачанного PNG.
+Диагностический delayed-прогон не подтверждает исправление production-кода.
+Тестовые профили/compact preference восстановлены; Grafana dashboards не сохранялись.
