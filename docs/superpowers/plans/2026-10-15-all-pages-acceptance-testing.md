@@ -1138,3 +1138,81 @@ renderer geometry и results.json. Тестовая instrumentation только
 регрессии parent/MAIN и selection/copy/save. Module boundaries, dependency
 contracts, documentation links и `git diff --check` прошли; сохранён только
 прежний advisory `dashbridgeInspectLocation`.
+
+### Базовая релизная приёмка всего расширения, 2026-10-16
+
+Проверена production-ревизия `4180407`, версия 2.4.4. В этом прогоне production-код
+не изменялся. **Итог: выпуск пока не рекомендован**, несмотря на проходящий
+автономный набор: визуальная проверка обнаружила дефект native compact capture.
+Это базовый обход продукта, а не подтверждение каждой комбинации настроек.
+
+- [x] Свежий `npm run test:all`: exit 0, ESLint, 225 JS test files,
+  41 Python check, Chromium 27/27. Browser smoke включает все 10 HTML-страниц
+  и 17 workflow/fixture-проверок, а не 27 разных страниц. Worklog, Options,
+  Popup, DashBridge, Batch, Confluence, Runner, selector, Recorder и Easter
+  охвачены существующими сценариями; состав см. в smoke JSON.
+- [x] Installer SelfTest и отдельные PowerShell regressions прошли.
+  Релизный ZIP 2.4.4 содержит ровно 220 production-файлов, 1 257 530 байт;
+  содержимое побайтно совпало с исходниками, dev-файлы отсутствуют.
+  SHA-256: `785bc5b91ddacb8ab56887c8204b3b7946d4ade08bc597dd893026516b2903f0`.
+  ZIP собран для проверки, публикация/tag/push не выполнялись.
+- [x] Авторизованные Chrome 155 и обе Grafana: `/api/user` 200.
+  Полный inventory трёх dashboard definitions и последовательный direct View
+  каждой non-row панели: 87 Timeseries, 16 Table, 24 Flot, 4 Stat, 1 Multistat,
+  всего 132. Включены панели из изначально свёрнутых разделов.
+  Для непустых графиков отдельно переключались legend/fill/thickness ON/OFF:
+  число серий и период не менялись, Flot canvas совпадал с host.
+  Prepare/restore и отсутствие оставленных frames проверены для всего обхода;
+  compact Stat/Multistat ожидаемо отклонён, native PNG получены.
+  Contact sheets просмотрены. Raw `status: passed` в panel JSON означает только
+  перечисленные структурные assertions и **не доказывает качество всех PNG**.
+- [x] Настоящий Batch: две панели × два периода → четыре compact PNG → ZIP v3
+  → импорт Confluence. Точные from/to и rangeIndex сохранены, две группы/четыре
+  файла распознаны. Picker all/none/cancel, отказ перевёрнутому периоду и перенос
+  Main → Series повторены. Импорт не выполнял рабочий Apply.
+- [x] Дополнительный локальный Batch: 11 групп сценариев прошли, включая оба
+  Series-режима с двумя периодами, пустой результат фильтра, no-data, ошибку
+  capture API, отмену после PNG и во время упаковки, уничтожение владельца,
+  сохранность чужого окна и успешный повтор. Series использует синтетический
+  HTTP/canvas fixture: это не доказательство изоляции всех реальных Grafana queries.
+- [x] Recorder в отдельном Chromium 156: Record → Stop → настоящий `.dashflow`
+  → проверка manifest/HAR/bodies → Import → Replay → сравнение → XLSX.
+  Сервер fixture получил ровно два действия (Record и Replay).
+  Runner/selector и Easter image/Clear повторены; все три группы прошли.
+- [x] Встроенный Runner на двух Grafana: F1/F2/A1–A9, все 22 результата успешны;
+  diagnostics и Stop/Clear проверены. Этот набор проверяет окружение/runtime,
+  а не заменяет визуальную оценку каждого renderer.
+- [ ] Исправить подтверждённый native compact дефект ниже и повторить регрессию.
+
+**Подтверждённый дефект.** На KNS direct View отдельных панелей с `No data`
+после prepare frame находится в `(225,240)` размером 1000×520, но React повторно
+записывает `transform: translate(563px,380px)` на grid root. Панель оказывается
+в `(788,620)` и обрезается; у другой панели смещение уходит за frame полностью.
+Дефект повторён отдельным prepare/viewport screenshot и настоящей кнопкой
+«Сохранить снимок панели в PNG» на двух панелях. Получены завершённые Chrome
+downloads, runtime сообщает `ok:true, restored:true`, однако PNG обрезан/пуст.
+Контрольный непустой Timeseries через ту же кнопку дал корректный PNG.
+ID 142/130 используются только как воспроизводимые примеры, не как условия фикса.
+No-data Table (44) также смещён в диагностике prepare; отдельный native Save
+для него здесь не выполнялся. Общая причина и охват требуют проверки при правке.
+
+Первые отказы вспомогательных harness не приняты за баги продукта:
+page-scoped download override прекращался после закрытия owner page; успешные
+downloads проверены через Chrome history. Native `chrome.downloads` не обязан
+вызывать Playwright `page.download`; исправленный harness читает history.
+Easter fixture с окном вне экрана получал отказ Chrome windows.update; повтор
+в видимой области успешен. Отмена Batch проверяется с ожиданием async cleanup.
+
+Evidence (игнорируемые локальные файлы): `test-results/release-basic-20261016-all.txt`,
+`release-basic-20261016-smoke.json`, `release-basic-installer-*.txt`,
+`release-basic-package/verification.json`, `release-basic-panels/`,
+`release-basic-batch-live-results.json`, `release-basic-batch-verified-results.json`,
+`release-basic-local-workflows.json`, `release-basic-runner-live-results.json`,
+`release-basic-empty-diagnostic.json`, `release-basic-native-save-verified.json`,
+`native-real-142.png`, `native-real-130.png`, `native-real-137.png`.
+Доказательства хранят внутренние URL/названия и не включены в релизный ZIP.
+Тестовые настройки/storage и download behavior восстановлены, рабочие dashboard
+не сохранялись. Рабочие Jira/Confluence POST/PUT исключены; Grafana 9, все сторонние
+plugins, стресс/длительная работа и вставка clipboard во все приложения этим
+базовым прогоном не подтверждаются. Предыдущие живые iframe-проверки Flot/Table/
+Timeseries остаются результатами предыдущего раздела, а не новым запуском здесь.
