@@ -105,11 +105,11 @@ function extractContracts(file, text, contracts) {
     for (const name of matchAll(text, /\baddEventListener(?:\?\.)?\s*\(\s*["']([^"']+)["']/g)) {
         if (CUSTOM_EVENT.test(name)) mapSetAdd(contracts.customEvents.consumers, name, file);
     }
-    for (const call of text.matchAll(/\bpostMessage\s*\(\s*\{([\s\S]{0,800}?)\}\s*,/g)) {
+    for (const call of text.matchAll(/\b(?:postMessage\s*\(\s*|postToDashboardFrame\s*\(\s*[^,{]+,\s*)\{([\s\S]{0,800}?)\}\s*[,)]/g)) {
         const action = call[1].match(/\baction\s*:\s*["']([^"']+)["']/)?.[1];
         if (action && CUSTOM_EVENT.test(action)) mapSetAdd(contracts.postMessages.producers, action, file);
     }
-    for (const name of matchAll(text, /\b(?:event|message|data)\.data\.action\s*(?:===|==)\s*["']([^"']+)["']/g)) {
+    for (const name of matchAll(text, /\b(?:event|message|data)\??\.data\??\.action\s*(?:===|==)\s*["']([^"']+)["']/g)) {
         if (CUSTOM_EVENT.test(name)) mapSetAdd(contracts.postMessages.consumers, name, file);
     }
     for (const name of matchAll(text, /\b(?:event|message|data)\.action\s*(?:===|==)\s*["']([^"']+)["']/g)) {

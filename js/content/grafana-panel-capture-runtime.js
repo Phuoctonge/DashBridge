@@ -491,17 +491,50 @@
             }
         };
         // DashBridge sizes its own card, so it must ask MAIN before that separate layout path.
-        const onCompactCaptureCheck = event => {
+        let layoutController = null;
+        const onCompactCaptureCheck = async event => {
             if (!isDashboardIframe || event.source !== window.parent || event.origin !== extensionOrigin
-                || event.data?.action !== 'dashbridgeCompactCaptureCheck'
-                || typeof event.data.requestId !== 'string' || event.data.requestId.length > 128) return;
+                || !['dashbridgeCompactCaptureCheck', 'dashbridgeCaptureLayoutCheck', 'dashbridgeCaptureLayoutChanged'].includes(event.data?.action)) return;
+            if (event.data.action === 'dashbridgeCaptureLayoutChanged') {
+                layoutController?.abort(); layoutController = null;
+                return;
+            }
+            if (typeof event.data.requestId !== 'string' || event.data.requestId.length > 128) return;
             const dom = window.DashBridgeGrafanaDom;
             const panel = dom?.findPanel({ panelId: new URLSearchParams(location.search).get('panelId') });
-            window.parent.postMessage({ action: 'dashbridgeCompactCaptureSupport', requestId: event.data.requestId,
-                error: panel ? dom.getCompactCaptureError(panel) : 'Панель ещё не загрузилась. Повторите снимок.' }, extensionOrigin);
+            if (event.data.action === 'dashbridgeCaptureLayoutCheck') {
+                // Parent geometry can settle before Grafana's debounced Flot resize.
+                // Redraw in MAIN, where the plot instance lives, before acknowledging.
+                if (layoutController) return;
+                const controller = new AbortController();
+                layoutController = controller;
+                let error = '';
+                try {
+                    if (!panel) throw new Error('Панель ещё не загрузилась.');
+                    window.dispatchEvent(new Event('resize'));
+                    const wait = () => window.DashBridgeGrafanaCaptureOutput?.waitForStableLayout?.(panel,
+                        { signal: controller.signal, watchdogMs: 3000 });
+                    if ((await wait())?.status !== 'stable') throw new Error('График не подтвердил новый размер.');
+                    if (controller.signal.aborted) return;
+                    window.DashBridgeGrafanaCompactLayout?.redrawFlot(panel, false);
+                    window.DashBridgeGrafanaVisualEngine?.reflowChart?.({ root: panel });
+                    if ((await wait())?.status !== 'stable') throw new Error('График не подтвердил новый размер.');
+                } catch (reason) { error = reason?.message || String(reason); }
+                finally { if (layoutController === controller) layoutController = null; }
+                if (!controller.signal.aborted) window.parent.postMessage({ action: 'dashbridgeCaptureLayoutReady',
+                    requestId: event.data.requestId, error }, extensionOrigin);
+                return;
+            }
+            if (event.data.action === 'dashbridgeCompactCaptureCheck') {
+                window.parent.postMessage({ action: 'dashbridgeCompactCaptureSupport', requestId: event.data.requestId,
+                    error: panel ? dom.getCompactCaptureError(panel) : 'Панель ещё не загрузилась. Повторите снимок.' }, extensionOrigin);
+            }
         };
         window.addEventListener('message', onCompactCaptureCheck);
-        registerRuntimeCleanup(() => window.removeEventListener('message', onCompactCaptureCheck));
+        registerRuntimeCleanup(() => {
+            window.removeEventListener('message', onCompactCaptureCheck);
+            layoutController?.abort(); layoutController = null;
+        });
         let activeBatchCaptureSession = null;
         const batchCaptureApi = Object.freeze({
             async prepare({ panelId, sessionId, outputWidth, outputHeight }) {

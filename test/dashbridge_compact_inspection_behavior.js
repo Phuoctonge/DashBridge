@@ -33,7 +33,7 @@ function fixture({ post = true, autoLayout = true } = {}) {
             }));
             return true;
         } });
-    const start = () => capture.capturePanel(frame, {}, { prepared: true, requestId: 'check', outputAction: 'image' });
+    const start = (options = {}) => capture.capturePanel(frame, {}, { prepared: true, requestId: 'check', outputAction: 'image', ...options });
     const reply = (overrides = {}) => { for (const fn of [...listeners]) fn({ source: frame.contentWindow,
         origin: 'https://grafana.test', data: { action: 'dashbridgeCompactCaptureSupport', requestId: 'check', error: '' }, ...overrides }); };
     const restored = () => { assert.equal(listeners.size, 0); assert.equal(timers.size, 0); assert.equal(styles.size, 0); };
@@ -72,6 +72,18 @@ test('renderer timeout or iframe navigation prevents capture and restores the ca
             const timer = [...f.timers.values()][0]; assert(timer); timer.fn();
         }
         assert.equal((await pending).ok, false); assert.equal(f.captures, 0); f.restored();
+    }
+});
+test('renderer refusal and cancellation release the listener without downloading', async () => {
+    for (const cancel of [false, true]) {
+        const f = fixture({ autoLayout: false }), controller = new AbortController();
+        const pending = f.start({ signal: controller.signal }); f.reply();
+        for (let i = 0; i < 20; i++) await Promise.resolve();
+        if (cancel) controller.abort();
+        else f.reply({ data: { action: 'dashbridgeCaptureLayoutReady', requestId: 'check', error: 'renderer deadline' } });
+        assert.equal((await pending).ok, false); assert.equal(f.captures, 0); f.restored();
+        f.reply({ data: { action: 'dashbridgeCaptureLayoutReady', requestId: 'check', error: '' } });
+        assert.equal(f.captures, 0);
     }
 });
 test('card inspection refusal produces no screenshot and releases its listener', async () => {

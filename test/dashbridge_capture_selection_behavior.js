@@ -43,6 +43,7 @@ const capture = scope.DashBridgeCapture.create({ getPanels: () => panels,
     setDefaultCapturePrepared() {}, getCompactCaptureDimensions: () => ({ width: 1000, height: 520 }),
     forceLoadPanel: () => frame, postToDashboardFrame() {},
     inspectCompactCapture: async () => { onInspect(); return compactError; },
+    waitForCaptureLayout: async () => '',
     documentRef: scope.document
 });
 const restored = () => {

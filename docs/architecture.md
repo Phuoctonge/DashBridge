@@ -1252,12 +1252,29 @@ click в Grafana document
 Перед `captureVisibleTab` direct Grafana, DashBridge и MAIN-подготовка панели
 используют общий `grafana-capture-output.js` checkpoint `waitForStableLayout`.
 Он сравнивает геометрию панели, canvas и известных renderer-узлов в нескольких
-кадрах браузера; смена узла или размера сбрасывает устойчивость. Проверка имеет
+кадрах браузера; смена узла или размера сбрасывает устойчивость. Общая проверка имеет
 только верхний watchdog и является advisory: `deadline`, скрытый документ или
 неизвестная геометрия продолжают захват, а отмена/pagehide освобождает все
 listeners и RAF. Фиксированные задержки перед первым снимком не являются частью
 контракта; отдельный rate-limit между частыми вызовами и correlation timeout
 сохраняются как защита ресурсов и устаревших ответов.
+
+Для compact-снимка карточки DashBridge одного parent checkpoint недостаточно:
+Flot может отложить resize, оставив прежний canvas устойчивым на несколько кадров.
+Поэтому `dashbridge-capture.js` после изменения карточки отправляет
+`dashbridgeCaptureLayoutCheck`, а MAIN-владелец `grafana-panel-capture-runtime.js`
+ждёт устойчивой внутренней геометрии, вызывает `redrawFlot(panel, false)` без
+изменения tick-настроек и повторно проверяет геометрию. Только ответ
+`dashbridgeCaptureLayoutReady` разрешает Chrome capture; это также путь report
+collage. Обе стороны проверяют source/origin/requestId; у MAIN одна активная
+операция, ожидания ограничены 3 секундами каждое, parent RPC — 8 секундами.
+Здесь `deadline`, скрытая страница и недоступный helper означают отказ, а не
+разрешение снимка. Отмена report, restoration message и runtime cleanup освобождают
+ожидание; parent восстанавливает CSS/scroll в `finally`. Кнопка сообщает причину
+отказа и допускает повтор. Обычный capture и native prepare сохраняют свои пути.
+Контракт проверяют `dashbridge_compact_inspection_behavior.js` и
+`grafana_compact_capture_policy_behavior.js`; стабильная геометрия не гарантирует
+завершение загрузки данных произвольного плагина — report отдельно ждёт transport.
 
 Prepared mode сохраняет пропорции и вписывается в viewport. В DashBridge
 временно меняются карточка и вложенная панель. Для legacy `.graph-panel`/Flot

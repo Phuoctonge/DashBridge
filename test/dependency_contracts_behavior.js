@@ -42,4 +42,15 @@ assert(order.errors.some(error => error.includes('consumes global DashBridgeFixt
 const dom = analyzeProject(fixture({ missingDom: true }));
 assert(dom.errors.some(error => error.includes('missing DOM id #missing')));
 
+write(goodRoot, 'pages/feature/feature.js', `
+postToDashboardFrame(iframe, { action: 'dashbridgeCaptureLayoutCheck', requestId });
+window.parent.postMessage({ action: 'dashbridgeCaptureLayoutReady', requestId }, origin);
+if (event.data?.action === 'dashbridgeCaptureLayoutCheck') receive();
+if (event.data.action === 'dashbridgeCaptureLayoutReady') finish();
+`);
+const protocol = analyzeProject(goodRoot);
+assert.deepStrictEqual(protocol.warnings, [], protocol.warnings.join('\n'));
+assert(protocol.contracts.postMessages.producers.dashbridgeCaptureLayoutCheck);
+assert(protocol.contracts.postMessages.consumers.dashbridgeCaptureLayoutReady);
+
 console.log('[OK] dependency contracts behavior');

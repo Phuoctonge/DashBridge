@@ -20,7 +20,7 @@ function fixture(type, { iframe = false, prepared = true, headerOnly = false } =
         parent: { postMessage: message => replies.push(message) },
         addEventListener: (type, callback) => listeners.set(type, callback),
         removeEventListener: (type, callback) => { if (listeners.get(type) === callback) listeners.delete(type); } };
-    const context = { window, document, console: { error() {} },
+    const context = { window, document, AbortController, Event, console: { error() {} },
         navigator: {}, location: { search: '?panelId=arbitrary-panel' }, URLSearchParams,
         requestAnimationFrame: cb => cb(), setTimeout: () => 0, clearTimeout() {},
         CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options.detail; } } };
@@ -58,6 +58,45 @@ test('MAIN compact inspection only answers the extension parent and removes its 
     assert.match(replies[0].error, /не поддерживается/);
     assert.equal(replies[0].requestId, 'inspection');
     cleanup.forEach(fn => fn()); assert.equal(listeners.size, 0);
+});
+test('iframe readiness redraws Flot between stable layout checks and acknowledges only after paint', async () => {
+    const f = fixture('graph', { iframe: true }), stages = [];
+    let finish;
+    f.window.dispatchEvent = () => stages.push('resize');
+    f.window.DashBridgeGrafanaCaptureOutput = { waitForStableLayout: async () => {
+        stages.push('stable');
+        if (stages.includes('redraw')) await new Promise(resolve => { finish = resolve; });
+        return { status: 'stable' };
+    } };
+    f.window.DashBridgeGrafanaCompactLayout = { redrawFlot: (panel, ticks) => {
+        assert.equal(panel, f.panel); assert.equal(ticks, false); stages.push('redraw');
+    } };
+    const event = { source: f.window.parent, origin: 'https://extension.test',
+        data: { action: 'dashbridgeCaptureLayoutCheck', requestId: 'layout' } };
+    const receive = f.listeners.get('message');
+    await receive({ ...event, source: {} }); await receive({ ...event, origin: 'https://other.test' });
+    assert.equal(stages.length, 0);
+    const pending = receive(event);
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    assert.deepEqual(stages, ['resize', 'stable', 'redraw', 'stable']); assert.equal(f.replies.length, 0);
+    await receive(event); assert.equal(stages.length, 4, 'one operation per runtime');
+    finish(); await pending;
+    assert.equal(f.replies[0].action, 'dashbridgeCaptureLayoutReady'); assert.equal(f.replies[0].error, '');
+});
+test('iframe readiness fails on deadline and suppresses replies after runtime cleanup', async () => {
+    for (const clean of [false, true]) {
+        const f = fixture('graph', { iframe: true }); let finish, signal;
+        f.window.dispatchEvent = () => {};
+        f.window.DashBridgeGrafanaCaptureOutput = { waitForStableLayout: (_panel, options) => {
+            signal = options.signal; return new Promise(resolve => { finish = resolve; });
+        } };
+        const pending = f.listeners.get('message')({ source: f.window.parent, origin: 'https://extension.test',
+            data: { action: 'dashbridgeCaptureLayoutCheck', requestId: 'layout' } });
+        if (clean) { f.cleanup.forEach(fn => fn()); assert.equal(signal.aborted, true); }
+        finish({ status: 'deadline' }); await pending;
+        assert.equal(f.replies.length, clean ? 0 : 1);
+        if (!clean) assert.match(f.replies[0].error, /не подтвердил/);
+    }
 });
 for (const type of ['timeseries', 'graph', 'table', 'custom-plugin', '']) {
     test(`${type || 'unknown'} retains its existing compact layout path`, async () => {

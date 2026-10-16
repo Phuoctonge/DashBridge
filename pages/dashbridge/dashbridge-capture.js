@@ -11,6 +11,7 @@ globalThis.DashBridgeCapture = (() => {
         forceLoadPanel,
         postToDashboardFrame,
         inspectCompactCapture = null,
+        waitForCaptureLayout = null,
         showAlert,
         storage = chrome.storage.sync,
         documentRef = document,
@@ -62,27 +63,42 @@ globalThis.DashBridgeCapture = (() => {
             return prepared;
         };
 
-        const checkCompactCapture = inspectCompactCapture || ((iframe, requestId) => new Promise((resolve, reject) => {
+        const frameRequest = (iframe, requestId, layout = false, signal = null) => new Promise((resolve, reject) => {
             const origin = new URL(iframe.src).origin;
+            const sourceUrl = iframe.src;
+            const sourceWindow = iframe.contentWindow;
             const finish = (error, reason) => {
                 clearTimeout(timer); window.removeEventListener('message', receive);
+                signal?.removeEventListener('abort', abort);
                 error ? reject(error) : resolve(reason);
             };
+            const abort = () => finish(new Error('Подготовка отменена'));
             const receive = event => {
-                if (event.source !== iframe.contentWindow || event.origin !== origin
+                if (event.source !== sourceWindow || event.origin !== origin
                     || event.data?.requestId !== requestId) return;
-                if (event.data.action === 'dashbridgeCompactCaptureSupport') {
+                if ((layout && event.data.action === 'dashbridgeCaptureLayoutReady')
+                    || (!layout && event.data.action === 'dashbridgeCompactCaptureSupport')) {
+                    if (!iframe.isConnected || iframe.src !== sourceUrl) return finish(new Error('Панель перезагружена.'));
                     finish(null, typeof event.data.error === 'string' ? event.data.error.slice(0, 500) : 'Не удалось проверить тип панели.');
                 }
             };
-            const timer = setTimeout(() => finish(new Error('Панель не ответила на проверку компактного снимка. Повторите снимок.')), 5000);
+            const timer = setTimeout(() => finish(new Error(layout
+                ? 'График не подтвердил новый размер. Повторите снимок.'
+                : 'Панель не ответила на проверку компактного снимка. Повторите снимок.')), layout ? 8000 : 5000);
             window.addEventListener('message', receive);
+            signal?.addEventListener('abort', abort, { once: true });
+            if (signal?.aborted) return abort();
             try {
-                if (!postToDashboardFrame(iframe, { action: 'dashbridgeCompactCaptureCheck', requestId })) {
+                const sent = layout
+                    ? postToDashboardFrame(iframe, { action: 'dashbridgeCaptureLayoutCheck', requestId })
+                    : postToDashboardFrame(iframe, { action: 'dashbridgeCompactCaptureCheck', requestId });
+                if (!sent) {
                     finish(new Error('Панель ещё не загрузилась. Повторите снимок.'));
                 }
             } catch (error) { finish(error); }
-        }));
+        });
+        const checkCompactCapture = inspectCompactCapture || frameRequest;
+        const checkCaptureLayout = waitForCaptureLayout || ((iframe, requestId, signal) => frameRequest(iframe, requestId, true, signal));
         const capturePanel = async (sourceIframe, panel, request, owner = null) => {
             if (panelCaptureInProgress || (selectionOwner && owner !== selectionOwner)) {
                 const busyResult = {
@@ -152,6 +168,16 @@ globalThis.DashBridgeCapture = (() => {
                 if (prepared && request.waitForData) await inspectPrepared();
                 await waitForLayout();
                 await window.DashBridgeGrafanaCaptureOutput?.waitForStableLayout?.(card || sourceIframe);
+                if (prepared) {
+                    try {
+                        const reason = await checkCaptureLayout(sourceIframe, request.requestId, request.signal);
+                        request.assertCurrent?.();
+                        if (reason) throw new Error(reason);
+                    } catch (error) {
+                        error.code = 'capture-layout-unready';
+                        throw error;
+                    }
+                }
                 const rect = sourceIframe.getBoundingClientRect();
                 if (rect.width <= 1 || rect.height <= 1) throw new Error('capture-panel-empty');
                 const tab = await chrome.tabs.getCurrent();
@@ -289,7 +315,7 @@ globalThis.DashBridgeCapture = (() => {
                             onCaptureVisibility(true);
                             result = await capturePanel(iframe, panel, {
                                 requestId: `report_image_${Date.now()}_${index}`, outputAction: 'image',
-                                prepared: true, outputWidth: 1000, allowUnrendered,
+                                prepared: true, outputWidth: 1000, allowUnrendered, signal,
                                 waitForData: waitForData ? async () => { check(); await waitForData(panel, signal); check(); } : null,
                                 assertCurrent: assertFrame
                             }, owner);
@@ -327,7 +353,7 @@ globalThis.DashBridgeCapture = (() => {
                     title: panel?.title
                 });
                 if (!result?.ok) {
-                    if (result?.errorCode === 'compact-unsupported') await showAlert?.(result.error);
+                    if (['compact-unsupported', 'capture-layout-unready'].includes(result?.errorCode)) await showAlert?.(result.error);
                     throw new Error(result?.error || 'capture-failed');
                 }
                 globalThis.DashBridgeAnalytics?.outcome(outputAction === 'copy'

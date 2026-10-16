@@ -1100,3 +1100,41 @@ results.json). В settled raw `status: PASS` отражает API/UI/download as
 `visualReview` и это дополнение, а не один факт скачанного PNG.
 Диагностический delayed-прогон не подтверждает исправление production-кода.
 Тестовые профили/compact preference восстановлены; Grafana dashboards не сохранялись.
+
+### Исправление ожидания renderer, 2026-10-16
+
+Регрессии до production-правки воспроизвели преждевременный screenshot при
+отсутствующем ответе iframe; контрольный коммит — `893d2b2`.
+DashBridge compact capture теперь ждёт `dashbridgeCaptureLayoutReady` от MAIN
+после внутренней проверки геометрии, явного Flot redraw и повторной проверки.
+Ответ другого окна/origin/requestId не принимается. Таймаут, отказ renderer,
+навигация и отмена запрещают screenshot, освобождают listener/timer и восстанавливают
+карточку; runtime cleanup подавляет поздний ответ. Общие владельцы toolbar/report
+и native capture проверены GitNexus, точным поиском и dependency guard.
+Guard дополнен распознаванием существующего `postToDashboardFrame` и optional
+chaining в обработчиках; новых необъяснённых advisories нет.
+
+Живой Chrome с перезагруженным расширением, без задержки screenshot transport:
+
+- mon-dc Flot: два отдельных compact PNG 1000×520 корректны при просмотре;
+  внутри iframe 1000×520 оба canvas стали 491×470, график помещается слева от
+  легенды, нижняя ось видна. Второй прогон дополнительно получил реальный report
+  collage 1032×600; его изображение также просмотрено.
+- KNS Timeseries и Table: direct prepare/restore повторены дважды, compact PNG
+  1000×520 через реальные кнопки DashBridge просмотрены; регрессии не обнаружены.
+- mon-dc Stat/Multistat: compact отказ через реальные кнопки и обычный PNG
+  повторно проверены; отдельная поддержка compact этих типов не добавлялась.
+
+Evidence: игнорируемые `test-results/release-compact-ready-legacy/`,
+`release-compact-ready-modern/`, `release-compact-ready-report/` — PNG, baseline,
+renderer geometry и results.json. Тестовая instrumentation только записывает
+размеры после вызова настоящего redraw, не откладывая Chrome capture.
+Профили/настройки и download behavior восстановлены; рабочие Grafana/Confluence
+не изменялись. Проверенные типы renderer не означают поддержку всех плагинов.
+
+Полный `npm run test:all` завершился с exit 0: ESLint, 225 JS test files,
+41 Python check, Chromium 27/27 (`test-results/iframe-ready-final-all.txt`).
+После уточнения отображения ошибки отдельно повторены ESLint, 22 целевые
+регрессии parent/MAIN и selection/copy/save. Module boundaries, dependency
+contracts, documentation links и `git diff --check` прошли; сохранён только
+прежний advisory `dashbridgeInspectLocation`.
