@@ -1499,3 +1499,23 @@ SLA от порядка metadata: одинаковые alias/instance в дву�
 capacity сохраняют прежний результат. Legend/report используют общий matcher;
 filter, Series selection, storage и permissions не меняются. Вставка PNG в
 рабочие редакторы исключена пользователем из дальнейшей приёмки.
+
+Исправлено после checkpoint `b2c7621`: общий matcher отклоняет противоречивые
+лучшие совпадения, более точное совпадение сбрасывает неоднозначность. RED→GREEN
+и независимое ревью прошли. 24 дополнительные комбинации разных datasource,
+max/last, порядка helper, trim и отсутствующих helper подтвердили изоляцию scope.
+Series discovery/selection и group/standalone controller регрессии прошли.
+На живых uPlot/Flot в direct и iframe временные конфликтующие metadata дали
+`-`/unknown, одинаковые capacity — 4; cleanup удалил все добавленные ячейки.
+Это проверка реального DOM с контролируемыми metadata, не случай на рабочих
+datasource. Первые iframe-пробы стенда ошибочно требовали dashboard panel ID
+в solo DOM; исправлен только тестовый root. Обычные живые max/last/OFF также
+прошли. Полный `test:all`: ESLint, 226 JS, 41 Python, Chromium 27/27, exit 0.
+Installer SelfTest/regressions, module/dependency/docs guards прошли;
+`npm audit` — 0 vulnerabilities, registry signatures — 72, attestations — 14.
+
+Evidence: `test-results/prerelease-alias-red.log`,
+`prerelease-capacity-alias-repro.json` (последний GREEN),
+`prerelease-capacity-scope-matrix.json`, `prerelease-alias-live-renderers.json`,
+`prerelease-alias-live-normal.log`, `prerelease-alias-test-all.log`,
+`prerelease-dependency-audit.json`, `prerelease-dependency-signatures.log`.

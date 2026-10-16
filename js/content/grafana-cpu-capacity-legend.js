@@ -24,6 +24,7 @@
             const normalizedLabel = normalizeName(label);
             let best = null;
             let bestScore = -1;
+            let ambiguous = false;
             for (const entry of visualMetadata.seriesCpuCapacityEntries) {
                 for (const name of entry.sourceNames || []) {
                     const candidate = normalizeName(name);
@@ -34,10 +35,15 @@
                     if (score > bestScore) {
                         best = entry;
                         bestScore = score;
+                        ambiguous = false;
+                    } else if (score === bestScore && Number(entry.value) !== Number(best.value)) {
+                        ambiguous = true;
                     }
                 }
             }
-            return best;
+            // Shared aliases/instances can belong to different datasource scopes.
+            // A label alone cannot choose between equally good, unequal vCPUs.
+            return ambiguous ? null : best;
         };
 
         const attachToReportSnapshot = (snapshot, sla = {}) => {

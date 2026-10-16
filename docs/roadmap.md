@@ -261,9 +261,12 @@ pagehide/pageshow. Первоначальное finding и прежние рез
   ports/FQDN/short endpoints: неоднозначные имена сохраняются полностью до join
   и в metadata. Сквозные direct/iframe fetch/XHR регрессии и живые max/last/OFF
   прошли; общий свежий `test:all`: ESLint, 226 JS, 41 Python, Chromium 27/27.
-  Осталось проверить другие mixed identities, partial helper,
-  time-only frames и duplicate labels; затем решать canonical correlation и
-  контракт capacity query `mode="user"`.
+  Дополнительные 24 комбинации разных datasource, max/last, порядка helper,
+  trim и отсутствующих helper прошли. Противоречивые совпадения одинаковых
+  alias/instance больше не дают произвольный SLA: легенда показывает `-`,
+  отчёт — unknown. Direct/iframe uPlot/Flot с контролируемыми metadata проверены.
+  Остались другие mixed identities и time-only frames; необходимость расширения
+  correlation и capacity query `mode="user"` оценивать по реальным данным.
 - **Storage и упрощение:** сначала измерить объёмы для `unlimitedStorage`.
   Повтор измерения popup и `BatchRunLifecycle.registerCleanup` — кандидаты на
   анализ, не блокеры; перед удалением нужны GitNexus и строковые контракты.
