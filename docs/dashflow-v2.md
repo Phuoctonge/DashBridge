@@ -39,15 +39,24 @@ window; обычное контролируемое окно остаётся о
 принимает exact Recorder URL и при disconnect пытается detach привязанного tabId.
 Heartbeat каждые 20 секунд отправляется только при attached; его interval
 принадлежит документу и не снимается на Stop. Закрытие/перезагрузка Recorder
-также запускает best-effort detach через beforeunload. Fallback service worker
-не закрывает incognito window и не восстанавливает реестр сессий после restart:
-это не гарантия удаления cookies при аварии страницы.
+также запускает best-effort detach через beforeunload. Worker сохраняет только
+`{tabId, documentId}` доверенного port sender в session-реестре
+`dashbridgeRecorderOwners`; очередь сериализует bind/unbind/disconnect и recovery.
+При каждом старте worker `runtime.getContexts` проверяет живые документы:
+attachment живого Recorder сохраняется, для исчезнувшего владельца выполняется
+detach только сохранённого tabId. Глобального обхода debugger targets нет.
+При ошибке contexts cleanup не угадывает отсутствие владельца; при ошибке
+detach запись сохраняется для следующего restart. Session storage не переживает
+закрытие браузера. Сохранение bind не атомарно с attach: crash до записи или
+ошибка storage остаются best-effort границей. Fallback не закрывает incognito
+window и не гарантирует удаление cookies при аварии страницы.
 
 Контракты проверяют
 [`recorder_session_transport_behavior.js`](../test/recorder_session_transport_behavior.js),
 [`recorder_session_controller_behavior.js`](../test/recorder_session_controller_behavior.js),
 [`recorder_startup_races_behavior.js`](../test/recorder_startup_races_behavior.js) и
-[`recorder_navigation_scope_behavior.js`](../test/recorder_navigation_scope_behavior.js).
+[`recorder_navigation_scope_behavior.js`](../test/recorder_navigation_scope_behavior.js) и
+[`background_recorder_recovery_behavior.js`](../test/background_recorder_recovery_behavior.js).
 
 ## Состав архива
 

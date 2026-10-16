@@ -1630,9 +1630,16 @@ Network capture применяет maxRequests также к ранним ExtraI
 `pages/recorder/recorder.html` загружает session transport, который владеет
 контролируемой вкладкой и CDP attach/detach.
 Lifecycle-port с heartbeat поддерживает worker для best-effort аварийного
-detach, если Recorder закрыт или перезагружен. Этот fallback не закрывает
-incognito window и не восстанавливает реестр сессий после restart worker;
-штатный cleanup и аварийный путь имеют разные гарантии, подробнее в
+detach, если Recorder закрыт или перезагружен. Worker сериализует сохранение
+`{tabId, documentId}` exact Recorder sender в `storage.session`
+(`dashbridgeRecorderOwners`). При restart он сверяет `runtime.getContexts`:
+живой документ сохраняет запись, исчезнувший владелец допускает detach только
+своего сохранённого target. Ошибка определения живых contexts не разрешает
+detach; ошибка detach сохраняет запись для следующего restart. Это проверяет
+[регрессия восстановления](../test/background_recorder_recovery_behavior.js).
+Fallback не закрывает incognito window; crash до сохранения bind и отказ
+session storage остаются best-effort границами. Штатный cleanup и аварийный
+путь имеют разные гарантии, подробнее в
 [DashFlow v2](dashflow-v2.md#владелец-записи-и-границы-cdp).
 Обобщённый `scenario-recorder.js` динамически инжектируется только в эту
 вкладку и её доступные frames; он не входит в статический all-URL manifest.
@@ -1736,7 +1743,7 @@ UID, orgId и panel ID. Переход SPA на другой dashboard не пр
 |---|---|---|
 | `storage.sync` | Grafana/Options, домены, compact capture, Popup, тема | Небольшие настройки; частые inputs debounce + flush. |
 | `storage.local` | Profiles, backups, Worklog/cache, Batch, diagnostics/status, `dashbridgeUpdateIndicator`, `dashbridgeInstallationId` | Долговечные/объёмные данные, отдельный псевдоним аналитики и служебная версия доступного обновления. |
-| `storage.session` | `grafanaVisualState:<tabId>`, `dashbridgeBatchCaptureWindows` | Состояние визуальных вкладок и реестр Batch capture windows для восстановления cleanup после перезапуска worker; это не постоянные пользовательские профили. |
+| `storage.session` | `grafanaVisualState:<tabId>`, `dashbridgeBatchCaptureWindows`, `dashbridgeRecorderOwners` | Состояние визуальных вкладок, Batch capture windows и владельцы Recorder debugger для восстановления cleanup после перезапуска worker; это не постоянные пользовательские профили. |
 | `localStorage` | Тема page, `dashbridge.timepicker.history` | Тема до paint с sync reconciliation; история времени локальная, до четырёх диапазонов. |
 | MAIN `Map` | Live state по `panelKey` | Только document, переживает React DOM repair. |
 

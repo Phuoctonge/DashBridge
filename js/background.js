@@ -60,21 +60,79 @@ chrome.alarms?.onAlarm?.addListener(alarm => {
 });
 void updateIndicator.restore().catch(error => console.warn('Failed to restore update indicator:', error));
 
-// Recorder owns the normal detach path. This port is the crash/close fallback:
-// MV3 debugger attachment belongs to the extension and can otherwise survive
-// the extension page that initiated it.
+// Debugger attachments survive a crashed extension renderer, which can also
+// restart this worker before onDisconnect runs. Keep only ownership IDs in
+// session storage; never detach an unregistered target or a live Recorder.
+const RECORDER_OWNERS_KEY = 'dashbridgeRecorderOwners';
+let recorderOwnerQueue = Promise.resolve();
+function queueRecorderOwners(task) {
+    recorderOwnerQueue = recorderOwnerQueue.then(task).catch(error => {
+        console.warn('Recorder ownership cleanup failed:', error);
+    });
+}
+async function readRecorderOwners() {
+    const stored = await chrome.storage.session.get(RECORDER_OWNERS_KEY);
+    return Array.isArray(stored[RECORDER_OWNERS_KEY]) ? stored[RECORDER_OWNERS_KEY].filter(owner =>
+        Number.isInteger(owner?.tabId) && owner.tabId >= 0
+        && typeof owner.documentId === 'string' && owner.documentId.length > 0) : [];
+}
+queueRecorderOwners(async () => {
+    if (!chrome.storage.session || !chrome.runtime.getContexts) return;
+    const owners = await readRecorderOwners();
+    if (!owners.length) return;
+    // Failure to enumerate contexts is unknown liveness, not permission to
+    // interrupt an ongoing recording. Preserve the registry for a later retry.
+    const contexts = await chrome.runtime.getContexts({
+        documentUrls: [chrome.runtime.getURL('pages/recorder/recorder.html')],
+    });
+    const live = new Set(contexts.map(context => context.documentId));
+    const retained = owners.filter(owner => live.has(owner.documentId));
+    for (const owner of owners) {
+        if (live.has(owner.documentId) || retained.some(item => item.tabId === owner.tabId)) continue;
+        try { await chrome.debugger.detach({ tabId: owner.tabId }); }
+        catch (error) {
+            retained.push(owner);
+            console.warn('Recorder recovery detach failed:', error);
+        }
+    }
+    await chrome.storage.session.set({ [RECORDER_OWNERS_KEY]: retained });
+});
+
+// The page owns normal Stop. Keep the immediate disconnect fallback even when
+// session persistence is unavailable; attach/bind persistence is best-effort.
 chrome.runtime.onConnect?.addListener(port => {
     if (port.name !== 'dashbridge-recorder-lifecycle'
         || port.sender?.id !== chrome.runtime.id
         || port.sender?.url !== chrome.runtime.getURL('pages/recorder/recorder.html')) return;
     let recorderTabId = null;
+    const documentId = port.sender.documentId;
+    const persistOwner = tabId => queueRecorderOwners(async () => {
+        if (!chrome.storage.session || typeof documentId !== 'string' || !documentId) return;
+        const owners = (await readRecorderOwners()).filter(owner =>
+            owner.documentId !== documentId && owner.tabId !== tabId);
+        if (Number.isInteger(tabId)) owners.push({ tabId, documentId });
+        await chrome.storage.session.set({ [RECORDER_OWNERS_KEY]: owners });
+    });
     port.onMessage.addListener(message => {
-        if (message?.type === 'bind' && Number.isInteger(message.tabId) && message.tabId >= 0) recorderTabId = message.tabId;
-        if (message?.type === 'unbind') recorderTabId = null;
+        if (message?.type === 'bind' && Number.isInteger(message.tabId) && message.tabId >= 0) {
+            recorderTabId = message.tabId;
+            persistOwner(recorderTabId);
+        }
+        if (message?.type === 'unbind') {
+            recorderTabId = null;
+            persistOwner(null);
+        }
     });
     port.onDisconnect.addListener(() => {
         if (!Number.isInteger(recorderTabId)) return;
-        chrome.debugger.detach({ tabId: recorderTabId }).catch(() => undefined);
+        const tabId = recorderTabId;
+        queueRecorderOwners(async () => {
+            await chrome.debugger.detach({ tabId });
+            if (!chrome.storage.session || typeof documentId !== 'string' || !documentId) return;
+            const owners = (await readRecorderOwners()).filter(owner =>
+                owner.documentId !== documentId || owner.tabId !== tabId);
+            await chrome.storage.session.set({ [RECORDER_OWNERS_KEY]: owners });
+        });
     });
 });
 

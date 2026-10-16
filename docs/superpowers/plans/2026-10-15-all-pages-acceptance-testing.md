@@ -1371,3 +1371,48 @@ Evidence: `test-results/prerelease-focus-red.txt`, `prerelease-focus-test-all.lo
 подтверждённого сохранения bind остаются best-effort границей: без отдельного
 ACK-протокола новая запись не считается атомарной с `debugger.attach`.
 Закрытие incognito window этим исправлением не проектируется.
+
+### Продолжение предрелизной приёмки: коллажи, Popup, Recorder, 2026-10-16
+
+- **Коллажи:** четыре живых Timeseries KNS и четыре Flot mon-dc при browser zoom
+  80% и 125%. Для каждого окружения Auto/Grid/Column, исходный PNG,
+  «Увеличить», Escape/возврат фокуса и restore прошли. Auto/Grid дали
+  2048×1184, Column — 1032×2352; все четыре панели видны на просмотренных PNG.
+  Отдельный пустой источник дал 3/4, явную причину и повтор с той же ошибкой;
+  только «Использовать успешные» разрешило частичный коллаж. Настройки,
+  профили, zoom и download behavior возвращены.
+- **Настоящий action Popup:** два close/reopen с кэшем и два timeout проверки
+  обновления прошли. Во втором случае прерван только GitHub latest fetch;
+  production deadline 6000 мс не сокращался, измерено 6540/6536 мс.
+  Popup оставался action document; extension tab не подменяла результат.
+- **Recorder:** RED-тест выполнил настоящий `background.js` в двух successive
+  worker VM с общим session storage и воспроизвёл orphan attachment. После
+  исправления GREEN покрывает live/orphan/foreign owner, unbind после restart,
+  конкурирующие записи и отказы storage/context/detach. Transport страницы,
+  Record/Stop и permissions не менялись. Checkpoint — `cbce80b`.
+- **Живой crash/restart:** два свежих CFT156 профиля подтвердили отсутствие
+  attachment после `Page.crash` через 0/2,5/15 секунд. Дополнительно один свежий
+  профиль прошёл два цикла worker stop/start → штатный heartbeat → локальное
+  действие → Stop (по четыре шага), затем две аварии Recorder с detach.
+  Обычное controlled window сохранялось. В начальном повторе на прежнем
+  тестовом профиле исполнялся старый cached worker: это не GREEN исправления;
+  новые профили подтвердили текущий код и сохранённый ownership до crash.
+
+Evidence: `test-results/prerelease-multi-*/results.json`, исходные PNG и
+`prerelease-multi-contact.jpg`; `prerelease-action-popup.json` и
+`prerelease-action-popup-verified.log`; `prerelease-recorder-crash-diagnostic.json`,
+`prerelease-recorder-recovery-fixed.json`. Эти файлы локальны и не входят в ZIP.
+Рабочие Jira/Confluence-записи и incognito crash cleanup не выполнялись.
+Предельные длинные легенды, вставка PNG в целевые приложения, полная матрица
+доступности, сложная Series/vCPU корреляция и Grafana 9 этим блоком не закрыты.
+
+Финальная проверка этого исправления: `npm run test:all` завершился с exit 0,
+ESLint, 226 JavaScript-наборов, 41 Python check, Chromium 27/27. Module,
+dependency и documentation guards прошли; dependency guard сохранил прежний
+advisory `dashbridgeInspectLocation`. Отдельное read-only ревью проверило
+ownership, recovery, attach/unbind/reconnect и очередь; существенных замечаний
+не выявлено. Локальный ZIP 2.4.4 содержит ровно 220 production-файлов,
+побайтово совпадающих с проверенными исходниками; лишних entries нет.
+Evidence: `test-results/prerelease-recorder-test-all.log`,
+`test-results/prerelease-recorder-package/verification.json`.
+Тег, push и публикация релиза не выполнялись.

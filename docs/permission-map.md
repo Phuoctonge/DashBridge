@@ -62,6 +62,15 @@ clipboard поведение Grafana при выключенном scope ост�
 password inputs. Manifest фиксирует лимиты и неполноту capture. Recorder
 предупреждает о секретах до записи; файлы исключены из Git через `.gitignore`.
 
+Аварийный Recorder cleanup в `background.js` сохраняет в `storage.session`
+только tabId и browser documentId exact Recorder port sender. После restart
+worker проверяет живые extension contexts и отсоединяет только сохранённый
+target исчезнувшего владельца. Чужие debugger targets не сканируются; при
+неизвестной liveness detach не выполняется. Session registry не содержит URL,
+cookies или трафик и не добавляет permissions. Ошибка storage и crash до
+сохранения bind остаются best-effort ограничениями; incognito window этот
+fallback не закрывает. Подробнее — [DashFlow v2](dashflow-v2.md#владелец-записи-и-границы-cdp).
+
 Клиентская аналитика использует только `storage` и один редкий `alarms` wake-up.
 Фиксированный HTTPS endpoint покрывается существующим `<all_urls>` host access;
 запрос выполняется без credentials/referrer, а сервер не хранит IP/access logs.
