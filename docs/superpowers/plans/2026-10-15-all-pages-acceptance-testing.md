@@ -1416,3 +1416,32 @@ ownership, recovery, attach/unbind/reconnect и очередь; существе
 Evidence: `test-results/prerelease-recorder-test-all.log`,
 `test-results/prerelease-recorder-package/verification.json`.
 Тег, push и публикация релиза не выполнялись.
+
+### Продолжение 2026-10-16: PNG paste и коллизия сокращённых vCPU имён
+
+Настоящая кнопка attachment-copy → OS clipboard → native Ctrl+V в локальный
+contenteditable прошла для 1 панели (1032×600), Grid из 4 (2048×1184) и Column
+из 4 (1032×2352). Размеры и SHA-256 декодированных пикселей совпали с preview;
+прежний буфер восстановлен без вывода его содержимого. Capture заменён ранее
+полученным настоящим PNG, attachment controller/collage/copy исполнялись текущие.
+Это проверка браузерного редактора, не рабочих Telegram/Confluence.
+Evidence: `test-results/prerelease-png-native-paste.json`.
+
+Дважды подтверждён контролируемый случай vCPU: `vm:9100` имеет capacity 2,
+`vm:9182` — 8, оба Load 2, coefficient 0.8. Без сокращения остаётся первая
+серия; с сокращением обе исчезают: `trimLoadServerNames` превращает оба
+instance в `vm`, capacity map теряет различие. Это не воспроизведение на
+текущих рабочих endpoint. Evidence: `test-results/prerelease-vcpu-correlation.json`.
+
+Ограниченный план исправления:
+1. Постоянная RED-регрессия: разные порты/short vs FQDN, порядок helper frames,
+   обе перегруженные серии с разными capacities, уникальные имена и выключенный
+   trim. Ошибка должна проявляться без браузера на текущем production owner.
+2. В существующем `trimLoadServerNames` определить неоднозначные короткие имена
+   среди выбранных Load/helper refs. Только для этих endpoint сохранить полные
+   labels/name/displayName; уникальные сокращать прежним способом. Новых
+   identity-fallbacks, модулей, UI-настроек и panel ID условий не добавлять.
+3. Проверить потребителей metadata и legend, все тесты, live обычного vCPU
+   max/last и OFF, затем обновить контракт/ZIP. Проверки длинных легенд пока
+   не завершены: начальные варианты стенда не нашли solo root/длинный label;
+   это не подтверждённый renderer defect.
