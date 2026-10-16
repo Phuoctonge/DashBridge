@@ -268,7 +268,10 @@ restart. Это не вся матрица продукта. Перед заяв
 
 - Подтвердить текущий MAIN-runtime в отдельном профиле по
   [development guide](development-guide.md#ранние-transport-wrappers).
-- Проверить недостающее: дробный DPR/browser zoom и длинные легенды, копирование
+- Native compact Timeseries/Flot дополнительно проверен при browser zoom
+  80/110/125%: шесть настоящих PNG, размеры и restore подтверждены,
+  изображения просмотрены. Проверить недостающее: дробный DPR/browser zoom
+  для iframe/коллажа и длинные легенды, копирование
   PNG в целевые приложения, реальные отказы Chrome capture и legacy Series
   definition context. DPR 1/2 и контролируемые error/cancel restore проверены выше.
   Latest/SLA `[80, null]` и пустые значения уже покрыты модульными тестами;
