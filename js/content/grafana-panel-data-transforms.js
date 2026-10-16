@@ -17,7 +17,7 @@
         ].filter(Boolean).join(' ').toLowerCase();
         const escapeKeywordRegExp = value => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     
-        const trimResponseDomainLabels = data => {
+        const trimResponseDomainLabels = (data, excludedRefIds = new Set()) => {
             if (!data?.results || tools.trimDomainEnabled !== true) return { data, modifiedCount: 0 };
             const suffix = String(tools.trimDomain || '.passport.local:9182');
             if (!suffix) return { data, modifiedCount: 0 };
@@ -29,7 +29,8 @@
                 if (next !== value) modifiedCount += 1;
                 return next;
             };
-            Object.values(data.results).forEach(result => (result.frames || []).forEach(frame => {
+            Object.entries(data.results).filter(([refId]) => !excludedRefIds.has(refId))
+                .forEach(([, result]) => (result.frames || []).forEach(frame => {
                 if (typeof frame.schema?.name === 'string') frame.schema.name = trim(frame.schema.name);
                 (frame.schema?.fields || []).forEach(field => {
                     field.name = trim(field.name);

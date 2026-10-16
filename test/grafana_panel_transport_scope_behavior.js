@@ -80,6 +80,33 @@ function createHarness({ iframe = true, capacity = false, visual = false } = {})
 const cases = [];
 const test = (name, run) => cases.push({ name, run });
 for (const transport of ['fetch', 'xhr-text', 'xhr-json']) {
+    for (const iframe of [true, false]) for (const [domain, instances] of [
+        ['.passport.local:9182', ['vm.passport.local:9182', 'vm']],
+        ['.passport.local', ['vm.passport.local:9182', 'vm:9182']],
+        ['.passport.local', ['vm:9100', 'vm:9182']]
+    ]) test(`${transport}: iframe=${iframe} domain ${domain} preserves distinct Load capacity identities ${instances.join('/')}`, async () => {
+        const harness = createHarness({ capacity: true, iframe });
+        Object.assign(harness.tools, { trimDomainEnabled: true, trimDomain: domain });
+        const request = await harness.start(transport, [query, { refId: 'B', expr: 'up' }]);
+        const withInstance = (instance, value) => {
+            const item = frame(value);
+            item.schema.fields[1].labels.instance = instance;
+            return item;
+        };
+        const { payload } = await request.finish({ results: {
+            A: { frames: instances.map(instance => withInstance(instance, 2)) },
+            B: { frames: [withInstance('other.passport.local:9182', 1)] },
+            DB_CPU_CAPACITY_1: { frames: instances.map((instance, index) => withInstance(instance, index ? 8 : 2)) }
+        } });
+        assert.equal(payload.results.A.frames.length, 1, 'the overloaded endpoint must survive all preceding name transforms');
+        const kept = payload.results.A.frames[0].schema.fields[1];
+        assert.equal(kept.labels.instance, instances[0], 'colliding endpoint stays unambiguous in the renderer');
+        assert.equal(kept.config.custom.__dashbridgeCpuCapacity.value, 2);
+        assert.equal(payload.results.DB_CPU_CAPACITY_1, undefined);
+        assert.equal(payload.results.B.frames[0].schema.fields[1].labels.instance,
+            iframe ? 'other.passport.local:9182'.replace(domain, '') : 'other.passport.local:9182',
+            'other refs retain the existing domain trimming and panel scope');
+    });
     for (const status of [200, 503]) test(`${transport}: visual-only variable ${status} leaves panel lifecycle unchanged`, async () => {
         const harness = createHarness({ visual: true });
         const request = await harness.start(transport, [{ refId: 'metricFindQuery' }]);

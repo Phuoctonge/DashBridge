@@ -123,20 +123,33 @@
         const escapedDomain = String(domain || '.passport.local:9182').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const domainRegex = new RegExp(`${escapedDomain}(?::\\d+)?`, 'ig');
         const trim = value => String(value).replace(domainRegex, '').replace(/:\d+$/, '');
-        for (const refId of refIds) {
-            for (const frame of data.results[refId]?.frames || []) {
-                for (const field of frame.schema?.fields || []) {
-                    for (const [key, value] of Object.entries(field.labels || {})) {
-                        if (['instance', 'server', 'host', 'pod', 'node'].includes(key.toLowerCase())) {
-                            field.labels[key] = trim(value);
-                        }
-                    }
-                    if (field.type === 'time' || field.name === 'Time') continue;
-                    if (field.name) field.name = trim(field.name);
-                    if (field.config?.displayName) field.config.displayName = trim(field.config.displayName);
-                    if (field.config?.displayNameFromDS) field.config.displayNameFromDS = trim(field.config.displayNameFromDS);
+        const fields = [...refIds].flatMap(refId => (data.results[refId]?.frames || [])
+            .flatMap(frame => frame.schema?.fields || []));
+        const originalByShortName = new Map();
+        const ambiguous = new Set();
+        for (const field of fields) {
+            const instance = String(field.labels?.instance || '').trim();
+            if (!instance) continue;
+            const shortened = trim(instance);
+            if (originalByShortName.has(shortened) && originalByShortName.get(shortened) !== instance) {
+                ambiguous.add(shortened);
+            }
+            originalByShortName.set(shortened, instance);
+        }
+        for (const field of fields) {
+            // Capacity joins and legend matching both consume these names.
+            // Keep a full endpoint when trimming would merge distinct ports
+            // or FQDN/short names; repeated fields of one endpoint are fine.
+            if (ambiguous.has(trim(String(field.labels?.instance || '').trim()))) continue;
+            for (const [key, value] of Object.entries(field.labels || {})) {
+                if (['instance', 'server', 'host', 'pod', 'node'].includes(key.toLowerCase())) {
+                    field.labels[key] = trim(value);
                 }
             }
+            if (field.type === 'time' || field.name === 'Time') continue;
+            if (field.name) field.name = trim(field.name);
+            if (field.config?.displayName) field.config.displayName = trim(field.config.displayName);
+            if (field.config?.displayNameFromDS) field.config.displayNameFromDS = trim(field.config.displayNameFromDS);
         }
     };
 

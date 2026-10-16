@@ -1445,3 +1445,43 @@ instance в `vm`, capacity map теряет различие. Это не вос
    max/last и OFF, затем обновить контракт/ZIP. Проверки длинных легенд пока
    не завершены: начальные варианты стенда не нашли solo root/длинный label;
    это не подтверждённый renderer defect.
+
+#### Результат продолжения 2026-10-16
+
+Коллизия vCPU исправлена после checkpoint `4d5fc73`. RED-регрессия фильтра
+показала потерю перегруженного endpoint; GREEN сохраняет полные имена только
+неоднозначных endpoint и корректные capacity 2/8 независимо от порядка helper.
+Независимое ревью нашло дополнительный шаг: общий domain trim выполнялся раньше
+и также мог слить FQDN с short-name. Сквозная RED-регрессия воспроизвела этот
+путь через fetch и оба XHR. Общий trim теперь передаёт Load/helper refs их
+collision-aware владельцу. Финальный transport-набор — 45 PASS, включая
+direct/iframe, чужие refs и выключение фильтра в полёте. Повторное независимое
+ревью новых конкретных регрессий не нашло.
+
+Отдельный браузер перезапущен корневым launcher; текущий MAIN подтверждён по
+исходнику функции. На живой mon-dc iframe получены 12 capacities, missing 0:
+max со всеми Load-окнами — 36 серий, last с двумя — 24, все OFF — 0 и
+`filtered_empty`. Искусственные совпадающие endpoint не выдаются за найденные
+на рабочем datasource. Для live modern/legacy direct проверены длинные подписи
+551–598 символов, compact 1000×520, перенос ON/OFF и восстановление размеров.
+uPlot прошёл три состояния с шестью рядами. У Flot 96 рядов: легенда справа
+вытесняет график уже в нативном View шириной около 1000; compact сохраняет
+ограничение. При переносе вниз ширина plot 906 px, OFF возвращает прежнюю
+раскладку. PNG просмотрены. Первые попытки стенда (неверный modern DTO,
+скрытый checkbox, произвольный порог ширины) не являются находками продукта.
+
+Полный текущий `test:all`: exit 0, ESLint, 226 JS, 41 Python, Chromium 27/27.
+Module/dependency/documentation guards прошли с прежним advisory
+`dashbridgeInspectLocation`. Новый локальный ZIP 2.4.4: ровно 220 файлов,
+1 258 843 байт, все байты соответствуют проверенному production-коду;
+SHA-256 `59c3c79be4dc210e6efa5f8ce91b9cf32799cc764b85b4c4d4dc17121323d4bb`.
+Тег, push и публикация не выполнялись.
+
+Evidence: `test-results/prerelease-vcpu-red.log`,
+`prerelease-vcpu-pipeline-red.log`, `prerelease-vcpu-pipeline-green.log`,
+`prerelease-vcpu-live-current.json`, `prerelease-vcpu-final-test-all.log`,
+`prerelease-long-legends/results.json` и PNG,
+`prerelease-vcpu-package/verification.json`. Прежние файлы correlation/live
+могут содержать последний GREEN; исходный RED сохранён отдельно в логах.
+Остались рабочие редакторы PNG, расширенная accessibility/screen-reader матрица,
+прочая Series/identity корреляция, особенности настоящих Jira/TDM и Grafana 9.

@@ -1099,6 +1099,16 @@ node_load1/5/15{... instance=...}
 - неизвестный vCPU — fail-open, серия не скрывается;
 - запрос без `instance` selector не расширяется до всего datasource;
 - helper refId уникален и не попадает в renderer/легенду;
+- сокращение Load-имён в `trimLoadServerNames` сохраняет полные имена endpoint,
+  если разные исходные `instance` в выбранных Load/helper refs получили бы одно
+  короткое имя. Иначе разные порты либо FQDN/short-name могли объединить capacity
+  до расчёта фильтра и сделать metadata легенды неоднозначными. Повтор одного
+  endpoint в нескольких Load-окнах не мешает обычному сокращению. Регрессии —
+  `test/grafana_cpu_capacity_filter_behavior.js`. Общий
+  `trimResponseDomainLabels` пропускает Load/helper refs, пока их сокращением
+  владеет capacity-фильтр: иначе он потеряет исходную identity ещё до guard.
+  Полную последовательность direct/iframe через fetch и XHR проверяет
+  `test/grafana_panel_transport_scope_behavior.js`; чужие панели не изменяются;
 - очистка helper принадлежит отправленному запросу: выключение фильтра или
   смена target до ответа не отменяют её и не удаляют чужие datasource refs;
 - числовой фильтр и vCPU-фильтр взаимоисключающие;

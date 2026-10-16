@@ -431,7 +431,11 @@
                     + (result.frames || []).reduce((frameTotal, frame) => frameTotal
                         + Math.max(0, (frame.schema?.fields || []).filter(field => field.type !== 'time' && field.name !== 'Time').length), 0), 0);
                 const beforeSeries = countSeries(scopedData);
-                trimResponseDomainLabels(scopedData);
+                // Load/helper identity must reach the collision-aware capacity
+                // trimmer intact; general domain removal can merge endpoints.
+                const capacityTrimRefs = tools.cpuCapacityFilterEnabled || cpuContext.helperRefIds.size
+                    ? new Set([...cpuContext.loadRefIds, ...cpuContext.helperRefIds]) : new Set();
+                trimResponseDomainLabels(scopedData, capacityTrimRefs);
                 if (tools.invertIdle) transformCpuData(scopedData);
                 const memoryTransform = tools.convertMemToUsed ? transformMemData(scopedData) : null;
                 visualMetadata.memoryConversionApplied = tools.convertMemToUsed ? memoryTransform.applied : null;

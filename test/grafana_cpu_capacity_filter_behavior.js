@@ -261,4 +261,48 @@ assert.strictEqual(selectorScopedResponse.results.P1.frames.length, 1,
 assert.strictEqual(selectorScopedResponse.results.P2.frames.length, 0,
     'overload from another selector must not retain a quiet series with the same instance');
 
+// Name trimming must not merge different endpoints before the capacity join,
+// or make their legend/metadata indistinguishable after filtering.
+for (const endpoints of [['vm:9100', 'vm:9182'], ['vm.passport.local:9182', 'vm:9182']]) {
+    for (const reverseHelperOrder of [false, true]) {
+        const preparedCollision = filter.prepareRequestBody({ queries: [{
+            refId: 'COLLISION', expr: 'node_load1{instance=~"vm.*"}', datasource: { uid: 'prom-main' }
+        }] }, { enabled: true });
+        const helperId = preparedCollision.helperRefIds[0];
+        const capacities = [frame(endpoints[0], [2]), frame(endpoints[1], [8])];
+        if (reverseHelperOrder) capacities.reverse();
+        for (const secondLoad of [2, 9]) {
+            const data = { results: {
+                COLLISION: { frames: [frame(endpoints[0], [2]), frame(endpoints[1], [secondLoad])] },
+                OTHER: { frames: [frame('unrelated.passport.local:9182', [1])] },
+                [helperId]: { frames: structuredClone(capacities) }
+            } };
+            for (const item of data.results.COLLISION.frames) {
+                const numeric = item.schema.fields[1];
+                numeric.name = numeric.labels.instance;
+                numeric.config = { displayName: numeric.name, displayNameFromDS: numeric.name };
+            }
+            const result = filter.filterResponse(data, preparedCollision.body, {
+                enabled: true, coefficient: 0.8, trimDomainEnabled: true, trimDomain: '.passport.local:9182'
+            });
+            const remaining = data.results.COLLISION.frames;
+            assert.strictEqual(result.metrics.afterSeries, secondLoad === 2 ? 1 : 2,
+                'trimming must preserve overload decisions for distinct full endpoints');
+            assert.strictEqual(result.metrics.capacityInstances, 2,
+                'the helper keeps both capacities regardless of frame order');
+            remaining.forEach((item, index) => {
+                const numeric = item.schema.fields[1];
+                assert.strictEqual(numeric.labels.instance, endpoints[index]);
+                assert.strictEqual(numeric.name, endpoints[index]);
+                assert.strictEqual(numeric.config.displayName, endpoints[index]);
+                assert.strictEqual(numeric.config.displayNameFromDS, endpoints[index]);
+                assert.strictEqual(numeric.config.custom.__dashbridgeCpuCapacity.value, index === 0 ? 2 : 8,
+                    'the legend receives the correct capacity with a distinguishable full name');
+            });
+            assert.strictEqual(data.results.OTHER.frames[0].schema.fields[1].labels.instance,
+                'unrelated.passport.local:9182', 'other refs do not participate in Load name trimming');
+        }
+    }
+}
+
 console.log('PASS dynamic vCPU filter groups Load Average by instance and fails open safely');
