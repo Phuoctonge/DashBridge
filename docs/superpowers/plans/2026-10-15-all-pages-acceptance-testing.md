@@ -1563,3 +1563,28 @@ Xvfb. Локальная desktop geometry отдельно прошла 10 ст�
 ESLint, 226 JavaScript, 41 Python, Chromium 27/27. После изменения способа
 release notes targeted release/profile тесты и ESLint также прошли.
 ZIP повторно сверен и имеет ту же SHA-256; удалённый CHANGELOG в него не входил.
+
+Выпуск [2.5.0](https://github.com/Phuoctonge/DashBridge/releases/tag/v2.5.0)
+опубликован с коммита `8f9f914`; [GitHub Actions run 38889347146](https://github.com/Phuoctonge/DashBridge/actions/runs/38889347146)
+завершился success, включая тесты, lint, browser smoke, installer и упаковку.
+Все четыре asset скачаны: ZIP — 220 файлов, 1 257 136 байт,
+SHA-256 `ba95651df512862e7043156fa6574f36b906cd8fb12b58f99e2d6ab22424648d`.
+Checksum и байты каждого файла ZIP, а также installer сверены с Git blobs
+тега. Размер отличается от локальной Windows-сборки из-за упаковки/переводов
+строк; опубликованный пакет совпадает с самим Git-тегом. Русское описание
+проверено на совпадение с подготовленным текстом после его установки через API.
+
+В первоначальной публикации checkout оставил lightweight ref, поэтому
+`for-each-ref` прочитал commit message. Опубликованное описание исправлено;
+workflow для следующих тегов явно получает аннотацию и проверяет type/commit.
+Изолированный bare-repo тест повторил commit → annotated tag и извлёк русский
+текст. Git по умолчанию удаляет Markdown-заголовки/лишние пустые строки из tag
+message, поэтому development guide требует `--cleanup=verbatim`. Сам опубликованный
+тег и assets после публикации не изменялись. Evidence:
+`test-results/release-2.5.0-published/verification.json`, `release.json`,
+`release-2.5.0-ci-success.zip`, `release-annotated-tag-probe.json`.
+
+Финальная правка извлечения tag annotation прошла изолированный Git probe и
+полный локальный `test:all` — exit 0, ESLint, 226 JS, 41 Python, Chromium 27/27
+(`test-results/release-notes-workflow-test-all.log`). Это обслуживание workflow
+и документации после выпуска, production-файлы опубликованного ZIP не менялись.

@@ -387,7 +387,9 @@ Push тега `vX.Y.Z` запускает `.github/workflows/release.yml`: по�
 тестов, проверку совпадения тега с версией manifest, сборку
 `DashBridge-X.Y.Z.zip`, installer и их SHA-256, затем публикацию GitHub Release с
 русскими release notes из аннотации тега. Перед push создавайте annotated tag
-с подготовленным текстом через `git tag -a vX.Y.Z -F <файл-с-описанием>`;
+с подготовленным текстом через
+`git tag -a vX.Y.Z --cleanup=verbatim -F <файл-с-описанием>`:
+без `--cleanup=verbatim` Git удаляет Markdown-заголовки как комментарии;
 пустое описание блокирует публикацию. История изменений хранится в GitHub
 Releases, отдельного CHANGELOG в репозитории нет. При открытии popup проверяет
 `releases/latest` не чаще одного раза в час, игнорирует draft/prerelease и

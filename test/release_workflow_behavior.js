@@ -25,6 +25,10 @@ assert(workflow.includes("git for-each-ref --format='%(contents)'")
     && workflow.includes('--notes-file "$RUNNER_TEMP/release-notes.md"')
     && !workflow.includes('--generate-notes'),
     'release notes must come from the annotated tag instead of a repository changelog or generated commit list');
+assert(workflow.includes('git fetch --no-tags origin "+refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"')
+    && workflow.includes('git cat-file -t "refs/tags/$GITHUB_REF_NAME"')
+    && workflow.includes('git rev-parse "refs/tags/$GITHUB_REF_NAME^{commit}"'),
+    'checkout may create a lightweight tag; fetch and verify its annotation and commit before publishing');
 assert(workflow.includes('npx playwright install --with-deps chromium')
     && workflow.indexOf('npx playwright install --with-deps chromium') < workflow.indexOf('node test/run-all-tests.js')
     && workflow.includes('run: xvfb-run -a node test/run-all-tests.js'),
