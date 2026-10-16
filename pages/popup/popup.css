@@ -572,11 +572,13 @@
             display: none;
         }
 
-        .fresh-code-notice.is-debug #freshCodeNoticeText {
+        /* Routers restore active classes asynchronously from storage. Derive visibility
+           from their committed state, including reopen, rather than a click/timer copy. */
+        .popup-scroll-region:has(> #tab-grafana.active .grafana-sub-btn[data-sub="grafana-debug"].active) > .fresh-code-notice #freshCodeNoticeText {
             display: none;
         }
 
-        .fresh-code-notice.is-debug .debug-easter-egg-trigger {
+        .popup-scroll-region:has(> #tab-grafana.active .grafana-sub-btn[data-sub="grafana-debug"].active) > .fresh-code-notice .debug-easter-egg-trigger {
             display: inline;
         }
 

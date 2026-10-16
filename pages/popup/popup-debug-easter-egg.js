@@ -1,21 +1,7 @@
 // Opens the local Easter egg outside the constrained extension popup.
 document.addEventListener('DOMContentLoaded', () => {
     const trigger = document.getElementById('debugFreshCodeEasterEgg');
-    const notice = document.getElementById('freshCodeNotice');
-    if (!trigger || !notice) return;
-
-    const updateNoticeMode = () => {
-        const grafanaTabActive = document.querySelector('.tab-btn[data-tab="tab-grafana"]')?.classList.contains('active');
-        const debugTabActive = document.querySelector('.grafana-sub-btn[data-sub="grafana-debug"]')?.classList.contains('active');
-        notice.classList.toggle('is-debug', Boolean(grafanaTabActive && debugTabActive));
-    };
-
-    document.addEventListener('click', (event) => {
-        if (event.target.closest('.tab-btn, .grafana-sub-btn')) {
-            setTimeout(updateNoticeMode, 0);
-        }
-    });
-    updateNoticeMode();
+    if (!trigger) return;
 
     trigger.addEventListener('click', () => {
         const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;

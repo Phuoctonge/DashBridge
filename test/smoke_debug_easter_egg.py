@@ -19,8 +19,6 @@ if __name__ == "__main__":
                 "debugFreshCodeEasterEgg",
                 "chrome.windows.create",
                 "pages/debug-easter-egg/debug-easter-egg.html",
-                "updateNoticeMode",
-                "freshCodeNotice",
             ],
         },
     )
@@ -53,6 +51,11 @@ if __name__ == "__main__":
         if marker not in styles:
             raise SystemExit(f"[FAIL] missing Easter egg style: {marker}")
     popup_styles = read("pages/popup/popup.css")
+    for marker in (':has(> #tab-grafana.active .grafana-sub-btn[data-sub="grafana-debug"].active)',
+                   "> .fresh-code-notice #freshCodeNoticeText",
+                   "> .fresh-code-notice .debug-easter-egg-trigger"):
+        if marker not in popup_styles:
+            raise SystemExit(f"[FAIL] missing Easter egg navigation style: {marker}")
     if "text-decoration: none" not in popup_styles:
         raise SystemExit("[FAIL] debug warning link must look like ordinary text")
     print("[OK] debug Easter egg stays local and isolated")
