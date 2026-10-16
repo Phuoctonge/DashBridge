@@ -89,10 +89,11 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\Downlo
 либо введите другой абсолютный путь распаковки. Для автоматизированного запуска
 тот же выбор доступен через параметр `-InstallPath`.
 
-Read-only диагностика браузеров, профилей и уже загруженных путей:
+Диагностика браузеров, профилей и путей установки без изменения файлов.
+Команда получает актуальный установщик из интернета и запускает только проверку:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Install-DashBridge.ps1 -Diagnostics
+powershell.exe -NoProfile -Command "& ([scriptblock]::Create((New-Object Net.WebClient).DownloadString('https://github.com/Phuoctonge/DashBridge/releases/latest/download/Install-DashBridge.ps1'))) -Diagnostics"
 ```
 
 Installer никогда не перезаписывает Git checkout. Для локальной разработки
