@@ -3,6 +3,16 @@
 `scripts/Install-DashBridge.ps1` — отдельный Windows bootstrapper для небольшой
 внутренней установки unpacked-расширения. Он не входит в ZIP расширения, не
 выполняется из service worker и не получает доступ к `chrome.storage`.
+Команда онлайн-запуска в README получает PS1 через `Net.WebClient.DownloadString`
+и выполняет `ScriptBlock` в отдельном `powershell.exe -NoProfile` без сохранения
+PS1 на диск. Installer не использует `$PSScriptRoot`/`$PSCommandPath`;
+параметры, обработка `exit` и изменения настроек PowerShell остаются в дочернем
+процессе. Скачанный PS1 запускается отдельно через `-File`; оба режима получают
+последний stable release. Для Windows PowerShell 5.1 используется встроенный в
+.NET Framework `WebClient`: он распознаёт UTF-8 BOM. Простой `irm` для release
+asset с `application/octet-stream` в проверенной среде декодировал BOM как
+`ï»¿`, из-за чего `ScriptBlock.Create` отклонял исходник. Загрузка ZIP и
+временная распаковка нужны в обоих режимах.
 
 ## Пользовательский поток
 

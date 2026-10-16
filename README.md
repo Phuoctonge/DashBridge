@@ -57,16 +57,22 @@ Installer определяет Google Chrome, Microsoft Edge или Яндекс
 в постоянную пользовательскую папку. Запустите в PowerShell:
 
 ```powershell
-$installerFile = Join-Path $env:TEMP ('Install-DashBridge-' + [guid]::NewGuid().ToString('N') + '.ps1')
-try {
-    Invoke-WebRequest 'https://github.com/Phuoctonge/DashBridge/releases/latest/download/Install-DashBridge.ps1' -UseBasicParsing -TimeoutSec 120 -ErrorAction Stop -OutFile $installerFile
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installerFile
-} catch {
-    Write-Error ('Не удалось скачать установщик: ' + $_.Exception.Message)
-}
+powershell.exe -NoProfile -Command "& ([scriptblock]::Create((New-Object Net.WebClient).DownloadString('https://github.com/Phuoctonge/DashBridge/releases/latest/download/Install-DashBridge.ps1')))"
 ```
 
-Права администратора не нужны. `ExecutionPolicy Bypass` действует только для
+Команда получает последний опубликованный установщик и выполняет его из памяти
+в отдельном процессе PowerShell. Вручную скачивать PS1 не нужно; ZIP расширения
+установщик загрузит сам. Права администратора не нужны.
+
+Если вы уже скачали `Install-DashBridge.ps1` в папку «Загрузки», запустите его так
+(для другой папки замените путь после `-File`):
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\Downloads\Install-DashBridge.ps1"
+```
+
+Локальный PS1 также получает последний релиз расширения, но сам файл установщика
+автоматически не обновляется. `ExecutionPolicy Bypass` действует только для
 этого процесса; корпоративные ограничения браузера и групповые политики сохраняются.
 
 Первый раз Chromium всё равно требует явного подтверждения: installer запустит
