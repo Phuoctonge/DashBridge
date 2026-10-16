@@ -1344,3 +1344,30 @@ Evidence: `test-results/prerelease-focus-red.txt`, `prerelease-focus-test-all.lo
 `prerelease-iframe-contact-final.jpg`. Остались расширенная матрица длинных
 легенд, multi-panel collage/zoom и полная keyboard/screen-reader приёмка;
 этот результат закрывает только перечисленные сценарии.
+
+### Новый подтверждённый остаток Recorder, 2026-10-16
+
+Две независимые browser crash-пробы на `ee999de`: после `Page.crash` Recorder
+перезапускается также extension worker, память lifecycle-port теряется.
+Команда `chrome.debugger.sendCommand` от имени расширения к исходной controlled
+вкладке возвращает результат через 0/2,5/15 секунд: attachment не снят.
+Это фактическое воспроизведение описанного best-effort ограничения, а не вывод
+по общему `debugger.getTargets().attached` (туда входит CDP тестового стенда).
+После измерения тест явно выполняет detach. Рабочие сайты не затрагивались.
+
+План исправления (владелец остаётся в `js/background.js`, новый модуль не нужен):
+
+1. Зафиксировать RED-регрессии worker restart: orphan отключается, живой Recorder
+   сохраняет attachment, чужие вкладки не затрагиваются, unbind/повтор не возвращают
+   снятую запись, ошибка storage/context API не выдаётся за успешную очистку.
+2. Сохранять только `{tabId, documentId}` владельца exact Recorder port в
+   `chrome.storage.session`; сериализовать read-modify-write. На старте worker
+   сверять live extension contexts и отсоединять только сохранённого orphan.
+   Обычный disconnect fallback сохранить; permissions и транспорт страницы не менять.
+3. Повторить настоящие crash-пробы, restart worker при живом владельце и Stop,
+   полный `test:all`, guards и сборку ZIP; обновить границы гарантий в документации.
+
+`storage.session` не переживает завершение браузера. Ошибка записи и crash до
+подтверждённого сохранения bind остаются best-effort границей: без отдельного
+ACK-протокола новая запись не считается атомарной с `debugger.attach`.
+Закрытие incognito window этим исправлением не проектируется.
