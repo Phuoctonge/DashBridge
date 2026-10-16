@@ -144,6 +144,15 @@ renderer с root внутри выбранной панели. У Grafana 12 т�
 React grid может переписать смещение уже после reparenting. Дочерние renderer
 элементы получают только min-width, их высотой продолжает владеть uPlot.
 Restore отключает observer и возвращает значения и priorities inline-стилей.
+Если у modern Timeseries/Table нет доступного uPlot с легендой или заполненной
+таблицы, `relaxInlineSizeConstraints` удерживает только известный panel shell:
+`section`/`.panel-container` и цепочку его предков до выбранного capture root.
+Это нужно и для штатного `No data`: без renderer прежний early return позволял
+React вернуть grid transform и вынести содержимое за PNG. Тип определяется
+`getPanelPluginId`, контейнер обязан принадлежать root; неизвестные типы и
+отсутствующая/чужая цепочка не получают этот fallback. Ветки Flot и заполненных
+renderer не расширяются. Тот же snapshot/observer восстанавливается владельцем
+native/Batch capture в `finally`; отдельного постоянного observer нет.
 Перенос легенды в `grafana-legend-visuals.js` также распознаёт native элементы
 `VizLegend series`, когда общие legacy-селекторы не нашли записей. Их общий
 предок определяет контейнер легенды до изменения flex direction; без этого

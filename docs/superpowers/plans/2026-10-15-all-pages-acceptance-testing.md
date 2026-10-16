@@ -1216,3 +1216,49 @@ Evidence (игнорируемые локальные файлы): `test-results
 plugins, стресс/длительная работа и вставка clipboard во все приложения этим
 базовым прогоном не подтверждаются. Предыдущие живые iframe-проверки Flot/Table/
 Timeseries остаются результатами предыдущего раздела, а не новым запуском здесь.
+
+### Исправление compact capture пустых панелей, 2026-10-16
+
+Предыдущий блокер подтверждён ещё раз настоящей кнопкой Save. Историческое
+сравнение 11 версий capture-модулей (24 прогона) воспроизвело смещение даже
+с модулем от 2026-09-01; это не полный запуск старых сборок. Native prepare
+до/после `4180407` побайтно одинаков. История и исходное finding выше сохранены.
+Контрольный коммит перед production-правкой — `e7aaf1d`.
+
+Исправлен только существующий `relaxInlineSizeConstraints`: при отсутствии
+renderer/строк известные Timeseries/Table удерживают panel shell, его measured
+ancestry и transform тем же controller. Нового модуля, ID-условий, постоянного
+polling и задержек нет. Старые ветки renderer сохранены. Регрессия сначала упала
+на отсутствии controller, затем прошла; она проверяет повторный React style
+write, сходимость observer, возврат значений/priorities, disconnect и отказ
+fallback для чужих контейнеров/других plugin types. Потребители проверены
+GitNexus и точным поиском: общий владелец native/Batch capture; iframe card
+владеет отдельным путём и проверен как соседняя регрессия.
+
+- [x] Расширение перезагружено, прежняя MAIN-регистрация обновлена; новый
+  Grafana document подтвердил `shellOnly` в действующей функции и HTTP 200.
+  Проверка исходника runtime обязательна: наличие правки на диске недостаточно.
+- [x] Реальная кнопка native Save: три пустые панели (две Timeseries, Table)
+  и две непустые контрольные (Timeseries/Table) сохранили PNG 1000×520.
+  Заголовок и `No data` видны целиком; runtime подтвердил restore.
+- [x] Batch: три панели × два периода → шесть PNG → ZIP v3 → импорт
+  Confluence, две группы/шесть файлов, точные границы manifest сохранены.
+  Пустые изображения и контрольный график просмотрены.
+- [x] Живой mon-dc Flot: direct prepare/restore дважды, реальный DashBridge
+  compact PNG и report collage; canvas 491×470 внутри iframe 1000×520.
+  Штатное уведомление Grafana `Templating [system] ... Failed to fetch` снова
+  присутствует на снимке; оно ранее воспроизведено без расширения и не считается
+  чистым изображением без внешних уведомлений. Геометрия графика/осей корректна.
+- [x] Живые KNS iframe Timeseries/Table: prepare/restore дважды и PNG через
+  реальные кнопки DashBridge; изображения просмотрены, временный профиль восстановлен.
+- [x] Полный `test:all`: exit 0, ESLint, 225 JS test files, 41 Python,
+  Chromium 27/27. Module/dependency guards прошли с прежним единственным
+  advisory `dashbridgeInspectLocation`.
+
+Evidence в игнорируемом `test-results/`: `empty-compact-red.txt`,
+`empty-compact-runtime-version.json`, `empty-compact-native-save-verified.json`,
+`empty-compact-after-*.png`, `empty-compact-batch-live-results.json`,
+`empty-compact-iframe-report/`, `empty-compact-iframe-modern/`,
+`empty-compact-all.txt`. Настройки и download behavior восстановлены, рабочие
+Grafana/Confluence не сохранялись. Блокер этой приёмки закрыт; прежний ZIP
+содержит старый helper и не должен использоваться как пакет с исправлением.

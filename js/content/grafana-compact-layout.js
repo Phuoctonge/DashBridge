@@ -159,11 +159,17 @@
         const uplot = table ? null : findUPlot(root);
         const legendRow = root?.querySelector('table tbody tr, .u-legend tr, tr[class*="LegendRow"], [data-testid^="data-testid VizLegend series "]');
         const legend = legendRow?.closest('table, [role="table"], .u-legend, ul') || legendRow;
-        if (!table && (!uplot || !legend)) return null;
+        // A modern panel can legitimately show No data with no renderer/rows.
+        // React still rewrites its measured wrapper and grid transform after
+        // reparenting. Retain that known panel shell without guessing plugin internals.
+        const shellOnly = !table && (!uplot || !legend)
+            && ['timeseries', 'table'].includes(window.DashBridgeGrafanaDom?.getPanelPluginId(root));
+        if (!table && (!uplot || !legend) && !shellOnly) return null;
         const chart = root.querySelector('.uplot');
-        let common = table ? table.closest('section, .panel-container, [data-testid^="data-testid Panel header"]') : chart;
-        if (!table) while (common && legend && !common.contains(legend)) common = common.parentElement;
-        if (!common || table && !root.contains(common) || !table && common === root) return null;
+        let common = table ? table.closest('section, .panel-container, [data-testid^="data-testid Panel header"]')
+            : shellOnly ? root.querySelector('section, .panel-container') : chart;
+        if (!table && !shellOnly) while (common && legend && !common.contains(legend)) common = common.parentElement;
+        if (!common || !root.contains(common) || !table && !shellOnly && common === root) return null;
         const properties = ['width', 'height', 'min-width', 'min-height', 'max-width', 'max-height'];
         const snapshots = [];
         const touched = new Set();
@@ -182,7 +188,7 @@
             touch(element);
             if (element === root) break;
         }
-        if (!table) Array.from(common.children).forEach(element => touch(element, false));
+        if (!table && !shellOnly) Array.from(common.children).forEach(element => touch(element, false));
         const originalTransform = {
             value: root.style.getPropertyValue('transform'), priority: root.style.getPropertyPriority('transform'),
         };

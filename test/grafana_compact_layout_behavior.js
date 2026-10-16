@@ -271,3 +271,47 @@ assert.strictEqual(listObserver.disconnected, true);
 assert.strictEqual(measuredWrapper.style.getPropertyValue('height'), '800px');
 assert.strictEqual(chartPanel.style.getPropertyValue('transform'), 'translate(563px, 722px)');
 console.log('PASS compact list legends pin and restore chart ancestry without changing renderer height');
+
+// No-data panels have neither a live uPlot/legend nor populated table rows.
+// Their React grid must still stay inside the temporary capture frame.
+for (const plugin of ['timeseries', 'table']) {
+    const emptyRoot = element(), emptyWrapper = element(), emptySection = element();
+    emptySection.parentElement = emptyWrapper; emptyWrapper.parentElement = emptyRoot;
+    emptyRoot.children = [emptyWrapper]; emptyWrapper.children = [emptySection];
+    emptyRoot.contains = node => [emptyRoot, emptyWrapper, emptySection].includes(node);
+    emptyRoot.querySelector = selector => selector.includes('section') ? emptySection : null;
+    context.window.DashBridgeGrafanaDom = { getPanelPluginId: () => plugin };
+    emptyRoot.style.setProperty('transform', 'translate(563px, 380px)', 'important');
+    emptyWrapper.style.setProperty('height', '850px', 'important');
+    emptySection.style.setProperty('width', '1118px');
+    const constraints = layout.relaxInlineSizeConstraints(emptyRoot);
+    assert(constraints, `${plugin} without data must retain its panel shell during capture`);
+    const observer = mutationObservers.at(-1);
+    emptyRoot.style.setProperty('transform', 'translate(563px, 380px)');
+    emptyWrapper.style.setProperty('height', '850px');
+    observer.callback();
+    assert.strictEqual(emptyRoot.style.getPropertyValue('transform'), 'none');
+    assert.strictEqual(emptyWrapper.style.getPropertyValue('height'), '100%');
+    assert.strictEqual(emptySection.style.getPropertyValue('width'), '100%');
+    let writes = 0;
+    const set = emptyRoot.style.setProperty;
+    emptyRoot.style.setProperty = (...args) => { writes++; set(...args); };
+    observer.callback(); assert.strictEqual(writes, 0, 'shell pin must converge');
+    emptyRoot.style.setProperty = set;
+    constraints.restore();
+    assert.strictEqual(observer.disconnected, true);
+    assert.strictEqual(emptyRoot.style.getPropertyValue('transform'), 'translate(563px, 380px)');
+    assert.strictEqual(emptyRoot.style.getPropertyPriority('transform'), 'important');
+    assert.strictEqual(emptyWrapper.style.getPropertyValue('height'), '850px');
+    assert.strictEqual(emptyWrapper.style.getPropertyPriority('height'), 'important');
+    assert.strictEqual(emptySection.style.getPropertyValue('width'), '1118px');
+    for (const unsupported of ['graph', 'custom-plugin', 'stat', '']) {
+        context.window.DashBridgeGrafanaDom.getPanelPluginId = () => unsupported;
+        assert.strictEqual(layout.relaxInlineSizeConstraints(emptyRoot), null,
+            'the shell fallback must not guess geometry for other renderer types');
+    }
+    context.window.DashBridgeGrafanaDom.getPanelPluginId = () => plugin;
+    emptyRoot.contains = () => false;
+    assert.strictEqual(layout.relaxInlineSizeConstraints(emptyRoot), null, 'foreign containers must not be resized');
+}
+console.log('PASS empty modern panel shells pin and restore without changing other renderers');
