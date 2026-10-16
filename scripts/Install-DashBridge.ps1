@@ -367,7 +367,11 @@ function Receive-Release([pscustomobject]$Release, [string]$TemporaryRoot) {
 function Install-ReleaseDirectory([string]$SourcePath, [string]$TargetPath) {
     $TargetPath = Assert-SafeTargetPath $TargetPath
     $parent = Split-Path -Parent $TargetPath
-    New-Item -ItemType Directory -Path $parent -Force | Out-Null
+    # Windows PowerShell 5.1 rejects New-Item -Force for an existing drive root.
+    # C:\DashBridge is a valid target; its existing parent C:\ needs no creation.
+    if (-not (Test-Path -LiteralPath $parent -PathType Container)) {
+        New-Item -ItemType Directory -Path $parent -Force | Out-Null
+    }
     $staging = Join-Path $parent ('.dashbridge-staging-' + [guid]::NewGuid().ToString('N'))
     $backup = $null
     try {

@@ -39,6 +39,28 @@ try {
     $from = Join-Path $testRoot 'source'; $target = Join-Path $testRoot 'target'
     New-Fixture $from; New-Fixture $target
     'original' | Set-Content -LiteralPath (Join-Path $target 'keep.txt')
+    # Windows PowerShell 5.1 rejects New-Item -Force on an existing drive root.
+    # Reproduce that provider failure in the temporary parent, never in C:\.
+    function New-Item {
+        param($ItemType, $Path, [switch]$Force)
+        if ($Path -eq $testRoot) { throw [ArgumentException]::new('The path is not of a legal form.') }
+        Microsoft.PowerShell.Management\New-Item -ItemType $ItemType -Path $Path -Force:$Force
+    }
+    try {
+        $existingParentTarget = Join-Path $testRoot 'existing-parent-update'
+        New-Fixture $existingParentTarget
+        'preserved' | Set-Content -LiteralPath (Join-Path $existingParentTarget 'keep.txt')
+        $parentBackup = Install-ReleaseDirectory $from $existingParentTarget
+        if (-not (Test-DashBridgeDirectory $existingParentTarget) -or
+            (Get-Content -LiteralPath (Join-Path $parentBackup 'keep.txt') -Raw).Trim() -ne 'preserved') {
+            throw 'Update under an existing parent lost its installation or backup.'
+        }
+        $newParentTarget = Join-Path $testRoot 'existing-parent-new'
+        [void](Install-ReleaseDirectory $from $newParentTarget)
+        if (-not (Test-DashBridgeDirectory $newParentTarget)) { throw 'Install under an existing parent failed.' }
+    } finally {
+        Remove-Item Function:New-Item
+    }
     $invalid = Join-Path $testRoot 'invalid'
     New-Item -ItemType Directory -Path $invalid | Out-Null
     Expect-Rejected { Install-ReleaseDirectory $invalid $target }
