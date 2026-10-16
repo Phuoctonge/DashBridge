@@ -23,6 +23,10 @@ class FakeElement {
         this.attributes.set(name, String(value));
     }
 
+    focus() {
+        documentRef.activeElement = this;
+    }
+
     emit(type, extra = {}) {
         const event = {
             target: this,
@@ -60,6 +64,7 @@ let mode = 'line';
 let thickness = 2;
 let prepared = false;
 const calls = [];
+const reportOpeners = [];
 const frames = [{ id: 'a' }, { id: 'b' }];
 const controller = context.DashBridgePageUiController.create({
     getCrosshairMode: () => mode,
@@ -79,9 +84,9 @@ const controller = context.DashBridgePageUiController.create({
     deleteProfile: id => calls.push(['delete', id]),
     getActiveProfile: () => ({ id: 'profile-1', name: 'Current' }),
     getActiveProfileId: () => 'profile-1',
-    openReportSettings: () => calls.push('reportSettings'),
-    openReportPreview: () => calls.push('reportPreview'),
-    openReportTest: () => calls.push('reportTest'),
+    openReportSettings: () => { reportOpeners.push(documentRef.activeElement?.id); calls.push('reportSettings'); },
+    openReportPreview: () => { reportOpeners.push(documentRef.activeElement?.id); calls.push('reportPreview'); },
+    openReportTest: () => { reportOpeners.push(documentRef.activeElement?.id); calls.push('reportTest'); },
     setupPanelAddition: () => calls.push('setupAddition'),
     closeDashboardPickerIfOpen: () => calls.push('closePicker'),
     setupPanelTransfer: () => calls.push('setupTransfer'),
@@ -94,6 +99,13 @@ const controller = context.DashBridgePageUiController.create({
 
 controller.setup();
 assert.deepStrictEqual(calls.slice(0, 2), ['setupAddition', 'setupTransfer']);
+for (const id of ['configureReportBtn', 'generateReportBtn', 'testReportBtn']) {
+    elements[id].focus();
+    elements[id].emit('click');
+    assert.strictEqual(elements.reportDropdown.style.display, 'none');
+}
+assert.deepStrictEqual(reportOpeners, ['reportMenuBtn', 'reportMenuBtn', 'reportMenuBtn'],
+    'report dialogs must capture the visible menu trigger as their focus return target');
 controller.updateCrosshairControls();
 assert.strictEqual(elements.crosshairToggleCheckbox.checked, true);
 assert.strictEqual(elements.crosshairThicknessValue.textContent, '2px');

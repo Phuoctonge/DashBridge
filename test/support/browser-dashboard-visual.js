@@ -85,6 +85,17 @@ module.exports = async function inspectDashboardVisual(context, extensionId) {
             await page.locator('#reportImagesTab').click();
         };
         await openPreview();
+        await page.locator('#reportTextTab').focus();
+        for (const [key, id] of [['ArrowRight', 'reportImagesTab'], ['ArrowRight', 'reportTextTab'],
+            ['End', 'reportImagesTab'], ['Home', 'reportTextTab'], ['ArrowLeft', 'reportImagesTab']]) {
+            await page.keyboard.press(key);
+            assert(await page.locator(`#${id}`).evaluate(node => document.activeElement === node
+                && node.getAttribute('aria-selected') === 'true'), `report tab ${key}`);
+        }
+        await page.keyboard.press('Escape');
+        await page.waitForFunction(() => document.activeElement === document.getElementById('reportMenuBtn'));
+        result.checks.push('report tabs keyboard wrap/Home/End and Escape returns focus to visible menu trigger');
+        await openPreview();
         await page.evaluate(() => chrome.storage.onChanged.addListener(changes => {
             if (changes.dashbridge_profiles) window.preferencesStorageDiff = {
                 before: JSON.stringify(profiles), after: JSON.stringify(changes.dashbridge_profiles.newValue)

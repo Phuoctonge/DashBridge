@@ -1306,3 +1306,41 @@ Evidence: `test-results/prerelease-next-blocks/` (`layout-module-results.json`,
 `prerelease-next-package/verification.json`. Новых подтверждённых дефектов
 этими блоками не выявлено. Runtime-набор повторно не запускался: код после
 полного успешного прогона для `4c46ac0` не менялся; текущая правка — документация.
+
+### Продолжение: iframe zoom и клавиатура отчёта, 2026-10-16
+
+**Подтверждён и исправлен дефект возврата фокуса.** После открытия просмотра
+или настроек сообщения через клавиатуру и закрытия по Escape фокус оставался
+на `body`: helper запоминал уже скрытый пункт меню. Повторено для обоих окон
+в светлой и тёмной темах. Checkpoint перед production-правкой — `f4970de`.
+В трёх обработчиках запуска отчётных окон header UI теперь фокусирует видимую
+кнопку «Сообщение» перед открытием. Общий modal helper не менялся.
+
+- GitNexus index/context/upstream impact/detect-changes и строковые контракты
+  проверены. Статический граф содержит неоднозначные `setup`-связи и является
+  нижней оценкой; подключение через HTML и зависимости `dashbridge.js` сверены
+  точным поиском. Другие страницы не используют изменённый header controller.
+- Регрессия Node упала до правки и прошла после: проверяет opener всех трёх
+  отчётных действий. Постоянный browser workflow проверяет стрелки/Home/End,
+  переход через границы вкладок, Escape и возврат на видимую кнопку.
+  Отдельный Chromium-прогон в обеих темах проверил по 70 Tab/Shift+Tab переходов
+  внутри preview, Escape/возврат фокуса preview и settings; page errors нет.
+- Живые KNS Timeseries и mon-dc Flot при browser zoom 80/125% прошли четыре
+  сценария: настоящий iframe PNG 1000×520, коллаж 1032×600, «Увеличить», Escape
+  и возврат фокуса. Исходные PNG и коллажи просмотрены; на части Flot-снимков
+  присутствует известное штатное уведомление Grafana `Templating ... Failed to fetch`.
+  Профили, capture setting, zoom и download behavior восстановлены.
+- Первоначальный KNS-стенд ошибочно использовал `now-1h` вместо исторического
+  периода; таймаут preview не считается дефектом продукта. Locator screenshot
+  Playwright при browser zoom также захватывал неверную область: визуальная
+  проверка основана на исходном Blob PNG коллажа, а не на этом снимке экрана.
+- Полный свежий `test:all` прошёл: ESLint, 225 JS files, 41 Python checks,
+  Chromium 27/27 (10 страниц и 17 workflows). Module/dependency guards прошли
+  с прежним advisory `dashbridgeInspectLocation`.
+
+Evidence: `test-results/prerelease-focus-red.txt`, `prerelease-focus-test-all.log`,
+`prerelease-report-keyboard-first.json`, `prerelease-report-keyboard.json`,
+`prerelease-focus-*.txt`, `prerelease-iframe-*/results.json` и PNG,
+`prerelease-iframe-contact-final.jpg`. Остались расширенная матрица длинных
+легенд, multi-panel collage/zoom и полная keyboard/screen-reader приёмка;
+этот результат закрывает только перечисленные сценарии.

@@ -156,14 +156,18 @@
             reportDropdown.addEventListener('click', event => event.stopPropagation());
             documentRef.getElementById('configureReportBtn').addEventListener('click', () => {
                 closeHeaderMenus();
+                // The hidden menu item cannot be the dialog's focus return target.
+                documentRef.getElementById('reportMenuBtn').focus({ preventScroll: true });
                 openReportSettings();
             });
             documentRef.getElementById('generateReportBtn').addEventListener('click', () => {
                 closeHeaderMenus();
+                documentRef.getElementById('reportMenuBtn').focus({ preventScroll: true });
                 openReportPreview();
             });
             documentRef.getElementById('testReportBtn').addEventListener('click', () => {
                 closeHeaderMenus();
+                documentRef.getElementById('reportMenuBtn').focus({ preventScroll: true });
                 openReportTest();
             });
 
