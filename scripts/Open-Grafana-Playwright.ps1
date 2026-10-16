@@ -22,12 +22,26 @@ New-Item -ItemType Directory -Force -Path $profileRoot | Out-Null
 $endpoint = "http://127.0.0.1:$Port/json/version"
 $ready = $false
 try { $null = Invoke-RestMethod -Uri $endpoint -TimeoutSec 1; $ready = $true } catch { }
+if ($ready) {
+    $testBrowser = Get-CimInstance Win32_Process -Filter "Name = 'chrome.exe'" | Where-Object {
+        $_.CommandLine -and $_.CommandLine.Contains("--user-data-dir=$profileRoot") -and
+        $_.CommandLine -match "--remote-debugging-port=$Port(?:\s|$)"
+    } | Select-Object -First 1
+    if (-not $testBrowser -or
+        -not $testBrowser.CommandLine.Contains('--host-resolver-rules="MAP analytics.tongehub.com ~NOTFOUND"') -or
+        -not $testBrowser.CommandLine.Contains('--no-proxy-server')) {
+        throw 'На CDP-порту уже открыт браузер без подтверждённой блокировки аналитики. Закройте отдельное тестовое окно Chrome и повторите запуск.'
+    }
+}
 if (-not $ready) {
     Start-Process -FilePath $chrome -ArgumentList @(
         "--user-data-dir=$profileRoot",
         "--load-extension=$projectRoot",
         "--remote-debugging-port=$Port",
         "--remote-allow-origins=http://localhost:$Port",
+        # Match the Node live-launch policy; applies to this test browser only.
+        '--host-resolver-rules="MAP analytics.tongehub.com ~NOTFOUND"',
+        '--no-proxy-server',
         '--no-first-run', '--no-default-browser-check', '--start-maximized', '--new-window', $Url
     ) | Out-Null
     for ($attempt = 0; $attempt -lt 30; $attempt++) {
@@ -38,6 +52,7 @@ if (-not $ready) {
 if (-not $ready) { throw "Chrome не открыл CDP на порту $Port." }
 Write-Host "Chrome открыт в отдельном профиле: $profileRoot" -ForegroundColor Green
 Write-Host "CDP: $endpoint" -ForegroundColor DarkGray
+Write-Host 'Production-аналитика заблокирована только в этом тестовом браузере.' -ForegroundColor DarkGray
 Write-Host 'Авторизуйтесь в Grafana в открытом окне.' -ForegroundColor Yellow
 Write-Host "Проверка: node scripts/check-visible-grafana-cdp.js --port $Port" -ForegroundColor Cyan
 Read-Host 'Нажмите Enter, чтобы закрыть PowerShell. Chrome останется открыт'

@@ -6,7 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const { chromium } = require('@playwright/test');
-const { resolveChromeExecutable } = require('../scripts/setup-grafana-e2e-profile');
+const { resolveChromeExecutable, testBrowserNetworkArgs } = require('../scripts/setup-grafana-e2e-profile');
 
 const root = path.resolve(__dirname, '..');
 const sizes = [
@@ -36,7 +36,7 @@ function stageExtension(directory) {
     const context = await chromium.launchPersistentContext(path.join(temp, 'profile'), {
         executablePath: resolveChromeExecutable(), headless: false,
         viewport: { width: 1280, height: 800 },
-        args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`, '--no-first-run']
+        args: [...testBrowserNetworkArgs, `--disable-extensions-except=${extension}`, `--load-extension=${extension}`, '--no-first-run']
     });
     const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
     const extensionId = new URL(worker.url()).hostname;

@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { chromium } = require('@playwright/test');
 const { acquireProfileLock } = require('./profile-lock');
-const { projectRoot, resolveChromeExecutable, resolveProfileRoot, validateGrafanaUrls, waitForExtensionWorker } = require('../../scripts/setup-grafana-e2e-profile');
+const { projectRoot, testBrowserNetworkArgs, resolveChromeExecutable, resolveProfileRoot, validateGrafanaUrls, waitForExtensionWorker } = require('../../scripts/setup-grafana-e2e-profile');
 
 async function runLiveCheck(urls, { headless = true } = {}) {
     const profileRoot = resolveProfileRoot();
@@ -13,7 +13,7 @@ async function runLiveCheck(urls, { headless = true } = {}) {
     const lock = acquireProfileLock(profileRoot);
     let context;
     try {
-        context = await chromium.launchPersistentContext(profileRoot, { executablePath, headless, viewport: { width: 1280, height: 900 }, args: [`--disable-extensions-except=${projectRoot}`, `--load-extension=${projectRoot}`, '--no-first-run'] });
+        context = await chromium.launchPersistentContext(profileRoot, { executablePath, headless, viewport: { width: 1280, height: 900 }, args: [...testBrowserNetworkArgs, `--disable-extensions-except=${projectRoot}`, `--load-extension=${projectRoot}`, '--no-first-run'] });
         const extensionId = await waitForExtensionWorker(context);
         const results = [];
         for (const value of urls) {

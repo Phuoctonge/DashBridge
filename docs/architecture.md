@@ -2060,6 +2060,16 @@ CustomEvent, а isolated bridge повторно переводит их в ра
 Service worker проверяет sender отдельно для extension pages, настроенной
 Grafana и Confluence. Полный контракт и запрет данных: `docs/analytics.md`.
 
+Production runtime не определяет тестовый режим по страницам или panel ID.
+Smoke подменяет collector локальным в своей временной копии расширения;
+live/auth/session launchers и видимый тестовый Chrome блокируют collector
+в аргументах отдельного browser process (DNS `~NOTFOUND` и запрет proxy/PAC/WPAD).
+Блокировка действует с первого запуска worker; локальная очередь сохраняет
+обычный bounded retry-контракт. Тестовый профиль не переносится в production.
+PowerShell-launcher отклоняет повторное использование CDP-браузера без flags;
+обычные Chrome/релиз и системный DNS не меняются. Проверка —
+`test/analytics_test_browser_behavior.js`, подробности — `docs/analytics.md`.
+
 Владелец аналитики проверяет сохранённую очередь по ограничениям collector,
 разделяет версии в агрегатах и сохраняет последнюю отклонённую HTTP 400 пачку
 в ограниченном локальном карантине, учитывая её в потерях. Options читает

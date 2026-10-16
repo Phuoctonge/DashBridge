@@ -5,6 +5,7 @@ const path = require('node:path');
 const { chromium } = require('@playwright/test');
 const {
     projectRoot,
+    testBrowserNetworkArgs,
     resolveChromeExecutable,
     reconcileRegisteredGrafanaRuntime,
     resolveProfileRoot,
@@ -24,6 +25,7 @@ async function main() {
         headless: false,
         viewport: { width: 1280, height: 900 },
         args: [
+            ...testBrowserNetworkArgs,
             `--disable-extensions-except=${projectRoot}`,
             `--load-extension=${projectRoot}`,
             '--no-first-run',

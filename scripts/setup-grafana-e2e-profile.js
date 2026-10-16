@@ -5,6 +5,12 @@ const path = require('node:path');
 const { chromium } = require('@playwright/test');
 
 const projectRoot = path.resolve(__dirname, '..');
+// Browser-process scope includes extension workers from their first request.
+// Force direct connections: PAC/WPAD proxies can resolve the blocked host remotely.
+const testBrowserNetworkArgs = Object.freeze([
+    '--host-resolver-rules=MAP analytics.tongehub.com ~NOTFOUND',
+    '--no-proxy-server',
+]);
 
 function validateGrafanaUrls(values) {
     if (values.length < 1 || values.length > 2) {
@@ -120,6 +126,7 @@ async function main() {
         headless: false,
         viewport: null,
         args: [
+            ...testBrowserNetworkArgs,
             `--disable-extensions-except=${projectRoot}`,
             `--load-extension=${projectRoot}`,
             '--no-first-run',
@@ -168,6 +175,7 @@ if (require.main === module) {
 
 module.exports = {
     projectRoot,
+    testBrowserNetworkArgs,
     reconcileRegisteredGrafanaRuntime,
     resolveChromeExecutable,
     resolveProfileRoot,

@@ -2,7 +2,7 @@
 
 const fs = require('node:fs');
 const { chromium } = require('@playwright/test');
-const { projectRoot, resolveChromeExecutable, resolveProfileRoot, waitForExtensionWorker } = require('../../scripts/setup-grafana-e2e-profile');
+const { projectRoot, testBrowserNetworkArgs, resolveChromeExecutable, resolveProfileRoot, waitForExtensionWorker } = require('../../scripts/setup-grafana-e2e-profile');
 const { acquireProfileLock } = require('./profile-lock');
 const { runLiveLegendScenario } = require('./scenarios/live-legend-scenario');
 const { runLiveThresholdScenario } = require('./scenarios/threshold-live-scenario');
@@ -32,7 +32,7 @@ async function runLiveScenario(options) {
     const lock = acquireProfileLock(profileRoot);
     let context;
     try {
-        context = await chromium.launchPersistentContext(profileRoot, { executablePath, headless: process.env.DASHBRIDGE_LIVE_HEADLESS !== 'false', viewport: { width: 1280, height: 900 }, args: [`--disable-extensions-except=${projectRoot}`, `--load-extension=${projectRoot}`, '--no-first-run'] });
+        context = await chromium.launchPersistentContext(profileRoot, { executablePath, headless: process.env.DASHBRIDGE_LIVE_HEADLESS !== 'false', viewport: { width: 1280, height: 900 }, args: [...testBrowserNetworkArgs, `--disable-extensions-except=${projectRoot}`, `--load-extension=${projectRoot}`, '--no-first-run'] });
         await waitForExtensionWorker(context);
         const page = await context.newPage();
         try {
