@@ -21,6 +21,14 @@ assert(workflow.includes("- 'v*'")
     'tag workflow must install locked dependencies and run the full suite before publishing a release');
 assert(workflow.includes('permissions:') && workflow.includes('contents: write'),
     'release job must declare only the GitHub permission it uses');
+assert(workflow.includes("git for-each-ref --format='%(contents)'")
+    && workflow.includes('--notes-file "$RUNNER_TEMP/release-notes.md"')
+    && !workflow.includes('--generate-notes'),
+    'release notes must come from the annotated tag instead of a repository changelog or generated commit list');
+assert(workflow.includes('npx playwright install --with-deps chromium')
+    && workflow.indexOf('npx playwright install --with-deps chromium') < workflow.indexOf('node test/run-all-tests.js')
+    && workflow.includes('run: xvfb-run -a node test/run-all-tests.js'),
+    'the general suite includes desktop Chromium tests and needs its runtime and display before it starts');
 assert(builder.includes('$ExpectedTag -ne "v$version"'),
     'archive builder must reject a tag that differs from manifest.version');
 for (const input of ['manifest.json', 'css', 'html', 'icons', 'js', 'pages', 'vendor']) {

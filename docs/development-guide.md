@@ -335,11 +335,16 @@ ID для UI. Для матричного Full допустимо повторн
 native legend и all-OFF invariant должны подтвердить границу; иначе обязателен
 полный isolation reset с Refresh.
 
-Полный dependency-free прогон:
+Общий Node/Python-прогон, включая desktop geometry в Chromium:
 
 ```powershell
 node test/run-all-tests.js
 ```
+
+Chromium должен быть установлен до этого запуска: проверка desktop geometry
+открывает настоящий браузер. На Linux без desktop-сессии используйте
+`xvfb-run -a node test/run-all-tests.js`. Release workflow устанавливает Chromium
+перед общим набором и выполняет его под Xvfb; отдельный browser smoke идёт следом.
 
 Если Python отсутствует в `PATH`, укажите исполняемый файл явно:
 
@@ -381,7 +386,10 @@ foreach ($file in $files) { node --check $file }
 Push тега `vX.Y.Z` запускает `.github/workflows/release.yml`: полный набор
 тестов, проверку совпадения тега с версией manifest, сборку
 `DashBridge-X.Y.Z.zip`, installer и их SHA-256, затем публикацию GitHub Release с
-автоматически сформированными release notes. При открытии popup проверяет
+русскими release notes из аннотации тега. Перед push создавайте annotated tag
+с подготовленным текстом через `git tag -a vX.Y.Z -F <файл-с-описанием>`;
+пустое описание блокирует публикацию. История изменений хранится в GitHub
+Releases, отдельного CHANGELOG в репозитории нет. При открытии popup проверяет
 `releases/latest` не чаще одного раза в час, игнорирует draft/prerelease и
 принимает download URL лишь при полном совпадении стабильного тега, версии,
 GitHub-путей и имён ZIP/installer assets. Popup скачивает installer только по

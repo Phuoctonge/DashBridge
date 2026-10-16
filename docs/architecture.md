@@ -1999,7 +1999,8 @@ Push тега `vX.Y.Z` запускает `.github/workflows/release.yml`. Workf
 Node/Python-тесты, ESLint и Chromium browser smoke под Xvfb, требует
 совпадения тега с версией `manifest.json`, собирает
 ZIP расширения, Windows installer и SHA-256 через `scripts/build-release.ps1`,
-затем публикует GitHub Release с автоматически сформированными notes.
+затем публикует GitHub Release с русским описанием изменений из аннотации тега.
+Отдельного CHANGELOG в репозитории нет; пустая аннотация блокирует публикацию.
 
 Popup при открытии запрашивает только `releases/latest` репозитория
 `Phuoctonge/DashBridge`; успешный результат кэшируется в `storage.local` на один

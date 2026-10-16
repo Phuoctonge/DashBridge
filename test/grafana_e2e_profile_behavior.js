@@ -3,6 +3,7 @@
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 const {
     reconcileRegisteredGrafanaRuntime,
     resolveChromeExecutable,
@@ -48,10 +49,30 @@ assert.match(localProfile, /[\\/]\.dashbridge-local[\\/]e2e[\\/]browser-profile$
 assert.strictEqual(resolveProfileRoot(localProfile), localProfile,
     'the canonical local profile may be explicitly selected');
 assert.throws(() => resolveProfileRoot(path.resolve(__dirname, '..', 'test-results', 'profile')), /outside the repository/);
-const localChrome = path.resolve(__dirname, '..', '.dashbridge-local', 'playwright', 'chromium-1243', 'chrome-win64', 'chrome.exe');
-assert.ok(fs.existsSync(localChrome), 'local Playwright Chromium must be copied before live launch');
-assert.strictEqual(resolveChromeExecutable(), localChrome,
-    'live launch must prefer the ignored local Playwright Chromium');
+// Exercise local-copy selection without depending on this machine's OS or installed revision.
+const browserRoot = path.resolve(__dirname, '..', '.dashbridge-local', 'playwright');
+const browserCopy = path.join(browserRoot, 'chromium-2000', 'chrome-win64', 'chrome.exe');
+let localCopyAvailable = true;
+const resolverRequire = name => {
+    if (name === 'node:fs') return {
+        existsSync: candidate => localCopyAvailable && [browserRoot, browserCopy].includes(candidate),
+        readdirSync: () => ['chromium-1000', 'chromium-2000', 'other'].map(name => ({
+            name, isDirectory: () => true
+        }))
+    };
+    if (name === '@playwright/test') return { chromium: { executablePath: () => '/fixture/browser' } };
+    return require(name);
+};
+const resolverModule = { exports: {} };
+vm.runInNewContext(fs.readFileSync(path.resolve(__dirname, '../scripts/setup-grafana-e2e-profile.js'), 'utf8'), {
+    require: resolverRequire, module: resolverModule,
+    __dirname: path.resolve(__dirname, '../scripts'), process: { env: {} }
+});
+assert.strictEqual(resolverModule.exports.resolveChromeExecutable(), browserCopy,
+    'live launch must prefer the newest available ignored local Chromium copy');
+localCopyAvailable = false;
+assert.strictEqual(resolverModule.exports.resolveChromeExecutable(), '/fixture/browser',
+    'a clean workstation must use the installed Playwright runtime');
 assert.strictEqual(resolveChromeExecutable('C:\\custom\\chrome.exe'), path.resolve('C:\\custom\\chrome.exe'),
     'explicit Chrome override must remain supported');
 if (previousProfileOverride === undefined) delete process.env.DASHBRIDGE_E2E_PROFILE;

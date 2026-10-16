@@ -21,12 +21,12 @@ jobs:
           python-version: '3.12'
       - name: Install development dependencies
         run: npm ci
-      - name: Run tests
-        run: node test/run-all-tests.js
-      - name: Lint extension
-        run: npm run lint
       - name: Install browser test runtime
         run: npx playwright install --with-deps chromium
+      - name: Run tests
+        run: xvfb-run -a node test/run-all-tests.js
+      - name: Lint extension
+        run: npm run lint
       - name: Browser smoke
         run: xvfb-run -a npm run test:browser
       - name: Test Windows installer
@@ -42,11 +42,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION=$(node -p "require('./manifest.json').version")
+          git for-each-ref --format='%(contents)' "refs/tags/$GITHUB_REF_NAME" > "$RUNNER_TEMP/release-notes.md"
+          test -s "$RUNNER_TEMP/release-notes.md"
           gh release create "$GITHUB_REF_NAME" \
             "dist/DashBridge-$VERSION.zip" \
             "dist/DashBridge-$VERSION.zip.sha256" \
             "dist/Install-DashBridge.ps1" \
             "dist/Install-DashBridge.ps1.sha256" \
             --verify-tag \
-            --generate-notes \
+            --notes-file "$RUNNER_TEMP/release-notes.md" \
             --title "DashBridge $VERSION"
