@@ -24,7 +24,7 @@ async function spoolOwnership() {
         async removeEntry(name) { directories.delete(name); }
     };
     const context = vm.createContext({ navigator: { locks: locks(), storage: {
-        getDirectory: async () => ({ getDirectoryHandle: async () => base })
+        getDirectory: async () => ({ async *entries() {}, getDirectoryHandle: async () => base })
     } } });
     vm.runInContext(read('pages/test-runner/test-runner-spool.js') + '\nthis.Spool = DiagnosticSpool;', context);
     const first = new context.Spool(); const second = new context.Spool();

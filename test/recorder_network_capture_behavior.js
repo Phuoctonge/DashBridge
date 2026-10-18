@@ -102,20 +102,21 @@ const controller = context.DashBridgeRecorderNetworkCapture.create({
         },
     });
     const request = state.requests.get('r1');
-    assert.strictEqual(request.requestHeaders.Authorization, 'Bearer token');
-    assert.strictEqual(request.requestHeaders.Basic, undefined);
+    // Early raw headers are queued until CDP declares this hop's ExtraInfo.
     assert.strictEqual(request.requestBodyCapture.status, 'captured');
     assert.strictEqual(state.inFlight.has('r1'), true);
 
     controller.handleEvent({ tabId: 7 }, 'Network.responseReceivedExtraInfo', {
-        requestId: 'r1', statusCode: 201,
+        requestId: 'r1', statusCode: 304,
         headers: { 'Set-Cookie': 'session=next' }, blockedCookies: [],
     });
     controller.handleEvent({ tabId: 7 }, 'Network.responseReceived', {
-        requestId: 'r1', type: 'Fetch',
+        requestId: 'r1', type: 'Fetch', hasExtraInfo: true,
         response: { status: 200, headers: { Basic: 'must-not-overwrite-extra-info' }, mimeType: 'text/plain' },
     });
-    assert.strictEqual(request.status, 200);
+    assert.strictEqual(request.requestHeaders.Authorization, 'Bearer token');
+    assert.strictEqual(request.requestHeaders.Basic, undefined);
+    assert.strictEqual(request.status, 304);
     assert.strictEqual(request.responseHeaders['Set-Cookie'], 'session=next');
     assert.strictEqual(request.responseHeaders.Basic, undefined);
 

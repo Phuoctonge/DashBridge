@@ -249,6 +249,30 @@
     margin-top: 1.5rem;
 }
 
+.modal-import-actions {
+    flex-wrap: nowrap;
+    gap: .5rem;
+}
+
+.modal-import-actions .btn {
+    white-space: nowrap;
+}
+
+@media (max-width: 30rem) {
+    .modal-import-content {
+        padding: 1rem;
+    }
+
+    .modal-import-actions {
+        gap: .375rem;
+    }
+
+    .modal-import-actions .btn {
+        padding-inline: .375rem;
+        font-size: .75rem;
+    }
+}
+
 .iframe-settings-modal {
     max-width: 32.5rem;
     max-height: calc(100dvh - 2rem);

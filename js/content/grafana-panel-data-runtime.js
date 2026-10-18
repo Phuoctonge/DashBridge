@@ -425,6 +425,17 @@
                 // mutate frames belonging to another dashboard panel.
                 const workspace = createResponseFilterWorkspace(data, targetRefIds, cpuContext.helperRefIds);
                 const scopedData = workspace.data;
+                // Grafana can return HTTP 200 while an individual datasource
+                // query failed. Keep that failure scoped to this panel and carry
+                // it into the request cycle, including parallel completions.
+                // A failed private capacity helper still leaves native data usable.
+                const failedResult = Object.entries(scopedData.results || {}).find(([refId, result]) =>
+                    !cpuContext.helperRefIds.has(refId) && Number.isInteger(Number(result?.status))
+                    && Number(result.status) >= 400 && Number(result.status) <= 599)?.[1];
+                if (failedResult) {
+                    request.failure = { outcome: 'http-error', httpStatus: Number(failedResult.status) };
+                    pushEvent('query-error', { ...request, status: request.failure.httpStatus, source: 'datasource-result' });
+                }
                 visualMetadata.responseUnitCodes = window.DashBridgeGrafanaUnit
                     ?.collectDataFrameUnitCodes?.(scopedData) || [];
                 const countSeries = source => Object.values(source?.results || {}).reduce((total, result) => total
@@ -496,9 +507,10 @@
                 const cpuFilterRemovedEverything = !!cpuCapacityFilter?.enabled
                     && cpuCapacityFilter.beforeSeries > 0
                     && cpuCapacityFilter.afterSeries === 0;
-                visualMetadata.responseFilterEmptyIsNormal = afterSeries === 0
+                visualMetadata.responseFilterEmptyIsNormal = !request.failure && afterSeries === 0
                     && (sourceFilterRemovedEverything || cpuFilterRemovedEverything);
-                if (visualMetadata.responseFilterEmptyIsNormal) setPanelDataStatus('filtered_empty');
+                if (request.failure) setPanelDataStatus('http_error', { httpStatus: request.failure.httpStatus });
+                else if (visualMetadata.responseFilterEmptyIsNormal) setPanelDataStatus('filtered_empty');
                 else if (beforeSeries === 0 && afterSeries === 0) setPanelDataStatus('empty_source');
                 else setPanelDataStatus('data');
                 diagnostics.last = {
@@ -583,17 +595,19 @@
                     }
                     if (!transformActive) {
                         const requestBody = await requestBodyPromise;
+                        let decodedResponse;
+                        const decodeOnce = () => decodedResponse ||= decodeNativeFetchResponse(response);
                         if (!isDashboardIframe && analysisCaptureActive
                             && panelAnalysisRequestMatches(analysisCapture, requestBody, requestStartedAt)) {
                             try {
-                                const decoded = await decodeNativeFetchResponse(response);
+                                const decoded = await decodeOnce();
                                 observePanelAnalysisResponse(analysisCapture, decoded, requestBody, requestStartedAt);
                             } catch { /* DOM fallback remains available when a datasource response is not JSON. */ }
                         }
                         const targetRefIds = getTargetQueryRefIds(requestBody);
                         if (hasPersistentVisualWork()) {
                             try {
-                                const decoded = await decodeNativeFetchResponse(response.clone());
+                                const decoded = await decodeOnce();
                                 captureRawLegendSeries(decoded, targetRefIds);
                             } catch { /* Last remains fail-open when the response is not a data frame. */ }
                         }
@@ -622,9 +636,10 @@
                         if (analysisCaptureActive && panelAnalysisRequestMatches(analysisCapture, requestBody, requestStartedAt)) {
                             observePanelAnalysisResponse(analysisCapture, decoded, requestBody, requestStartedAt);
                         }
-                        const data = transform(decoded, requestBody, { requestId, transport: 'fetch' });
+                        const request = { requestId, transport: 'fetch' };
+                        const data = transform(decoded, requestBody, request);
                         consumeVisualStylesAfterQuery();
-                        completeRequest(requestId, 'fetch', data?.results ? 'transformed' : 'decode-error');
+                        completeRequest(requestId, 'fetch', request.failure?.outcome || (data?.results ? 'transformed' : 'decode-error'), request.failure);
                         return window.DashBridgeGrafanaNetwork.createJsonResponse(data, response);
                     } catch (error) {
                         pushEvent('decode-error', { requestId, transport: 'fetch', reason: error.message || String(error) });
@@ -737,7 +752,7 @@
                                 Object.defineProperty(this, 'response', { configurable: true, value: serialized });
                                 this.__dashbridgeResponseOverridden = true;
                             }
-                            completeRequest(requestId, 'xhr', json?.results ? 'transformed' : 'decode-error');
+                            completeRequest(requestId, 'xhr', request.failure?.outcome || (json?.results ? 'transformed' : 'decode-error'), request.failure);
                         } catch (error) {
                             pushEvent('decode-error', { ...request, reason: error.message || String(error) });
                             completeRequest(requestId, 'xhr', 'decode-error');

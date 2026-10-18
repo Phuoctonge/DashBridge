@@ -40,20 +40,32 @@ const dashBridgeProfileWriter = DashBridgeStorageWriter.create(null, {
 });
 const DashBridgeProfileStore = {
     async load({ deferBaseline = false } = {}) {
+        const read = async () => {
         const result = await chrome.storage.local.get(['dashbridge_profiles', 'dashbridge_activeProfileId', 'dashbridge_rejected_profiles_backup']);
         let rawProfiles = Array.isArray(result.dashbridge_profiles) ? result.dashbridge_profiles : [];
         let seededDefault = false;
-        if (!rawProfiles.some(profile => profile?.systemKey === 'dashbridge')) {
+        {
             try {
                 const response = await fetch('dashbridge-default-profile.json', { cache: 'no-store' });
                 if (response.ok) {
                     const seed = await response.json();
                     if (seed && typeof seed === 'object' && Array.isArray(seed.panels)) {
-                        const existing = rawProfiles.find(profile => profile?.isSystemDefault === true);
-                        rawProfiles = rawProfiles.filter(profile => profile !== existing);
-                        rawProfiles.push({ ...seed, name: 'DashBridge', systemKey: 'dashbridge', isSystemDefault: true,
-                            id: existing?.id || crypto.randomUUID() });
+                        const existing = rawProfiles.find(profile => profile?.systemKey === 'dashbridge' || profile?.isSystemDefault === true);
+                        const canonical = { ...seed, name: 'DashBridge', systemKey: 'dashbridge', isSystemDefault: true,
+                            id: existing?.id || crypto.randomUUID() };
+                        let restored = canonical;
                         seededDefault = true;
+                        try {
+                            if (existing) restored = DashBridgeLocalStateSchema.projectSystemProfile(canonical, existing);
+                            seededDefault = !existing || DashBridgeLocalStateSchema.systemProfileFingerprint(existing)
+                                !== DashBridgeLocalStateSchema.systemProfileFingerprint(restored);
+                        } catch (_) {
+                            // Invalid legacy customization must not discard the
+                            // packaged panels or prevent structural repair.
+                            restored = canonical;
+                        }
+                        rawProfiles = rawProfiles.filter(profile => profile !== existing);
+                        rawProfiles.push(restored);
                     }
                 }
             } catch (_) { /* packaged seed is optional in restricted/offline contexts */ }
@@ -81,7 +93,7 @@ const DashBridgeProfileStore = {
         const baseline = new Map(normalized.items.map(profile => [
             profile.id, dashBridgeProfileFingerprint(profile)
         ]));
-        dashBridgeSystemProfileBaseline = normalized.items.find(profile => profile.systemKey === 'dashbridge') || null;
+        const systemBaseline = normalized.items.find(profile => profile.systemKey === 'dashbridge');
         if ((normalized.skippedProfiles || normalized.skippedPanels) && !result.dashbridge_rejected_profiles_backup) {
             await chrome.storage.local.set({
                 dashbridge_rejected_profiles_backup: {
@@ -93,9 +105,19 @@ const DashBridgeProfileStore = {
         }
         // Cross-tab reads are speculative until the page accepts them. Rejected
         // reads must not authorize a stale draft against a newer CAS baseline.
-        const accept = () => { dashBridgeProfileBaseline = baseline; };
+        const accept = () => {
+            dashBridgeProfileBaseline = baseline;
+            dashBridgeSystemProfileBaseline = systemBaseline ? structuredClone(systemBaseline) : null;
+        };
         if (!deferBaseline) accept();
         return { profiles, activeProfileId, skippedProfiles: normalized.skippedProfiles, skippedPanels: normalized.skippedPanels, accept };
+        };
+        // Reconciliation with the packaged seed is a write; serialize it with
+        // migration and the broker, including the initial read and fetch.
+        if (typeof globalThis.navigator?.locks?.request !== 'function') {
+            throw new Error('Web Locks недоступны: профили не изменены.');
+        }
+        return globalThis.navigator.locks.request('dashbridge-profile-storage', read);
     },
     async save(profiles, activeProfileId) {
         if (!Array.isArray(profiles) || !profiles.some(profile => profile?.id === activeProfileId)) {
@@ -103,14 +125,8 @@ const DashBridgeProfileStore = {
         }
         const nextProfiles = profiles.map(profile => {
             if (profile?.systemKey !== 'dashbridge' || !dashBridgeSystemProfileBaseline) return profile;
-            // The system layout is managed by the extension, but the time range
-            // and refresh interval are deliberately user-owned preferences.
-            return { ...structuredClone(dashBridgeSystemProfileBaseline),
-                // Report settings are also user-owned. In particular, replacing
-                // the whole system profile here silently discarded custom SLA
-                // phrases immediately after the editor reported a successful save.
-                report: structuredClone(profile.report || dashBridgeSystemProfileBaseline.report),
-                timeState: structuredClone(profile.timeState || dashBridgeSystemProfileBaseline.timeState) };
+            // Runtime metadata must not become edits of the packaged layout.
+            return DashBridgeLocalStateSchema.projectSystemProfile(dashBridgeSystemProfileBaseline, profile);
         });
         return dashBridgeProfileWriter.write({ profiles: nextProfiles, activeProfileId });
     },

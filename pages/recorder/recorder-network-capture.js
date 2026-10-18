@@ -21,6 +21,8 @@
             throw new TypeError('Recorder network capture dependencies are incomplete');
         }
 
+        const extraInfoExpected = new WeakMap();
+        const extraInfoPending = new WeakMap();
         const ensureRequest = requestId => {
             const activeKey = state.activeRequests.get(requestId) || requestId;
             let request = state.requests.get(activeKey);
@@ -67,6 +69,8 @@
                     redirectURL: params.request?.url || '',
                 });
                 setResponseBodyStatus(previous, 'unavailable', 'redirect');
+                extraInfoExpected.set(previous, params.redirectHasExtraInfo !== false);
+                flushExtraInfo(cdpId);
             }
             const redirectIndex = state.redirectCounts.get(cdpId) || 0;
             const candidateKey = redirectIndex ? `${cdpId}:redirect-${redirectIndex}` : cdpId;
@@ -94,26 +98,55 @@
             return request;
         };
 
-        const requestForExtraInfo = (requestId, indexMap) => {
-            const chain = state.requestChains.get(requestId) || [];
-            const index = indexMap.get(requestId) || 0;
-            if (!chain[index]) {
-                const key = index ? `${requestId}:redirect-${index}` : requestId;
-                if (!state.requests.has(key)) {
-                    if (state.requests.size >= maxRequests) return null;
-                    state.requests.set(key, {
-                        requestId: key, cdpRequestId: requestId, stepId: state.activeStepId,
-                        requestBodyCapture: { status: 'none' },
-                        responseBodyCapture: { status: 'pending' },
-                        decodedDataLength: 0, dataEncodedLength: 0,
-                    });
-                }
-                chain[index] = key;
-                state.requestChains.set(requestId, chain);
+        const requestForExtraInfo = (requestId, indexMap, params) => {
+            let queue = extraInfoPending.get(indexMap);
+            if (!queue) { queue = { byId: new Map(), count: 0 }; extraInfoPending.set(indexMap, queue); }
+            const pendingById = queue.byId;
+            const pending = pendingById.get(requestId) || [];
+            if (params) {
+                // Early events may precede requestWillBeSent. Bound their queues
+                // by the same request cap and wait for per-hop CDP expectations.
+                if (!ensureRequest(requestId) || queue.count >= maxRequests) return [];
+                pending.push(params);
+                queue.count += 1;
+                pendingById.set(requestId, pending);
+                return [];
             }
-            const key = chain[index];
-            indexMap.set(requestId, index + 1);
-            return state.requests.get(key);
+            const chain = state.requestChains.get(requestId) || [];
+            let index = indexMap.get(requestId) || 0;
+            const matched = [];
+            while (chain[index]) {
+                const request = state.requests.get(chain[index]);
+                const expected = extraInfoExpected.get(request);
+                if (expected === undefined || (expected && !pending.length)) break;
+                index += 1;
+                if (expected) {
+                    matched.push({ request, params: pending.shift() });
+                    queue.count -= 1;
+                }
+            }
+            indexMap.set(requestId, index);
+            if (!pending.length) pendingById.delete(requestId);
+            return matched;
+        };
+
+        const flushExtraInfo = requestId => {
+            for (const { request, params } of requestForExtraInfo(requestId, state.requestExtraInfoIndexes)) {
+                request.requestHeaders = params.headers || request.requestHeaders || {};
+                request.associatedCookies = params.associatedCookies || [];
+                request.requestHeadersText = params.headersText || null;
+                request.connectTiming = params.connectTiming || null;
+                request.clientSecurityState = params.clientSecurityState || null;
+                markMultipartRequestBody(request);
+            }
+            for (const { request, params } of requestForExtraInfo(requestId, state.responseExtraInfoIndexes)) {
+                request.responseHeaders = params.headers || request.responseHeaders || {};
+                request.responseHeadersText = params.headersText || null;
+                request.blockedCookies = params.blockedCookies || [];
+                request.exemptedCookies = params.exemptedCookies || [];
+                request.resourceIPAddressSpace = params.resourceIPAddressSpace || null;
+                if (Number.isFinite(params.statusCode)) request.status = params.statusCode;
+            }
         };
 
         const captureRequestBody = async request => {
@@ -338,16 +371,8 @@
                 }
                 state.inFlight.add(params.requestId);
             } else if (method === 'Network.requestWillBeSentExtraInfo') {
-                const request = requestForExtraInfo(
-                    params.requestId, state.requestExtraInfoIndexes,
-                );
-                if (!request) return;
-                request.requestHeaders = params.headers || request.requestHeaders || {};
-                request.associatedCookies = params.associatedCookies || [];
-                request.requestHeadersText = params.headersText || null;
-                request.connectTiming = params.connectTiming || null;
-                request.clientSecurityState = params.clientSecurityState || null;
-                markMultipartRequestBody(request);
+                requestForExtraInfo(params.requestId, state.requestExtraInfoIndexes, params);
+                flushExtraInfo(params.requestId);
             } else if (method === 'Network.responseReceived') {
                 const request = ensureRequest(params.requestId);
                 if (!request) return;
@@ -371,17 +396,11 @@
                     responseTiming: params.response?.timing || null,
                     resourceType: params.type || request.resourceType,
                 });
+                extraInfoExpected.set(request, params.hasExtraInfo !== false);
+                flushExtraInfo(params.requestId);
             } else if (method === 'Network.responseReceivedExtraInfo') {
-                const request = requestForExtraInfo(
-                    params.requestId, state.responseExtraInfoIndexes,
-                );
-                if (!request) return;
-                request.responseHeaders = params.headers || request.responseHeaders || {};
-                request.responseHeadersText = params.headersText || null;
-                request.blockedCookies = params.blockedCookies || [];
-                request.exemptedCookies = params.exemptedCookies || [];
-                request.resourceIPAddressSpace = params.resourceIPAddressSpace || null;
-                if (Number.isFinite(params.statusCode)) request.status = params.statusCode;
+                requestForExtraInfo(params.requestId, state.responseExtraInfoIndexes, params);
+                flushExtraInfo(params.requestId);
             } else if (method === 'Network.dataReceived') {
                 const request = ensureRequest(params.requestId);
                 if (!request) return;
@@ -407,6 +426,9 @@
             } else if (method === 'Network.loadingFailed') {
                 const request = ensureRequest(params.requestId);
                 if (!request) return;
+                // CORS/blocked requests can emit ExtraInfo without responseReceived.
+                if (!extraInfoExpected.has(request)) extraInfoExpected.set(request, true);
+                flushExtraInfo(params.requestId);
                 request.finishedMonotonic = params.timestamp;
                 request.failed = true;
                 request.errorText = params.errorText;

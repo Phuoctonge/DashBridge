@@ -76,7 +76,11 @@ fallback не закрывает. Подробнее — [DashFlow v2](dashflow-
 запрос выполняется без credentials/referrer, а сервер не хранит IP/access logs.
 Контракт данных описан в `docs/analytics.md`.
 
-DNR дополнительно ограничен initiator расширения; при навигации с DashBridge
+DNR дополнительно ограничен initiator расширения либо hostname целевой Grafana:
+это сохраняет embedding при самостоятельной навигации iframe на login/rotation
+после простоя. `initiatorDomains` сопоставляет также поддомены и не различает
+порты; target-host/port regex и DashBridge tabIds остаются обязательными.
+Переходы на сторонние SSO-hosts не разрешаются автоматически. При навигации с DashBridge
 или замене вкладки service worker пересинхронизирует правила. Вкладка с чужим
 pendingUrl исключается. Общий broker снимков direct Grafana и DashBridge
 проверяет активную вкладку и URL до и после capture и отклоняет результат при
@@ -88,7 +92,8 @@ pendingUrl исключается. Общий broker снимков direct Grafa
 scripts или Popup. Service worker проверяет HTTP(S) dashboard URL без credentials,
 сохраняет только host, ограничивает подключения сотней и дожидается runtime/DNR.
 Query-параметры, имена дашбордов и контекст теста не отправляются в аналитику.
-Область DNR остаётся прежней: разрешённые hosts, DashBridge tabs, extension initiator.
+Область DNR: разрешённые target-hosts, DashBridge tabs и initiator расширения
+либо hostname самой целевой Grafana. Обычные вкладки сайтов не получают embedding.
 
 Команда `dashbridge-grafana-connections-replace` разрешена только exact Options
 page, проверяет нормализованные списки и базовое состояние в очереди владельца
@@ -164,3 +169,12 @@ policy от этого не появляются. Серверная настр�
 допустимости каждого сообщения. Проверка sender/route/origin выполняется
 владельцем конкретного действия. Известные DOM-scope и explicit-loader
 ограничения выше остаются ограничениями; текст документа не устраняет их.
+
+Системный профиль DashBridge дополнительно защищён владельцем записи:
+background profile broker запрещает добавление из direct Grafana, удаление и
+структурную подмену профиля. Разрешены время/refresh, проект/серверы и настройки
+графиков; datasource и шаблоны сообщения фиксированы. Options при импорте и
+восстановлении сохраняет существующий системный профиль. Сверка с упакованным
+seed принадлежит profile store и использует общий profile-storage Web Lock.
+Это защита штатных UI/message-путей, без новых permissions; DevTools и правка
+самих файлов расширения находятся вне этой границы.

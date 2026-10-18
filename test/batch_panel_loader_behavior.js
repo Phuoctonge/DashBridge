@@ -12,6 +12,7 @@ let ordinaryInterceptorAvailable = true;
 let requestCompleteEventsAvailable = true;
 let filteredEmptyAllowed = false;
 let canvasPainted = true;
+let pixelReadbacks = 0;
 let panelHasRenderer = true;
 let svgMode = 'canvas';
 let panelText = '';
@@ -25,7 +26,10 @@ let earlyRuntimeCalls = 0;
 const renderer = {
     width: 800, height: 300,
     getBoundingClientRect: () => ({ height: 300, width: 800 }),
-    getContext: () => ({ getImageData: () => ({ data: canvasPainted ? [255, 0, 0, 255] : [255, 255, 255, 0] }) }),
+    getContext: () => ({ getImageData: () => {
+        pixelReadbacks++;
+        return { data: canvasPainted ? [255, 0, 0, 255] : [255, 255, 255, 0] };
+    } }),
 };
 const panel = {
     querySelector: selector => {
@@ -164,6 +168,31 @@ vm.runInContext(fs.readFileSync('pages/batch/batch-panel-loader.js', 'utf8'), co
     assert.equal(earlyRuntimeCalls, 1, 'ordinary Batch panels must install the MAIN runtime before navigation');
     assert.equal(logs[0], 'Загрузка панели 7…');
     assert.equal(listeners.size, 0, 'loader must remove its tab listener after readiness');
+    assert.ok(pixelReadbacks > 0, 'generic canvas readiness must still verify painted pixels');
+    context.DashBridgeGrafanaVisualEngine = { findUPlot: () => ({ data: [[1], [2]] }) };
+    pixelReadbacks = 0;
+    const nativeChartResult = await loadPanel(
+        7, 'https://grafana.example/d/dashboard?viewPanel=7', '7', null, null, null,
+    );
+    assert.deepEqual({ ...nativeChartResult }, { x: 10, y: 20, w: 800, h: 400, dpr: undefined });
+    assert.equal(pixelReadbacks, 0, 'native series data must avoid redundant canvas readback');
+    delete context.DashBridgeGrafanaVisualEngine;
+
+    const normalApplyPanelTools = context.applySharedGrafanaPanelTools;
+    context.applySharedGrafanaPanelTools = async () => ({ ok: false, reason: 'refresh-unavailable' });
+    for (const tools of [{ convertMemToUsed: true }, { seriesQueryFilterEnabled: true }]) {
+        const unconfirmedResult = await loadPanel(
+            7, 'https://grafana.example/d/dashboard?viewPanel=7', '7', null, null, tools,
+        );
+        assert.equal(unconfirmedResult, null,
+            'response transformations must not capture an unconfirmed first render without Refresh');
+    }
+    const visualOnlyResult = await loadPanel(
+        7, 'https://grafana.example/d/dashboard?viewPanel=7', '7', null, null, { removeFill: true },
+    );
+    assert.deepEqual({ ...visualOnlyResult }, { x: 10, y: 20, w: 800, h: 400, dpr: undefined },
+        'visual-only settings may use the current valid render when Refresh is unavailable');
+    context.applySharedGrafanaPanelTools = normalApplyPanelTools;
 
     canonicalizeNavigation = true;
     currentTabUrl = 'https://grafana.example/d/other';
@@ -179,6 +208,7 @@ vm.runInContext(fs.readFileSync('pages/batch/batch-panel-loader.js', 'utf8'), co
     currentTabUrl = 'https://grafana.example/d/dashboard?viewPanel=7';
 
     ordinaryDataReady = false;
+    pixelReadbacks = 0;
     const blankResult = await loadPanel(
         7,
         'https://grafana.example/d/dashboard?viewPanel=7',
@@ -186,7 +216,17 @@ vm.runInContext(fs.readFileSync('pages/batch/batch-panel-loader.js', 'utf8'), co
         { aborted: false, addEventListener() {}, removeEventListener() {} },
     );
     assert.equal(blankResult, null, 'ordinary data panels must not capture before their request settles');
+    assert.equal(pixelReadbacks, 0, 'active requests must avoid canvas readback until settlement');
     ordinaryDataReady = true;
+
+    canvasPainted = false;
+    pixelReadbacks = 0;
+    const settledBlankCanvas = await loadPanel(
+        7, 'https://grafana.example/d/dashboard?viewPanel=7', '7', null, null, null,
+    );
+    assert.equal(settledBlankCanvas, null, 'settled requests alone must not accept a blank generic canvas');
+    assert.ok(pixelReadbacks > 0, 'generic canvas still needs pixel evidence after request settlement');
+    canvasPainted = true;
 
     requestCompleteEventsAvailable = false;
     const rendererWithoutCompletionEvent = await loadPanel(

@@ -4,7 +4,7 @@
     function create({ normalizePanelUrl, buildSoloPanelUrl, getPanelIdentity, parsePanelIds,
         parseDashboardUrl, fetchDashboardPanels, normalizePanelMetadataText, showAlert,
         currentProfileHasPanel, getCurrentProfilePanelIdentities, getPanels, savePanels,
-        appendPanelCards, showConfirm, configureConnection,
+        appendPanelCards, showConfirm, configureConnection, canEditProfile = () => true,
         documentRef = document, randomUUID = () => crypto.randomUUID() }) {
         if (typeof normalizePanelUrl !== 'function' || typeof buildSoloPanelUrl !== 'function'
             || typeof getPanelIdentity !== 'function' || typeof parsePanelIds !== 'function'
@@ -72,6 +72,7 @@
             return true;
         };
         const addAndSave = async (id, addedPanels, getSignature, onSaved) => {
+            if (!canEditProfile()) return;
             const owner = getPanels();
             const record = { id, owner, getSignature, signature: getSignature(), onSaved,
                 version: formVersions.get(id) || 0 };
@@ -81,6 +82,7 @@
             await persistAddition(record);
         };
         const ensureConnection = async (url, isCurrent) => {
+            if (!canEditProfile()) return false;
             if (connectionPending) return false;
             connectionPending = true;
             try {

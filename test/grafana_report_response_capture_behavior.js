@@ -31,7 +31,8 @@ assert(toolsSource.includes('const observeActive = transformActive || hasPersist
 
 assert(toolsSource.includes('visualMetadata.responseTableRecords = collectResponseTableRecords(scopedData);')
     && toolsSource.includes('visualMetadata.responseSeriesNames = collectResponseSeriesNames(scopedData);')
-    && toolsSource.includes("completeRequest(requestId, 'fetch', data?.results ? 'transformed' : 'decode-error');"),
+    && toolsSource.includes("completeRequest(requestId, 'fetch', request.failure?.outcome")
+    && toolsSource.includes('return window.DashBridgeGrafanaNetwork.createJsonResponse(data, response);'),
     'active panel transforms must retain lightweight table/name metadata and return the transformed response');
 
 assert(visualSource.includes('const collectPanelReportSnapshot')

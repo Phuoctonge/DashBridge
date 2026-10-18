@@ -12,6 +12,7 @@ const frame = value => ({ schema: { fields: [
 function createHarness({ iframe = true, capacity = false, visual = false } = {}) {
     const pending = [];
     const statuses = [];
+    const statusDetails = [];
     const events = [];
     class XHR extends EventTarget {
         open() { this.readyState = 1; this.status = 0; }
@@ -46,12 +47,12 @@ function createHarness({ iframe = true, capacity = false, visual = false } = {})
         legendSelection: context.DashBridgeGrafanaLegendSelection,
         getTargetPanel: () => null, pushBoundedDiagnosticEvent: (_journal, event) => events.push(event),
         capDiagnosticJournal() {}, setRecentDiagnosticRecord() {},
-        setPanelDataStatus: status => statuses.push(status), syncPanelDataStatusPresentation() {},
+        setPanelDataStatus(status, details) { statuses.push(status); statusDetails.push(details); }, syncPanelDataStatusPresentation() {},
         responseSeriesFilterIsEnabled: () => false, syncResponseFilterPresentation() {},
         hasPersistentVisualWork: () => visual, reapplyVisualStylesAfterDataTransform() {},
         consumeVisualStylesAfterQuery() {}, registerRuntimeCleanup() {}, isThresholdRestorePending: () => false
     }).installDataInterceptor();
-    return { context, tools, statuses, events,
+    return { context, tools, statuses, statusDetails, events,
         async start(transport, queries) {
             const body = JSON.stringify({ queries });
             if (transport === 'fetch') {
@@ -80,6 +81,31 @@ function createHarness({ iframe = true, capacity = false, visual = false } = {})
 const cases = [];
 const test = (name, run) => cases.push({ name, run });
 for (const transport of ['fetch', 'xhr-text', 'xhr-json']) {
+    for (const iframe of [false, true]) test(`${transport}: iframe=${iframe} RAM pairs remain distinct across scrape jobs`, async () => {
+        const harness = createHarness({ iframe });
+        const queries = ['A', 'B', 'C'].map(refId => ({ ...query, refId }));
+        Object.assign(harness.tools, { convertMemToUsed: true,
+            targetQuerySignatures: queries.map(item => JSON.stringify(item)) });
+        const memory = (role, job, values) => ({ schema: { fields: [
+            { name: 'Time', type: 'time' },
+            { name: role === 'Used' ? 'Value' : `node_memory_Mem${role}_bytes`, type: 'number',
+                config: { displayNameFromDS: `vm1 ${role}` }, labels: { instance: 'vm1', job,
+                    ...(role === 'Used' ? {} : { __name__: `node_memory_Mem${role}_bytes` }) } }
+        ] }, data: { values: [[1000, 2000], values] } });
+        const payload = { results: {
+            A: { frames: [memory('Used', 'first', [50, 60]), memory('Used', 'second', [10, 20])] },
+            B: { frames: [memory('Available', 'second', [180, 160]), memory('Available', 'first', [40, 25])] },
+            C: { frames: [memory('Total', 'first', [100, 100]), memory('Total', 'second', [200, 200])] }
+        } };
+        const request = await harness.start(transport, queries);
+        const output = (await request.finish(payload)).payload;
+        const frames = Object.values(output.results).flatMap(result => result.frames);
+        assert.equal(frames.length, 2, 'no original byte fields may leak into the percent plot');
+        assert(frames.every(item => item.schema.fields[1].config.unit === 'percent'));
+        assert.deepEqual(frames.find(item => item.schema.fields[1].labels.job === 'first').data.values[1], [60, 75]);
+        assert.deepEqual(frames.find(item => item.schema.fields[1].labels.job === 'second').data.values[1], [10, 20]);
+        assert.equal(harness.context.__dashbridgeDataInterceptorDiagnostic.last.memoryTransform.applied, true);
+    });
     for (const iframe of [true, false]) for (const [domain, instances] of [
         ['.passport.local:9182', ['vm.passport.local:9182', 'vm']],
         ['.passport.local', ['vm.passport.local:9182', 'vm:9182']],
@@ -160,6 +186,51 @@ for (const transport of ['fetch', 'xhr-text', 'xhr-json']) {
             assert.equal(harness.events.some(event => event.stage === 'decode-error'), false);
         });
     }
+    for (const httpStatus of [200, 401]) test(`${transport}: unauthorized query is never empty source (HTTP ${httpStatus})`, async () => {
+        const harness = createHarness();
+        harness.tools.invertIdle = true;
+        const request = await harness.start(transport, [query]);
+        const payload = httpStatus === 200
+            ? { results: { A: { error: 'Unauthorized', status: 401, frames: [] } } }
+            : { message: 'Unauthorized' };
+        assert.deepEqual((await request.finish(payload, httpStatus)).payload, payload);
+        assert.equal(harness.statuses.at(-1), 'http_error');
+        assert.equal(harness.statusDetails.at(-1).httpStatus, 401);
+        assert.equal(harness.statuses.includes('empty_source'), false);
+    });
+    test(`${transport}: embedded query failure survives a parallel successful response`, async () => {
+        const harness = createHarness();
+        harness.tools.invertIdle = true;
+        const failed = await harness.start(transport, [query]);
+        const successful = await harness.start(transport, [query]);
+        await failed.finish({ results: { A: { error: 'Unauthorized', status: 401, frames: [] } } });
+        await successful.finish({ results: { A: { frames: [frame(1)] } } });
+        assert.equal(harness.statuses.at(-1), 'http_error');
+        assert.equal(harness.statusDetails.at(-1).httpStatus, 401);
+        const recovery = await harness.start(transport, [query]);
+        await recovery.finish({ results: { A: { frames: [] } } });
+        assert.equal(harness.statuses.at(-1), 'empty_source', 'a later successful cycle clears the failure');
+    });
+    test(`${transport}: unrelated query failure does not affect scoped panel data`, async () => {
+        const harness = createHarness({ iframe: false });
+        harness.tools.invertIdle = true;
+        const request = await harness.start(transport, [query, { ...query, refId: 'B', expr: 'other_metric' }]);
+        const payload = { results: { A: { frames: [frame(1)] }, B: { error: 'Unauthorized', status: 401, frames: [] } } };
+        assert.deepEqual((await request.finish(payload)).payload, payload);
+        assert.equal(harness.statuses.at(-1), 'data');
+    });
+    test(`${transport}: private capacity helper failure leaves native panel data available`, async () => {
+        const harness = createHarness({ capacity: true });
+        const request = await harness.start(transport, [query]);
+        const helper = JSON.parse(request.body).queries.find(item => item.refId !== 'A');
+        assert.ok(helper, 'capacity filter must add its request-owned helper');
+        const result = await request.finish({ results: {
+            A: { frames: [frame(17)] },
+            [helper.refId]: { error: 'Unauthorized', status: 401, frames: [] }
+        } });
+        assert.deepEqual(result.payload, { results: { A: { frames: [frame(17)] } } });
+        assert.equal(harness.statuses.at(-1), 'data', 'missing helper capacity must fail open');
+    });
     test(`${transport}: disabled filter adds no helper and leaves response unchanged`, async () => {
         const harness = createHarness();
         const request = await harness.start(transport, [query]);

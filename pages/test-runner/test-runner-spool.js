@@ -52,6 +52,20 @@ class DiagnosticSpool {
     static async clearStaleSessions() {
         if (typeof navigator.storage?.getDirectory !== 'function' || !navigator.locks?.request) return;
         const root = await navigator.storage.getDirectory();
+        for await (const [name, handle] of root.entries()) {
+            const match = /^dashbridge-e2e-export-(\d+)-[a-z0-9]+\.json$/.exec(name);
+            if (!match || handle.kind !== 'file') continue;
+            await navigator.locks.request(`dashbridge-export:${name}`, { ifAvailable: true }, async lock => {
+                if (!lock) return;
+                try {
+                    const file = await (await root.getFileHandle(name)).getFile();
+                    // A long writer may finish well after its filename timestamp.
+                    // Preserve the full download grace after the last write too.
+                    const modified = Math.max(Number(match[1]), Number(file.lastModified) || 0);
+                    if (Date.now() - modified >= 30 * 60_000) await root.removeEntry(name);
+                } catch { /* Another document may already have reclaimed this export. */ }
+            });
+        }
         const base = await root.getDirectoryHandle('dashbridge-e2e-spool', { create: true });
         for await (const [name] of base.entries()) {
             if (!name.startsWith('dashbridge-e2e-run-')) continue;

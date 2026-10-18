@@ -3,7 +3,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const context = {};
+const context = { URL };
 context.globalThis = context;
 vm.createContext(context);
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'shared', 'dnr-rules.js'), 'utf8'), context);
@@ -26,6 +26,11 @@ assert(!new RegExp(plan.rules[0].condition.regexFilter).test('https://child.a.te
 assert.deepStrictEqual(Array.from(plan.rules[0].condition.tabIds), [1, 2]);
 assert.strictEqual(context.DashBridgeDnrRules.planSessionRules([], [1]).truncated, false);
 const guarded = context.DashBridgeDnrRules.buildSessionRules(['grafana.test'], [17], { initiatorDomain: 'extension-id' });
-assert.deepStrictEqual(Array.from(guarded[0].condition.initiatorDomains), ['extension-id'],
-    'rules must reject website initiators even before navigation cleanup finishes');
+assert.deepStrictEqual(Array.from(guarded[0].condition.initiatorDomains), ['extension-id', 'grafana.test'],
+    'configured Grafana must retain embedding on its own session/login navigations');
+const portGuarded = context.DashBridgeDnrRules.buildSessionRules(['grafana.test:8443', 'other.test'], [17], { initiatorDomain: 'extension-id' });
+assert.deepStrictEqual(Array.from(portGuarded[0].condition.initiatorDomains), ['extension-id', 'grafana.test']);
+assert(!portGuarded[0].condition.initiatorDomains.includes('other.test'), 'another configured host cannot initiate this host rule');
+assert(new RegExp(portGuarded[0].condition.regexFilter).test('https://grafana.test:8443/login'));
+assert(!new RegExp(portGuarded[0].condition.regexFilter).test('https://grafana.test:9443/login'));
 console.log('PASS Grafana DNR rules are session-scoped to DashBridge tab IDs');

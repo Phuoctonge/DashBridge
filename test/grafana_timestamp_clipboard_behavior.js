@@ -60,12 +60,13 @@ for (const value of ['2024-02-29T12:00:00+0300', '2024-02-29 12:00:00 GMT+0300']
 
 async function popupRegression() {
     const elements = new Map();
-    for (const id of ['grafanaTimestampReadBtn', 'grafanaTimestampResult', 'grafanaTimestampFrom',
+    for (const id of ['grafanaDjangoTimeCard', 'grafanaTimestampReadBtn', 'grafanaTimestampResult', 'grafanaTimestampFrom',
         'grafanaTimestampTo', 'grafanaTimestampStatus']) {
         elements.set(id, { textContent: '', hidden: true, handlers: {},
             style: { display: '', removeProperty(name) { delete this[name]; } },
             classList: { toggle() {} }, addEventListener(name, handler) { this.handlers[name] = handler; } });
     }
+    let timestampReads = 0;
     const activeUrl = 'https://grafana.example/d/source?from=1787774400000&to=1787777280000'
         + '&var-instance=one&var-instance=two&timezone=Europe%2FMoscow&secret=private';
     const opened = [];
@@ -82,13 +83,21 @@ async function popupRegression() {
             update(id, options) { assert.strictEqual(id, 42); opened.push(new URL(options.url)); }
         }, storage: {
             sync: { get(keys, callback) { callback({ grafanaKeepParams: 'from, to, var-instance, timezone' }); } },
-            session: { get(keys, callback) { callback({}); }, set() {}, remove() {} }
+            session: { get(keys, callback) { timestampReads++; callback({}); }, set() {}, remove() {} }
         } }
     };
     vm.createContext(popup);
     vm.runInContext(fs.readFileSync('js/shared/grafana-time.js', 'utf8'), popup);
     vm.runInContext(source, popup);
     popup.setupGrafanaTimestampTool();
+    assert.equal(timestampReads, 0, 'Django tool is off by default and must not read its cache');
+    assert.equal(elements.get('grafanaDjangoTimeCard').hidden, true);
+    assert.equal(elements.get('grafanaTimestampReadBtn').handlers.click, undefined);
+    popup.setupGrafanaTimestampTool(false);
+    assert.equal(timestampReads, 0, 'explicitly disabled tool must not initialize');
+    popup.setupGrafanaTimestampTool(true);
+    assert.equal(elements.get('grafanaDjangoTimeCard').hidden, false);
+    assert.equal(timestampReads, 1);
     const status = elements.get('grafanaTimestampStatus');
     // Reproduce popup-core's tab-change cleanup before the next user action.
     status.style.display = 'none';

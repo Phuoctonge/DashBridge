@@ -80,6 +80,7 @@
                         );
                     if (choice !== 'replace' && choice !== 'create') return;
                     if (choice === 'replace') {
+                        if (getActiveProfile()?.id !== activeProfile?.id || getActiveProfile()?.systemKey === 'dashbridge') return;
                         setPanels(importedPanels);
                         if (activeProfile && imported.hasTimeState) {
                             activeProfile.timeState = importedTimeState;

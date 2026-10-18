@@ -120,6 +120,8 @@ async function exportDiagnostics() {
     let fileHandle = null;
     let temporaryRoot = null;
     let temporaryName = null;
+    let releaseTemporaryLease = null;
+    let downloadRetained = false;
     try {
         if (typeof window.showSaveFilePicker === 'function') {
             try {
@@ -159,6 +161,13 @@ async function exportDiagnostics() {
             }
             temporaryRoot = await navigator.storage.getDirectory();
             temporaryName = `dashbridge-e2e-export-${Date.now()}-${Math.random().toString(36).slice(2)}.json`;
+            if (!navigator.locks?.request) throw new Error('Web Locks недоступны для безопасного временного экспорта');
+            await new Promise((resolve, reject) => {
+                navigator.locks.request(`dashbridge-export:${temporaryName}`, { ifAvailable: true }, async lock => {
+                    if (!lock) throw new Error('Временный экспорт уже занят');
+                    await new Promise(release => { releaseTemporaryLease = release; resolve(); });
+                }).catch(reject);
+            });
             fileHandle = await temporaryRoot.getFileHandle(temporaryName, { create: true });
         }
         const writable = await fileHandle.createWritable();
@@ -178,13 +187,16 @@ async function exportDiagnostics() {
             link.href = url;
             link.download = filename;
             link.click();
-            setTimeout(() => {
+            setTimeout(async () => {
                 URL.revokeObjectURL(url);
-                void temporaryRoot.removeEntry(temporaryName).catch(() => { });
+                try { await temporaryRoot.removeEntry(temporaryName); }
+                catch { /* A later startup cleanup can retry a failed deletion. */ }
+                finally { releaseTemporaryLease?.(); }
             // A multi-gigabyte browser download can legitimately take several
             // minutes. Keep the disk-backed source alive without retaining it
             // in JS heap, then reclaim the private temporary file.
             }, 30 * 60_000);
+            downloadRetained = true;
             if (elStatusLine) {
                 elStatusLine.textContent = `Диагностика собрана во временный файл и передана браузеру: ${(progress.characters / 1024 / 1024).toFixed(1)} МБ`;
                 elStatusLine.className = 'tr-status tr-status-ok';
@@ -197,13 +209,14 @@ async function exportDiagnostics() {
         }
     } catch (error) {
         // Opening the writer or reading the completed file can fail too.
-        if (temporaryRoot && temporaryName) await temporaryRoot.removeEntry(temporaryName).catch(() => { });
+        if (temporaryRoot && temporaryName && releaseTemporaryLease) await temporaryRoot.removeEntry(temporaryName).catch(() => { });
         console.error('[TestRunner] Diagnostic export failed', error);
         if (elStatusLine) {
             elStatusLine.textContent = `Не удалось экспортировать диагностику: ${error?.message || String(error)}`;
             elStatusLine.className = 'tr-status tr-status-fail';
         }
     } finally {
+        if (!downloadRetained) releaseTemporaryLease?.();
         exporting = false;
         if (elExportDiagnosticsBtn) elExportDiagnosticsBtn.disabled = false;
         onExportStateChange(false);

@@ -221,6 +221,7 @@ const dashBridgePanelTransferController = DashBridgePanelTransferController.crea
     renderDashboard,
 });
 const dashBridgePanelAdditionController = DashBridgePanelAdditionController.create({
+    canEditProfile: () => getActiveProfile()?.systemKey !== 'dashbridge',
     normalizePanelUrl: normalizeGrafanaPanelUrl,
     buildSoloPanelUrl: buildDashBridgeSoloPanelUrl,
     getPanelIdentity: getProfilePanelIdentity,

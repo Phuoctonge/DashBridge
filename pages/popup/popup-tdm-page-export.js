@@ -1,4 +1,4 @@
-// Serialized function executed in the active TDM page MAIN world.
+// Serialized function executed in the active TDM page isolated world.
 // Keep it self-contained: chrome.scripting.executeScript transfers only this function body.
 async function _tdmExportScriptInternal(options) {
     const TDM_EXPORT_MAX_DURATION_MS = 10 * 60 * 1000;
@@ -8,6 +8,9 @@ async function _tdmExportScriptInternal(options) {
 
     const chatContainer = document.querySelector('[class*="ChatContainerScrollableBlock"]');
     if (!chatContainer) return { error: "Чат не найден" };
+    // The page owns scrolling even if the launching popup closes or is reopened.
+    if (globalThis.__dashbridgeTdmExportActive) return { errorCode: 'busy', error: 'Экспорт этого чата уже выполняется.' };
+    globalThis.__dashbridgeTdmExportActive = true;
 
     const originalDistanceFromBottom = Math.max(0, chatContainer.scrollHeight - chatContainer.scrollTop);
     const exportDeadline = Date.now() + TDM_EXPORT_MAX_DURATION_MS;
@@ -391,5 +394,6 @@ async function _tdmExportScriptInternal(options) {
     } finally {
         clearTimeout(watchdog);
         chatContainer.scrollTop = Math.max(0, chatContainer.scrollHeight - originalDistanceFromBottom);
+        globalThis.__dashbridgeTdmExportActive = false;
     }
 }

@@ -20,6 +20,11 @@
                 <input id="debugEasterEggFile" type="file" accept=".png,.jpg,.jpeg,.jpe,.webp,.gif,.bmp,.svg,.avif,image/png,image/jpeg,image/webp,image/gif,image/bmp,image/svg+xml,image/avif">
                 <button id="debugEasterEggClear" type="button">Очистить</button>
                 <button id="debugEasterEggClose" type="button" aria-label="Закрыть окно">×</button>
+                <label class="debug-easter-egg-size" for="debugEasterEggSize">
+                    Размер
+                    <input id="debugEasterEggSize" type="range" min="-100" max="100" value="0" aria-valuetext="100%">
+                    <output id="debugEasterEggSizeValue" for="debugEasterEggSize">100%</output>
+                </label>
             </div>
         </header>
         <div id="debugEasterEggTarget" class="debug-easter-egg-target">

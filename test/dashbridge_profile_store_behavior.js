@@ -21,6 +21,7 @@ const stored = {
 };
 const context = {
     URL, console, Date, structuredClone,
+    navigator: { locks: { request: async (_name, callback) => callback() } },
     crypto: { randomUUID: () => '00000000-0000-4000-8000-000000000001' },
     chrome: { runtime: {
         lastError: null,

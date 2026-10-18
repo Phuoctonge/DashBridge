@@ -142,6 +142,65 @@ assert.strictEqual(context.transformMem(ambiguousUsed).applied, false);
 assert.deepStrictEqual(ambiguousUsed, ambiguousBefore,
     'multiple related original Used fields must fail open atomically');
 
+// The live Grafana response contains two jobs for one instance. Reversing
+// Available order must not combine one scrape's Total with the other scrape.
+const twoJobs = () => ({ results: {
+    T: { frames: [memoryFrame('Total', [100, 100]),
+        memoryFrame('Total', [200, 200], { labels: { job: 'second-job' } })] },
+    A: { frames: [memoryFrame('Available', [180, 160], { labels: { job: 'second-job' } }),
+        memoryFrame('Available', [40, 25])] },
+    U: { frames: [memoryFrame('Used', [55, 70]),
+        memoryFrame('Used', [15, 30], { labels: { job: 'second-job' } })] }
+} });
+const distinctJobs = twoJobs();
+assert.strictEqual(context.transformMem(distinctJobs).applied, true);
+const jobFrames = Object.values(distinctJobs.results).flatMap(result => result.frames);
+assert.strictEqual(jobFrames.length, 2,
+    'every complete label identity must be converted without leftover byte fields');
+assert(jobFrames.every(item => item.schema.fields[1].config.unit === 'percent'));
+const valuesForJob = job => Array.from(jobFrames.find(item => item.schema.fields[1].labels.job === job).data.values[1]);
+assert.deepStrictEqual(valuesForJob('node'), [60, 75]);
+assert.deepStrictEqual(valuesForJob('second-job'), [10, 20]);
+
+const roleInHostname = threeSeries();
+for (const [ref, role] of [['T', 'Total'], ['A', 'Available'], ['U', 'Used']]) {
+    const field = roleInHostname.results[ref].frames[0].schema.fields[1];
+    field.labels.instance = 'totalvm:9182';
+    field.config.displayNameFromDS = `totalvm:9182 ${role}`;
+}
+assert.strictEqual(context.transformMem(roleInHostname).applied, true);
+assert.strictEqual(Object.values(roleInHostname.results).flatMap(result => result.frames).length, 1,
+    'role words inside a hostname must not prevent removal of the matching Used byte field');
+
+const shortHostLabel = threeSeries();
+Object.values(shortHostLabel.results).forEach(result => {
+    result.frames[0].schema.fields[1].labels.host = 'a';
+});
+assert.strictEqual(context.transformMem(shortHostLabel).applied, true,
+    'short identity labels must not erase letters inside metric role names');
+
+const missingJobPair = twoJobs();
+missingJobPair.results.A.frames.shift();
+const missingJobBefore = clone(missingJobPair);
+assert.strictEqual(context.transformMem(missingJobPair).applied, false);
+assert.deepStrictEqual(missingJobPair, missingJobBefore,
+    'a complete first job must not conceal an incomplete second job on the same instance');
+
+const duplicateTotal = threeSeries();
+duplicateTotal.results.T.frames.push(memoryFrame('Total', [200, 200]));
+const duplicateTotalBefore = clone(duplicateTotal);
+assert.strictEqual(context.transformMem(duplicateTotal).applied, false);
+assert.deepStrictEqual(duplicateTotal, duplicateTotalBefore,
+    'two Total fields with exactly the same identity are ambiguous, not first-match wins');
+
+const misalignedPair = threeSeries();
+misalignedPair.results.U.frames = [];
+misalignedPair.results.A.frames[0].data.values[0] = [2, 3];
+const misalignedPairBefore = clone(misalignedPair);
+assert.strictEqual(context.transformMem(misalignedPair).applied, false);
+assert.deepStrictEqual(misalignedPair, misalignedPairBefore,
+    'Total/Available time alignment must be checked even without an original Used field');
+
 context.tools.availKeyword = 'consumed';
 context.tools.memCalcMode = 'used';
 const customUsed = { results: {

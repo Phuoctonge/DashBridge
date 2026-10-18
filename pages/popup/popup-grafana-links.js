@@ -3,7 +3,9 @@
 
 document.addEventListener("DOMContentLoaded", () => {
     if (typeof renderButtons === 'function') renderButtons();
-    setupGrafanaTimestampTool();
+    chrome.storage.sync.get({ module_grafana_django_time: false }, settings => {
+        setupGrafanaTimestampTool(settings?.module_grafana_django_time === true);
+    });
     const modal = document.getElementById("modalOverlay");
     const openModalBtn = document.getElementById("openAddModal");
     const closeModalBtn = document.getElementById("closeModal");
@@ -45,7 +47,11 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 });
 
-function setupGrafanaTimestampTool() {
+function setupGrafanaTimestampTool(enabled = false) {
+    const card = document.getElementById('grafanaDjangoTimeCard');
+    if (!card) return;
+    card.hidden = enabled !== true;
+    if (enabled !== true) return;
     const storageKey = 'grafanaTimestampRange';
     const storageTtlMs = 3 * 60 * 1000;
     const timestampStorage = chrome.storage.session || chrome.storage.local;

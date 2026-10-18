@@ -13,7 +13,7 @@
         });
     }
 
-    function performDomAction(step) {
+    function performDomAction(step, inspectOnly = false) {
         const locator = step?._dashbridge?.locator || {};
         const expectedFrameUrl = step?._dashbridge?.frameUrl;
         if (expectedFrameUrl && location.href !== expectedFrameUrl) return { ok: false, url: location.href, error: 'Другой frame URL' };
@@ -100,6 +100,7 @@
             const description = locator.accessibleName || locator.ariaLabel || locator.name || locator.testId || locator.href || locator.css || 'locator';
             return { ok: false, url: location.href, error: ambiguity || `Надёжный элемент не найден: ${description}` };
         }
+        if (inspectOnly) return { ok: true, url: location.href };
         element.scrollIntoView({ block: 'center', inline: 'center' });
         if (step.type === 'click') { element.click(); return { ok: true, url: location.href }; }
         if (step.type === 'change') {
@@ -158,11 +159,25 @@
             const deadline = Date.now() + timeoutMs; let lastError = 'Элемент не найден';
             while (Date.now() < deadline) {
                 if (state.stopRequested) throw new Error('Операция остановлена пользователем');
+                // Recorded frame IDs belong to the old tab. Resolve candidates
+                // without side effects, then act in exactly one current document.
+                const mainFrame = step._dashbridge?.frameId === 0 || !step._dashbridge?.frameUrl;
+                const childFrame = !mainFrame && Number(step._dashbridge?.frameId) > 0;
                 const results = await chrome.scripting.executeScript({
-                    target: { tabId: state.tabId, allFrames: true }, func: performDomAction, args: [step]
+                    target: { tabId: state.tabId, ...(mainFrame ? { frameIds: [0] } : { allFrames: true }) },
+                    func: performDomAction, args: [step, true]
                 }).catch(error => { lastError = error?.message || String(error); return []; });
-                const success = results.find(item => item.result?.ok);
-                if (success) return success;
+                const candidates = results.filter(item => item.result?.ok && (!childFrame || item.frameId !== 0));
+                if (candidates.length > 1) throw new Error('Неоднозначный frame: элемент найден в нескольких фреймах');
+                if (state.stopRequested) throw new Error('Операция остановлена пользователем');
+                const candidate = candidates[0];
+                if (candidate) {
+                    const target = { tabId: state.tabId, ...(candidate.documentId
+                        ? { documentIds: [candidate.documentId] } : { frameIds: [candidate.frameId] }) };
+                    const [execution] = await chrome.scripting.executeScript({ target, func: performDomAction, args: [step] });
+                    if (execution?.result?.ok) return execution;
+                    throw new Error(execution?.result?.error || 'Документ frame изменился перед действием');
+                }
                 lastError = results.map(item => item.result?.error).filter(error => error && error !== 'Другой frame URL')[0] || lastError;
                 await delay(200);
             }

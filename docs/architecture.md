@@ -94,6 +94,31 @@ Wrappers устанавливаются один раз на документ; �
 [network](../test/grafana_network_behavior.js) и
 [runtime](../test/grafana_panel_data_runtime_behavior.js).
 
+### CPU Idle → Load: подтверждённый контракт
+
+`transformCpuData` в [panel response transforms](../js/content/grafana-panel-data-transforms.js)
+использует Idle в процентах `0…100`: вычисляет `100 − Idle`, сохраняет время
+и null, оставляет вычисленные ряды `load (calc)` вместо исходных CPU modes.
+Владелец transport и cleanup — `grafana-panel-data-runtime.js`, владелец состояния
+и команды ON/OFF — `grafana-panel-tools.js`; алгоритм общий для direct Grafana
+и DashBridge iframe. OFF требует нового исходного ответа Grafana.
+
+**Рабочая CPU-панель проверена 2026-10-17: ошибок расчёта не обнаружено.**
+На `mon-dc.mos.ru`, dashboard `QkZzx-fWz`, panel `2` (`CPU Usage`, Grafana
+10.1.10, Flot), PromQL уже содержит `* 100 / count(...)`, ось — `percent`
+с диапазоном `0…100`. Численная live-сверка native Idle и renderer Load по
+server/timestamp на фиксированном часовом периоде: 12 серверов, 2892 точки,
+0 расхождений с допуском `1e-8`. Test Runner подтвердил ON/OFF и повторные
+переключения; временные настройки восстановлены. Порядок повторной проверки —
+[testing.md](testing.md#проверка-cpu-idle--load).
+
+Замечание «CPU неверен из-за дробной `percentunit`» к этой проверенной панели
+не относится. Настоящий вход `0…1` здесь не проверен и не объявлен поддержанным;
+он не является доказанным дефектом рабочего сценария. Не менять формулу и не
+возвращать такую находку без реального ответа, query, единицы, timestamps и
+воспроизведённого расхождения с отображаемым результатом. Unit conversion
+в отчётах — отдельный контракт, он не задаёт масштаб этого CPU-преобразования.
+
 ### DNR для единого дашборда
 
 Некоторые Grafana запрещают embedding через X-Frame-Options/CSP. Простая
@@ -103,7 +128,9 @@ Wrappers устанавливаются один раз на документ; �
 [syncRules/getDashBridgeTabIds](../js/background-grafana-infrastructure.js).
 Правила требуют разрешённый exact hostname (запись без порта допускает его порты,
 запись с портом ограничивает этот порт), `sub_frame`, tab ID страницы DashBridge
-и extension initiator. Навигация с DashBridge, закрытие/замена вкладки
+и initiator расширения либо hostname самой целевой Grafana. Это позволяет
+Grafana самостоятельно переходить на login/rotation после простоя: при таком
+переходе initiator уже не расширение. Навигация с DashBridge, закрытие/замена вкладки
 вызывают пересинхронизацию; чужой pendingUrl исключается.
 
 Действие **удаляет весь заголовок CSP**, а не только `frame-ancestors`, и XFO;
@@ -330,6 +357,13 @@ host с портом, проверка готовой регистрации т�
 потребителем. `pages/shared/theme.js` находится в `<head>` до `<body>`, синхронно читает
 `localStorage`, затем согласует тему с `chrome.storage.sync`, исключая FOWT.
 
+`popup-core.js` перед `popup-grafana-router.js` публикует
+`DashBridgePopupGuiCapture.reportSize(delay)`: единое измерение DOM и сообщение
+`dashbridge-popup-capture-size` только для GUI capture с captureId. Core и router
+сохраняют собственные точки готовности и задержки 250/350 мс; обычный action
+Popup не отправляет это сообщение. Проверка —
+[popup layout](../test/popup_initial_layout_behavior.js).
+
 `theme.js` тем же ранним путём применяет `uiScale`. Общие tokens, размеры
 контролов, иконок, отступов и читаемых областей принадлежат
 `pages/shared/theme.css`; ограниченный слой legacy/dark compatibility находится
@@ -396,19 +430,6 @@ MutationObserver/listeners на pagehide; `start` на pageshow заново з�
 listener снимаются на pagehide и восстанавливаются на pageshow.
 Таблица CPU/RAM имеет минимальную читаемую высоту; если шапка и действия
 не помещаются вместе с таблицей, прокручивается также внешний диалог.
-
-Служебное окно «Тест на свежесть кода» декодирует выбранный файл перед заменой
-видимого изображения (`loadPhoto` в `pages/debug-easter-egg/debug-easter-egg.js`).
-Повреждённый файл освобождает свой Blob URL, сохраняет прежнее фото и показывает
-ошибку в существующей подсказке. Новый корректный файл позволяет повторить действие.
-«Очистить» отменяет только эффекты; фото остаётся. Это локальный lifecycle окна,
-без storage/внешней сети; browser smoke проверяет два отказа, retry и очистку эффектов.
-Кнопка запуска в Popup видна только в активной Grafana → «Отладка»:
-`popup.css` вычисляет это через `:has()` по active-состоянию навигации.
-Отдельной JS-копии состояния нет: восстановление вкладок из storage асинхронно
-и могло закончиться после первоначальной проверки видимости. Запуск окна
-принадлежит `popup-debug-easter-egg.js`; повторное открытие, запуск и скрытие
-на других вкладках проверяет `popup_easter_egg_restore_behavior.js`.
 
 ## Владельцы логики
 
@@ -493,7 +514,7 @@ classifier. Полный режим только показывает controls �
 | ZIP/лимиты | `archive-download.js`, `archive-budget.js` | Batch, exports. |
 | Batch panel-rules UI | `batch-panel-rules-ui.js` | `batch.js`; editor, validation, delayed persistence and stale-load guard. |
 | Batch operation lifecycle | `batch-operation-controller.js` | `batch.js`; cancellation, progress, capture-window ownership and archive helpers. |
-| Batch page UI/state | `batch-page-controller.js` | Вкладки, уведомления, журнал, режим панелей, progress UI, темы снимков, нормализация диапазонов, синхронизация полей Main/Series и переключатель подробного `batch-debug.jsonl` в шапке. Настройка читается перед первым запуском и сохраняется в `chrome.storage.sync`; по умолчанию подробные логи включены. |
+| Batch page UI/state | `batch-page-controller.js` | Вкладки, уведомления, журнал, режим панелей, progress UI, темы снимков, нормализация диапазонов, синхронизация полей Main/Series и переключатель подробного `batch-debug.jsonl` в шапке. Настройка читается перед первым запуском и сохраняется в `chrome.storage.sync`; по умолчанию подробные логи включены. Переключатель доступен только на вкладке Batch: обычное сохранение Options не записывает этот ключ, импорт/экспорт настроек сохраняет его. |
 | Batch main run | `batch-main-run-controller.js` | Валидация и последовательный сбор полного dashboard, panel rules, PNG/ZIP manifest и частичный результат через общий operation lifecycle. |
 | Batch Series discovery | `batch-series-discovery-controller.js` | Dashboard API/query signatures, временная Grafana-вкладка, ранний MAIN capture, bounded settle/timeout, abort cleanup и fallback `panel-ID`/numeric ID. |
 | Batch Series run | `batch-series-run-controller.js` | Group/standalone selection, legend filtering, sequential capture, ZIP manifest, partial result и cleanup discovery tab через общий operation lifecycle. |
@@ -551,6 +572,30 @@ disabled-пункты показывают профили, в которых п�
 
 ### DashBridge
 
+Системный профиль `systemKey: dashbridge` восстанавливает состав, порядок,
+размеры, URL-источники и шаблоны сообщения из упакованного
+`pages/dashbridge/dashbridge-default-profile.json` при загрузке. Пользователь
+может менять время/refresh, проект и серверы (`var-project`, `var-station`,
+`var-system`, повторяющийся `var-instance`), а также функции и параметры
+`panel.tools` через «Настройки графика». Datasource и остальные URL-параметры,
+пауза, состав/размеры панелей и настройки сообщения защищены; для их изменения
+нужно скопировать профиль. Настройки вложений в preview системного профиля
+остаются временными и не записываются в него.
+
+Чистая политика принадлежит `local-state-schema.js`; profile store хранит
+отделённый от runtime baseline и переносит только разрешённые поля. Загрузка
+и сверка с seed используют тот же `dashbridge-profile-storage` Web Lock,
+что broker и migration. Broker повторно защищает профиль от удаления,
+подмены markers и структурных изменений через CAS и generic storage commit;
+`savePanel` запрещает добавление из direct Grafana. В её picker системный
+профиль виден как disabled с пояснением. В DashBridge скрыты структурные
+действия, а их владельцы отклоняют применение. Импорт создаёт отдельный профиль.
+Общий импорт/восстановление Options сохраняет существующий системный профиль
+целиком; импортируемые пользовательские профили применяются отдельно.
+Проверки: `dashbridge_system_profile_protection_behavior.js` и
+`dashbridge_profile_system_report_behavior.js`. Прямое редактирование storage
+через DevTools и изменение файлов расширения не являются границей защиты.
+
 #### Автоматические переменные Grafana
 
 Добавление одиночного URL, списка ID и выбор панелей дашборда проходят
@@ -607,6 +652,9 @@ datasource, regex и definition. Их новые значения выбирае
 Обычное чтение не записывает выбранные значения. Явное обновление вариантов
 может изменить недопустимый выбор штатным механизмом Grafana и согласовать
 его с остальными панелями группы.
+Первый ответ чтения сохраняет уже известный состав группы: существующие панели
+с разными URL-значениями не считаются новыми. Наследование принятого выбора
+применяется к панелям, добавленным после этого состава.
 Пауза не снимается фильтрами; card creation допускает отсутствие iframe. Новая панель существующей группы наследует её
 выбор; удаление последней панели убирает группу.
 
@@ -748,6 +796,11 @@ tools перед сохранением, заново находя актуал�
 до окончания записи. Общий modal закрывается после успешного callback;
 результат `false` сохраняет окно, прежний `undefined` direct Grafana остаётся
 успехом. Смена профиля во время первоначальной загрузки отменяет открытие окна.
+«Сбросить всё» в общем окне Grafana/DashBridge выключает переопределение
+столбцов сводки и скрывает вложенные настройки. В черновике все обнаруженные
+столбцы возвращаются во включённое состояние, добавляемый `Last` — в выключенное;
+последующее включение общего переключателя сохраняет этот исходный набор.
+Сброс применяется к графику только после Save.
 
 В Options заголовок раскрывающейся секции Grafana — native button, switch модуля
 остаётся отдельным соседом. Handler заголовка синхронно меняет hidden,
@@ -765,6 +818,17 @@ Options хранит базовый список Grafana-подключений.
 профиль повторно использует UUID панели. Полный render выполняет cleanup
 threshold-состояния и уведомлений каждой прежней карточки до удаления DOM.
 Правая легенда адаптивна и не резервирует половину ширины графика.
+
+В `grafana-panel-data-runtime.js` HTTP-ошибка транспорта и статус 400–599
+в отдельном scoped datasource result (даже при внешнем HTTP 200) дают
+`http_error` с исходным кодом, а не `empty_source`. Ошибка сохраняется до
+завершения параллельных запросов текущего цикла; следующий успешный цикл её
+сбрасывает. Результаты других панелей не влияют на этот статус в direct Grafana.
+Ошибка приватного helper-запроса vCPU сохраняет fail-open поведение фильтра:
+успешные исходные данные панели остаются доступными, helper удаляется.
+Ответ с ошибкой основной серии остаётся доступен штатной обработке Grafana. Эти сценарии
+для fetch, XHR text и XHR JSON закреплены в
+`test/grafana_panel_transport_scope_behavior.js`.
 
 Пока MAIN показывает пояснение пустого ответа/ошибки, `grafana-dom.js`
 создаёт принадлежащий поколению panel-tools контроллер скрытия native `No data`.
@@ -1069,7 +1133,16 @@ URL; очередь читает его при освобождении, а не
 Новых storage keys и permissions нет.
 
 DNR создаётся только для открытых вкладок `pages/dashbridge/dashbridge.html` и разрешённых
-Grafana-хостов. Правила дополнительно требуют extension initiator. Закрытие,
+Grafana-хостов. Правила дополнительно требуют initiator расширения либо hostname
+целевой Grafana. Второй вариант нужен для собственных переходов iframe после
+истечения/обновления сессии: иначе XFO/CSP снова блокируют документ, хотя
+ручная навигация из родительского DashBridge успешно открывает тот же график.
+Проверка `initiatorDomains` принадлежит DNR и сопоставляет hostname, включая его
+поддомены, без проверки порта; точный target-host/port regex остаётся независимым.
+Чужие SSO-хосты автоматически не разрешаются. Правило не обновляет cookies и
+не устраняет серверные 401; оно сохраняет embedding при навигации. Сценарий
+самостоятельного перехода и HTTP redirect с XFO/CSP проверяется
+`inspectSecurityBoundaries` в browser smoke. Закрытие,
 замена вкладки и навигация с DashBridge запускают пересинхронизацию session
 rules; вкладки с чужим pendingUrl не включаются в новый набор.
 
@@ -1367,6 +1440,11 @@ copy fail-open сохраняет тот же PNG через Downloads. MAIN cap
 ключами. Отсутствующий параметр сохраняет значение целевой ссылки.
 После очистки статусов при переключении вкладок `setupGrafanaTimestampTool`
 снимает inline-скрытие перед новым результатом, оставляя отображение CSS.
+Карточка «Время для Django» и её session-cache инициализируются только при
+явном `storage.sync.module_grafana_django_time === true`; отсутствующая настройка
+означает Off. Переключатель находится в Options → Модули → Grafana и сохраняется
+при экспорте/импорте настроек с проверкой boolean. Встроенный entry point
+«Единый дашборд Grafana» представлен отдельной карточкой с описанием.
 Регрессии: [передача параметров и статус времени](../test/grafana_timestamp_clipboard_behavior.js).
 
 ```text
@@ -1378,6 +1456,18 @@ CPU и RAM разделяют transport, но не расчёт и шаблон�
 RAM-преобразование в `grafana-panel-data-transforms.js` атомарно заменяет
 полные пары Total/Available (либо Total/Used при явном режиме Used) на
 рассчитанный Used с единицей `percent` и согласованными display names.
+Пары разделяются по полному набору labels без Prometheus `__name__`, а не
+только по `instance`: один endpoint может одновременно принадлежать разным
+`job`, environment или zone. Все полные наборы преобразуются независимо;
+рассчитанные поля сохраняют эти labels, даже если подписи легенды совпадают.
+Значения identity labels исключаются из определения роли метрики как целые
+идентификаторы: `total` внутри имени сервера не делает его ряд метрикой Total.
+Повтор одного Total/Available с той же identity и семантической подписью,
+неполная пара либо несовпадение временных осей/длины значений оставляют весь
+ответ без RAM-преобразования. Первое подходящее поле не разрешает произвольный
+выбор между дублями. Контракт проверяют
+`test/grafana_mem_conversion_atomic_behavior.js` и fetch/XHR-сценарии direct/iframe
+в `test/grafana_panel_transport_scope_behavior.js`.
 В режиме Available отдельный исходный Used в bytes/default unit удаляется
 только при совпадении подписи без роли метрики и всех labels, кроме
 Prometheus `__name__`, с обоими источниками пары. Временные оси тройки должны
@@ -2106,6 +2196,11 @@ request-complete; прежние ответы не подтверждают пр
 неприменённое RAM-преобразование или timeout запрещают снимок. Затем loader
 отдельно проверяет готовность DOM/размеров панели. Это не проверка пиксельного
 совпадения renderer с преобразованными данными.
+Отказ `refresh-unavailable` допускает текущий renderer только для визуальных
+настроек; преобразование RAM или числовой фильтр не обходят подтверждение
+нового ответа. Canvas pixel readback остаётся fallback после завершения
+запросов и проверки доступных uPlot/Flot/Table/SVG данных либо корректного
+filtered-empty, а не выполняется при каждом ожидании готовности.
 При исключении в Series оставшиеся задания текущего среза учитываются как
 ошибки в progress и ZIP manifest; ошибка discovery до определения серий
 учитывается как одно неуспешное задание. Отмена не записывается как ошибка среза.
@@ -2143,6 +2238,44 @@ request-complete; прежние ответы не подтверждают пр
 
 ### Дополнительные контракты асинхронного состояния
 
+- Direct Grafana settings Save фиксирует dashboard/base path/org и владельца
+  MAIN lifecycle при открытии; проверяет их перед применением и после ожиданий.
+  Эквивалентный remount панели того же ID разрешён. Устаревший редактор остаётся
+  открытым с просьбой открыть настройки заново, без записи в другой dashboard.
+  Проверка — [settings lifecycle](../test/grafana_direct_settings_lifecycle_behavior.js).
+- Options сохраняет ревизию отправленного черновика. Позднее подтверждение Save
+  не снимает dirty у ввода, сделанного во время записи; beforeunload продолжает
+  предупреждать. Повторный Save блокируется до завершения, ошибка разрешает retry.
+  Проверка — [async save](../test/options_async_save_behavior.js).
+- TDM Popup синхронно блокирует второй export до завершения сбора и ZIP.
+  Самодостаточный exporter в isolated world TDM дополнительно удерживает
+  document-local guard `__dashbridgeTdmExportActive`: новый Popup не запускает
+  второй сбор в том же документе. Guard освобождается вместе с восстановлением
+  scroll в finally; прежний десятиминутный deadline сохранён. Даты пишутся
+  только при явном `tdmRememberDate: true`; отсутствие настройки означает false.
+  Проверки — [controller](../test/tdm_controller_behavior.js) и
+  [deadline/scroll](../test/tdm_export_deadline_behavior.js).
+- Recorder replay сначала ищет подходящий frame без действий. Неоднозначные
+  одинаковые URL отклоняются до click/change/submit; единственное действие
+  направляется в найденный текущий documentId (frameId fallback для старого API).
+  Замена документа между поиском и действием не разрешает клик в новом документе.
+  Записанный main-frame 0 и legacy-шаг без frame URL сохраняют top-frame scope;
+  положительный frameId старой записи не считается ID новой вкладки.
+  Проверка — [frame scope](../test/recorder_replay_frame_scope_behavior.js).
+- Recorder связывает ExtraInfo с ожиданиями каждого redirect hop по CDP
+  `redirectHasExtraInfo`/`hasExtraInfo`, пропуская cached hops без события.
+  Ранние события и blocked/CORS failures обрабатываются ограниченными очередями
+  сессионного controller; поздний ExtraInfo сохраняет точные status/headers.
+  Проверка — [redirect correlation](../test/recorder_redirect_extra_info_behavior.js).
+- Visual-only fetch лениво декодирует ответ один раз для analysis и persistent
+  legend capture. Consumers читают общий результат, native Response остаётся
+  непрочитанным для Grafana; не-JSON ответ сохраняет fail-open.
+  Проверка — [response decode](../test/grafana_visual_response_decode_behavior.js).
+- Временный diagnostics export удерживает per-file Web Lock во время записи
+  и 30-минутного download grace. Startup/begin cleanup удаляет только свободные
+  просроченные корневые файлы точного export prefix; grace учитывает timestamp
+  имени и последнюю запись файла. Активный экспорт другой вкладки не удаляется.
+  Проверка — [export ownership](../test/test_runner_export_ownership_behavior.js).
 - Подтверждение Jira POST в Worklog синхронно сохраняет `sent` для stable ID
   во всех существующих Undo/Redo snapshots до ожидания локального commit.
   История может восстановить поля черновика или удалённую строку, но не отменяет

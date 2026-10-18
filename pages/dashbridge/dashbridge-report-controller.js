@@ -218,7 +218,7 @@
                 preferences: reportEngine.normalizeProfile(getActiveProfile()?.report).attachments,
                 onPreferencesChange: async preferences => {
                     const profile = getActiveProfile();
-                    if (!profile || profile.id !== previewProfileId || !saveProfiles) return;
+                    if (!profile || profile.systemKey === 'dashbridge' || profile.id !== previewProfileId || !saveProfiles) return;
                     profile.panels = getPanels();
                     profile.report = { ...profile.report, attachments: preferences };
                     const saved = await saveProfiles();

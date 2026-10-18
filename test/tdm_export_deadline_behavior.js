@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const { test } = require('node:test');
 
-async function runExport(mode) {
+async function runExport(mode, concurrentStart = false) {
     let now = 0, nextTimer = 0, restored = 0, top = 600, canvasDraws = 0, fetchSignal, readerAborted = false;
     const timers = new Map();
     const clock = {
@@ -42,6 +42,9 @@ async function runExport(mode) {
     let outcome;
     context._tdmExportScriptInternal({ savePhotos: true, format: 'html', photoExportId: 'fixture' })
         .then(value => { outcome = { value }; }, error => { outcome = { error }; });
+    let concurrent;
+    if (concurrentStart) context._tdmExportScriptInternal({ savePhotos: true, format: 'html', photoExportId: 'second-popup' })
+        .then(value => { concurrent = value; });
     for (let turn = 0; turn < 1000 && !outcome; turn++) {
         for (let tick = 0; tick < 15; tick++) await Promise.resolve();
         if (outcome) break;
@@ -50,7 +53,7 @@ async function runExport(mode) {
         timers.delete(pending[0]); now = pending[1].at; pending[1].callback();
     }
     for (let tick = 0; tick < 15; tick++) await Promise.resolve();
-    return { outcome, restored, top, now, canvasDraws, fetchSignal, readerAborted, timers: timers.size };
+    return { outcome, concurrent, restored, top, now, canvasDraws, fetchSignal, readerAborted, timers: timers.size };
 }
 for (const mode of ['headers', 'body', 'reader', 'photo-transfer']) test(`TDM aborts ${mode} wait at the total deadline and restores scroll`, async () => {
     const result = await runExport(mode);
@@ -79,4 +82,9 @@ test('Non-timeout export failures preserve their reason without being classified
     assert.equal(result.outcome?.value?.errorCode, 'export_error');
     assert.equal(result.outcome.value.error, 'Fixture parse failure');
     assert.equal(result.top, 600); assert.equal(result.timers, 0);
+});
+test('TDM serialized exporter rejects a second popup without touching the current scroll owner', async () => {
+    const result = await runExport('headers', true);
+    assert.equal(result.concurrent?.errorCode, 'busy');
+    assert.equal(result.restored, 1);
 });

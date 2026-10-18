@@ -34,7 +34,29 @@
             return commitQueue.then(() => result);
         };
 
-        const queueCommit = values => enqueue(() => chromeRef.storage.local.set(values));
+        const assertSystemProfiles = (current, next) => {
+            const isSystem = localStateSchema.isSystemProfile;
+            for (const profile of current.filter(isSystem)) {
+                const incoming = next.find(item => item.id === profile.id);
+                if (!incoming || localStateSchema.systemProfileFingerprint(incoming)
+                    !== localStateSchema.systemProfileFingerprint(localStateSchema.projectSystemProfile(profile, incoming))) {
+                    throw new Error('Системный профиль защищён: доступны время, проект, серверы и настройки графика.');
+                }
+            }
+            if (next.some(profile => isSystem(profile) && !current.some(item => item.id === profile.id && isSystem(item)))) {
+                throw new Error('Нельзя создавать или подменять системный профиль.');
+            }
+        };
+        const queueCommit = values => enqueue(async () => {
+            if (Object.prototype.hasOwnProperty.call(values, 'dashbridge_profiles')) {
+                const stored = await chromeRef.storage.local.get('dashbridge_profiles');
+                const normalized = localStateSchema.normalizeProfiles(values.dashbridge_profiles, { mode: 'load' });
+                assertSystemProfiles(localStateSchema.normalizeProfiles(stored.dashbridge_profiles || [], { mode: 'load' }).items,
+                    normalized.items);
+                values = { ...values, dashbridge_profiles: normalized.items };
+            }
+            return chromeRef.storage.local.set(values);
+        });
 
         const commitProfilePatch = async (message, sender) => {
             if (!isTrustedExtensionPage(sender, 'pages/dashbridge/dashbridge.html')
@@ -91,6 +113,7 @@
                     profiles[index] = profile;
                 }
             });
+            assertSystemProfiles(normalizedStored.items, profiles);
             if (!profiles.length) throw new Error('Нельзя удалить все профили DashBridge.');
             const activeProfileId = profiles.some(profile => profile.id === message.activeProfileId)
                 ? message.activeProfileId
@@ -142,6 +165,7 @@
             let profile = requestedProfileId ? profiles.find(item => item.id === requestedProfileId) : null;
             let createdProfile = false;
             if (requestedProfileId && !profile) throw new Error('Выбранный профиль больше не существует.');
+            if (localStateSchema.isSystemProfile(profile)) throw new Error('Системный профиль защищён: добавление панелей запрещено.');
             if (!profile) {
                 createdProfile = true;
                 profile = {

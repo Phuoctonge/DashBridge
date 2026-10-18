@@ -32,8 +32,11 @@ let saves = 0;
 let navigations = 0;
 let updates = 0;
 let now = 100000;
+let systemProfile = false;
 const messages = [];
 const panel = { id: 'p', src: 'https://grafana.test/d-solo/uid/name?orgId=1&var-x=a#policy=off' };
+const existingFollower = { id: 'existing', src: 'https://grafana.test/d-solo/uid/name?orgId=1&var-x=b#policy=off' };
+const panels = [panel, existingFollower];
 const frame = () => ({ isConnected: true, dataset: { dashbridgeLoaded: 'true' }, src: panel.src,
     contentWindow: { postMessage: message => messages.push(message) } });
 let currentFrame = frame();
@@ -46,13 +49,17 @@ const context = vm.createContext({
 for (const file of ['dashbridge-variables-state.js', 'dashbridge-variables-controller.js']) {
     vm.runInContext(fs.readFileSync(`pages/dashbridge/${file}`, 'utf8'), context);
 }
+vm.runInContext(fs.readFileSync('js/shared/local-state-schema.js', 'utf8'), context);
 const controller = context.DashBridgeVariablesController.create({
-    getPanels: () => [panel], getActiveProfile: () => ({ id: 'profile' }),
+    getPanels: () => panels, getActiveProfile: () => ({ id: 'profile', ...(systemProfile ? { systemKey: 'dashbridge' } : {}) }),
     getPanelForIframe: candidate => candidate === currentFrame ? panel : null,
     applyPanelParamsToUrl: (item, src = item.src) => src,
     navigateDashboardFrame: (target, src) => { navigations++; target.src = src; },
     savePanels: async () => { saves++; }, invalidate() {},
-    replacePanelCard: () => { currentFrame.isConnected = false; currentFrame = frame(); replacements++; },
+    replacePanelCard: panelId => {
+        if (panelId === panel.id) { currentFrame.isConnected = false; currentFrame = frame(); }
+        replacements++;
+    },
     updatePanelCard: (panelId, options) => {
         assert.equal(panelId, panel.id);
         assert.equal(options.reloadFrame, false);
@@ -90,6 +97,24 @@ const tick = delay => {
     assert.equal(dialog.open, false, 'close button does not cancel transport');
     respond(currentFrame.contentWindow, { ...snapshot, requestId: messages.at(-1).requestId });
     await new Promise(resolve => setImmediate(resolve));
+    tick(150);
+    assert.equal(new URL(existingFollower.src).searchParams.get('var-x'), 'b',
+        'initial read must preserve existing panels with their own saved selections');
+    assert.equal(saves, 0, 'initial read must not persist inherited selections for existing members');
+    assert.equal(replacements, 0, 'initial read must not reload existing members');
+    const newFollower = { id: 'new', src: existingFollower.src };
+    panels.push(newFollower);
+    respond(currentFrame.contentWindow, { action: 'dashbridgePanelRendered' });
+    tick(150);
+    assert.equal(new URL(newFollower.src).searchParams.get('var-x'), 'a',
+        'a genuinely new member inherits the accepted group selection');
+    assert.equal(new URL(existingFollower.src).searchParams.get('var-x'), 'b');
+    assert.equal(saves, 1); assert.equal(replacements, 1);
+    // Keep the remaining transport scenarios isolated from membership setup.
+    panels.splice(1);
+    respond(currentFrame.contentWindow, { action: 'dashbridgePanelRendered' });
+    tick(150);
+    saves = 0; replacements = 0;
     const group = host.children[0];
     const budgetBody = group.children[1].children[0].children[1];
     const budgetInput = budgetBody.children[0];
@@ -196,6 +221,27 @@ const tick = delay => {
     closeButton.events.click();
     toggle.events.click();
     assert.equal(messages.length, pendingRequestCount, 'reopening during a pending read must not duplicate it');
+    systemProfile = true;
+    const protectedUrl = new URL(panel.src); protectedUrl.searchParams.set('var-dataSource', 'fixed');
+    panel.src = protectedUrl.href; currentFrame.src = panel.src;
+    const protectedSnapshot = { ...snapshot, variables: [
+        { ...snapshot.variables[0], name: 'project', label: 'Project', values: ['a'] },
+        { ...snapshot.variables[0], name: 'dataSource', label: 'Datasource', values: ['unwanted'] },
+    ] };
+    respond(currentFrame.contentWindow, { ...protectedSnapshot, requestId: messages.at(-1).requestId });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(group.children[1].children.length, 1, 'system profile exposes project/server selectors only');
+    const projectBody = group.children[1].children[0].children[1];
+    projectBody.children[0].value = 'b'; projectBody.children[0].events.input();
+    projectBody.children.find(child => child.textContent === 'Применить').events.click();
+    assert.equal(new URL(currentFrame.src).searchParams.get('var-dataSource'), 'fixed');
+    respond(currentFrame.contentWindow, { action: 'dashbridgeIframeReady' }); tick(300);
+    respond(currentFrame.contentWindow, { ...protectedSnapshot, variables: [
+        { ...protectedSnapshot.variables[0], values: ['b'] }, protectedSnapshot.variables[1],
+    ], requestId: messages.at(-1).requestId });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(new URL(panel.src).searchParams.get('var-project'), 'b');
+    assert.equal(new URL(panel.src).searchParams.get('var-dataSource'), 'fixed', 'resolved dependencies cannot rewrite a protected datasource');
     controller.stop();
     assert.equal(toggle.events.click, undefined);
     assert.equal(dialog.events.keydown, undefined);

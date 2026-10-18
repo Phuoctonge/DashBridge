@@ -272,9 +272,11 @@
             );
             const option = document.createElement('option'); option.value = profile.id;
             option.textContent = alreadySaved ? `${profile.name} (уже есть в этом профиле)` : profile.name;
-            option.disabled = alreadySaved;
-            if (!alreadySaved && !firstAvailableProfileId) firstAvailableProfileId = profile.id;
-            if (!alreadySaved && profile.id === stored.dashbridge_activeProfileId) activeAvailableProfileId = profile.id;
+            const protectedProfile = profile.systemKey === 'dashbridge' || profile.isSystemDefault === true;
+            if (protectedProfile) option.textContent = `${profile.name} (защищённый профиль)`;
+            option.disabled = alreadySaved || protectedProfile;
+            if (!option.disabled && !firstAvailableProfileId) firstAvailableProfileId = profile.id;
+            if (!option.disabled && profile.id === stored.dashbridge_activeProfileId) activeAvailableProfileId = profile.id;
             profileSelect.append(option);
         });
         const newOption = document.createElement('option'); newOption.value = '__new__'; newOption.textContent = '＋ Добавить профиль';

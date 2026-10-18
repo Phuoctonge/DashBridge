@@ -11,7 +11,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const fileInput = document.getElementById('debugEasterEggFile');
     const hint = document.getElementById('debugEasterEggHint');
     const header = document.querySelector('.debug-easter-egg-header');
-    if (!closeButton || !clearButton || !target || !portrait || !fileInput || !hint || !header) return;
+    const sizeSlider = document.getElementById('debugEasterEggSize');
+    const sizeValue = document.getElementById('debugEasterEggSizeValue');
+    if (!closeButton || !clearButton || !target || !portrait || !fileInput || !hint || !header || !sizeSlider || !sizeValue) return;
     portrait.draggable = false;
 
     const spriteSources = Array.from({ length: 9 }, (_, index) => `pages/debug-easter-egg/assets/cache-${String(index + 1).padStart(2, '0')}.txt`);
@@ -20,6 +22,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let spritesReady = false;
     const randomBetween = (minimum, maximum) => minimum + Math.random() * (maximum - minimum);
     const imageScale = () => Math.sqrt((target.clientWidth * target.clientHeight) / (640 * 640));
+    const sizeMultiplier = () => 2 ** (Number(sizeSlider.value) / 100);
+    sizeSlider.addEventListener('input', () => {
+        const percentage = `${Math.round(sizeMultiplier() * 100)}%`;
+        sizeValue.value = percentage;
+        sizeSlider.setAttribute('aria-valuetext', percentage);
+    });
     const decodeAsset = async (source) => {
         if (assetUrls.has(source)) return assetUrls.get(source);
         const response = await fetch(chrome.runtime.getURL(source));
@@ -27,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const base64 = (await response.text()).replace(/\s+/g, '');
         const binary = atob(base64);
         const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
-        const url = URL.createObjectURL(new Blob([bytes], { type: 'image/png' }));
+        const url = URL.createObjectURL(new Blob([bytes], { type: 'image/webp' }));
         assetUrls.set(source, url);
         return url;
     };
@@ -94,9 +102,9 @@ document.addEventListener('DOMContentLoaded', () => {
         throwGeneration += 1;
         target.querySelectorAll('.debug-easter-egg-effect').forEach((effect) => effect.remove());
     };
-    const createPoopSprite = (className, source = randomSprite(), size = randomBetween(36, 68)) => {
+    const createPoopSprite = (className, source = randomSprite(), size = randomBetween(36, 68), multiplier = 1) => {
         const poop = document.createElement('img');
-        const pixelSize = Math.max(10, Math.round(size * imageScale()));
+        const pixelSize = Math.max(10, Math.round(size * imageScale() * multiplier));
         poop.className = className;
         poop.src = assetUrls.get(source);
         poop.alt = '';
@@ -106,22 +114,22 @@ document.addEventListener('DOMContentLoaded', () => {
         poop.style.setProperty('--poop-size', `${pixelSize}px`);
         return poop;
     };
-    const createImpactSplat = (x, y, source) => {
+    const createImpactSplat = (x, y, source, multiplier) => {
         const impact = document.createElement('div');
         impact.className = 'debug-easter-egg-impact debug-easter-egg-effect';
         impact.style.left = `${x}px`;
         impact.style.top = `${y}px`;
         const impactRotation = randomAngle();
         impact.style.setProperty('--splat-rotation', `${impactRotation}deg`);
-        impact.appendChild(createPoopSprite('debug-easter-egg-splat', source, randomBetween(38, 72)));
+        impact.appendChild(createPoopSprite('debug-easter-egg-splat', source, randomBetween(38, 72), multiplier));
         for (let index = 0; index < 4; index += 1) {
             const droplet = document.createElement('span');
             const angle = (Math.PI * 2 * index) / 4 + Math.random() * 0.55;
-            const distance = 20 + Math.random() * 13;
+            const distance = (20 + Math.random() * 13) * multiplier;
             droplet.className = 'debug-easter-egg-droplet';
             droplet.style.setProperty('--drop-x', `${Math.cos(angle) * distance}px`);
             droplet.style.setProperty('--drop-y', `${Math.sin(angle) * distance}px`);
-            droplet.style.setProperty('--drop-size', `${5 + Math.round(Math.random() * 4)}px`);
+            droplet.style.setProperty('--drop-size', `${(5 + Math.round(Math.random() * 4)) * multiplier}px`);
             impact.appendChild(droplet);
         }
         target.appendChild(impact);
@@ -130,8 +138,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!spritesReady) return;
         const generation = throwGeneration;
         const source = randomSprite();
+        const multiplier = sizeMultiplier();
         const flightRotation = randomAngle();
-        const projectile = createPoopSprite('debug-easter-egg-projectile debug-easter-egg-effect', source, randomBetween(32, 58));
+        const projectile = createPoopSprite('debug-easter-egg-projectile debug-easter-egg-effect', source, randomBetween(32, 58), multiplier);
         const startX = target.clientWidth * randomBetween(.15, .85);
         const startY = target.clientHeight + 28;
         const duration = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 460;
@@ -148,7 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
             projectile.style.transform = `translate(-50%, -50%) rotate(${flightRotation + progress * 340}deg)`;
             if (progress < 1) return requestAnimationFrame(frame);
             projectile.remove();
-            createImpactSplat(destinationX, destinationY, source);
+            createImpactSplat(destinationX, destinationY, source, multiplier);
         };
         requestAnimationFrame(frame);
     };

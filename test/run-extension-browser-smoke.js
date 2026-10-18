@@ -16,6 +16,7 @@ const inspectRuntimePortScope = require('./support/browser-runtime-port-scope');
 const inspectConfluenceTarget = require('./support/browser-confluence-target');
 const inspectIframeSettings = require('./dashbridge_iframe_settings_browser.cjs');
 const inspectWorklogUi = require('./support/browser-worklog-ui');
+const inspectSystemProfile = require('./support/browser-system-profile');
 
 const projectRoot = path.resolve(__dirname, '..');
 const resultsRoot = path.join(projectRoot, 'test-results');
@@ -41,9 +42,13 @@ async function startAnalyticsSink() {
     const requests = [];
     const server = http.createServer((request, response) => {
         if (request.method === 'GET' && request.url.startsWith('/fixture/')) {
+            if (request.url === '/fixture/rotate') {
+                response.writeHead(302, { location: '/fixture/protected?restored=1' });
+                response.end(); return;
+            }
             response.writeHead(200, { 'content-type': 'text/html', 'x-frame-options': 'DENY',
                 'content-security-policy': "frame-ancestors 'none'" });
-            response.end('<html><body>boundary fixture</body></html>'); return;
+            response.end('<html><body>boundary fixture<button id="session-rotate" onclick="location.href=\'/fixture/rotate\'">Rotate session</button></body></html>'); return;
         }
         if (request.method === 'OPTIONS') {
             response.writeHead(204, {
@@ -224,6 +229,39 @@ async function inspectPage(context, extensionId, relativePath) {
             }
             await input.setInputFiles({ name: 'retry.png', mimeType: 'image/png', buffer: image });
             await page.waitForFunction(() => document.getElementById('debugEasterEggHint').textContent === 'Нажимайте по фото.');
+            const sizeRegression = await page.evaluate(async () => {
+                const slider = document.getElementById('debugEasterEggSize');
+                const target = document.getElementById('debugEasterEggTarget');
+                if (slider.value !== '0') return false;
+                const originalRandom = Math.random;
+                Math.random = () => 0.5;
+                try {
+                    const scale = Math.sqrt(target.clientWidth * target.clientHeight / (640 * 640));
+                    for (const value of [0, -100, 100]) {
+                        slider.value = value;
+                        slider.dispatchEvent(new Event('input'));
+                        const rect = target.getBoundingClientRect();
+                        target.dispatchEvent(new globalThis.MouseEvent('click', { clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 }));
+                        const multiplier = 2 ** (value / 100);
+                        const projectile = target.querySelector('.debug-easter-egg-projectile');
+                        if (projectile.width !== Math.max(10, Math.round(45 * scale * multiplier))) return false;
+                        // Moving the slider during flight must not resize this shot's impact.
+                        slider.value = -value;
+                        slider.dispatchEvent(new Event('input'));
+                        await new Promise(resolve => setTimeout(resolve, 600));
+                        const impact = target.querySelector('.debug-easter-egg-impact:last-child img');
+                        if (impact?.width !== Math.max(10, Math.round(55 * scale * multiplier))) return false;
+                    }
+                    return true;
+                } finally {
+                    Math.random = originalRandom;
+                    slider.value = 0;
+                    slider.dispatchEvent(new Event('input'));
+                    document.getElementById('debugEasterEggClear').click();
+                }
+            });
+            if (!sizeRegression) throw new Error('Size slider must preserve photo scaling and capture half/default/double size for each shot');
+            result.sizeSliderRegression = 'center preserves area scaling; half/double projectile and captured impact sizes pass';
             await portrait.click();
             await page.locator('#debugEasterEggClear').click();
             await page.waitForTimeout(500);
@@ -620,6 +658,7 @@ async function inspectSecurityBoundaries(context, extensionId, endpoint) {
     const result = { name: 'DNR navigation and capture tab isolation', status: 'passed', checks: [] };
     const dashboard = await context.newPage();
     const control = await context.newPage();
+    const ordinary = await context.newPage();
     const base = new URL(endpoint).origin;
     try {
         await control.goto(`chrome-extension://${extensionId}/pages/options/options.html`);
@@ -631,8 +670,27 @@ async function inspectSecurityBoundaries(context, extensionId, endpoint) {
             const frame = document.createElement('iframe'); frame.id = 'boundary-test-frame';
             frame.src = `${base}/fixture/protected`; document.body.append(frame);
         }, base);
-        await dashboard.frameLocator('#boundary-test-frame').getByText('boundary fixture', { exact: true }).waitFor();
+        await dashboard.frameLocator('#boundary-test-frame').locator('#session-rotate').waitFor();
         result.checks.push('configured iframe loads with initiator guard');
+        await Promise.all([
+            dashboard.waitForEvent('framenavigated', { predicate: frame => frame.url().endsWith('/fixture/protected?restored=1'), timeout: 5000 }),
+            // Exercise the iframe's native navigation handler directly: this
+            // boundary check must not depend on dashboard layout during startup.
+            dashboard.frameLocator('#boundary-test-frame').locator('#session-rotate').evaluate(button => button.click()),
+        ]);
+        await dashboard.frameLocator('#boundary-test-frame').locator('#session-rotate').waitFor();
+        const restored = dashboard.frames().find(frame => frame.url().endsWith('/fixture/protected?restored=1'));
+        if (!restored) throw new Error('Grafana self-navigation and session redirect lost embedding permission');
+        result.checks.push('Grafana self-navigation and session redirect retain embedding after initial load');
+        await ordinary.goto(`${base}/fixture/unrelated`);
+        await Promise.all([
+            ordinary.waitForEvent('console', { predicate: message => /frame-ancestors|X-Frame-Options/i.test(message.text()), timeout: 5000 }),
+            ordinary.evaluate(base => {
+                const frame = document.createElement('iframe'); frame.src = `${base}/fixture/protected`;
+                document.body.append(frame);
+            }, base),
+        ]);
+        result.checks.push('same-host iframe in an ordinary tab remains blocked while DashBridge rules are active');
         await control.bringToFront();
         const denied = await dashboard.evaluate(() => chrome.runtime.sendMessage({ type: 'dashbridge-capture-visible-tab' }));
         if (denied.ok || denied.error !== 'capture-target-changed') throw new Error('Inactive capture was not rejected');
@@ -648,7 +706,7 @@ async function inspectSecurityBoundaries(context, extensionId, endpoint) {
         }, base);
         await dashboard.waitForTimeout(300);
         const leaked = await dashboard.evaluate(() => {
-            try { return document.querySelector('iframe')?.contentDocument?.body?.textContent === 'boundary fixture'; }
+            try { return !!document.querySelector('iframe')?.contentDocument?.querySelector('#session-rotate'); }
             catch { return false; }
         });
         if (leaked) throw new Error('DNR escaped extension navigation scope');
@@ -656,7 +714,7 @@ async function inspectSecurityBoundaries(context, extensionId, endpoint) {
     } catch (error) {
         result.status = 'failed'; result.error = serializeError(error);
     } finally {
-        await dashboard.close(); await control.close();
+        await dashboard.close(); await control.close(); await ordinary.close();
     }
     return result;
 }
@@ -719,6 +777,7 @@ async function main() {
             await inspectNoDataWorkflow(context),
             await inspectSecurityBoundaries(context, extensionId, analyticsSink.endpoint),
             await inspectRuntimePortScope(context, extensionId),
+            await inspectSystemProfile(context, extensionId),
             await inspectIframeSettings(chromeExecutable)
         ];
 

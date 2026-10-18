@@ -117,17 +117,21 @@
 
         <!-- Подвкладка: Ссылки (Дашборды) -->
         <div id="grafana-links" class="grafana-sub-content">
-            <button id="openDashBridgeBtn" class="btn btn-primary"
-                style="margin-bottom: 0.75rem; width: 100%; font-size: 0.8125rem; border: none;">
-                <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            <div class="card dashbridge-launch-card">
+                <h3 class="section-title"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                     stroke-linecap="round" stroke-linejoin="round">
                     <polygon points="12 2 2 7 12 12 22 7 12 2" />
                     <polyline points="2 17 12 22 22 17" />
                     <polyline points="2 12 12 17 22 12" />
-                </svg> Единый дашборд Grafana
-            </button>
+                </svg> Единый дашборд Grafana</h3>
+                <p class="popup-feature-description">Соберите графики из разных дашбордов Grafana на одном экране.
+                    Переключайте профили и управляйте общим периодом времени.</p>
+                <button id="openDashBridgeBtn" class="btn btn-primary popup-launch-btn" type="button">
+                    Открыть дашборд
+                </button>
+            </div>
 
-            <div class="card grafana-timestamp-card">
+            <div id="grafanaDjangoTimeCard" class="card grafana-timestamp-card" hidden>
                 <h3 class="section-title"><svg class="ic" viewBox="0 0 24 24" fill="none"
                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="m8 9-3 3 3 3" />

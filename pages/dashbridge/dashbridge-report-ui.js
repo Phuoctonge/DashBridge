@@ -50,6 +50,7 @@
         }
 
         function openPanelEditor(panel, onSaved = null) {
+            if (getActiveProfile()?.systemKey === 'dashbridge') return;
             const ownerProfileId = getActiveProfile()?.id;
             let baselinePanel = JSON.stringify(panel.report);
             const config = reportEngine.normalizePanel(panel.report, panel);
@@ -317,6 +318,7 @@
         }
 
         function openSettings(focusPanelId = null) {
+            if (getActiveProfile()?.systemKey === 'dashbridge') return;
             const profile = getActiveProfile();
             let baselineReport = JSON.stringify(profile?.report);
             if (!profile) return;

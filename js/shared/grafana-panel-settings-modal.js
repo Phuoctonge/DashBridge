@@ -264,7 +264,7 @@
         const columnContainer = overlay.querySelector('.panel-tools-column-options');
         const columnEditor = overlay.querySelector('[data-key="legendColumnsEnabled"]');
         let legendColumnsResetRequested = false;
-        columnEditor?.addEventListener('change', () => { legendColumnsResetRequested = false; if (columnContainer) columnContainer.hidden = !columnEditor.checked; });
+        columnEditor?.addEventListener('change', () => { if (columnContainer) columnContainer.hidden = !columnEditor.checked; });
         const renderColumns = columns => {
             if (!columnContainer || !Array.isArray(columns)) return;
             const names = [...new Set(columns.map(value => String(value || '').trim()).filter(Boolean))];
@@ -549,9 +549,9 @@
         thickness?.addEventListener('input', updateThicknessControls);
         overlay.querySelector('.panel-tools-reset-all')?.addEventListener('click', () => {
             legendColumnsResetRequested = true;
-            if (field('legendColumnsEnabled')) field('legendColumnsEnabled').checked = true;
+            if (field('legendColumnsEnabled')) field('legendColumnsEnabled').checked = false;
             columnContainer?.querySelectorAll('[data-key^="legendColumn_"]').forEach(input => { input.checked = input.dataset.key.slice(13) !== 'last'; });
-            if (columnContainer) columnContainer.hidden = false;
+            if (columnContainer) columnContainer.hidden = true;
             ['removeFill', 'thickenLines', 'invertLegend', 'invertIdle', 'convertMemToUsed', 'seriesQueryFilterEnabled', 'cpuCapacityFilterEnabled', 'cpuCapacityFilterLoad5', 'cpuCapacityFilterLoad15', 'thresholdEnabled'].forEach(name => { if (field(name)) field(name).checked = false; });
             if (field('cpuCapacityFilterLoad1')) field('cpuCapacityFilterLoad1').checked = true;
             if (field('seriesQueryFilterHighlightEnabled')) field('seriesQueryFilterHighlightEnabled').checked = true;

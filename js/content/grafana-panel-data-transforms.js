@@ -147,7 +147,26 @@
             const availPattern = new RegExp(escapeKeywordRegExp(availKeyword), 'gi');
             const escapedDomain = String(tools.trimDomain || '.passport.local:9182').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const domainRegex = new RegExp(escapedDomain, 'i');
-            const serverFrames = {};
+            const serverFrames = new Map();
+            const metricName = (field, keyword) => String(field.config?.displayName
+                || field.config?.displayNameFromDS || field.name || '')
+                .replace(new RegExp(`\\b${escapeKeywordRegExp(keyword)}\\b`, 'gi'), '').trim();
+            const labelIdentity = field => JSON.stringify(Object.entries(field.labels || {})
+                .filter(([key]) => key !== '__name__').sort(([left], [right]) => left.localeCompare(right)));
+            const sameTimes = (left, right) => !!left && !!right && left.length === right.length
+                && Array.from(left).every((value, index) => value === right[index]);
+            const memoryRoleText = field => {
+                const identityKeys = ['instance', 'host', 'server', 'node', 'pod'];
+                const labels = Object.entries(field.labels || {});
+                let text = [field.name, field.config?.displayName, field.config?.displayNameFromDS,
+                    ...labels.filter(([key]) => !identityKeys.includes(key.toLowerCase())).map(([, value]) => value)
+                ].filter(Boolean).join(' ').toLowerCase();
+                labels.filter(([key]) => identityKeys.includes(key.toLowerCase())).forEach(([, value]) => {
+                    if (value) text = text.replace(new RegExp(`(?<![\\w])${escapeKeywordRegExp(String(value))}(?![\\w])`, 'gi'), '');
+                });
+                return text;
+            };
+            let ambiguousPair = false;
     
             // BUG-K fix: ключ строится из того же набора источников, что и классификация поля
             // (instance > host > server > node > displayName > displayNameFromDS > name).
@@ -156,9 +175,8 @@
             const buildServerKey = (field, fieldIndex, refId) => {
                 const instance = field.labels?.instance || field.labels?.host || field.labels?.server || field.labels?.node || '';
                 const display = field.config?.displayName || field.config?.displayNameFromDS || field.name || '';
-                const rawServer = String(instance || display)
-                    .replace(totalPattern, '')
-                    .replace(availPattern, '');
+                const rawServer = instance ? String(instance) : String(display)
+                    .replace(totalPattern, '').replace(availPattern, '');
                 // Удаляем суффикс домена, затем только хвостовой порт (:1234) - не все двоеточия.
                 const trimmed = tools.trimDomainEnabled === false
                     ? rawServer
@@ -169,41 +187,51 @@
             Object.entries(data.results).forEach(([refId, result]) => (result.frames || []).forEach(frame => {
                 const fields = frame.schema?.fields || [];
                 fields.forEach((field, fieldIndex) => {
-                    const lowerName = getFieldText(field);
+                    if (field.type === 'time' || field.name === 'Time') return;
+                    const lowerName = memoryRoleText(field);
                     const isTotal = lowerName.includes(totalKeyword);
                     const isAvail = lowerName.includes(availKeyword);
                     if (!isTotal && !isAvail) return;
                     const server = buildServerKey(field, fieldIndex, refId);
-                    const item = serverFrames[server] || (serverFrames[server] = {
-                        timeField: null, totalField: null, availField: null, originalRefId: refId
+                    // One endpoint can be scraped by multiple jobs. Pair within
+                    // the complete label scope; a shortened legend name is display only.
+                    const key = JSON.stringify([server, labelIdentity(field)]);
+                    if (!serverFrames.has(key)) serverFrames.set(key, {
+                        server, timeField: null, totalField: null, availField: null, originalRefId: refId
                     });
+                    const item = serverFrames.get(key);
                     const timeIndex = fields.findIndex(candidate => candidate.type === 'time' || candidate.name === 'Time');
                     if (timeIndex >= 0 && !item.timeField) {
                         item.timeField = { field: fields[timeIndex], values: frame.data.values[timeIndex] };
                     }
                     const metric = { field, values: frame.data.values[fieldIndex], times: frame.data.values[timeIndex] };
+                    if (isTotal && item.totalField
+                        && metricName(item.totalField.field, totalKeyword) === metricName(field, totalKeyword)
+                        || isAvail && item.availField
+                        && metricName(item.availField.field, availKeyword) === metricName(field, availKeyword)) {
+                        ambiguousPair = true;
+                    }
                     if (isTotal && !item.totalField) item.totalField = metric;
                     if (isAvail && !item.availField) item.availField = metric;
                 });
             }));
     
-            const memoryPairs = Object.values(serverFrames);
+            const memoryPairs = [...serverFrames.values()];
             if (!memoryPairs.length) return { data, modifiedCount, applied: false, reason: 'no-memory-series' };
+            if (ambiguousPair) return { data, modifiedCount, applied: false, reason: 'ambiguous-memory-pair' };
             const incompletePair = memoryPairs.some(item => !item.timeField || !item.totalField || !item.availField
                 || typeof item.timeField.values?.map !== 'function'
                 || !item.totalField.values || !item.availField.values);
             if (incompletePair) return { data, modifiedCount, applied: false, reason: 'incomplete-pair' };
+            if (memoryPairs.some(item => !sameTimes(item.totalField.times, item.availField.times)
+                || item.totalField.values.length !== item.totalField.times.length
+                || item.availField.values.length !== item.availField.times.length)) {
+                return { data, modifiedCount, applied: false, reason: 'incompatible-memory-times' };
+            }
 
             // Used can be a separate Prometheus expression (name=Value). Match
             // its semantic display name and complete series labels, not merely
             // instance or the word Used: those also occur in unrelated metrics.
-            const metricName = (field, keyword) => String(field.config?.displayName
-                || field.config?.displayNameFromDS || field.name || '')
-                .replace(new RegExp(`\\b${escapeKeywordRegExp(keyword)}\\b`, 'gi'), '').trim();
-            const labelIdentity = field => JSON.stringify(Object.entries(field.labels || {})
-                .filter(([key]) => key !== '__name__').sort(([left], [right]) => left.localeCompare(right)));
-            const sameTimes = (left, right) => !!left && !!right && left.length === right.length
-                && Array.from(left).every((value, index) => value === right[index]);
             const relatedUsedFields = new Set();
             let ambiguousUsed = false;
             if (memCalcMode === 'available') {
@@ -262,7 +290,8 @@
                 });
             });
     
-            Object.entries(serverFrames).forEach(([server, item]) => {
+            memoryPairs.forEach(item => {
+                const { server } = item;
                 if (!item.timeField || !item.totalField || !item.availField) return;
                 const secondMetricIsUsed = memCalcMode === 'used';
                 const values = item.timeField.values.map((_, index) => {
@@ -277,9 +306,8 @@
                 field.config = { ...(field.config || {}), displayName: field.name, displayNameFromDS: field.name, unit: 'percent' };
                 delete field.config.min;
                 delete field.config.max;
-                Object.keys(field.labels || {}).forEach(key => {
-                    if (!['instance', 'server', 'host', 'pod', 'node'].includes(key.toLowerCase())) field.labels[key] = field.name;
-                });
+                // Keep job/zone/etc. so calculated series retain their distinct identity.
+                if (field.labels) delete field.labels.__name__;
                 data.results[item.originalRefId]?.frames.push({
                     schema: { name: server, refId: item.originalRefId, meta: {}, fields: [item.timeField.field, field] },
                     data: { values: [item.timeField.values, values] }

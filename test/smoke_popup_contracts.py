@@ -86,11 +86,11 @@ CASES = [
             "!popup-grafana-cpu.js", "!popup-grafana-mem.js", "!grafana-metric-ui.js",
         ],
         "sources": {
-            "pages/popup/popup-core.js": ['"tab-grafana"', '"tab-recorder"', "lastActiveTab"],
+            "pages/popup/popup-core.js": ['"tab-grafana"', '"tab-recorder"', "lastActiveTab", "dashbridge-popup-capture-size"],
             "pages/popup/popup-grafana-router.js": [
                 'const subBtns = document.querySelectorAll(".grafana-sub-btn")',
                 'const subContents = document.querySelectorAll(".grafana-sub-content")',
-                "lastActiveGrafanaSubTab", "dashbridge-popup-capture-size",
+                "lastActiveGrafanaSubTab", "DashBridgePopupGuiCapture.reportSize(350)",
                 "!module_grafana_cpu", "!module_grafana_mem",
             ],
         },

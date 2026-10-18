@@ -142,7 +142,11 @@
             frame.contentWindow.postMessage({ action: 'dashbridgeVariablesRequest', requestId: id, operation, name, values },
                 new URL(frame.dataset.src || frame.src).origin);
         }
+        const editableVariable = variable => getActiveProfile()?.systemKey !== 'dashbridge'
+            || root.DashBridgeLocalStateSchema.isSystemVariable(variable.name);
         function reload(group, nextVariables, changedName) {
+            nextVariables = nextVariables.filter(editableVariable);
+            if (changedName && !nextVariables.some(variable => variable.name === changedName)) return;
             if (group.pending || group.reloading || !alive(group)) return;
             const panel = members(group).find(item => !item.paused && frameFor(item));
             const frame = panel && frameFor(panel);
@@ -303,9 +307,9 @@
             }
             group.controls.replaceChildren();
             for (const variable of group.snapshot.variables) {
-                if (variable.hide !== 2 && variable.type !== 'constant') group.controls.appendChild(field(group, variable));
+                if (editableVariable(variable) && variable.hide !== 2 && variable.type !== 'constant') group.controls.appendChild(field(group, variable));
             }
-            group.element.hidden = group.snapshot.variables.every(variable => variable.hide === 2 || variable.type === 'constant');
+            group.element.hidden = group.snapshot.variables.every(variable => !editableVariable(variable) || variable.hide === 2 || variable.type === 'constant');
             updateVisibility();
         }
         function makeGroup(key, panel) {
@@ -345,7 +349,7 @@
                     for (const panel of members(group)) {
                         if (!group.ids.has(panel.id)) {
                             try {
-                                const next = codec.apply(panel.src, group.snapshot.variables);
+                                const next = codec.apply(panel.src, group.snapshot.variables.filter(editableVariable));
                                 if (next !== panel.src) { panel.src = next; replacePanelCard(panel.id); changed = true; }
                             } catch (error) { status(group, error.message); }
                         }
@@ -365,7 +369,7 @@
             const changes = [];
             if (group.transaction) {
                 try {
-                    for (const panel of members(group)) changes.push([panel, codec.apply(panel.src, snapshot.variables)]);
+                    for (const panel of members(group)) changes.push([panel, codec.apply(panel.src, snapshot.variables.filter(editableVariable))]);
                 } catch (error) { fail(group, error.message); return; }
             }
             const initial = !group.snapshot;
@@ -375,7 +379,9 @@
             group.transaction = null;
             group.snapshot = snapshot; group.updatedAt = Date.now(); group.failed = false;
             if (initial && sourcePanel) {
-                group.ids = new Set([sourcePanel.id]);
+                // sync already recorded the members present before this read.
+                // Preserve their saved selections; only later additions inherit.
+                group.ids.add(sourcePanel.id);
                 schedule();
             }
             group.element.removeAttribute('aria-busy');

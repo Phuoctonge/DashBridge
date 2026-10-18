@@ -212,6 +212,14 @@ header {
 }
 
 html[data-dashbridge-system-profile="true"] #renameProfileBtn,
+html[data-dashbridge-system-profile="true"] #addPanelMenuBtn,
+html[data-dashbridge-system-profile="true"] #configureReportBtn,
+html[data-dashbridge-system-profile="true"] .drag-handle,
+html[data-dashbridge-system-profile="true"] .btn-delete,
+html[data-dashbridge-system-profile="true"] .btn-pause,
+html[data-dashbridge-system-profile="true"] .btn-resume,
+html[data-dashbridge-system-profile="true"] .btn-iframe-settings,
+html[data-dashbridge-system-profile="true"] .btn-report-settings,
 html[data-dashbridge-system-profile="true"] #deleteProfileBtn {
     display: none;
 }
@@ -262,6 +270,22 @@ header .grafana-dropdown {
 
 .add-panel-menu #addPanelBtn {
     border-radius: 6px 0 0 6px;
+}
+
+html[data-dashbridge-system-profile="true"] .add-panel-menu {
+    display: none;
+}
+
+.system-profile-hint {
+    display: none;
+    max-inline-size: 19rem;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    line-height: 1.35;
+}
+
+html[data-dashbridge-system-profile="true"] .system-profile-hint {
+    display: block;
 }
 
 .add-panel-menu .add-panel-menu-trigger {

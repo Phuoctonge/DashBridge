@@ -7,6 +7,27 @@ const html = fs.readFileSync('pages/popup/popup.html', 'utf8');
 const css = fs.readFileSync('pages/popup/popup.css', 'utf8');
 const core = fs.readFileSync('pages/popup/popup-core.js', 'utf8');
 const router = fs.readFileSync('pages/popup/popup-grafana-router.js', 'utf8');
+const vm = require('node:vm');
+const captureMessages = [], captureTimers = [];
+const captureContext = vm.createContext({ URLSearchParams,
+    location: { search: '?guiCapture=1&guiCaptureId=capture-test' },
+    document: { addEventListener() {}, body: { scrollWidth: 320, scrollHeight: 400 },
+        documentElement: { scrollWidth: 300, scrollHeight: 390 } },
+    chrome: { runtime: { sendMessage: value => captureMessages.push(value) } },
+    setTimeout: (callback, delay) => captureTimers.push({ callback, delay }),
+});
+vm.runInContext(core, captureContext);
+captureContext.DashBridgePopupGuiCapture.reportSize(250);
+captureContext.DashBridgePopupGuiCapture.reportSize(350);
+assert.deepEqual(captureTimers.map(timer => timer.delay), [250, 350]);
+assert.equal(captureMessages.length, 0, 'GUI capture measures after each router settles');
+for (const timer of captureTimers) timer.callback();
+assert.deepEqual(JSON.parse(JSON.stringify(captureMessages)), [250, 350].map(() => ({
+    type: 'dashbridge-popup-capture-size', captureId: 'capture-test', width: 336, height: 416,
+})), 'both GUI layout checkpoints retain the exact capture envelope');
+captureContext.location.search = '';
+captureContext.DashBridgePopupGuiCapture.reportSize(250);
+assert.equal(captureTimers.length, 2, 'ordinary popup must never report GUI capture dimensions');
 const scrollRegionStart = html.indexOf('<main class="popup-scroll-region">');
 const scrollRegionEnd = html.indexOf('</main>', scrollRegionStart);
 

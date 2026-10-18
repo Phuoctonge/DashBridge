@@ -96,11 +96,16 @@
     function showImportChoice(message) {
         return new Promise(resolve => {
             const { overlay, okButton, cancelButton, actions } = createModal(message, { confirm: true });
-            actions.style.flexWrap = 'wrap';
+            const content = overlay.querySelector('.modal-content');
+            content.className += ' modal-import-content';
+            content.style.maxWidth = '30rem';
+            actions.className += ' modal-import-actions';
             okButton.textContent = 'Заменить';
             const createButton = appendElement(actions, 'button', 'btn btn-outline modal-create');
             createButton.type = 'button';
             createButton.textContent = 'Создать новый';
+            cancelButton.textContent = 'Отклонить';
+            actions.appendChild(cancelButton);
             const close = choice => { overlay.remove(); resolve(choice); };
             okButton.addEventListener('click', () => close('replace'));
             createButton.addEventListener('click', () => close('create'));

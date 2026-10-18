@@ -47,10 +47,12 @@
         };
 
         const deletePanel = async id => {
+            if (getActiveProfile()?.systemKey === 'dashbridge') return;
             if (!await showConfirm('Удалить панель?')) {
                 root.DashBridgeAnalytics?.outcome('dashbridge.panel_deleted', 'cancelled');
                 return;
             }
+            if (getActiveProfile()?.systemKey === 'dashbridge') return;
             setPanels(getPanels().filter(panel => panel.id !== id));
             savePanels();
             removePanelCard(id);
@@ -126,6 +128,7 @@
         };
 
         const openIframeSettings = panel => {
+            if (getActiveProfile()?.systemKey === 'dashbridge') return;
             const profileId = getActiveProfile()?.id;
             const signature = value => JSON.stringify([value.src, value.grafanaTheme || 'follow', value.width, value.height]);
             let baseline = signature(panel);
@@ -235,6 +238,7 @@
         };
 
         const togglePanelPause = async id => {
+            if (getActiveProfile()?.systemKey === 'dashbridge') return;
             const panel = getPanels().find(item => item.id === id);
             if (!panel) return;
             if (panelAnalysis.isPanel(panel)) closePanelAnalysis();
@@ -333,6 +337,7 @@
         };
 
         const saveCardOrder = container => {
+            if (getActiveProfile()?.systemKey === 'dashbridge') return;
             const panelsById = new Map(getPanels().map(panel => [panel.id, panel]));
             setPanels([...container.querySelectorAll('.panel-card')]
                 .map(card => panelsById.get(card.dataset.panelId))
@@ -358,6 +363,7 @@
                 if (event.target === container && !container.contains(event.relatedTarget)) clearDragMarkers();
             });
             container.addEventListener('drop', event => {
+                if (getActiveProfile()?.systemKey === 'dashbridge') return;
                 if (!draggedElement || !targetElement || !dropSide) return;
                 event.preventDefault();
                 if (dropSide === 'left') container.insertBefore(draggedElement, targetElement);
@@ -369,6 +375,7 @@
         };
 
         const bindCardDrag = (card, panel, container) => {
+            if (getActiveProfile()?.systemKey === 'dashbridge') return;
             const handle = card.querySelector('.drag-handle');
             handle.addEventListener('mousedown', () => { card.draggable = true; });
             handle.addEventListener('mouseup', () => { card.draggable = false; });

@@ -24,7 +24,11 @@
                     condition: { regexFilter: '^https?://' + host.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
                         + (/^\[[^\]]+\]:\d+$|^[^:]+:\d+$/.test(host) ? '/' : '(:[0-9]+)?/'),
                         resourceTypes: ['sub_frame'], tabIds: normalizedTabIds,
-                        ...(options.initiatorDomain ? { initiatorDomains: [options.initiatorDomain] } : {}) }
+                        // Grafana may navigate its own iframe while rotating a
+                        // session. That request is initiated by Grafana, not
+                        // the extension; keep the same tab/target-host guards.
+                        ...(options.initiatorDomain ? { initiatorDomains: [options.initiatorDomain,
+                            new URL('http://' + host).hostname] } : {}) }
                 });
             }
         }

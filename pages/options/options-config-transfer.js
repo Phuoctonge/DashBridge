@@ -16,7 +16,7 @@
         'jiraDefaultComment', 'jiraDefaultTimeSpent',
         'tdmLastStart', 'tdmLastEnd', 'lastActiveTab', 'lastActiveGrafanaSubTab',
         'module_grafana', 'module_recorder', 'module_jira', 'module_tdm', 'module_grafana_links',
-        'module_grafana_batch', 'module_grafana_debug', 'batchDetailedLogging'
+        'module_grafana_batch', 'module_grafana_debug', 'module_grafana_django_time', 'batchDetailedLogging'
     ]);
     const LOCAL_IMPORT_KEYS = new Set([
         'dashbridge_profiles', 'dashbridge_activeProfileId', 'jiraWorklogs', 'jiraSortOrder', 'jiraIssueCache',
@@ -32,19 +32,59 @@
         dropped.push(`${area}.${key}`);
         return false;
     }));
-    const setStorageValues = (area, values) => new Promise((resolve, reject) => {
+    const setStorageValues = async (area, values) => {
+        const write = () => new Promise((resolve, reject) => {
         area.set(values, () => {
             if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
             else resolve();
         });
-    });
-    const removeStorageValues = (area, keys) => new Promise((resolve, reject) => {
-        if (!keys.length) { resolve(); return; }
-        area.remove(keys, () => {
-            if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-            else resolve();
         });
-    });
+        if (area !== chrome.storage.local || !Array.isArray(values.dashbridge_profiles)) return write();
+        const preserve = async () => {
+            const current = await area.get('dashbridge_profiles');
+            const system = (current.dashbridge_profiles || []).filter(DashBridgeLocalStateSchema.isSystemProfile);
+            if (system.length) {
+                const ids = new Set(system.map(profile => profile.id));
+                const profiles = [...system, ...values.dashbridge_profiles.filter(profile =>
+                    !ids.has(profile.id) && !DashBridgeLocalStateSchema.isSystemProfile(profile))];
+                values = { ...values, dashbridge_profiles: profiles };
+                if (values.dashbridge_activeProfileId && !profiles.some(profile => profile.id === values.dashbridge_activeProfileId)) {
+                    values.dashbridge_activeProfileId = system[0].id;
+                }
+            }
+            return write();
+        };
+        if (typeof root.navigator?.locks?.request !== 'function') {
+            throw new Error('Web Locks недоступны: профили не изменены.');
+        }
+        return root.navigator.locks.request('dashbridge-profile-storage', preserve);
+    };
+    const removeStorageValues = async (area, keys) => {
+        const remove = () => new Promise((resolve, reject) => {
+            if (!keys.length) { resolve(); return; }
+            area.remove(keys, () => {
+                if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+                else resolve();
+            });
+        });
+        if (area !== chrome.storage.local || !keys.includes('dashbridge_profiles')) return remove();
+        if (typeof root.navigator?.locks?.request !== 'function') {
+            throw new Error('Web Locks недоступны: профили не изменены.');
+        }
+        return root.navigator.locks.request('dashbridge-profile-storage', async () => {
+            const current = await area.get('dashbridge_profiles');
+            const system = (current.dashbridge_profiles || []).filter(DashBridgeLocalStateSchema.isSystemProfile);
+            if (system.length) {
+                await new Promise((resolve, reject) => area.set({ dashbridge_profiles: system,
+                    dashbridge_activeProfileId: system[0].id }, () => {
+                    if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+                    else resolve();
+                }));
+                keys = keys.filter(key => !['dashbridge_profiles', 'dashbridge_activeProfileId'].includes(key));
+            }
+            return remove();
+        });
+    };
 
     function create({ parseGrafanaIframeDomains, normalizePanelTitle, getAnalysisThresholdPairError, showStatus }) {
         if (![parseGrafanaIframeDomains, normalizePanelTitle, getAnalysisThresholdPairError, showStatus]
@@ -121,7 +161,7 @@
                     if (!sync[key]) throw new Error(`Некорректное название панели Grafana в настройке ${key}.`);
                 }
             });
-            ['tdmSavePhotosDefault', 'tdmRememberDate', 'tdmExcludeUserDefault', 'confluenceScrollFixEnabled'].forEach(key => {
+            ['tdmSavePhotosDefault', 'tdmRememberDate', 'tdmExcludeUserDefault', 'confluenceScrollFixEnabled', 'module_grafana_django_time'].forEach(key => {
                 if (sync[key] !== undefined && typeof sync[key] !== 'boolean') {
                     throw new Error(`Некорректное логическое значение настройки ${key}.`);
                 }

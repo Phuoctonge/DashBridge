@@ -20,7 +20,7 @@ async function verifyFailure(stage) {
     const status = {}; const states = []; let downloads = 0;
     const context = vm.createContext({ console: { error() {} }, window: {}, Date, Intl,
         setTimeout: (callback, delay) => { if (!delay) callback(); },
-        navigator: { storage: { getDirectory: async () => directory } },
+        navigator: { locks: { request: async (_name, _options, callback) => callback({}) }, storage: { getDirectory: async () => directory } },
         chrome: { runtime: { getManifest: () => ({ version: 'test' }) } },
         URL: { createObjectURL: () => 'blob:fixture' },
         document: { createElement: () => ({ click() { downloads++; } }) },

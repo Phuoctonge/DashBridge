@@ -8,6 +8,8 @@ function formatTdmExportProgress(message) {
         ? label + ' ' + current + ' из ' + Number(message.total) + '...'
         : label + ' ' + current + '...';
 }
+let tdmExportRunning = false;
+let tdmExportStatusTimer;
 document.addEventListener("DOMContentLoaded", () => {
     const photosCheck = document.getElementById("tdmExportPhotos");
     const excludeCheck = document.getElementById("tdmExcludeUserCheckbox");
@@ -44,7 +46,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (startInput && endInput) {
         const saveDates = () => {
             chrome.storage.sync.get(["tdmRememberDate"], (data) => {
-                if (data.tdmRememberDate !== false) {
+                if (data.tdmRememberDate === true) {
                     chrome.storage.sync.set({
                         tdmLastStart: startInput.value,
                         tdmLastEnd: endInput.value
@@ -94,6 +96,7 @@ document.addEventListener("DOMContentLoaded", () => {
  * Экспорт сообщений из TDM Chat (Улучшенная версия из popup_old.js)
  */
 async function tdmExport() {
+    if (tdmExportRunning) return;
     const statusEl = document.getElementById("tdmExportStatus");
     const btn = document.getElementById("tdmExportBtn");
     const photosCheck = document.getElementById("tdmExportPhotos");
@@ -139,7 +142,12 @@ async function tdmExport() {
     };
     const analyticsDimensions = { format: ['html', 'json', 'both'].includes(options.format) ? options.format : 'html' };
     DashBridgeAnalytics?.track('tdm.export_started', 'used', analyticsDimensions);
-    const finishAnalytics = outcome => DashBridgeAnalytics?.outcome('tdm.export_finished', outcome, analyticsDimensions);
+    const finishAnalytics = outcome => {
+        chrome.runtime.onMessage.removeListener(progressListener);
+        tdmExportRunning = false;
+        btn.disabled = false;
+        DashBridgeAnalytics?.outcome('tdm.export_finished', outcome, analyticsDimensions);
+    };
 
     const photoArchive = options.savePhotos && typeof JSZip !== 'undefined'
         ? createRollingZipArchive({
@@ -171,6 +179,9 @@ async function tdmExport() {
         }
         return undefined;
     };
+    tdmExportRunning = true;
+    btn.disabled = true;
+    clearTimeout(tdmExportStatusTimer);
     chrome.runtime.onMessage.addListener(progressListener);
 
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -241,7 +252,7 @@ async function tdmExport() {
                             statusEl.textContent = "Формирование ZIP архива...";
                             photoQueue.then(() => photoArchive.finalize()).then(() => {
                                 statusEl.textContent = "Экспорт полностью завершен!";
-                                setTimeout(() => { statusEl.style.display = "none"; }, 5000);
+                                tdmExportStatusTimer = setTimeout(() => { statusEl.style.display = "none"; }, 5000);
                                 finishAnalytics('success');
                             }).catch(e => {
                                 statusEl.textContent = "Ошибка ZIP: " + e.message;
@@ -249,7 +260,7 @@ async function tdmExport() {
                             });
                         } else {
                             statusEl.textContent = "Экспорт успешно завершен!";
-                            setTimeout(() => { statusEl.style.display = "none"; }, 5000);
+                            tdmExportStatusTimer = setTimeout(() => { statusEl.style.display = "none"; }, 5000);
                             finishAnalytics('success');
                         }
                     }

@@ -12,7 +12,10 @@ module.exports = async function inspectDashboardVisual(context, extensionId) {
         await page.screenshot({ path: file, animations: 'disabled' }); result.screenshots.push(file);
     };
     try {
-        await page.goto(`chrome-extension://${extensionId}/pages/dashbridge/dashbridge.html`);
+        // Inherited active panels may still be loading remote sites. Wait for
+        // the local UI/profile initialization before installing our paused fixture.
+        await page.goto(`chrome-extension://${extensionId}/pages/dashbridge/dashbridge.html`, { waitUntil: 'domcontentloaded' });
+        await page.locator('#profileList .profile-list-item.active').waitFor({ state: 'attached' });
         await page.evaluate(async () => {
             const profile = { id: 'visual-audit', name: 'Проверка нагрузки', report: {
                 template: '{{profileName}}\n{{testName}} · {{environment}}\n{{panels}}',

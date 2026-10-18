@@ -359,7 +359,41 @@
         return normalized;
     }
 
+    const isSystemProfile = profile => profile?.systemKey === 'dashbridge' || profile?.isSystemDefault === true;
+    const isSystemVariable = name => ['project', 'station', 'system', 'instance'].includes(name);
+    // Only the built-in dashboards' project/server selectors are user-owned.
+    // Datasource, panel identity, URL scope and all unknown fields remain fixed.
+    function projectSystemProfile(baseline, draft) {
+        const result = structuredClone(baseline);
+        if (draft?.timeState) result.timeState = Object.fromEntries(['from', 'to', 'refresh']
+            .filter(key => draft.timeState[key] !== undefined).map(key => [key, draft.timeState[key]]));
+        result.panels.forEach(panel => {
+            const incoming = draft?.panels?.find(item => item.id === panel.id);
+            if (!incoming) return;
+            if (incoming.tools !== undefined) panel.tools = normalizeTools(incoming.tools, 'Настройки графика');
+            const url = new URL(panel.src), next = new URL(incoming.src);
+            for (const name of ['project', 'station', 'system', 'instance']) {
+                const key = 'var-' + name;
+                if (!url.searchParams.has(key) && !next.searchParams.has(key)) continue;
+                const values = next.searchParams.getAll(key);
+                if (JSON.stringify(values) === JSON.stringify(url.searchParams.getAll(key))) continue;
+                url.searchParams.delete(key);
+                values.forEach(value => url.searchParams.append(key, value));
+            }
+            // Avoid rewriting unchanged seed URLs just to normalize escaping.
+            if (url.href !== new URL(panel.src).href) panel.src = url.href;
+        });
+        return result;
+    }
+    const profileFingerprint = value => JSON.stringify(value, (_key, item) => item && typeof item === 'object' && !Array.isArray(item)
+        ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item);
+    function systemProfileFingerprint(profile) {
+        const copy = structuredClone(profile);
+        copy.panels.forEach(panel => { const url = new URL(panel.src); url.searchParams.sort(); panel.src = url.href; });
+        return profileFingerprint(copy);
+    }
     root.DashBridgeLocalStateSchema = Object.freeze({
+        isSystemProfile, isSystemVariable, projectSystemProfile, systemProfileFingerprint,
         profileFingerprint: value => JSON.stringify(value, (_key, item) => item && typeof item === 'object' && !Array.isArray(item)
             ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item),
         isSafeId: value => typeof value === 'string' && SAFE_ID_PATTERN.test(value),

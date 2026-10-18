@@ -2,6 +2,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let connectionBaseline = null;
     let dirtyReady = false;
     let isDirty = false;
+    let editRevision = 0;
+    let savePending = false;
     const dirtyStatus = document.getElementById('optionsDirtyStatus');
     const saveIsland = document.querySelector('.save-island');
     const setDirty = dirty => {
@@ -11,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     const markDirty = event => {
         if (!dirtyReady || !event.target.matches('input, select, textarea')) return;
+        editRevision++;
         setDirty(true);
     };
     document.addEventListener('input', markDirty);
@@ -110,7 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'tdmExcludeUserTextDefault', 'tdmRememberDate',
         'tdmSavePhotosDefault', 'tdmExcludeUserDefault', 'wikiIframeIds',
         'module_grafana', 'module_recorder', 'module_jira', 'module_tdm',
-        'module_grafana_links', 'module_grafana_batch', 'module_grafana_debug', 'batchDetailedLogging'
+        'module_grafana_links', 'module_grafana_batch', 'module_grafana_debug', 'module_grafana_django_time'
     ], (data) => {
         // Устанавливаем значения, используя дефолты если данных нет
         const defaults = {
@@ -121,10 +124,6 @@ document.addEventListener('DOMContentLoaded', () => {
             rememberLastTab: true,
             rememberLastSubTab: true,
             uiScale: 'auto',
-            cpuTemplateFull: '{server} до {cpu}%',
-            cpuTemplateTop3: 'до {cpu1}% для {server1}, до {cpu2}% для {server2}, для остальных до {cpu3}%',
-            memTemplateFull: '{server} до {mem}%',
-            memTemplateTop3: 'до {mem1}% для {server1}, до {mem2}% для {server2}, для остальных до {mem3}%',
             wikiDomains: "itpm-wiki.mos.ru\nwiki.mos-team.ru\nwiki.lanit.ru",
             wikiIframeIds: "wysiwygTextarea_ifr, mce_0_ifr",
             tdmExcludeUserTextDefault: "",
@@ -138,6 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
             module_grafana_links: true,
             module_grafana_batch: true,
             module_grafana_debug: true,
+            module_grafana_django_time: false,
             ...getGrafanaSettingsDefaults()
         };
 
@@ -192,8 +192,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById("settingModuleTdm").checked = config.module_tdm;
         document.getElementById("settingModuleGrafanaLinks").checked = config.module_grafana_links;
         document.getElementById("settingModuleGrafanaBatch").checked = config.module_grafana_batch;
-        document.getElementById("settingBatchDetailedLogging").checked = config.batchDetailedLogging !== false;
         document.getElementById("settingModuleGrafanaDebug").checked = config.module_grafana_debug;
+        document.getElementById("settingModuleGrafanaDjangoTime").checked = config.module_grafana_django_time === true;
 
         document.getElementById("settingCpuTemplateFull").value = config.cpuTemplateFull;
         document.getElementById("settingCpuTemplateTop3").value = config.cpuTemplateTop3;
@@ -300,6 +300,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Сохранение основных настроек
     document.getElementById('saveBtn').addEventListener('click', async () => {
+        if (savePending) return;
         const grafanaDefaults = getGrafanaSettingsDefaults();
         const kw = document.getElementById("settingGrafanaKeyword").value.trim() || grafanaDefaults.grafanaIdleKeyword;
         const memTotalKw = document.getElementById("settingGrafanaMemTotalKeyword").value.trim() || grafanaDefaults.grafanaMemTotalKeyword;
@@ -362,6 +363,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (!connectionBaseline) { showMaintStatus('Дождитесь загрузки настроек.', 'red'); return; }
+        const savedRevision = editRevision;
+        const saveButton = document.getElementById('saveBtn');
+        savePending = true;
+        saveButton.disabled = true;
         if (JSON.stringify(grafanaIframeDomains) !== JSON.stringify(connectionBaseline)) {
             try {
                 const response = await chrome.runtime.sendMessage({
@@ -369,7 +374,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 if (!response?.ok) throw new Error(response?.error || 'Не удалось сохранить подключения.');
                 connectionBaseline = [...grafanaIframeDomains];
-            } catch (error) { showMaintStatus(error.message, 'red'); return; }
+            } catch (error) {
+                savePending = false;
+                saveButton.disabled = false;
+                showMaintStatus(error.message, 'red'); return;
+            }
         }
         chrome.storage.sync.set({
             grafanaIdleKeyword: kw,
@@ -414,17 +423,20 @@ document.addEventListener('DOMContentLoaded', () => {
             module_tdm: document.getElementById("settingModuleTdm").checked,
             module_grafana_links: document.getElementById("settingModuleGrafanaLinks").checked,
             module_grafana_batch: document.getElementById("settingModuleGrafanaBatch").checked,
-            batchDetailedLogging: document.getElementById("settingBatchDetailedLogging").checked,
-            module_grafana_debug: document.getElementById("settingModuleGrafanaDebug").checked
+            module_grafana_debug: document.getElementById("settingModuleGrafanaDebug").checked,
+            module_grafana_django_time: document.getElementById("settingModuleGrafanaDjangoTime").checked
         }, () => {
             const saveError = chrome.runtime.lastError;
+            savePending = false;
+            saveButton.disabled = false;
             if (saveError) {
                 globalThis.DashBridgeAnalytics?.outcome('options.saved', 'error');
                 showMaintStatus(`Не удалось сохранить настройки: ${saveError.message}`, 'red');
                 return;
             }
             globalThis.DashBridgeAnalytics?.outcome('options.saved', 'success');
-            setDirty(false);
+            // Acknowledgement belongs to the submitted draft, not later user input.
+            if (editRevision === savedRevision) setDirty(false);
             const btn = document.getElementById('saveBtn');
             const text = document.getElementById('saveBtnText');
             if (text) {

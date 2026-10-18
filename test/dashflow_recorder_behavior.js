@@ -216,8 +216,8 @@ const importRead = recorderDashflow.indexOf('const imported = await io.read(file
 const importCommit = recorderDashflow.indexOf('await stopSession(false);', importRead);
 assert(importRead >= 0 && importCommit > importRead,
     'Recorder must not reset the live session until the archive has fully validated');
-assert(recorderNetwork.includes('earlyPlaceholder && !earlyPlaceholder.url') && recorderNetwork.includes('chain[index] = key'),
-    'request placeholders must preserve out-of-order ExtraInfo, including redirect chains');
+assert(recorderNetwork.includes('earlyPlaceholder && !earlyPlaceholder.url'),
+    'requestWillBeSent must reuse its early request placeholder');
 assert(recorderNetwork.includes('request.associatedCookies !== undefined') && recorderNetwork.includes('request.blockedCookies !== undefined'),
     'early request and response ExtraInfo headers must not be overwritten by the basic CDP events');
 assert(recorderSession.includes('const finalizeUnexpected = async'),

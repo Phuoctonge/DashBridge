@@ -157,7 +157,12 @@ function createBatchPanelLoader({ log }) {
                     return (Number(canvas.width) > 1 && Number(canvas.height) > 1)
                         || (canvasRect.width > 1 && canvasRect.height > 1);
                 }) || (renderer !== panel && renderer.getBoundingClientRect().width > 1);
-                const canvasHasPaint = [...panel.querySelectorAll('canvas')].some(canvas => {
+                const filteredEmpty = filterMayProduceEmpty
+                    && window.__dashbridgePanelToolsVisualMetadata?.responseFilterEmptyIsNormal === true
+                    && window.__dashbridgePanelToolsVisualMetadata?.responseDataStatus?.kind === 'filtered_empty';
+                const rendererHasData = chartHasPoints || flotHasPoints || tableHasRows || svgHasGeometry || filteredEmpty;
+                const canvasHasPaint = requestSettled && !rendererHasData && canvasHasGeometry
+                    && [...panel.querySelectorAll('canvas')].some(canvas => {
                     try {
                         const context = canvas.getContext?.('2d', { willReadFrequently: true });
                         const width = Math.min(256, Math.max(1, Number(canvas.width) || 1));
@@ -175,11 +180,7 @@ function createBatchPanelLoader({ log }) {
                     } catch { /* tainted or unsupported canvas is not evidence */ }
                     return false;
                 });
-                const filteredEmpty = filterMayProduceEmpty
-                    && window.__dashbridgePanelToolsVisualMetadata?.responseFilterEmptyIsNormal === true
-                    && window.__dashbridgePanelToolsVisualMetadata?.responseDataStatus?.kind === 'filtered_empty';
-                if (!requestSettled || !(chartHasPoints || flotHasPoints || tableHasRows || svgHasGeometry
-                    || (canvasHasGeometry && canvasHasPaint) || filteredEmpty)) {
+                if (!requestSettled || !(rendererHasData || canvasHasPaint)) {
                     stableFrames = 0;
                     if (collectDiagnostics) history[history.length - 1].reason = !requestSettled ? 'requests-active' : 'empty-renderer';
                     schedule();
@@ -430,10 +431,10 @@ function createBatchPanelLoader({ log }) {
                             if (!applied?.ok) {
                                 record('panel-tools', 'failed', { reason: applied?.reason || 'unknown' }, afterToolsTab?.url || null);
                                 // A View/solo route may have no dashboard
-                                // Refresh control. The page still has a valid
-                                // first render; let readiness decide whether it
-                                // can be captured instead of discarding it here.
-                                if (applied.reason === 'refresh-unavailable') {
+                                // Refresh control. Visual-only settings may use
+                                // its first render, but response transformations
+                                // require confirmation from a refreshed request.
+                                if (applied.reason === 'refresh-unavailable' && !refresh) {
                                 trace('panel-tools-refresh-unavailable');
                                 log(`Обновление панели ${panelId} недоступно, использую текущий рендер`, true);
                                 } else {

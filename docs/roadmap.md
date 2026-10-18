@@ -24,9 +24,12 @@
   до renderer, streaming plugins и оставшиеся стадии отмены подготовки.
   Одиночный settlement timeout, не повторившийся при проверке, не считать
   установленным дефектом. Фиксированный период не делает datasource транзакционным.
-- **CPU/RAM:** fractional `percentunit`, несовпадающие временные оси и полная
-  identity Total/Available/Used требуют реальных входных данных до новых правок.
-  Синтетический пример не доказывает ошибку рабочей CPU-панели.
+- **CPU/RAM:** исследовать остальные mixed-identity shapes по реальным входным
+  данным. Рабочая CPU-панель с Idle `0…100` проверена численно;
+  [контракт и границы проверки](architecture.md#cpu-idle--load-подтверждённый-контракт)
+  исключают повторную находку про `percentunit` без воспроизведения на настоящем
+  входе. Для RAM Total/Available/Used полная label identity и совпадение
+  временных осей уже проверяются; произвольные формы ответа требуют своей проверки.
 - **vCPU:** после исправлений коллизий endpoint и конфликтующих capacity остаются
   прочие mixed identities и time-only frames. Расширение correlation и изменение
   helper query `mode="user"` оценивать по фактическим данным.
@@ -45,6 +48,11 @@
 
 ## Недостающее покрытие
 
+- Дополнить авторизованное покрытие lifecycle/settings и совместного decode:
+  SPA/remount с открытым редактором, RAM analysis вместе с visual legend capture,
+  ошибки ответа и восстановление, длительная неактивность вкладки. Проверка
+  apply/reset в direct Grafana и визуальных команд DashBridge iframe не заменяет
+  эти сценарии; численная проверка рабочей CPU-панели зафиксирована в архитектуре.
 - Grafana 9, остальные plugins, base path, темы, DPR и сочетания browser zoom.
   Наличие selector не доказывает поддержку; недоступная среда получает BLOCKED.
 - Предельные легенды остальных plugins, реальные отказы Chrome capture и
@@ -82,6 +90,9 @@
 - Расширять существующий opt-in live harness по недостающим capabilities:
   base-path auth, отказ неизвестного сценария, panel-scoped assertions,
   фактический apply/reset и отмена по timeout. Не создавать второй runner.
+- Исправить выбор панели штатного Test Runner для `/d-solo/` без keyed DOM
+  wrapper: загруженные Flot/uPlot не должны давать ложный panelFound=false.
+  Подтверждать capabilities по renderer; не подменять пропуски успешными проверками.
 - Рассмотреть отдельный PR/branch CI без публикации и рабочих сессий;
   release workflow остаётся привязан к тегу.
 - Измерить 1/8/20/50 панелей и 50/500/2500 серий: startup, refresh latency,

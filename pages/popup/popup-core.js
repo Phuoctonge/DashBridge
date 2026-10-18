@@ -1,7 +1,6 @@
-document.addEventListener("DOMContentLoaded", () => {
-    const tabs = document.querySelectorAll(".tab-btn");
-    const contents = document.querySelectorAll(".tab-content");
-    const reportGuiCaptureSize = () => {
+// Both tab routers report the same envelope after their own layout settle delay.
+globalThis.DashBridgePopupGuiCapture = Object.freeze({
+    reportSize(delay) {
         const query = new URLSearchParams(location.search);
         const captureId = query.get('guiCaptureId');
         if (!query.has('guiCapture') || !captureId) return;
@@ -13,8 +12,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 width: Math.ceil(Math.max(document.body.scrollWidth, root.scrollWidth) + 16),
                 height: Math.ceil(Math.max(document.body.scrollHeight, root.scrollHeight) + 16)
             });
-        }, 250);
-    };
+        }, delay);
+    }
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+    const tabs = document.querySelectorAll(".tab-btn");
+    const contents = document.querySelectorAll(".tab-content");
 
     // Загружаем состояния модулей
     const defaultModules = {
@@ -104,7 +108,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (targetTab) {
                 activateTab(targetTab, false);
             }
-            reportGuiCaptureSize();
+            globalThis.DashBridgePopupGuiCapture.reportSize(250);
         });
     });
 

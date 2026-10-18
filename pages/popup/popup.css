@@ -222,6 +222,11 @@
             box-shadow: var(--shadow);
         }
 
+        .dashbridge-launch-card {
+            border-color: var(--primary);
+        }
+
+        .popup-feature-description,
         .grafana-timestamp-hint {
             margin: 0 0 0.625rem;
             color: var(--text-muted);

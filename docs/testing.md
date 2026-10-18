@@ -51,7 +51,6 @@
 | [DashBridge](../pages/dashbridge/dashbridge.html) | Profiles CRUD/import/export/две вкладки; добавление single/IDs/picker, invalid URL и commit failure; pause/resume/delete/fullscreen; tools и iframe settings, nested dialogs/focus при загрузке; relative/absolute/invalid/reversed time и переменные с All/multi/limits; refresh Off/«Обновить сейчас»; SLA warning/error/partial loading, сообщения, PNG/коллаж и restore |
 | [Test Runner](../pages/test-runner/test-runner.html) | URL validation и выбранные сценарии; run/startup cancel/mid-run Stop/restart; planned = completed + NOT RUN; diagnostics/OPFS, export JSON и clipboard при отказе; history/Clear, reload/pagehide и cleanup принадлежащих окон; большой export и double export на контролируемом стенде |
 | [Test Selector](../pages/test-runner/test-selector.html) | Standalone и embedded: search/no results, all/none/one, fast/FAIL/NOT RUN presets, Save/reopen, Cancel/Escape, отказ storage и retry без потери draft |
-| [Служебное фото](../pages/debug-easter-egg/debug-easter-egg.html) | Валидное/повреждённое изображение и retry, file/clipboard, portrait/landscape и scale, эффекты/Clear/Close; предыдущее фото не теряется при ошибке. Окно должно находиться на экране: Chromium запрещает resize за его пределами |
 
 ## Direct Grafana и iframe
 
@@ -69,6 +68,28 @@
   ordinary остаётся отдельным поддерживаемым маршрутом.
 - Host/port revoke/re-add, чужой frame/refId, навигация и поздние ответы:
   граница scope и lifecycle не расширяются из-за теста.
+
+## Проверка CPU Idle → Load
+
+Для известной рабочей панели действует [подтверждённый контракт](architecture.md#cpu-idle--load-подтверждённый-контракт).
+Не считать `percentunit` в произвольном fixture доказательством ошибки этой панели.
+
+1. В отдельном тестовом профиле сохранить исходные tools, выбрать CPU-панель
+   и фиксированный абсолютный период, сохранив все dashboard variables.
+2. Прочитать panel definition: query, unit/axes, refIds. Подтвердить масштаб
+   исходного Idle по настоящему datasource response; метка unit сама по себе
+   не заменяет эту проверку.
+3. После OFF и refresh сохранить native Idle; после ON и нового успешного
+   запроса сопоставить renderer `load (calc)` по server и timestamp. Для входа
+   `0…100` ожидать `100 − Idle` с допуском `1e-8`; отсутствие совпавших точек
+   или рядов не считать PASS. Проверить сохранение null и временных осей
+   подходящими behavior-тестами.
+4. Пройти Test Runner `H5_2` и `H5_3`: ON/OFF и повторные переключения.
+   Восстановить исходные tools с явным boolean `invertIdle` и refresh;
+   отсутствие ключа не является командой выключения.
+5. Записать точный scope, количество рядов/точек, расхождения и restore
+   в игнорируемые `test-results/`. Отдельная панель с настоящим входом `0…1`
+   требует собственной проверки и не отменяет результат для входа `0…100`.
 
 ## Сквозные маршруты
 

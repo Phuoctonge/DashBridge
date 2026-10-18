@@ -12,12 +12,14 @@
     // previous generation before installing the current one.
     window.__dashbridgePanelToolsLifecycle?.cleanup?.();
     const runtimeCleanups = new Set();
+    let runtimeDisposed = false;
     const registerRuntimeCleanup = cleanup => {
         runtimeCleanups.add(cleanup);
         return () => runtimeCleanups.delete(cleanup);
     };
     window.__dashbridgePanelToolsLifecycle = {
         cleanup() {
+            runtimeDisposed = true;
             [...runtimeCleanups].forEach(cleanup => {
                 try { cleanup(); } catch (_) { /* Detached Grafana trees are safe to ignore. */ }
             });
@@ -2147,7 +2149,27 @@
     };
     const openPanelSettings = panel => {
         const panelKey = getPanelStateKey(panel);
-        const thresholdRoot = window.DashBridgeGrafanaDom?.outerPanel(panel) || panel || document;
+        let thresholdRoot = window.DashBridgeGrafanaDom?.outerPanel(panel) || panel || document;
+        const settingsLifecycle = window.__dashbridgePanelToolsLifecycle;
+        const settingsIdentity = () => JSON.stringify([location.origin,
+            location.pathname.match(/^(.*?)\/d(?:-solo)?\/([^/]+)/)?.slice(1),
+            new URLSearchParams(location.search).get('orgId') || '']);
+        const openedIdentity = settingsIdentity();
+        const settingsAreCurrent = () => {
+            if (!runtimeDisposed && settingsLifecycle === window.__dashbridgePanelToolsLifecycle
+                && settingsIdentity() === openedIdentity) {
+                const current = window.DashBridgeGrafanaDom?.findPanel?.({ panelId: panelKey });
+                if (current?.isConnected && getPanelStateKey(current) === panelKey) {
+                    panel = current;
+                    thresholdRoot = window.DashBridgeGrafanaDom?.outerPanel(panel) || panel;
+                    return true;
+                }
+            }
+            const overlay = document.querySelector('.dashbridge-panel-settings-overlay');
+            const hint = overlay?.querySelector('.panel-tools-hint');
+            if (hint) hint.textContent = 'Панель изменилась. Закройте настройки и откройте их заново.';
+            return false;
+        };
         const panelTitle = getPanelAnalysisTitle(panel);
         const panelSettings = readPanelAnalysisSettings();
         const panelKind = window.DashBridgeGrafanaPanelAnalysis?.classifyPanelTitle(panelTitle, panelSettings) || null;
@@ -2187,6 +2209,7 @@
                     : (status?.engine && status.engine !== 'unknown' ? 'Без единицы' : 'Единица определяется по графику')
             },
             onSave: async next => {
+                if (!settingsAreCurrent()) return false;
                 const nextState = {
                     ...state,
                     ...next
@@ -2218,6 +2241,7 @@
                         root: thresholdRoot,
                         panelId: panelKey
                     }) || [];
+                    if (!settingsAreCurrent()) return false;
                     nextState.targetLegendSeries = getPanelLegendSeries(panel);
                 }
                 // invertIdle и convertMemToUsed тоже работают через fetch-перехват.
@@ -2234,6 +2258,7 @@
                             root: thresholdRoot,
                             panelId: panelKey
                         }) || [];
+                        if (!settingsAreCurrent()) return false;
                     }
                 }
                 // Если все data-трансформации выключены - очищаем сохранённые сигнатуры.
@@ -2313,10 +2338,12 @@
                     const visualLegendFilter = getVisualLegendFilter(nextState);
                     const seriesConfig = Object.fromEntries(getPanelLegendSeries(panel).map(name => [name, !visualLegendFilter.includes(name)]));
                     await window.DashBridgeGrafanaVisualEngine?.apply({ panelId, seriesConfig: hasLegendVisibilityWork(nextState) ? seriesConfig : null, mode: nextState.legendMode, ...nextState });
+                    if (!settingsAreCurrent()) return false;
                 }
                 if (tools.thresholdEnabled && !thresholdRestoreAfterNextQuery) await applyThresholdWhenChartReady();
                 else if (tools.thresholdEnabled) await startThresholdReporting();
                 else await startThresholdReporting();
+                if (!settingsAreCurrent()) return false;
                 if (dataTransformChanged || legendDataFilterChanged) {
                     refreshSelectedPanelData(panel);
                 } else if (thresholdHighlightVisibilityChanged) {
