@@ -147,6 +147,10 @@
                     rule.cpuCapacityFilterCoefficient = Number(row.querySelector('[data-rule-field="cpuCapacityFilterCoefficient"]')?.value);
                     rule.cpuCapacityFilterMode = row.querySelector('[data-rule-field="cpuCapacityFilterMode"]')?.value;
                     rule.cpuCapacityFilterHighlightEnabled = row.querySelector('[data-rule-field="cpuCapacityFilterHighlightEnabled"]')?.checked;
+                    // Missing Load 1m means enabled in legacy rules; preserve an explicit opt-out.
+                    for (const key of ['cpuCapacityFilterLoad1', 'cpuCapacityFilterLoad5', 'cpuCapacityFilterLoad15']) {
+                        rule[key] = row.querySelector(`[data-rule-field="${key}"]`).checked;
+                    }
                 }
             }); return rules;
         };

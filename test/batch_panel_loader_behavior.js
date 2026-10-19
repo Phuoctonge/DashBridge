@@ -399,6 +399,18 @@ vm.runInContext(fs.readFileSync('pages/batch/batch-panel-loader.js', 'utf8'), co
         'a completed CPU filter with no matching series must still produce a valid empty-state capture');
     assert.match(currentTabUrl, /dashbridgeCpuCapacityFilter=/,
         'Batch must bootstrap CPU filtering before the first datasource request');
+    filteredEmptyAllowed = true;
+    for (let mask = 0; mask < 8; mask++) {
+        const selection = [0, 1, 2].map(index => Boolean(mask & (1 << index)));
+        await loadPanel(7, 'https://grafana.example/d/dashboard?viewPanel=7', '7', null, null, {
+            cpuCapacityFilterEnabled: true, cpuCapacityFilterLoad1: selection[0],
+            cpuCapacityFilterLoad5: selection[1], cpuCapacityFilterLoad15: selection[2],
+        }, { aborted: false, addEventListener() {}, removeEventListener() {} });
+        const bootstrap = JSON.parse(new URL(currentTabUrl).searchParams.get('dashbridgeCpuCapacityFilter'));
+        assert.deepEqual([bootstrap.load1, bootstrap.load5, bootstrap.load15], selection,
+            `shared Batch loader must pass the exact Load selection to Grafana, mask ${mask}`);
+    }
+    filteredEmptyAllowed = false;
     panelText = 'No data';
     panelHasRenderer = true;
     const noDataResult = await loadPanel(

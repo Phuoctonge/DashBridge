@@ -1,6 +1,6 @@
 {
   "name": "dashbridge-development",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "private": true,
   "description": "Development-only analysis and browser verification for the DashBridge extension.",
   "scripts": {

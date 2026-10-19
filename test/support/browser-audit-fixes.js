@@ -77,6 +77,8 @@ module.exports = async function inspectAuditFixes(context, extensionId) {
         await batch.goto(`chrome-extension://${extensionId}/pages/batch/batch.html`);
         await inspectPanelRuleConflicts(context, extensionId);
         result.checks.push('two Batch editors merge unrelated panels and preserve drafts on conflicts');
+        await inspectLoadRuleRoundTrip(context, extensionId);
+        result.checks.push('all eight Load selections survive autosave and reload; legacy defaults and unrelated rules remain intact');
         const windowId = await batch.evaluate(async () => {
             const runner = createBatchCaptureWindowRunner();
             const first = await runner.acquire({ focused: false });
@@ -168,3 +170,67 @@ async function inspectPanelRuleConflicts(context, extensionId) {
     }
 }
 module.exports.inspectPanelRuleConflicts = inspectPanelRuleConflicts;
+
+async function inspectLoadRuleRoundTrip(context, extensionId) {
+    const page = await context.newPage();
+    const url = 'https://batch-load.test/d/round-trip?orgId=1';
+    const fields = ['cpuCapacityFilterLoad1', 'cpuCapacityFilterLoad5', 'cpuCapacityFilterLoad15'];
+    const open = async () => {
+        await page.goto(`chrome-extension://${extensionId}/pages/batch/batch.html`);
+        await page.locator('#dashUrl').fill(url);
+        await page.locator('#dashUrl').press('Tab');
+        await page.locator('#batchPanelRulesStatus').filter({ hasText: 'Загружено' }).waitFor();
+    };
+    const legacy = { cpuCapacityFilterEnabled: true, cpuCapacityFilterCoefficient: 0.65,
+        cpuCapacityFilterMode: 'last', cpuCapacityFilterHighlightEnabled: false,
+        invertIdle: true, thresholdEnabled: true, thresholdValue: 75 };
+    try {
+        await page.goto(`chrome-extension://${extensionId}/pages/batch/batch.html`);
+        await page.evaluate(({ url, legacy }) => window.BatchPanelRules.save(url, {
+            1: legacy, 2: { convertMemToUsed: true, removeFill: true },
+        }), { url, legacy });
+        await open();
+        const row = page.locator('.batch-panel-rule').first();
+        const field = name => row.locator(`[data-rule-field="${name}"]`);
+        for (const [index, name] of fields.entries()) {
+            assert.equal(await field(name).isChecked(), index === 0, 'legacy rule defaults to Load 1m only');
+        }
+        const baseline = await page.evaluate(url => window.BatchPanelRules.load(url), url);
+        // Start with only 5m: the original bug silently re-enabled 1m on this save.
+        for (const mask of [2, 4, 0, 1, 3, 5, 6, 7]) {
+            const selected = fields.map((_, index) => Boolean(mask & (1 << index)));
+            for (const [index, name] of fields.entries()) await field(name).setChecked(selected[index]);
+            // Ensure an actual save even when a selection happens to be unchanged.
+            await field('cpuCapacityFilterCoefficient').fill(String(0.5 + mask / 100));
+            await page.locator('#batchPanelRulesStatus').filter({ hasText: 'Сохранено' }).waitFor();
+            const saved = await page.evaluate(url => window.BatchPanelRules.load(url), url);
+            const actual = fields.map((name, index) => index === 0 ? saved[1][name] !== false : saved[1][name] === true);
+            assert.deepEqual(actual, selected, `stored Load selection for mask ${mask}`);
+            const expected = { ...baseline[1], cpuCapacityFilterCoefficient: 0.5 + mask / 100 };
+            fields.forEach((name, index) => {
+                delete expected[name];
+                if (index === 0 || selected[index]) expected[name] = selected[index];
+            });
+            assert.deepEqual(saved[1], expected, 'other filter, threshold and CPU settings must survive');
+            assert.deepEqual(saved[2], baseline[2], 'another panel and its RAM transform must survive');
+            assert.deepEqual(await page.evaluate(url => {
+                const rule = window.BatchPanelRules.forPanel;
+                return window.BatchPanelRules.load(url).then(rules => rule(rules, 1));
+            }, url), { ...saved[1], targetPanelId: '1' }, 'capture consumer receives the saved selection');
+            await open();
+            for (const [index, name] of fields.entries()) {
+                assert.equal(await field(name).isChecked(), selected[index], `reloaded ${name}, mask ${mask}`);
+            }
+        }
+        await field('seriesQueryFilterEnabled').check();
+        await page.locator('#batchPanelRulesStatus').filter({ hasText: 'Сохранено' }).waitFor();
+        await open();
+        assert.equal(await field('cpuCapacityFilterEnabled').isChecked(), false, 'series filter still excludes vCPU filter');
+        const saved = await page.evaluate(url => window.BatchPanelRules.load(url), url);
+        assert.equal(saved[1].seriesQueryFilterEnabled, true);
+        for (const name of fields) assert.equal(saved[1][name], undefined, 'disabled capacity fields remain absent');
+    } finally {
+        await page.close();
+    }
+}
+module.exports.inspectLoadRuleRoundTrip = inspectLoadRuleRoundTrip;
